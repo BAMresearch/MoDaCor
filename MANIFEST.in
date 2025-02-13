@@ -1,0 +1,19 @@
+graft docs
+exclude docs/reference/autosummary/*
+graft src
+graft ci
+graft tests
+
+include .editorconfig
+include .pre-commit-config.yaml
+include .cookiecutterrc
+include tox.ini
+
+include AUTHORS.rst
+include CHANGELOG.md
+include CONTRIBUTING.rst
+include LICENSE
+include README.rst
+
+global-exclude *.py[cod] __pycache__/* *.so *.dylib .DS_Store */.ipynb_checkpoints/*
+recursive-include templates *.j2

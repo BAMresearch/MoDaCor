@@ -1,0 +1,93 @@
+[project]
+name = "modacor"
+description = "new modular data corrections for any neutron or xray technique that produces 1D or 2D scattering/diffraction/imaging data"
+dynamic = ["version", "readme"]
+license = {text = "MIT license"}
+classifiers = [
+  # complete classifier list: http://pypi.python.org/pypi?%3Aaction=list_classifiers
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: Unix",
+  "Operating System :: POSIX",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Framework :: Jupyter :: JupyterLab",
+  "Topic :: Utilities",
+  "Topic :: Scientific/Engineering",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+]
+
+[[project.authors]]
+name = "Brian R. Pauw"
+email = "brian.pauw@bam.de"
+
+[[project.authors]]
+name = "Tim Snow"
+email = "tim.snow@diamond.ac.uk"
+
+[[project.authors]]
+name = "Ingo Breßler"
+email = "ingo.bressler@bam.de"
+
+[project.urls]
+homepage = "https://BAMresearch.github.io/modacor"
+documentation = "https://BAMresearch.github.io/modacor"
+repository = "https://github.com/BAMresearch/modacor"
+changelog = "https://BAMresearch.github.io/modacor/changelog.html"
+
+[build-system]
+requires = [
+    "setuptools>=40.6",
+    "wheel",
+]
+# check-manifest checks that, https://github.com/mgedmin/check-manifest/commit/c9df78
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["modacor*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "modacor.__version__"}
+readme = {file = ["README.rst", "CHANGELOG.md"]}
+
+[tool.coverage.report]
+path = "coverage-report"
+
+# on version numbers: https://peps.python.org/pep-0440/
+# and bottom of https://softwareengineering.stackexchange.com/a/151558
+[tool.semantic_release]
+#major_on_zero = false # no major release when current major version is zero
+version_variables = [                        # version location
+    "src/modacor/__init__.py:__version__",
+    "docs/conf.py:version",
+]
+[tool.semantic_release.commit_parser_options]
+allowed_tags = ["build", "chore", "ci", "docs", "feat", "enh", "fix", "perf", "style", "refactor", "test"]
+minor_tags = ["feat", "enh"]
+patch_tags = ["fix", "perf"]
+[tool.semantic_release.changelog]
+exclude_commit_patterns = ["chore", ".*\\bGHA\\b.*", ".*\\b[gG][hH] actions?\\b.*"]
+[tool.semantic_release.publish]
+upload_to_vcs_release = false
+
+[tool.black]
+line-length = 100
+preview = true
+
+[tool.isort]
+profile = "black"
+line_length = 100
+group_by_package = true
+known_first_party = "modacor"
+ensure_newline_before_comments = true
+extend_skip = ["ci/templates", ".ipynb_checkpoints"]

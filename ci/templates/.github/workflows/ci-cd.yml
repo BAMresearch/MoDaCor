@@ -1,0 +1,90 @@
+name: CI-CD
+
+# Controls when the action will run.
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  # check if everything works first
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  # make a new version next, release or prerelease
+  release:
+    needs: [tests]
+    uses: ./.github/workflows/release.yml
+
+  build:
+    needs: [release, tests]  # build only if all tests are successful
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  docs:
+    needs: [release]  # get (release) version number first
+    uses: ./.github/workflows/docs.yml
+
+  coverage:
+    needs: [tests, docs]  # coverage report is added to the docs webpage
+    uses: ./.github/workflows/coverage.yml
+
+{#- Some Jinja macros for reusing recurring workflow job steps -#}
+
+{%- macro checkout(depth=1) -%}
+      - name: Checking out the repo
+        uses: actions/checkout@v4
+        {%- if depth != 1 +%}
+        with:
+          fetch-depth: {{ depth }}
+        {%- endif -%}
+{%- endmacro -%}
+
+{%- macro setup_python(arch, py=py_ver, req=['ci/requirements.txt']) -%}
+      # see *py_ver* in ci/update.py
+      - name: Setting up Python {{ py }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '{{ py }}'
+          {% if arch %}
+          architecture: '{{ arch }}'
+          {% endif %}
+          cache: pip
+          cache-dependency-path: |
+          {%- for fn in req +%}
+            {{ fn }}
+          {%- endfor -%}
+{%- endmacro -%}
+
+{% macro conda_activate() -%}
+          [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
+{%- endmacro -%}
+
+{% macro pip_install_req() -%}
+      - name: Install dependencies
+        shell: sh
+        run: |
+          {{ conda_activate() }}
+          python -m pip install --upgrade pip
+          python -m pip install --progress-bar=off -r ci/requirements.txt
+{%- endmacro -%}
+
+{% macro sys_install_req() -%}
+      - name: Install required system packages
+        shell: sh
+        run: |
+          PLATFORM="$(echo "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')"
+          REQFN="ci/requirements_$PLATFORM.txt"
+          if [ "$PLATFORM" = "linux" ] && [ -f "$REQFN" ]; then
+            sudo apt-get -y install $(sed -e '/^\s*#/d' "$REQFN")
+          elif [ "$PLATFORM" = "windows" ] && [ -f "$REQFN" ]; then
+            choco install $(sed -e '/^\s*#/d' "$REQFN")
+          else
+            echo "macro sys_install_req(): platform '$PLATFORM' not implemented yet."
+          fi
+{%- endmacro +%}

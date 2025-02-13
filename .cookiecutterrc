@@ -1,0 +1,29 @@
+# This file exists so you can easily regenerate your project.
+# run:
+#  (cd ..; cookiecutter -f --config-file=modacor/.cookiecutterrc gh:BAMresearch/yapy-cookiecutter)
+# or without answering questions:
+#  (cd ..; cookiecutter -f --no-input --config-file=modacor/.cookiecutterrc gh:BAMresearch/yapy-cookiecutter)
+
+default_context:
+    author_count:              '3'
+    full_names:                'Brian R. Pauw, Tim Snow, Ingo Breßler'
+    emails:                    'brian.pauw@bam.de, tim.snow@diamond.ac.uk, ingo.bressler@bam.de'
+    websites:                  'https://lookingatnothing.com, https://www.diamond.ac.uk/Instruments/Soft-Condensed-Matter/small-angle/I22/Staff/Tim-Snow.html,'
+    project_name:              'MoDaCor'
+    repo_name:                 'modacor'
+    repo_hosting:              'github.com'
+    repo_hosting_domain:       'github.com'
+    repo_userorg:              'BAMresearch'
+    docs_url:                  'https://BAMresearch.github.io/modacor'
+    repo_main_branch:          'main'
+    package_name:              'modacor'
+    distribution_name:         'modacor'
+    project_short_description: 'new modular data corrections for any neutron or xray technique that produces 1D or 2D scattering/diffraction/imaging data'
+    release_date:              'today'
+    year_from:                 '2025'
+    year_to:                   '2025'
+    version:                   '0.1.0'
+    pypi_host:                 'test.pypi.org'
+    license:                   'MIT license'
+    sphinx_theme:              'furo'
+    extra_context:             {'exclude_existing': "['AUTHORS.rst', 'CHANGELOG.md', 'src/modacor/__init__.py']"}

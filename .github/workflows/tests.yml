@@ -1,0 +1,88 @@
+name: Tests
+
+# Controls when the action will run.
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+  workflow_call:
+
+jobs:
+  # defining this job separately allows to refer to it later as job.needs dependency
+  tests:
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python_arch: ['x64']
+        python:
+          - [3, 12]
+        # os: ['ubuntu', 'windows', 'macos']
+        os: ['ubuntu']
+    env:
+      PYTHON: ${{ join(matrix.python, '.') }}  # e.g. '3.11'
+      TOX_ENV: ${{ format('{0}{1}', 'py', join(matrix.python, '')) }}  # e.g. 'py311'
+    runs-on: ${{ format('{0}-latest', matrix.os) }}
+    name: "Test py-${{ join(matrix.python, '.') }} (${{ matrix.os }})"
+    steps:
+
+      - name: Checking out the repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # see *py_ver* in ci/update.py
+      - name: Setting up Python ${{ env.PYTHON }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '${{ env.PYTHON }}'
+          architecture: '${{ matrix.python_arch }}'
+          cache: pip
+          cache-dependency-path: |
+            ci/requirements.txt
+            tests/requirements.txt
+
+      - name: Install required system packages
+        shell: sh
+        run: |
+          PLATFORM="$(echo "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')"
+          REQFN="ci/requirements_$PLATFORM.txt"
+          if [ "$PLATFORM" = "linux" ] && [ -f "$REQFN" ]; then
+            sudo apt-get -y install $(sed -e '/^\s*#/d' "$REQFN")
+          elif [ "$PLATFORM" = "windows" ] && [ -f "$REQFN" ]; then
+            choco install $(sed -e '/^\s*#/d' "$REQFN")
+          else
+            echo "macro sys_install_req(): platform '$PLATFORM' not implemented yet."
+          fi
+
+      - name: Install dependencies
+        shell: sh
+        run: |
+          [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
+          python -m pip install --upgrade pip
+          python -m pip install --progress-bar=off -r ci/requirements.txt
+
+      - name: Show installed package details
+        shell: sh
+        run: |
+          [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
+          virtualenv --version
+          pip --version
+          tox --version
+          pip list --format=freeze
+
+      - name: Run tests
+        shell: sh
+        run: |
+          [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
+          tox -e ${{ env.TOX_ENV }} -v
+
+      - name: Rename coverage data uniquely
+        shell: sh
+        run: mv .coverage coverage.${{ env.TOX_ENV }}.${{ matrix.os }}
+
+      - name: Upload coverage data for next step
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.*
