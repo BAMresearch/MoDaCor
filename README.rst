@@ -15,8 +15,8 @@ data
     :target: https://test.pypi.org/project/modacor
     :alt: PyPI Package latest release
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/BAMresearch/modacor/v0.1.0.svg
-    :target: https://github.com/BAMresearch/modacor/compare/v0.1.0...main
+.. |commits-since| image:: https://img.shields.io/github/commits-since/BAMresearch/modacor/v0.0.0.svg
+    :target: https://github.com/BAMresearch/modacor/compare/v0.0.0...main
     :alt: Commits since latest release
 
 .. |license| image:: https://img.shields.io/pypi/l/modacor.svg

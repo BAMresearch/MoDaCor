@@ -32,7 +32,7 @@ project = "MoDaCor"
 year = "2025"
 author = "Brian R. Pauw, Tim Snow and Ingo Breßler"
 copyright = "{0}, {1}".format(year, author)
-version = "0.1.0"
+version = "0.0.0"
 release = version
 commit_id = None
 try:
