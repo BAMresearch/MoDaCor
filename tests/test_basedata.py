@@ -1,7 +1,7 @@
 import pytest
 import xarray as xr
 import pint
-import tiled.client  # assuming this is available from the Bluesky ecosystem
+import tiled.client  # not sure what the class of tiled.client is...
 from modacor.dataclasses.basedata import BaseData  # adjust the import path as needed
 from modacor.dataclasses.processstep import ProcessStep  # adjust the import path as needed
 

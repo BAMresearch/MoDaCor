@@ -16,17 +16,17 @@ NXCite = str
 
 
 def validate_required_keys(instance, attribute, value):
-    keys = [key.strip() for key in value.keys()]
-    missing = [key for key in keys if key not in instance.calling_data]
+    # keys = [key.strip() for key in value.keys()]
+    keys = [key.strip() for key in instance.required_data_keys]
+    missing = [key for key in keys if key not in instance.calling_arguments]
     if missing:
-        raise ValueError(f"Missing required data keys in calling_data: {missing}")
+        raise ValueError(f"Missing required data keys in calling_arguments: {missing}")
 
 
 @define
 class ProcessStep:
     calling_name: str = field()  # short name to identify the calling process for the UI
     calling_id: str = field()  # not sure what we were planning here. some UID perhaps? difference with calling_module
-    # input variables go here: 
     calling_module_path: Path = field(validator=v.instance_of(Path))  # partial path to the module from src/modacor/modules onwards
     calling_version: str = field()  # module version being executed
     required_data_keys: List[str] = field(factory=list)  # list of data keys required by the process
