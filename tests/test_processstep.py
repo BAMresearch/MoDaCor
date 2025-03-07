@@ -36,7 +36,7 @@ def test_full_instantiation():
         step_keywords=['test', 'full'],
         step_doc="Test full instantiation",
         step_reference="doi: 10.1234/5678",
-        note="I am a note.",
+        step_note="I am a note.",
         # produced_values={},  # this is internally generated
         use_frames_cache=['fish'],
         use_overall_cache=['cake'],
@@ -62,7 +62,7 @@ def test_missing_required_input():
             step_keywords=['test', 'full'],
             step_doc="Test full instantiation",
             step_reference="doi: 10.1234/5678",
-            note="I am a note.",
+            step_note="I am a note.",
             # produced_values={},  # this is internally generated
             use_frames_cache=['fish'],
             use_overall_cache=['cake'],
@@ -84,7 +84,7 @@ def test_duration_calculation():
         step_keywords=['test', 'duration'],
         step_doc="Test duration calculation",
         step_reference="",
-        note=None,
+        step_note=None,
         produced_values={},
         use_frames_cache=[],
     )

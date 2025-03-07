@@ -34,7 +34,7 @@ class ProcessStep:
     step_keywords: List[str] = field(factory=list)  # list of keywords that can be used to identify the process (allowing for searches)
     step_doc: str = field(default="")  # documentation for the process
     step_reference: NXCite = field(default="")  # NXCite to the paper describing the process
-    note: Optional[str] = field(default=None)
+    step_note: Optional[str] = field(default=None)
     # if the process produces intermediate arrays, they are stored here, optionally cached
     produced_values: Dict[str, Any] = field(factory=dict)
     use_frames_cache: List[str] = field(factory=list)  # for produced_values dictionary key names in this list, the produced_values are cached on first run, and reused on subsequent runs. Maybe two chaches, one for per-file and one for per-execution. 
