@@ -66,6 +66,10 @@ https://BAMresearch.github.io/modacor
 Development
 ===========
 
+For coding contributions, we strongly recommend: 
+  - using flake8 and/or black for consistent formatting. 
+  - writing tests for every added functionality -> towards test-driven coding practices.
+
 To run all the tests run::
 
     tox
