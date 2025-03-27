@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, List
 
 from attrs import define, field
 from attrs import validators as v
-import logging
+# import logging
 
 from modacor.dataclasses.messagehandler import MessageHandler
 
@@ -21,6 +21,7 @@ def validate_required_keys(instance, attribute, value):
     missing = [key for key in keys if key not in instance.calling_arguments]
     if missing:
         raise ValueError(f"Missing required data keys in calling_arguments: {missing}")
+
 
 
 @define
@@ -39,25 +40,27 @@ class ProcessStep:
     produced_values: Dict[str, Any] = field(factory=dict)
     use_frames_cache: List[str] = field(factory=list)  # for produced_values dictionary key names in this list, the produced_values are cached on first run, and reused on subsequent runs. Maybe two chaches, one for per-file and one for per-execution. 
     use_overall_cache: List[str] = field(factory=list)  # for produced_values dictionary key names in this list, the produced_values are cached on first run, and reused on subsequent runs. Maybe two chaches, one for per-file and one for per-execution. 
-    start_time: Optional[datetime] = field(default=None)  # built-in profiling.... sort of. Will this do?
-    stop_time: Optional[datetime] = field(default=None)
+    # moved to ModuleExecution:
+    # start_time: Optional[datetime] = field(default=None)  # built-in profiling.... sort of. Will this do?
+    # stop_time: Optional[datetime] = field(default=None)  # built-in profiling.... sort of. Will this do?
     message_handler: MessageHandler = field(
         default=MessageHandler(),
         validator=v.instance_of(MessageHandler)
     )  # handler for the list of (logging?) messages emitted by the process during operation
     saved: dict = field(factory=dict)  # dictionary to store any data that needs to be saved in the output file. keys should be internal variable names, values should be HDF5 paths. 
 
-    def start(self):
-        self.start_time = datetime.now(tz=timezone.utc)
+    # moved to ModuleExecution
+    # def start(self):
+    #     self.start_time = datetime.now(tz=timezone.utc)
     
-    def stop(self):
-        self.stop_time = datetime.now(tz=timezone.utc)
+    # def stop(self):
+    #     self.stop_time = datetime.now(tz=timezone.utc)
     
-    @property
-    def duration(self) -> Optional[float]:
-        if self.start_time and self.stop_time:
-            return (self.stop_time - self.start_time).total_seconds()
-        return None
+    # @property
+    # def duration(self) -> Optional[float]:
+    #     if self.start_time and self.stop_time:
+    #         return (self.stop_time - self.start_time).total_seconds()
+    #     return None
     
     # # placeholders:
     # def can_execute(self) -> bool:
