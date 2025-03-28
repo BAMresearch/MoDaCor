@@ -61,13 +61,6 @@ class ProcessStepExecutor:
     def apply(self):
         pass
 
-    # # example:
-    # def apply(self):
-    #     self.start()
-    #     result = method(*self.args, **self.kwargs)
-    #     self.stop()
-    #     return result
-
 
 @define
 class ProcessStepDescriber:

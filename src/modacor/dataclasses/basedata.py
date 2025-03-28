@@ -42,6 +42,8 @@ class BaseData:
 
     # List of uncertainties represented as xarray DataArray objects; defaulting to an empty list
     uncertainties: List[da.Array] = field(factory=list, validator=[v.instance_of(list)])
+    # a brief description of where each uncertainty estimator came from 
+    uncertainties_origins: List[str] = field(factory=list, validator=[v.instance_of(list)])
 
     # Scalar multiplier and its uncertainty
     scalar: float = field(default=1.0, validator=v.instance_of(float), converter=float)

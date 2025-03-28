@@ -14,23 +14,24 @@ class PoissonUncertainty(ProcessStepExecutor):
         Check if the process can be applied to the given data.
         """
         # Check if the required data is available.. these checks should probably be abstracted and made generally available.
-        if (intensity_object := self.kwargs.get("I", None)) is None:
+        if (intensity_object := self.kwargs.get("Signal", None)) is None:
             self.message_handler.error(
-                "Signal ('I') data is required for PoissonUncertainty."
+                "Signal data is required for PoissonUncertainty."
             )
             return False
         if not (intensity_object.internal_units == ureg.counts):
             self.message_handler.error(
-                "Signal data ('I') should have units of counts."
+                "Signal data should have units of counts."
             )
             return False
 
         return True
 
-    @dask.delayed
     def apply(self):
-        intensity_object: BaseData = self.kwargs["I"]
-        intensity_object.uncertainties.append(
-            da.clip(intensity_object.internal_data, 1, da.inf)**0.5
+        # intensity_object: BaseData = self.kwargs["Signal"]
+        self.kwargs["Signal"].uncertainties += [
+            dask.delayed(
+                da.clip(self.kwargs["Signal"].internal_data, 1, da.inf)**0.5
             )
-        # self.message_handler.info("PoissonUncertainty applied successfully.")
+        ]
+        self.kwargs["Signal"].uncertainties_origins += ["PoissonUncertainty"] 
