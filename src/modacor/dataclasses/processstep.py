@@ -1,6 +1,7 @@
 # src/modacor/dataclasses/processstep.py
 # # -*- coding: utf-8 -*-
 from __future__ import annotations
+from abc import abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, List
@@ -23,9 +24,53 @@ def validate_required_keys(instance, attribute, value):
         raise ValueError(f"Missing required data keys in calling_arguments: {missing}")
 
 
+@define
+class ProcessStepExecutor:
+    """A base class defining a processing step"""
+    # we recommend using kwargs for all arguments, and using the required_data_keys to specify the required arguments
+    kwargs: dict = field(factory=dict, validator=v.instance_of(dict))
+    note: Optional[str] = field(default=None, validator=v.optional(v.instance_of(str)))
+    start_time: Optional[datetime] = field(default=None)  # built-in profiling.... sort of. Will this do?
+    stop_time: Optional[datetime] = field(default=None)  # built-in profiling.... sort of. Will this do?
+    # if the process produces intermediate arrays, they are stored here, optionally cached
+    produced_values: Dict[str, Any] = field(factory=dict)
+    # a message handler, supporting logging, warnings, errors, etc. emitted by the process during execution
+    message_handler: MessageHandler = field(
+        default=MessageHandler(),
+        validator=v.instance_of(MessageHandler)
+    )
+    saved: dict = field(factory=dict)  # dictionary to store any data that needs to be saved in the output file. keys should be internal variable names, values should be HDF5 paths. 
+
+    def start(self):
+        self.start_time = datetime.now(tz=timezone.utc)
+
+    def stop(self):
+        self.stop_time = datetime.now(tz=timezone.utc)
+
+    @property
+    def duration(self) -> Optional[float]:
+        if self.start_time and self.stop_time:
+            return (self.stop_time - self.start_time).total_seconds()
+        return None
+
+    @abstractmethod
+    def can_apply(self) -> bool:
+        pass
+
+    @abstractmethod
+    def apply(self):
+        pass
+
+    # # example:
+    # def apply(self):
+    #     self.start()
+    #     result = method(*self.args, **self.kwargs)
+    #     self.stop()
+    #     return result
+
 
 @define
-class ProcessStep:
+class ProcessStepDescriber:
     calling_name: str = field()  # short name to identify the calling process for the UI
     calling_id: str = field()  # not sure what we were planning here. some UID perhaps? difference with calling_module
     calling_module_path: Path = field(validator=v.instance_of(Path))  # partial path to the module from src/modacor/modules onwards
@@ -36,36 +81,5 @@ class ProcessStep:
     step_doc: str = field(default="")  # documentation for the process
     step_reference: NXCite = field(default="")  # NXCite to the paper describing the process
     step_note: Optional[str] = field(default=None)
-    # if the process produces intermediate arrays, they are stored here, optionally cached
-    produced_values: Dict[str, Any] = field(factory=dict)
     use_frames_cache: List[str] = field(factory=list)  # for produced_values dictionary key names in this list, the produced_values are cached on first run, and reused on subsequent runs. Maybe two chaches, one for per-file and one for per-execution. 
     use_overall_cache: List[str] = field(factory=list)  # for produced_values dictionary key names in this list, the produced_values are cached on first run, and reused on subsequent runs. Maybe two chaches, one for per-file and one for per-execution. 
-    # moved to ModuleExecution:
-    # start_time: Optional[datetime] = field(default=None)  # built-in profiling.... sort of. Will this do?
-    # stop_time: Optional[datetime] = field(default=None)  # built-in profiling.... sort of. Will this do?
-    message_handler: MessageHandler = field(
-        default=MessageHandler(),
-        validator=v.instance_of(MessageHandler)
-    )  # handler for the list of (logging?) messages emitted by the process during operation
-    saved: dict = field(factory=dict)  # dictionary to store any data that needs to be saved in the output file. keys should be internal variable names, values should be HDF5 paths. 
-
-    # moved to ModuleExecution
-    # def start(self):
-    #     self.start_time = datetime.now(tz=timezone.utc)
-    
-    # def stop(self):
-    #     self.stop_time = datetime.now(tz=timezone.utc)
-    
-    # @property
-    # def duration(self) -> Optional[float]:
-    #     if self.start_time and self.stop_time:
-    #         return (self.stop_time - self.start_time).total_seconds()
-    #     return None
-    
-    # # placeholders:
-    # def can_execute(self) -> bool:
-    #     return self.status == "pending" and all([key in self.calling_data for key in self.required_data_keys])
-
-    # def execute(self, data_to_correct: "BaseData", **kwargs) -> "BaseData":
-    #     if not self.can_execute():
-    #         raise ValueError("Process step cannot be executed at this time.")

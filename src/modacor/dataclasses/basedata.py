@@ -6,7 +6,7 @@ from typing import List, Optional, Union
 from attrs import define, field
 from attrs import validators as v
 import logging
-from .processstep import ProcessStep
+from .processstep import ProcessStepDescriber
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class BaseData:
     scalar_uncertainty: float = field(default=0.0, validator=v.instance_of(float), converter=float)
 
     # Provenance can be a list containing either ProcessStep or lists of ProcessStep
-    provenance: List[Union[ProcessStep, List[ProcessStep]]] = field(factory=list)
+    provenance: List[Union[ProcessStepDescriber, List[ProcessStepDescriber]]] = field(factory=list)
 
     # Rank of the data with custom validation:
     # Must be between 1 and 3 and not exceed the dimensionality of internal_data.
