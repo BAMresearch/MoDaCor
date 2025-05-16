@@ -1,5 +1,6 @@
 import tiled
 import tiled.client
+from tiled.client.array import DaskArrayClient
 import dask.array as da
 import pint
 from typing import List, Optional, Union
@@ -57,9 +58,13 @@ class BaseData:
     rank_of_data: int = field(default=1, validator=[v.instance_of(int), validate_rank_of_data])
 
     # Data source placeholder (e.g., a Tiled instance, such as tiled.client.from_uri("http://localhost:8000", "dask"))
-    data_source: Optional[tiled.client.container.Container] = field(
+    # data_source: Optional[tiled.client.container.Container] = field(
+    #     default=None, 
+    #     validator=[v.optional(v.instance_of(tiled.client.container.Container))]
+    #     )
+    data_source: Optional[DaskArrayClient] = field(
         default=None, 
-        validator=[v.optional(v.instance_of(tiled.client.container.Container))]
+        validator=[v.optional(v.instance_of(DaskArrayClient))]
         )
 
     @property

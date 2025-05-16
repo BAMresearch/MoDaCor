@@ -39,7 +39,7 @@ class PoissonUncertainty(ProcessStepExecutor):
         """
         return check_data_element_and_units(self.data, "Signal", pint.Unit("counts"), self.message_handler)
 
-    def apply(self):
+    def apply(self, **kwargs):
         # intensity_object: BaseData = self.kwargs["Signal"]
         # self.start() # this timing doesn't make a lot of sense with dask delayed
         self.data.data["Signal"].uncertainties += [
