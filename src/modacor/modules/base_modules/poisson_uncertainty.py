@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pint
 from modacor.dataclasses import ProcessStepExecutor, ProcessStepDescriber
-import dask
-import dask.array as da
+# import dask
+# import dask.array as da
 from modacor.dataclasses.validators import check_data_element_and_units
 
 
@@ -42,11 +42,11 @@ class PoissonUncertainty(ProcessStepExecutor):
     def apply(self, **kwargs):
         # intensity_object: BaseData = self.kwargs["Signal"]
         # self.start() # this timing doesn't make a lot of sense with dask delayed
-        self.data.data["Signal"].uncertainties += [
-            dask.delayed(
-                da.clip(self.data.data["Signal"].internal_data, 1, da.inf)**0.5
-            )
-        ]
+        # self.data.data["Signal"].uncertainties += [
+        #     dask.delayed(
+        #         da.clip(self.data.data["Signal"].internal_data, 1, da.inf)**0.5
+        #     )
+        # ]
         self.data.data["Signal"].uncertainties_origins += ["PoissonUncertainty"]
         self.data.provenance += [self.documentation] # should be enough to recreate?
         # self.stop()

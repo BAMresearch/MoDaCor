@@ -5,8 +5,6 @@ import pytest
 # import tiled.client  # not sure what the class of tiled.client is...
 from ..dataclasses.basedata import BaseData  # adjust the import path as needed
 
-# from modacor.dataclasses.processstep import ProcessStep  # adjust the import path as needed
-
 
 # Create a dummy client to use as the data_source
 class DummyClient:

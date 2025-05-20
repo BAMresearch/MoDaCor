@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from ..dataclasses.processstep import ProcessStep
+from ..dataclasses.process_step import ProcessStep
 
 
 # Dummy BaseData for testing execute() since ProcessStep.execute() requires it.

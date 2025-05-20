@@ -2,11 +2,9 @@
 name = "modacor"
 description = "new modular data corrections for any neutron or xray technique that produces 1D or 2D scattering/diffraction/imaging data"
 dynamic = ["version", "readme"]
-license = {text = "MIT license"}
 classifiers = [
   # complete classifier list: http://pypi.python.org/pypi?%3Aaction=list_classifiers
   "Development Status :: 3 - Alpha",
-  "License :: OSI Approved :: BSD 3-clause license",
   "Operating System :: Unix",
   "Operating System :: POSIX",
   "Operating System :: MacOS",

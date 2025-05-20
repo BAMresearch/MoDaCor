@@ -1,7 +1,7 @@
 from attrs import define, field, validators as v
 from typing import List, Union
 from .basedata import BaseData
-from .process_step import ProcessStepDescriber
+from .processstep import ProcessStepDescriber
 
 
 @define

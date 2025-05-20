@@ -1,25 +1,34 @@
 # src/modacor/dataclasses/validators.py
 # -*- coding: utf-8 -*-
-
 from __future__ import annotations
+
+from numbers import Integral
+from typing import Any
 
 import pint
 
-# from modacor.dataclasses.scatteringdata import DataBundle # Cyclic imports
-from modacor.dataclasses.messagehandler import MessageHandler
+from .databundle import DataBundle
+from .messagehandler import MessageHandler
+
+# from .scatteringdata import ScatteringData
+
+__all__ = [
+    "check_data_element_and_units",
+    "is_list_of_ints",
+]
 
 
-def is_list_of_ints(value):
+def is_list_of_ints(value: Any):
     """
     Check if the value is a list of integers.
     """
     if not isinstance(value, list):
         return False
-    return all(isinstance(i, int) for i in value)
+    return all(isinstance(i, Integral) for i in value)
 
 
 def check_data_element_and_units(
-    data,  # DataBundle
+    data: DataBundle,
     data_element_name: str,
     required_unit: pint.Unit,
     message_handler: MessageHandler,
@@ -27,8 +36,8 @@ def check_data_element_and_units(
     """
     Check that the required data element is present with the correct units in the DataBundle object.
     """
-    # Check if the required data is available...
-    # these checks should probably be abstracted and made generally available.
+    # Check if the required data is available.. these checks should probably be abstracted
+    # and made generally available.
     if (intensity_object := data.data.get(data_element_name, None)) is None:
         message_handler.error(f"{data_element_name} is required.")
         return False
