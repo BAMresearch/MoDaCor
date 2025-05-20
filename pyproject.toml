@@ -28,6 +28,7 @@ classifiers = [
 dependencies = [
    'pint',
    'numpy',
+   'attrs',
 ]
 
 [[project.authors]]

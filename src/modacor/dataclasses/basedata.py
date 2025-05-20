@@ -7,9 +7,11 @@ import numpy as np
 import pint
 from attrs import define, field
 from attrs import validators as v
-from tiled.client.array import DaskArrayClient
 
 from .processstep import ProcessStepDescriber
+
+# from tiled.client.array import DaskArrayClient
+
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +46,7 @@ class BaseData:
     raw_data: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
 
     # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
-    variances: Dict[str : np.ndarray] = field(factory=dict, validator=[v.instance_of(dict)])
+    variances: Dict[str, np.ndarray] = field(factory=dict, validator=[v.instance_of(dict)])
 
     # array with some normalization (exposure time, solid-angle ....)
     normalization: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
@@ -62,9 +64,7 @@ class BaseData:
     #     default=None,
     #     validator=[v.optional(v.instance_of(tiled.client.container.Container))]
     #     )
-    data_source: Optional[DaskArrayClient] = field(
-        default=None, validator=[v.optional(v.instance_of(DaskArrayClient))]
-    )
+    data_source: Optional = field(default=None)
 
     @property
     def mean(self) -> np.ndarray:
