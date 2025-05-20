@@ -3,7 +3,7 @@
 import logging
 from typing import Dict, List, Optional, Union
 
-import dask.array as da
+import numpy as np
 import pint
 from attrs import define, field
 from attrs import validators as v
@@ -41,13 +41,13 @@ class BaseData:
     display_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
 
     # Core data array stored as an xarray DataArray
-    raw_data: da.Array = field(factory=da.array, validator=[v.instance_of(da.Array)])
+    raw_data: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
 
     # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
-    variances: Dict[str : da.Array] = field(factory=dict, validator=[v.instance_of(dict)])
+    variances: Dict[str : np.ndarray] = field(factory=dict, validator=[v.instance_of(dict)])
 
     # array with some normalization (exposure time, solid-angle ....)
-    normalization: da.Array = field(factory=da.array, validator=[v.instance_of(da.Array)])
+    normalization: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
 
     # Provenance can be a list containing either ProcessStep or lists of ProcessStep
     provenance: List[Union[ProcessStepDescriber, List[ProcessStepDescriber]]] = field(factory=list)
@@ -67,35 +67,52 @@ class BaseData:
     )
 
     @property
-    def mean(self) -> da.Array:
+    def mean(self) -> np.ndarray:
         """
         Returns the raw_data array with the normalization applied.
         The result is cast to internal units.
         """
         return self.raw_data / self.normalization
 
-    def std(self, kind) -> da.Array:
+    def std(self, kind) -> np.ndarray:
         """
         Returns the uncertainties, i.e. standard deviation
         The result is cast to internal units.
         """
-        return da.sqrt(self.variances[kind] / self.normalization)
+        return np.sqrt(self.variances[kind] / self.normalization)
 
-    def sem(self, kind) -> da.Array:
+    def sem(self, kind) -> np.ndarray:
         """
         Returns the uncertainties, i.e. standard deviation
         The result is cast to internal units.
         """
-        return da.sqrt(self.variances[kind]) / self.normalization
+        return np.sqrt(self.variances[kind]) / self.normalization
 
     @property
     def _unit_scale(self, display_units) -> float:
         return (1 * self.internal_units).to(display_units).magnitude
 
     @property
-    def display_data(self) -> da.Array:
+    def display_data(self) -> np.ndarray:
         """
         Returns the internal_data array with the scalar applied and converted
         to display units using Pint's unit conversion.
         """
         return self._unit_scale(self.display_units) * self.raw_data / self.normalization
+
+    @property
+    def mask(self) -> np.ndarray:
+        """calculate the mask for the array"""
+        return self.normalization == 0
+
+    @mask.setter
+    def mask(self, value):
+        """Apply a mask to the data"""
+        idx = np.where(value)
+        self.raw_data[idx] = 0
+        self.normalization[idx] = 0
+        for var in self.variances.values():
+            var[idx] = 0
+
+    def add_poisson_noise(self):
+        self.varinces["poisson"] = np.random.poisson(self.raw_data)
