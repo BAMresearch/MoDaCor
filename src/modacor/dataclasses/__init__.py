@@ -1,5 +1,7 @@
 from .basedata import BaseData
-from .process_step import ProcessStepDescriber, ProcessStep
+
+from .process_step import ProcessStep
 from .scatteringdata import ScatteringData
-# from .moduleexecution import ModuleExecution
+from .process_step_describer import ProcessStepDescriber
+
 from .. import ureg, Q_

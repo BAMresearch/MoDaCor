@@ -5,8 +5,8 @@ dynamic = ["version", "readme"]
 license = {text = "MIT license"}
 classifiers = [
   # complete classifier list: http://pypi.python.org/pypi?%3Aaction=list_classifiers
-  "Development Status :: 4 - Beta",
-  "License :: OSI Approved :: MIT License",
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: BSD 3-clause license",
   "Operating System :: Unix",
   "Operating System :: POSIX",
   "Operating System :: MacOS",
@@ -14,10 +14,9 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: Implementation :: CPython",
   "Framework :: Jupyter :: JupyterLab",
   "Topic :: Utilities",
