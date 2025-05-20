@@ -3,7 +3,7 @@ import tiled.client
 from tiled.client.array import DaskArrayClient
 import dask.array as da
 import pint
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 from attrs import define, field
 from attrs import validators as v
 import logging
@@ -39,16 +39,13 @@ class BaseData:
     display_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
 
     # Core data array stored as an xarray DataArray
-    internal_data: da.Array = field(factory=da.array, validator=[v.instance_of(da.Array)])
+    raw_data: da.Array = field(factory=da.array, validator=[v.instance_of(da.Array)])
 
-    # List of uncertainties represented as xarray DataArray objects; defaulting to an empty list
-    uncertainties: List[da.Array] = field(factory=list, validator=[v.instance_of(list)])
-    # a brief description of where each uncertainty estimator came from 
-    uncertainties_origins: List[str] = field(factory=list, validator=[v.instance_of(list)])
+    # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
+    variances: Dict[str : da.Array] = field(factory=dict, validator=[v.instance_of(dict)])
 
-    # Scalar multiplier and its uncertainty
-    scalar: float = field(default=1.0, validator=v.instance_of(float), converter=float)
-    scalar_uncertainty: float = field(default=0.0, validator=v.instance_of(float), converter=float)
+    # array with some normalization (exposure time, solid-angle ....)
+    normalization: da.Array = field(factory=da.array, validator=[v.instance_of(da.Array)])
 
     # Provenance can be a list containing either ProcessStep or lists of ProcessStep
     provenance: List[Union[ProcessStepDescriber, List[ProcessStepDescriber]]] = field(factory=list)
@@ -68,17 +65,30 @@ class BaseData:
         )
 
     @property
-    def data(self) -> da.Array:
+    def mean(self) -> da.Array:
         """
-        Returns the internal_data array with the scalar applied.
+        Returns the raw_data array with the normalization applied.
         The result is cast to internal units.
         """
-        as_quantity = False
-        # Here, scalar multiplication is applied element-wise.
-        if not as_quantity:
-            return self.internal_data * self.scalar
-        else:
-            return Q_(self.internal_data * self.scalar, self.internal_units)
+        return self.raw_data / self.normalization
+
+    def std(self, kind) -> da.Array:
+        """
+        Returns the uncertainties, i.e. standard deviation
+        The result is cast to internal units.
+        """
+        return da.sqrt(self.variances[kind] / self.normalization)
+
+    def std(self, kind) -> da.Array:
+        """
+        Returns the uncertainties, i.e. standard deviation
+        The result is cast to internal units.
+        """
+        return da.sqrt(self.variances[kind]) / self.normalization
+
+    @property
+    def _unit_scale(self, display_units) -> float:
+        return (1 * self.internal_units).to(display_units).magnitude
 
     @property
     def display_data(self) -> da.Array:
@@ -86,13 +96,4 @@ class BaseData:
         Returns the internal_data array with the scalar applied and converted
         to display units using Pint's unit conversion.
         """
-        as_quantity = False
-        # calculate the conversion factor:
-        if not as_quantity:
-            return (
-                self.internal_data
-                * self.scalar
-                * (1 * self.internal_units).to(self.display_units).magnitude
-            )
-        else:
-            return Q_(self.internal_data * self.scalar, self.internal_units).to(self.display_units)
+        return self._unit_scale(self.display_units) * self.raw_data / self.normalization 
