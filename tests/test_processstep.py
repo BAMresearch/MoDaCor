@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from modacor.dataclasses.processstep import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep
 
 
 # Dummy BaseData for testing execute() since ProcessStep.execute() requires it.

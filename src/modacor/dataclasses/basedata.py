@@ -7,7 +7,7 @@ from typing import List, Optional, Union
 from attrs import define, field
 from attrs import validators as v
 import logging
-from .processstep import ProcessStepDescriber
+from .process_step import ProcessStepDescriber
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class BaseData:
 
     # List of uncertainties represented as xarray DataArray objects; defaulting to an empty list
     uncertainties: List[da.Array] = field(factory=list, validator=[v.instance_of(list)])
-    # a brief description of where each uncertainty estimator came from 
+    # a brief description of where each uncertainty estimator came from
     uncertainties_origins: List[str] = field(factory=list, validator=[v.instance_of(list)])
 
     # Scalar multiplier and its uncertainty
@@ -59,11 +59,11 @@ class BaseData:
 
     # Data source placeholder (e.g., a Tiled instance, such as tiled.client.from_uri("http://localhost:8000", "dask"))
     # data_source: Optional[tiled.client.container.Container] = field(
-    #     default=None, 
+    #     default=None,
     #     validator=[v.optional(v.instance_of(tiled.client.container.Container))]
     #     )
     data_source: Optional[DaskArrayClient] = field(
-        default=None, 
+        default=None,
         validator=[v.optional(v.instance_of(DaskArrayClient))]
         )
 

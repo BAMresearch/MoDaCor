@@ -1,7 +1,17 @@
 # src/modacor/dataclasses/validators.py
 # -*- coding: utf-8 -*-
 
+
+__all__ = [
+    "check_data_element_and_units",
+    "is_list_of_ints",
+]
+
 from __future__ import annotations
+
+from numbers import Integral
+from typing import Any
+
 from modacor.dataclasses import ScatteringData
 from modacor.dataclasses.messagehandler import MessageHandler
 import pint
@@ -29,3 +39,12 @@ def check_data_element_and_units(
         return False
 
     return True
+
+
+def is_list_of_ints(input: Any) -> bool:
+    """
+    Check if the input is a list of integers.
+    """
+    if not isinstance(input, list):
+        return False
+    return all([isinstance(item, Integral) for item in input])
