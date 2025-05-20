@@ -1,12 +1,14 @@
-import tiled
-import tiled.client
-from tiled.client.array import DaskArrayClient
+# import tiled
+# import tiled.client
+import logging
+from typing import Dict, List, Optional, Union
+
 import dask.array as da
 import pint
-from typing import List, Optional, Union, Dict
 from attrs import define, field
 from attrs import validators as v
-import logging
+from tiled.client.array import DaskArrayClient
+
 from .processstep import ProcessStepDescriber
 
 logger = logging.getLogger(__name__)
@@ -54,15 +56,15 @@ class BaseData:
     # Must be between 1 and 3 and not exceed the dimensionality of internal_data.
     rank_of_data: int = field(default=1, validator=[v.instance_of(int), validate_rank_of_data])
 
-    # Data source placeholder (e.g., a Tiled instance, such as tiled.client.from_uri("http://localhost:8000", "dask"))
+    # Data source placeholder (e.g., a Tiled instance, such as
+    # tiled.client.from_uri("http://localhost:8000", "dask"))
     # data_source: Optional[tiled.client.container.Container] = field(
-    #     default=None, 
+    #     default=None,
     #     validator=[v.optional(v.instance_of(tiled.client.container.Container))]
     #     )
     data_source: Optional[DaskArrayClient] = field(
-        default=None, 
-        validator=[v.optional(v.instance_of(DaskArrayClient))]
-        )
+        default=None, validator=[v.optional(v.instance_of(DaskArrayClient))]
+    )
 
     @property
     def mean(self) -> da.Array:
@@ -79,7 +81,7 @@ class BaseData:
         """
         return da.sqrt(self.variances[kind] / self.normalization)
 
-    def std(self, kind) -> da.Array:
+    def sem(self, kind) -> da.Array:
         """
         Returns the uncertainties, i.e. standard deviation
         The result is cast to internal units.
@@ -96,4 +98,4 @@ class BaseData:
         Returns the internal_data array with the scalar applied and converted
         to display units using Pint's unit conversion.
         """
-        return self._unit_scale(self.display_units) * self.raw_data / self.normalization 
+        return self._unit_scale(self.display_units) * self.raw_data / self.normalization
