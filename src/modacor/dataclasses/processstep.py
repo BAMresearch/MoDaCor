@@ -52,35 +52,23 @@ class ProcessStepDescriber:
 
 
 @define
-class ProcessStepExecutor:
+class ProcessStep:
     """A base class defining a processing step"""
     # we recommend using kwargs for all arguments, and using the required_data_keys to specify the required arguments
     documentation: ProcessStepDescriber = field(validator=v.instance_of(ProcessStepDescriber), init=False)
-    data = field(validator=validate_required_data_keys)  # can't import ScatteringData here due to ciccular import
-    kwargs: dict = field(factory=dict, validator=v.instance_of(dict))
-    note: Optional[str] = field(default=None, validator=v.optional(v.instance_of(str)))
-    start_time: Optional[datetime] = field(default=None)  # built-in profiling.... sort of. Will this do?
-    stop_time: Optional[datetime] = field(default=None)  # built-in profiling.... sort of. Will this do?
+    # data = field(validator=validate_required_data_keys)  # can't import ScatteringData here due to ciccular import
+    configuration: dict = field(factory=dict, validator=v.instance_of(dict))
+    # note: Optional[str] = field(default=None, validator=v.optional(v.instance_of(str)))  # part of configuration
+    previous_steps: List[str] = field(factory=list, validator=v.instance_of(list))  # list of previous steps in the process
     # if the process produces intermediate arrays, they are stored here, optionally cached
-    produced_values: Dict[str, Any] = field(factory=dict)
+    produced_outputs: Dict[str, Any] = field(factory=dict)
     # a message handler, supporting logging, warnings, errors, etc. emitted by the process during execution
     message_handler: MessageHandler = field(
         default=MessageHandler(),
         validator=v.instance_of(MessageHandler)
     )
-    saved: dict = field(factory=dict)  # dictionary to store any data that needs to be saved in the output file. keys should be internal variable names, values should be HDF5 paths. 
-
-    def start(self):
-        self.start_time = datetime.now(tz=timezone.utc)
-
-    def stop(self):
-        self.stop_time = datetime.now(tz=timezone.utc)
-
-    @property
-    def duration(self) -> Optional[float]:
-        if self.start_time and self.stop_time:
-            return (self.stop_time - self.start_time).total_seconds()
-        return None
+    # the following will be in the configuration
+    # saved: dict = field(factory=dict)  # dictionary to store any data that needs to be saved in the output file. keys should be internal variable names, values should be HDF5 paths. 
 
     @abstractmethod
     def can_apply(self) -> bool:
@@ -89,4 +77,3 @@ class ProcessStepExecutor:
     @abstractmethod
     def apply(self):
         pass
-
