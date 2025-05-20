@@ -3,7 +3,7 @@ import xarray as xr
 import pint
 import tiled.client  # not sure what the class of tiled.client is...
 from modacor.dataclasses.basedata import BaseData  # adjust the import path as needed
-from modacor.dataclasses.processstep import ProcessStep  # adjust the import path as needed
+from modacor.dataclasses.process_step import ProcessStep  # adjust the import path as needed
 
 # Create a dummy client to use as the data_source
 class DummyClient:
@@ -32,12 +32,12 @@ def test_data_and_display_data_properties(ureg, sample_data):
         provenance=[],               # empty provenance
         rank_of_data=1               # valid since sample_data.ndim is 1
     )
-    
+
     # Test the 'data' property
     expected_data = sample_data * 2.0
     # Here we check that the computed values match the expected ones.
     assert (bd.data == expected_data).all(), "data property did not apply the scalar correctly."
-    
+
     # Test the 'display_data' property
     # The conversion from meters to centimeters yields a factor of 100.
     conversion_factor = (1 * ureg.Unit("m")).to("cm").magnitude  # should be 100.0
@@ -47,7 +47,7 @@ def test_data_and_display_data_properties(ureg, sample_data):
 def test_rank_validation_exceeds_ndim(ureg):
     # Create a 2D DataArray
     arr = xr.DataArray([[1, 2], [3, 4]])
-    
+
     # Attempting to set rank_of_data=3 (while arr.ndim is 2) should raise a ValueError.
     with pytest.raises(ValueError) as exc_info:
         BaseData(
