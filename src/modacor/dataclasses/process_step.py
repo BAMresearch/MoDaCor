@@ -12,22 +12,21 @@ from typing import Any
 from attrs import define, field
 from attrs import validators as v
 
-from modacor.dataclasses.databundle import DataBundle
-
-from modacor.dataclasses.messagehandler import MessageHandler
-from modacor.dataclasses.process_step_describer import ProcessStepDescriber
-from modacor.dataclasses.validators import is_list_of_ints
-from modacor.io.io_sources import IoSources
+from ..io.io_sources import IoSources
+from .databundle import DataBundle
+from .messagehandler import MessageHandler
+from .process_step_describer import ProcessStepDescriber
+from .validators import is_list_of_ints
 
 
 @define
 class ProcessStep:
     """A base class defining a processing step"""
 
-    io_sources : IoSources = field()
+    io_sources: IoSources = field()
 
     # class attribute for a machine-readable description of the process step
-    documentation: ProcessStepDescriber()
+    documentation: ProcessStepDescriber
 
     # dynamic instance configuration
     configuration: dict = field(factory=dict, validator=v.instance_of(dict))
@@ -40,7 +39,8 @@ class ProcessStep:
     # if the process produces intermediate arrays, they are stored here, optionally cached
     produced_outputs: dict[str, Any] = field(factory=dict)
 
-    # a message handler, supporting logging, warnings, errors, etc. emitted by the process during execution
+    # a message handler, supporting logging, warnings, errors, etc. emitted by the process
+    # during execution
     message_handler: MessageHandler = field(
         default=MessageHandler(), validator=v.instance_of(MessageHandler)
     )
