@@ -1,5 +1,0 @@
-sphinx>=1.3
-furo
-myst_parser
-toml
-numpy

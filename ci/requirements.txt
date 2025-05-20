@@ -7,6 +7,7 @@ build
 twine
 toml
 python-semantic-release
+jinja2
 # provides the *coverage* command to combine and publish coverage data
 # generated within tox environments
 pytest-cov
