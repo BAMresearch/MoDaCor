@@ -1,14 +1,14 @@
 # import tiled
 # import tiled.client
 import logging
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional  # , Union
 
 import numpy as np
 import pint
 from attrs import define, field
 from attrs import validators as v
 
-from .processstep import ProcessStepDescriber
+# from .processstep import ProcessStepDescriber
 
 # from tiled.client.array import DaskArrayClient
 
@@ -52,7 +52,7 @@ class BaseData:
     normalization: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
 
     # Provenance can be a list containing either ProcessStep or lists of ProcessStep
-    provenance: List[Union[ProcessStepDescriber, List[ProcessStepDescriber]]] = field(factory=list)
+    provenance: List = field(factory=list)
 
     # Rank of the data with custom validation:
     # Must be between 1 and 3 and not exceed the dimensionality of internal_data.

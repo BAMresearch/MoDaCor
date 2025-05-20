@@ -1,6 +1,8 @@
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import pytest
+
 from modacor.dataclasses.processstep import ProcessStep
 
 
@@ -31,16 +33,16 @@ def test_full_instantiation():
         calling_id="proc_002",
         calling_module_path=Path("src/modacor/modules/some_module.py"),
         calling_version="1.0",
-        required_data_keys=['fish', 'cake'],
-        calling_arguments={'fish': 'salmon', 'cake': 'chocolate'},
-        step_keywords=['test', 'full'],
+        required_data_keys=["fish", "cake"],
+        calling_arguments={"fish": "salmon", "cake": "chocolate"},
+        step_keywords=["test", "full"],
         step_doc="Test full instantiation",
         step_reference="doi: 10.1234/5678",
         step_note="I am a note.",
         # produced_values={},  # this is internally generated
-        use_frames_cache=['fish'],
-        use_overall_cache=['cake'],
-        saved={'cake': '/path/to/cake'},
+        use_frames_cache=["fish"],
+        use_overall_cache=["cake"],
+        saved={"cake": "/path/to/cake"},
     )
     ps.start()
     ps.stop()
@@ -51,22 +53,24 @@ def test_missing_required_input():
     """
     Test that a ProcessStep can be instantiated with all arguments.
     """
-    with pytest.raises(ValueError, match="Missing required data keys in calling_arguments: \['bread'\]"):
+    with pytest.raises(
+        ValueError, match=r"Missing required data keys in calling_arguments: ['bread']"
+    ):
         ProcessStep(
             calling_name="Test Process",
             calling_id="proc_002",
             calling_module_path=Path("src/modacor/modules/some_module.py"),
             calling_version="1.0",
-            required_data_keys=['fish', 'cake', 'bread'],
-            calling_arguments={'fish': 'salmon', 'cake': 'chocolate'},
-            step_keywords=['test', 'full'],
+            required_data_keys=["fish", "cake", "bread"],
+            calling_arguments={"fish": "salmon", "cake": "chocolate"},
+            step_keywords=["test", "full"],
             step_doc="Test full instantiation",
             step_reference="doi: 10.1234/5678",
             step_note="I am a note.",
             # produced_values={},  # this is internally generated
-            use_frames_cache=['fish'],
-            use_overall_cache=['cake'],
-            saved={'cake': '/path/to/cake'},
+            use_frames_cache=["fish"],
+            use_overall_cache=["cake"],
+            saved={"cake": "/path/to/cake"},
         )
 
 
@@ -81,7 +85,7 @@ def test_duration_calculation():
         calling_version="1.0",
         required_data_keys=[],
         calling_arguments={},
-        step_keywords=['test', 'duration'],
+        step_keywords=["test", "duration"],
         step_doc="Test duration calculation",
         step_reference="",
         step_note=None,
