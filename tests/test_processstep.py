@@ -51,7 +51,7 @@ def test_missing_required_input():
     """
     Test that a ProcessStep can be instantiated with all arguments.
     """
-    with pytest.raises(ValueError, match="Missing required data keys in calling_arguments: \['bread'\]"):
+    with pytest.raises(ValueError, match="Missing required data keys in calling_arguments: ['bread']"):
         ProcessStep(
             calling_name="Test Process",
             calling_id="proc_002",
