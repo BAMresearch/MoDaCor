@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from modacor.dataclasses.processstep import ProcessStep
+from ..dataclasses.processstep import ProcessStep
 
 
 # Dummy BaseData for testing execute() since ProcessStep.execute() requires it.
