@@ -5,12 +5,13 @@ toml
 sphinx>=1.3
 
 attrs
+dask
 entrypoints
 matplotlib
 numpy
 pint
 pytest
-staminaa
+stamina
 tiled
 tox
 xarray

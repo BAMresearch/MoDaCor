@@ -1,10 +1,11 @@
 attrs
+dask
 entrypoints
 matplotlib
 numpy
 pint
 pytest
-staminaa
+stamina
 tiled
 tox
 xarray
