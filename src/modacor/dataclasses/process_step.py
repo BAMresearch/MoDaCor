@@ -5,7 +5,6 @@ __all__ = ["ProcessStep"]
 __license__ = "BSD-3-Clause"
 
 
-from __future__ import annotations
 from abc import abstractmethod
 from numbers import Integral
 from typing import Any
@@ -13,7 +12,7 @@ from typing import Any
 from attrs import define, field
 from attrs import validators as v
 
-from modacor.dataclasses import ScatteringData
+from modacor.dataclasses.databundle import DataBundle
 
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
@@ -69,11 +68,11 @@ class ProcessStep:
         return True
 
     @abstractmethod
-    def calculate(self, data: ScatteringData, **kwargs: Any) -> dict[str, Any]:
+    def calculate(self, data: DataBundle, **kwargs: Any) -> dict[str, Any]:
         """Calculate the process step on the given data"""
         raise NotImplementedError("Subclasses must implement this method")
 
-    def execute(self, data: ScatteringData, **kwargs: Any) -> ScatteringData:
+    def execute(self, data: DataBundle, **kwargs: Any) -> DataBundle:
         """Execute the process step on the given data"""
         if not self.__prepared:
             self.prepare_execution()
