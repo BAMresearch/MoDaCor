@@ -50,7 +50,7 @@ class Pipeline(TopologicalSorter):
         run pipeline. to be extended for different schedulers
         """
         self.prepare()
-        while pipeline.is_active():
-            for node in pipeline.get_ready():
+        while self.is_active():
+            for node in self.get_ready():
                 node.execute(data, **kwargs)
-                pipeline.done(node)
+                self.done(node)
