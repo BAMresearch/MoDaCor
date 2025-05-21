@@ -13,7 +13,7 @@ class MessageHandler:
     Args:
         level (int): The logging level to use. Defaults to logging.INFO.
     """
-    def __init__(self, level: int = logging.INFO, name: str = 'MoDaCor' **kwargs):
+    def __init__(self, level: int = logging.INFO, name: str = 'MoDaCor', **kwargs):
         self.level = level
         self.name = name
 
