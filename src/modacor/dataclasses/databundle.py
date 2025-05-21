@@ -16,8 +16,7 @@ def validate_axes(instance, attribute, value):
     return True
 
 
-@define
-class DataBundle:
+class DataBundle(dict):
     """
     DataBundle is a specialized data class for storing related data.
     It contains a dictionary of BaseData data elements, for example Signal, 
@@ -26,14 +25,6 @@ class DataBundle:
 
     """
 
-    description: str = field(default="")
-    data: dict[str:BaseData] = field(factory=dict, validator=v.instance_of(dict))
+    description: str|None = None
     # as per NXcanSAS, matches the data dimensions to axes
-    axes: list[str] = field(factory=list, validator=[v.instance_of(list), validate_axes])
-
-    @property
-    def available_data_keys(self) -> List[str]:
-        """
-        Returns a list of available data keys in the DataBundle.
-        """
-        return list(self.data.keys())
+    default_plot: str|None = None

@@ -1,7 +1,7 @@
 # import tiled
 # import tiled.client
 import logging
-from typing import Dict, List
+from typing import Dict, List, Self
 
 import numpy as np
 import pint
@@ -60,8 +60,10 @@ class BaseData:
     provenance: List = field(factory=list)
 
     # Rank of the data with custom validation:
-    # Must be between 1 and 3 and not exceed the dimensionality of internal_data.
+    # Must be between 0 and 3 and not exceed the dimensionality of internal_data.
     rank_of_data: int = field(default=1, validator=[v.instance_of(int), validate_rank_of_data])
+
+    axes: List[Self | None] = field(factory=list, validator=[v.instance_of(list)])
 
     @property
     def mean(self) -> np.ndarray:
