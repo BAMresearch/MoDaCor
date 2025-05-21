@@ -1,7 +1,7 @@
 [project]
 name = "modacor"
 description = "new modular data corrections for any neutron or xray technique that produces 1D or 2D scattering/diffraction/imaging data"
-dynamic = ["version", "readme"]
+dynamic = ["version", "readme", "dependencies"]
 classifiers = [
   # complete classifier list: http://pypi.python.org/pypi?%3Aaction=list_classifiers
   "Development Status :: 3 - Alpha",
@@ -56,6 +56,7 @@ include = ["modacor*"]
 [tool.setuptools.dynamic]
 version = {attr = "modacor.__version__"}
 readme = {file = ["README.rst", "CHANGELOG.md"]}
+dependencies = {file = ["requirements.txt"]}
 
 [tool.coverage.report]
 path = "coverage-report"
