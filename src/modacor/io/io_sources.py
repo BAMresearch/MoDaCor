@@ -5,11 +5,10 @@ __license__ = "BSD-3-Clause"
 __all__ = ["IoSources"]
 
 
-from typing import Type, Any
+from typing import Any, Type
 
-from attrs import field
-
-from attrs import define
+import numpy as np
+from attrs import define, field
 
 from modacor.io.io_source import IoSource
 
@@ -17,7 +16,7 @@ from modacor.io.io_source import IoSource
 @define
 class IoSources:
 
-    source_registry: dict[str, Type] = field(factory=dict)
+    source_registry: dict[str, IoSource] = field(factory=dict)
 
     def register_source(self, source_reference: str, source: IoSource):
         """
@@ -50,10 +49,9 @@ class IoSources:
         IoSource :
             The source class associated with the provided name.
         """
-        source = self.source_registry.get(source_reference)
-        if source is None:
+        if source_reference not in self.source_registry:
             raise ValueError(f"Source {source_reference} not registered.")
-        return source
+        return self.source_registry[source_reference]
 
     def get_data(self, data_reference: str, index: int | tuple[int]) -> np.ndarray:
         """
@@ -97,4 +95,4 @@ class IoSources:
         """
         _source_ref, _data_key = data_reference.split("::", 1)
         _source = self.get_source(_source_ref)
-        return _source.get_statisc_metadata(_data_key)
+        return _source.get_static_metadata(_data_key)

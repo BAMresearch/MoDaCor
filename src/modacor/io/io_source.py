@@ -5,15 +5,17 @@ __license__ = "BSD-3-Clause"
 __all__ = ["IoSource"]
 
 
-from typing import Type, Any
+from typing import Any
 
-from attrs import field, define
+import numpy as np
+from attrs import define, field
 
 
 @define
 class IoSource:
     """
-    IoSource is a base class for all IO sources in the Modacor framework.
+    IoSource is a base class for all IO sources in the MoDaCor framework.
+
     It provides access to a specific IO source and its associated methods.
     """
 
