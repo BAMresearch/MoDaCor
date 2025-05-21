@@ -25,3 +25,46 @@
 __license__ = "BSD-3-Clause"
 __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
+
+from modacor.io.hdf.hdf_loader import *
+
+from os.path import abspath
+from logging import WARNING
+import numpy as np
+import h5py
+
+
+class TestHDFLoader(unittest.TestCase):
+    """Testing class for modacor/io/hdf/hdf_loader.py"""
+
+    def setUp(self):
+        self.test_hdf_loader = HDFLoader()
+        self.test_file_path = "tbd - some form of temp file"
+        self.test_dataset_name = "dataset"
+        self.test_dataset_shape = (10, 2)
+
+
+    def tearDown(self):
+        self.test_h5_loader = None
+        self.test_file_path = None
+        self.test_dataset_name = None
+        self.test_dataset_shape = None
+
+
+    def test_open_file(self):
+        absolute_test_file_path = abspath(self.test_file_path)
+        self.test_h5_loader._open_file(self.test_file_path)
+
+        self.assertEqual(absolute_test_file_path, self.test_h5_loader._file_path)
+        self.assertEqual(self.test_dataset_name, self.test_h5_loader._file_datasets[0])
+        self.assertEqual(self.test_dataset_shape, self.test_h5_loader._file_datasets_shapes[self.test_dataset_name])
+
+
+    def test_close_file(self):
+        self.test_open_file()
+        self.test_h5_loader._close_file()
+
+        self.assertEqual(None, self.test_h5_loader._file_path)
+        self.assertEqual(None, self.test_h5_loader._file_reference)
+        self.assertEqual([], self.test_h5_loader._file_datasets)
+        self.assertEqual({}, self.test_h5_loader._file_datasets_shapes)

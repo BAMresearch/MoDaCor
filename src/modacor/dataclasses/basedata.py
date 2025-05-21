@@ -50,10 +50,11 @@ class BaseData:
 
     # Scalers to put on the denominator, sparated from the array for distinct uncertainty
     normalization_factor: float = field(
-        default=1, validator=[v.instance_of(float), validate_rank_of_data]
+        factory=float, validator=[v.instance_of(float), validate_rank_of_data]
     )
+
     normalization_factor_variance: float = field(
-        validator=[v.instance_of(float), validate_rank_of_data]
+        factory=float, validator=[v.instance_of(float), validate_rank_of_data]
     )
 
     # Provenance can be a list containing either ProcessStep or lists of ProcessStep
@@ -63,7 +64,7 @@ class BaseData:
 
     # Rank of the data with custom validation:
     # Must be between 0 and 3 and not exceed the dimensionality of internal_data.
-    rank_of_data: int = field(default=1, validator=[v.instance_of(int), validate_rank_of_data])
+    rank_of_data: int = field(factory=int, validator=[v.instance_of(int), validate_rank_of_data])
 
     @property
     def mean(self) -> np.ndarray:
