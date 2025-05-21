@@ -13,26 +13,40 @@ class MessageHandler:
     Args:
         level (int): The logging level to use. Defaults to logging.INFO.
     """
-    def __init__(self, level: int = logging.INFO, **kwargs):
+    def __init__(self, level: int = logging.INFO, name: str = 'MoDaCor' **kwargs):
         self.level = level
+        self.name = name
 
-    def log(self, message: str, level: int = None):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(level)
+
+        self.consoleLogHandler = logging.StreamHandler()
+        self.consoleLogHandler.setLevel(level)
+
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.consoleLogHandler.setFormatter(formatter)
+        self.logger.addHandler(self.consoleLogHandler)
+
+    def log(self, message: str, level: int = None, name: str = None):
         if level is None:
             level = self.level
-        logger.log(level, message)
+
+        if name is None:
+            name = self.name
+        
+        self.logger(message, level=level, name=name)
 
     def info(self, message: str):
-        self.log(message, level=logging.INFO)
+        self.log(message, level=logging.INFO, name='MoDaCor')
 
     def warning(self, message: str):
-        self.log(message, level=logging.WARNING)
+        self.log(message, level=logging.WARNING, name='MoDaCor')
 
     def error(self, message: str):
-        self.log(message, level=logging.ERROR)
+        self.log(message, level=logging.ERROR, name='MoDaCor')
 
     def critical(self, message: str):
-        self.log(message, level=logging.CRITICAL)
+        self.log(message, level=logging.CRITICAL, name='MoDaCor')
     
     def debug(self, message: str):
-        self.log(message, level=logging.DEBUG)
-    
+        self.log(message, level=logging.DEBUG, name='MoDaCor')
