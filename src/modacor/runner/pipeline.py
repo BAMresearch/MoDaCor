@@ -29,3 +29,15 @@ class Pipeline(TopologicalSorter):
     @classmethod
     def from_dict(cls, graph_dict: dict, name=""):
         return cls(name=name, graph=graph_dict)
+
+    def add_branch(self, branch_graph: dict, branching_node):
+        """
+        add a pipeline as a branch on an existing pipeline, using the inherited add method
+
+        """
+        pipeline_to_add = Pipeline(graph=branch_graph)
+        pipeline_to_add_ordered = [*pipeline_to_add.static_order()]
+        self.add(branching_node, *pipeline_to_add_ordered)
+        self.graph = {**self.graph, **branch_graph}
+        self.graph[branching_node].update({pipeline_to_add_ordered[-1]})
+
