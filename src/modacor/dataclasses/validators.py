@@ -11,6 +11,7 @@ from .databundle import DataBundle
 from .messagehandler import MessageHandler
 
 # from .scatteringdata import ScatteringData
+_dummy_handler = MessageHandler()
 
 __all__ = [
     "check_data_element_and_units",
@@ -27,6 +28,27 @@ def is_list_of_ints(value: Any):
     return all(isinstance(i, Integral) for i in value)
 
 
+def check_data(
+    data: DataBundle,
+    data_element_name: str = None,
+    required_unit: pint.Unit = None,
+    message_handler: MessageHandler = _dummy_handler,
+) -> bool:
+    """
+    Check that the required data element is present in the DataBundle object.
+    """
+    if not isinstance(data, DataBundle):
+        return False
+    if data_element_name is not None:
+        if (intensity_object := data.data.get(data_element_name, None)) is None:
+            message_handler.error(f"{data_element_name} is required.")
+            return False
+        if not (intensity_object.internal_units == required_unit):
+            message_handler.error(f"{data_element_name} should have units of {required_unit}.")
+            return False
+    return True
+
+
 def check_data_element_and_units(
     data: DataBundle,
     data_element_name: str,
@@ -36,13 +58,4 @@ def check_data_element_and_units(
     """
     Check that the required data element is present with the correct units in the DataBundle object.
     """
-    # Check if the required data is available.. these checks should probably be abstracted
-    # and made generally available.
-    if (intensity_object := data.data.get(data_element_name, None)) is None:
-        message_handler.error(f"{data_element_name} is required.")
-        return False
-    if not (intensity_object.internal_units == required_unit):
-        message_handler.error(f"{data_element_name} should have units of {required_unit}.")
-        return False
-
-    return True
+    return check_data(data, data_element_name, required_unit, message_handler)
