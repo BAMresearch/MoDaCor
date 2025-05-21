@@ -5,13 +5,13 @@ toml
 sphinx>=1.3
 
 attrs
-dask
 entrypoints
 matplotlib
 numpy
+hdf5plugin
+h5py
 pint
 pytest
 stamina
-tiled
 tox
-xarray
+scipy
