@@ -15,8 +15,12 @@ __all__ = ["Pipeline"]
 
 @define
 class Pipeline(TopologicalSorter):
+    """
+    Pipeline nodes are assumed to be of type ProcessStep
+    """
+
     name: str = field(default="Unnamed Pipeline")
-    graph: dict = field(factory=dict)
+    graph: dict[ProcessStep] = field(factory=dict)
 
     def __attrs_post_init__(self):
         super().__init__(graph=self.graph)
@@ -41,3 +45,12 @@ class Pipeline(TopologicalSorter):
         self.graph = {**self.graph, **branch_graph}
         self.graph[branching_node].update({pipeline_to_add_ordered[-1]})
 
+    def run(self, data: DataBundle, **kwargs):
+        """
+        run pipeline. to be extended for different schedulers
+        """
+        self.prepare()
+        while pipeline.is_active():
+            for node in pipeline.get_ready():
+                node.execute(data, **kwargs)
+                pipeline.done(node)
