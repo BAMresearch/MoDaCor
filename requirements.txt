@@ -1,4 +1,5 @@
 attrs
+dask
 entrypoints
 matplotlib
 numpy
@@ -7,5 +8,6 @@ h5py
 pint
 pytest
 stamina
+tiled
 tox
 scipy

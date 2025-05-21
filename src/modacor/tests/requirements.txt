@@ -9,3 +9,4 @@ pytest
 stamina
 tox
 scipy
+uncertainties
