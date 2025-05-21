@@ -40,6 +40,7 @@ class BaseData:
     # Unit information using Pint units - required input (ingest, internal, and display)
     ingest_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
     internal_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
+    normalization_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
     display_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
 
     # Core data array stored as an xarray DataArray
