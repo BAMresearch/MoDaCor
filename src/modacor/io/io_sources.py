@@ -1,11 +1,34 @@
 # SPDX-License-Identifier: BSD-3-Clause
-
+# Copyright 2025 MoDaCor Authors
+#
+# Redistribution and use in source and binary forms, with or without modification,
+# are permitted provided that the following conditions are met:
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+# 3. Neither the name of the copyright holder nor the names of its contributors
+#    may be used to endorse or promote products derived from this software without
+#    specific prior written permission.
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 __license__ = "BSD-3-Clause"
+__copyright__ = "Copyright 2025 MoDaCor Authors"
+__status__ = "Alpha"
 __all__ = ["IoSources"]
 
 
-from typing import Any, Type
+from typing import Any
 
 import numpy as np
 from attrs import define, field
@@ -16,7 +39,7 @@ from modacor.io.io_source import IoSource
 @define
 class IoSources:
 
-    source_registry: dict[str, IoSource] = field(factory=dict)
+    defined_sources: dict[str, IoSource] = field(factory=dict)
 
     def register_source(self, source_reference: str, source: IoSource):
         """
@@ -26,14 +49,14 @@ class IoSources:
         ----------
         source_reference : str
             The reference name of the source to register.
-        source : Type
+        source : IoSource
             The class of the source to register.
         """
         if not isinstance(source_reference, str):
             raise TypeError("source_name must be a string")
         if not isinstance(source, IoSource):
             raise TypeError("source_class must be a subclass of IoSource")
-        self.source_registry[source_reference] = source
+        self.defined_sources[source_reference] = source
 
     def get_source(self, source_reference: str) -> IoSource:
         """
@@ -49,11 +72,11 @@ class IoSources:
         IoSource :
             The source class associated with the provided name.
         """
-        if source_reference not in self.source_registry:
+        if source_reference not in self.defined_sources:
             raise ValueError(f"Source {source_reference} not registered.")
-        return self.source_registry[source_reference]
+        return self.defined_sources[source_reference]
 
-    def get_data(self, data_reference: str, index: int | tuple[int]) -> np.ndarray:
+    def get_data(self, data_reference: str, index: int) -> np.ndarray:
         """
         Get data from the specified source using the provided data key.
 
@@ -64,8 +87,8 @@ class IoSources:
         ----------
         data_reference : str
             The reference name of the source to access.
-        index : int | tuple[int]
-            The index or indices to access the data.
+        index : int
+            The index to access the data.
 
         Returns
         -------
