@@ -31,7 +31,6 @@ import numpy as np
 import pytest
 
 from modacor.io import IoSources
-from modacor.io.io_registry import IoRegistry, register_as_io_source
 from modacor.io.io_source import IoSource
 
 data_shape = (20, 20)
