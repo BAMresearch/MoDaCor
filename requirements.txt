@@ -1,11 +1,13 @@
 attrs
+dask
 entrypoints
 matplotlib
 numpy
+hdf5plugin
+h5py
 pint
 pytest
 stamina
+tiled
 tox
 scipy
-h5py
-hdf5plugin

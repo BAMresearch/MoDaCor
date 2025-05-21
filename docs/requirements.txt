@@ -8,7 +8,10 @@ attrs
 entrypoints
 matplotlib
 numpy
+hdf5plugin
+h5py
 pint
 pytest
 stamina
 tox
+scipy
