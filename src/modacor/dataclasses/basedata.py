@@ -53,17 +53,17 @@ class BaseData:
         default=1, validator=[v.instance_of(float), validate_rank_of_data]
     )
     normalization_factor_variance: float = field(
-        validator=[v.instance_of(float), validate_rank_of_data]
+        default=0, validator=[v.instance_of(float), validate_rank_of_data]
     )
 
     # Provenance can be a list containing either ProcessStep or lists of ProcessStep
-    provenance: List = field(factory=list)
+    provenance: List = field(default=[])
 
     # Rank of the data with custom validation:
     # Must be between 0 and 3 and not exceed the dimensionality of internal_data.
     rank_of_data: int = field(default=1, validator=[v.instance_of(int), validate_rank_of_data])
 
-    axes: List[Self | None] = field(factory=list, validator=[v.instance_of(list)])
+    axes: List[Self | None] = field(default=None)
 
     @property
     def mean(self) -> np.ndarray:

@@ -14,9 +14,15 @@ logger = logging.getLogger(__name__)
 
 @define
 class IntegratedData(BaseData):
-    """
+    r"""
     IntegratedData is a data class that stores the data array from azimuthalIntegration
     and its associated metadata.
+
+    TODO: deal with normalization factor/variance:
+    ```
+    \text{Var}\left(\frac{A}{B}\right) \approx \left(\frac{\mu_A}{\mu_B}\right)^2
+    \left( \frac{\sigma_A^2}{\mu_A^2} + \frac{\sigma_B^2}{\mu_B^2} \right)
+    ```
     """
 
     average: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
