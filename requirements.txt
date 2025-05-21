@@ -9,3 +9,4 @@ stamina
 tiled
 tox
 xarray
+uncertainties
