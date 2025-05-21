@@ -38,6 +38,12 @@ from modacor.io.io_source import IoSource
 
 @define
 class IoSources:
+    """
+    IoSources is a collection of al the defined IoSource instances to load data.
+
+    It provides the interface to register new sources and access the different
+    data sources through a single interface.
+    """
 
     defined_sources: dict[str, IoSource] = field(factory=dict)
 
@@ -56,6 +62,8 @@ class IoSources:
             raise TypeError("source_name must be a string")
         if not isinstance(source, IoSource):
             raise TypeError("source_class must be a subclass of IoSource")
+        if source_reference in self.defined_sources:
+            raise ValueError(f"Source {source_reference} already registered.")
         self.defined_sources[source_reference] = source
 
     def get_source(self, source_reference: str) -> IoSource:
@@ -73,8 +81,33 @@ class IoSources:
             The source class associated with the provided name.
         """
         if source_reference not in self.defined_sources:
-            raise ValueError(f"Source {source_reference} not registered.")
+            raise KeyError(f"Source {source_reference} not registered.")
         return self.defined_sources[source_reference]
+
+    def split_data_reference(self, data_reference: str) -> tuple[str, str]:
+        """
+        Split the data reference into source reference and data key.
+
+        The data_reference is composed of the source reference and the internal
+        data reference, separated by "::".
+
+        Parameters
+        ----------
+        data_reference : str
+            The reference name of the source to access.
+
+        Returns
+        -------
+        tuple[str, str] :
+            A tuple containing the source reference and the data key.
+        """
+        _split = data_reference.split("::", 1)
+        if len(_split) != 2:
+            raise ValueError(
+                "data_reference must be in the format 'source_ref::data_key' with a "
+                "double colon separating both entries."
+            )
+        return _split[0], _split[1]
 
     def get_data(self, data_reference: str, index: int) -> np.ndarray:
         """
@@ -95,7 +128,7 @@ class IoSources:
         Any :
             The data associated with the provided key.
         """
-        _source_ref, _data_key = data_reference.split("::", 1)
+        _source_ref, _data_key = self.split_data_reference(data_reference)
         _source = self.get_source(_source_ref)
         return _source.get_data(index, _data_key)
 
