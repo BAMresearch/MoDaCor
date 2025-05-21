@@ -1,17 +1,12 @@
 # import tiled
 # import tiled.client
 import logging
-from typing import Dict, List, Optional  # , Union
+from typing import Dict, List
 
 import numpy as np
 import pint
 from attrs import define, field
 from attrs import validators as v
-
-# from tiled.client.array import DaskArrayClient
-# from .processstep import ProcessStepDescriber
-# from tiled.client.array import DaskArrayClient
-
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +36,7 @@ class BaseData:
     ingest_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
     internal_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
     normalization_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
+    normalization_factor_unit: pint.Unit = field(validator=v.instance_of(pint.Unit))
     display_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
 
     # Core data array stored as an xarray DataArray
@@ -52,20 +48,20 @@ class BaseData:
     # array with some normalization (exposure time, solid-angle ....)
     normalization: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
 
+    # Scalers to put on the denominator, sparated from the array for distinct uncertainty
+    normalization_factor: float = field(
+        default=1, validator=[v.instance_of(float), validate_rank_of_data]
+    )
+    normalization_factor_variance: float = field(
+        validator=[v.instance_of(float), validate_rank_of_data]
+    )
+
     # Provenance can be a list containing either ProcessStep or lists of ProcessStep
     provenance: List = field(factory=list)
 
     # Rank of the data with custom validation:
     # Must be between 1 and 3 and not exceed the dimensionality of internal_data.
     rank_of_data: int = field(default=1, validator=[v.instance_of(int), validate_rank_of_data])
-
-    # Data source placeholder (e.g., a Tiled instance, such as
-    # tiled.client.from_uri("http://localhost:8000", "dask"))
-    # data_source: Optional[tiled.client.container.Container] = field(
-    #     default=None,
-    #     validator=[v.optional(v.instance_of(tiled.client.container.Container))]
-    #     )
-    data_source: Optional = field(default=None)
 
     @property
     def mean(self) -> np.ndarray:
