@@ -19,6 +19,10 @@ class DummyProcessStepDescriber:
     pass
 
 
+class DummyProcessStep:
+    pass
+
+
 def test_linear_pipeline(linear_pipeline):
     "tests the sequence is expected for a linear graph"
     pipeline = Pipeline(graph=linear_pipeline)
@@ -33,11 +37,12 @@ def test_linear_pipeline(linear_pipeline):
 
 def test_node_addition(linear_pipeline):
     pipeline = Pipeline.from_dict(linear_pipeline)
-    pipeline.add(ProcessStep(io_sources=DummyIoSources(), documentation=DummyProcessStepDescriber))
+    ps = DummyProcessStep()
+    pipeline.add(ps, *[1, 2, 3])
     pipeline.prepare()
     sequence = []
     while pipeline.is_active():
         for node in pipeline.get_ready():
             sequence.append(node)
             pipeline.done(node)
-    assert sequence == [1, 2, 3]
+    assert sequence == [1, 2, 3, ps]
