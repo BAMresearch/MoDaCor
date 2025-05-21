@@ -76,7 +76,6 @@ class HDFLoader(IoSources):
 
     def _find_datasets(self, path_name, path_object):
         """An internal function to be used to walk the tree of an HDF5 file and return a list of the datasets within"""
-
         if(isinstance(self._file_reference[path_name], h5py._hl.dataset.Dataset)):
             self._file_datasets.append(path_name)
             self._file_datasets_shapes[path_name] = self._file_reference[path_name].shape

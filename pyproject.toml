@@ -24,6 +24,22 @@ classifiers = [
 ]
 
 [[project.authors]]
+name = "Ingo Breßler"
+email = "ingo.bressler@bam.de"
+
+[[project.authors]]
+name = "Anja Hörmann"
+email = "anja.hoermann@bam.de"
+
+[[project.authors]]
+name = "Jerome Kieffer"
+email = "Jerome.Kieffer@esrf.fr"
+
+[[project.authors]]
+name = "Armin Moser"
+email = "armin.moser@anton-paar.com"
+
+[[project.authors]]
 name = "Brian R. Pauw"
 email = "brian.pauw@bam.de"
 
@@ -32,8 +48,12 @@ name = "Tim Snow"
 email = "tim.snow@diamond.ac.uk"
 
 [[project.authors]]
-name = "Ingo Breßler"
-email = "ingo.bressler@bam.de"
+name = "Glen J. Smales"
+email = "glen@slightlyscattered.com"
+
+[[project.authors]]
+name = "Malte Storm"
+email = "malte.storm@hereon.de"
 
 [project.urls]
 homepage = "https://BAMresearch.github.io/modacor"
