@@ -26,12 +26,14 @@ __license__ = "BSD-3-Clause"
 __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
 
-from modacor.io.hdf.hdf_loader import *
-
-from os.path import abspath
+import unittest
 from logging import WARNING
-import numpy as np
+from os.path import abspath
+
 import h5py
+import numpy as np
+
+from ....io.hdf.hdf_loader import *
 
 
 class TestHDFLoader(unittest.TestCase):
@@ -43,13 +45,11 @@ class TestHDFLoader(unittest.TestCase):
         self.test_dataset_name = "dataset"
         self.test_dataset_shape = (10, 2)
 
-
     def tearDown(self):
         self.test_h5_loader = None
         self.test_file_path = None
         self.test_dataset_name = None
         self.test_dataset_shape = None
-
 
     def test_open_file(self):
         absolute_test_file_path = abspath(self.test_file_path)
@@ -57,8 +57,10 @@ class TestHDFLoader(unittest.TestCase):
 
         self.assertEqual(absolute_test_file_path, self.test_h5_loader._file_path)
         self.assertEqual(self.test_dataset_name, self.test_h5_loader._file_datasets[0])
-        self.assertEqual(self.test_dataset_shape, self.test_h5_loader._file_datasets_shapes[self.test_dataset_name])
-
+        self.assertEqual(
+            self.test_dataset_shape,
+            self.test_h5_loader._file_datasets_shapes[self.test_dataset_name],
+        )
 
     def test_close_file(self):
         self.test_open_file()
