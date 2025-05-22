@@ -1,5 +1,4 @@
 __coding__ = "utf-8"
-__file__ = "src/modacor/dataclasses/processingdata.py"
 __author__ = "Brian R. Pauw"
 __copyright__ = "MoDaCor team"
 __license__ = "BSD3"
