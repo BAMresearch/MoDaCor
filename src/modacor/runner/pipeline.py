@@ -34,16 +34,36 @@ class Pipeline(TopologicalSorter):
     def from_dict(cls, graph_dict: dict, name=""):
         return cls(name=name, graph=graph_dict)
 
-    def add_branch(self, branch_graph: dict, branching_node):
+    def add_incoming_branch(self, branch_graph: dict, branching_node):
         """
-        add a pipeline as a branch on an existing pipeline, using the inherited add method
+        Add a pipeline as a branch whose outcome shall be combined the existing pipeline.
+
+        This assumes that the branch to be added has a single exit point.
 
         """
         pipeline_to_add = Pipeline(graph=branch_graph)
         pipeline_to_add_ordered = [*pipeline_to_add.static_order()]
         self.add(branching_node, *pipeline_to_add_ordered)
-        self.graph = {**self.graph, **branch_graph}
+        # add the last node of the incoming as a predecessor to the connection point
         self.graph[branching_node].update({pipeline_to_add_ordered[-1]})
+        # add the rest of the graph
+        self.graph = self.graph | branch_graph
+
+    def add_outgoing_branch(self, branch_graph: dict, branching_node):
+        """
+        Add a pipeline as a branch whose input is based on the existing pipeline.
+
+        This assumes that the branch to be added has a single entry point.
+
+        """
+        pipeline_to_add = Pipeline(graph=branch_graph)
+        pipeline_to_add_ordered = [*pipeline_to_add.static_order()]
+        # add the connection node as a predecessor to the first node of the outgoing branch
+        branch_graph[pipeline_to_add_ordered[0]].update({branching_node})
+        # add the rest of the graph
+        self.graph = self.graph | branch_graph
+        # reinitialize the TopologicalSorter
+        super().__init__(graph=self.graph)
 
     def run(self, data: DataBundle, **kwargs):
         """
