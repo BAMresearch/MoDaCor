@@ -29,7 +29,10 @@ __status__ = "Alpha"
 import unittest
 from logging import WARNING
 from os.path import abspath
-
+from os import unlink
+import numpy as np
+import tempfile
+import unittest
 import h5py
 import numpy as np
 
@@ -40,33 +43,35 @@ class TestHDFLoader(unittest.TestCase):
     """Testing class for modacor/io/hdf/hdf_loader.py"""
 
     def setUp(self):
-        self.test_hdf_loader = HDFLoader()
-        self.test_file_path = "tbd - some form of temp file"
-        self.test_dataset_name = "dataset"
-        self.test_dataset_shape = (10, 2)
+        self.test_hdf_loader = HDFLoader(source_reference = 'Test Data')
+        self.temp_file_handle = tempfile.NamedTemporaryFile(delete=False, delete_on_close=False)
+        self.temp_file_path = self.temp_file_handle.name
+        self.temp_file_handle.close()
+        self.temp_dataset_name = "dataset"
+        self.temp_dataset_shape = (10, 2)
+        self.temp_hdf_file = h5py.File(self.temp_file_path, 'w')
+        self.temp_hdf_file[self.temp_dataset_name] = np.zeros(self.temp_dataset_shape)
+        self.temp_file_handle.close()
 
     def tearDown(self):
         self.test_h5_loader = None
         self.test_file_path = None
         self.test_dataset_name = None
         self.test_dataset_shape = None
+        unlink(self.temp_file_path)
 
     def test_open_file(self):
-        absolute_test_file_path = abspath(self.test_file_path)
-        self.test_h5_loader._open_file(self.test_file_path)
+        self.test_hdf_loader._open_file(self.temp_file_path)
 
-        self.assertEqual(absolute_test_file_path, self.test_h5_loader._file_path)
-        self.assertEqual(self.test_dataset_name, self.test_h5_loader._file_datasets[0])
-        self.assertEqual(
-            self.test_dataset_shape,
-            self.test_h5_loader._file_datasets_shapes[self.test_dataset_name],
-        )
+        self.assertEqual(self.temp_file_path, self.test_hdf_loader._file_path)
+        self.assertEqual(self.temp_dataset_name, self.test_hdf_loader._file_datasets[0])
+        self.assertEqual(self.temp_dataset_shape, self.test_hdf_loader._file_datasets_shapes[self.temp_dataset_name])
 
     def test_close_file(self):
         self.test_open_file()
-        self.test_h5_loader._close_file()
+        self.test_hdf_loader._close_file()
 
-        self.assertEqual(None, self.test_h5_loader._file_path)
-        self.assertEqual(None, self.test_h5_loader._file_reference)
-        self.assertEqual([], self.test_h5_loader._file_datasets)
-        self.assertEqual({}, self.test_h5_loader._file_datasets_shapes)
+        self.assertEqual(None, self.test_hdf_loader._file_path)
+        self.assertEqual(None, self.test_hdf_loader._file_reference)
+        self.assertEqual([], self.test_hdf_loader._file_datasets)
+        self.assertEqual({}, self.test_hdf_loader._file_datasets_shapes)
