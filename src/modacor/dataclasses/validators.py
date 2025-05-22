@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from numbers import Integral
-from typing import Any
+from typing import Any, Type
 
 import pint
 
@@ -19,7 +19,7 @@ __all__ = [
 ]
 
 
-def is_list_of_ints(value: Any):
+def is_list_of_ints(instance: Type, attribute: str, value: Any):
     """
     Check if the value is a list of integers.
     """

@@ -25,7 +25,3 @@
 __license__ = "BSD-3-Clause"
 __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
-
-
-from ..io_source import IoSource
-from ..io_sources import IoSources

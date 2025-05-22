@@ -6,14 +6,18 @@ with variance propagation by comparing against reference results from the
 `uncertainties` package. Randomly generated arrays simulate real-world numeric data
 with associated variances.
 """
+
 import numpy as np
+from uncertainties.unumpy import nominal_values, std_devs, uarray
+
 import modacor.math.variance_calculations as varc
-from uncertainties.unumpy import uarray, nominal_values, std_devs
 
 samples = 1000
 
+
 def generate_samples(size, low=1, high=1.0e9):
     return np.random.uniform(low, high, size)
+
 
 def generate_error(values, add_zero_errors=False):
     s = np.sqrt(values)
@@ -35,7 +39,7 @@ def test_add():
     result, variances = varc.add(x, dx**2, y, dy**2)
 
     assert np.allclose(result, nominal_values(expected))
-    assert np.allclose(variances, std_devs(expected)**2)
+    assert np.allclose(variances, std_devs(expected) ** 2)
 
 
 def test_subtract():
@@ -51,7 +55,7 @@ def test_subtract():
     result, variances = varc.subtract(x, dx**2, y, dy**2)
 
     assert np.allclose(result, nominal_values(expected))
-    assert np.allclose(variances, std_devs(expected)**2)
+    assert np.allclose(variances, std_devs(expected) ** 2)
 
 
 def test_multiply():
@@ -67,7 +71,7 @@ def test_multiply():
     result, variances = varc.multiply(x, dx**2, y, dy**2)
 
     assert np.allclose(result, nominal_values(expected))
-    assert np.allclose(variances, std_devs(expected)**2)
+    assert np.allclose(variances, std_devs(expected) ** 2)
 
 
 def test_divide():
@@ -83,4 +87,4 @@ def test_divide():
     result, variances = varc.divide(x, dx**2, y, dy**2)
 
     assert np.allclose(result, nominal_values(expected))
-    assert np.allclose(variances, std_devs(expected)**2)
+    assert np.allclose(variances, std_devs(expected) ** 2)

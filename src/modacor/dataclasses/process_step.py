@@ -3,10 +3,12 @@
 
 __all__ = ["ProcessStep"]
 __license__ = "BSD-3-Clause"
+__version__ = "0.0.1"
 
 
 from abc import abstractmethod
 from numbers import Integral
+from pathlib import Path
 from typing import Any
 
 from attrs import define, field
@@ -26,7 +28,12 @@ class ProcessStep:
     io_sources: IoSources = field()
 
     # class attribute for a machine-readable description of the process step
-    documentation: ProcessStepDescriber
+    documentation = ProcessStepDescriber(
+        calling_name="Generic Process step",
+        calling_id=None,
+        calling_module_path=Path(__file__),
+        calling_version=__version__,
+    )
 
     # dynamic instance configuration
     configuration: dict = field(factory=dict, validator=v.instance_of(dict))
@@ -45,9 +52,8 @@ class ProcessStep:
         default=MessageHandler(), validator=v.instance_of(MessageHandler)
     )
 
-    # a list of data keys that are modified by this process
-    def __attrs_post_init__(self):
-        self.__prepared = False
+    # internal variables:
+    __prepared: bool = field(default=False, validator=v.instance_of(bool))
 
     def prepare_execution(self):
         """
@@ -94,5 +100,5 @@ class ProcessStep:
         if key in self.configuration:
             self.configuration[key] = value
         else:
-            raise KeyError(f"Key {key} not found in configuration")
+            raise KeyError(f"Key {key} not found in configuration")  # noqa
         self.__prepared = False
