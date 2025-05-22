@@ -44,7 +44,6 @@ class TestHDFLoader(unittest.TestCase):
     def setUp(self):
         self.test_hdf_loader = HDFLoader(source_reference = 'Test Data')
         self.temp_file_handle = tempfile.NamedTemporaryFile(delete=False, delete_on_close=False)
-        # self.temp_file = self.temp_file_handle.file
         self.temp_file_path = self.temp_file_handle.name
         self.temp_file_handle.close()
         self.temp_dataset_name = "dataset"
