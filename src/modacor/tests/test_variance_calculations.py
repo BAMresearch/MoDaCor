@@ -10,7 +10,7 @@ with associated variances.
 import numpy as np
 from uncertainties.unumpy import nominal_values, std_devs, uarray
 
-import modacor.math.variance_calculations as varc
+from ..math import variance_calculations as varc
 
 samples = 1000
 

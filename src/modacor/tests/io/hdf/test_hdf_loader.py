@@ -26,9 +26,7 @@ __license__ = "BSD-3-Clause"
 __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
 
-from modacor.io.hdf.hdf_loader import *
-
-from os.path import abspath
+import unittest
 from logging import WARNING
 from os.path import abspath
 from os import unlink
@@ -36,6 +34,9 @@ import numpy as np
 import tempfile
 import unittest
 import h5py
+import numpy as np
+
+from ....io.hdf.hdf_loader import *
 
 
 class TestHDFLoader(unittest.TestCase):
@@ -52,7 +53,6 @@ class TestHDFLoader(unittest.TestCase):
         self.temp_hdf_file[self.temp_dataset_name] = np.zeros(self.temp_dataset_shape)
         self.temp_file_handle.close()
 
-
     def tearDown(self):
         self.test_h5_loader = None
         self.test_file_path = None
@@ -60,14 +60,11 @@ class TestHDFLoader(unittest.TestCase):
         self.test_dataset_shape = None
         unlink(self.temp_file_path)
 
-
     def test_open_file(self):
         self.test_hdf_loader._open_file(self.temp_file_path)
-
         self.assertEqual(self.temp_file_path, self.test_hdf_loader._file_path)
         self.assertEqual(self.temp_dataset_name, self.test_hdf_loader._file_datasets[0])
         self.assertEqual(self.temp_dataset_shape, self.test_hdf_loader._file_datasets_shapes[self.temp_dataset_name])
-
 
     def test_close_file(self):
         self.test_open_file()
