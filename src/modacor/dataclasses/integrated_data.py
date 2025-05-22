@@ -36,6 +36,4 @@ class IntegratedData(BaseData):
 
     # array with some normalization (exposure time, solid-angle ....)
     sum_normalization: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
-    sum_normalization_squared: np.ndarray = field(
-        factory=np.ndarray, validator=[v.instance_of(np.ndarray)]
-    )
+    sum_normalization_squared: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])

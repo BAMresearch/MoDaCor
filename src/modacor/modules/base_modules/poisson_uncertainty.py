@@ -43,9 +43,7 @@ class PoissonUncertainty(ProcessStep):
         """
         Check if the process can be applied to the given data.
         """
-        return check_data_element_and_units(
-            self.data, "Signal", pint.Unit("counts"), self.message_handler
-        )
+        return check_data_element_and_units(self.data, "Signal", pint.Unit("counts"), self.message_handler)
 
     def apply(self, **kwargs):
         # intensity_object: BaseData = self.kwargs["Signal"]

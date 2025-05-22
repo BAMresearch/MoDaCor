@@ -41,9 +41,7 @@ def register_as_io_source(cls):
         raise TypeError("The class must be a subclass of IoSource to be registered.")
     type_ref = getattr(cls, "type_reference", None)
     if not isinstance(type_ref, str):
-        raise AttributeError(
-            "The class must have a class attribute 'type_reference' of type string."
-        )
+        raise AttributeError("The class must have a class attribute 'type_reference' of type string.")
     if type_ref in IoRegistry:
         raise ValueError(f"Class with type_reference '{type_ref}' is already registered.")
     IoRegistry[type_ref] = cls
