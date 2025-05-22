@@ -54,14 +54,14 @@ class ProcessStepDescriber:
     step_doc: str = field(default="")  # documentation for the process
     step_reference: NXCite = field(default="")  # NXCite to the paper describing the process
     step_note: str | None = field(default=None)
-    use_frames_cache: list[str] = field(factory=list)
-    # for produced_values dictionary key names in this list, the produced_values are cached
-    # on first run, and reused on subsequent runs. Maybe two chaches, one for per-file and
-    # one for per-execution.
-    use_overall_cache: list[str] = field(factory=list)
-    # for produced_values dictionary key names in this list, the produced_values are cached
-    # on first run, and reused on subsequent runs. Maybe two chaches, one for per-file and
-    # one for per-execution.
+    # use_frames_cache: list[str] = field(factory=list)
+    # # for produced_values dictionary key names in this list, the produced_values are cached
+    # # on first run, and reused on subsequent runs. Maybe two chaches, one for per-file and
+    # # one for per-execution.
+    # use_overall_cache: list[str] = field(factory=list)
+    # # for produced_values dictionary key names in this list, the produced_values are cached
+    # # on first run, and reused on subsequent runs. Maybe two chaches, one for per-file and
+    # # one for per-execution.
 
     def copy(self) -> ProcessStepDescriber:
         raise NotImplementedError()

@@ -39,10 +39,10 @@ from ..io_source import IoSource
 from ..io_sources import IoSources
 
 
-class HDFLoader(IoSources):
-    def __init__(self, source_reference: str, source: IoSource, logging_level=WARNING):
-        super().__init__(source_reference, source)
-        self.hdf_logger = MessageHandler("hdf5logger", logging_level)
+class HDFLoader(IoSource):
+    def __init__(self, source_reference: str, logging_level = WARNING):
+        super().__init__(source_reference)
+        self.hdf_logger = MessageHandler(level = logging_level, name = 'hdf5logger')
         self._file_path = None
         self._file_reference = None
         self._file_datasets = []
@@ -59,12 +59,12 @@ class HDFLoader(IoSources):
             self._file_path = abspath(file_path)
             self._file_reference.visititems(self._find_datasets)
         except OSError as error:
-            self.hdf_logger.log.error(error)
+            self.hdf_logger.logger.error(error)
             raise OSError(error)
 
     def _close_file(self):
         try:
-            self.file_reference.close()
+            self._file_reference.close()
             self._file_path = None
             self._file_reference = None
             self._file_datasets.clear()

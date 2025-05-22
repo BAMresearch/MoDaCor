@@ -1,5 +1,5 @@
-# src/modacor/dataclasses/processingdata.py
-# -*- coding: utf-8 -*-
+__coding__ = "utf-8"
+__file__ = "src/modacor/dataclasses/processingdata.py"
 __author__ = "Brian R. Pauw"
 __copyright__ = "MoDaCor team"
 __license__ = "BSD3"
@@ -8,6 +8,7 @@ __version__ = "20250522.1"
 __status__ = "Development"  # "Development", "Production"
 
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -25,7 +26,7 @@ class PoissonUncertainties(ProcessStep):
     documentation = ProcessStepDescriber(
         calling_name="Add Poisson Uncertainties",
         calling_id="PoissonUncertainties",
-        calling_module_path=__file__,
+        calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
         works_on={"variances": ["Poisson"]},
