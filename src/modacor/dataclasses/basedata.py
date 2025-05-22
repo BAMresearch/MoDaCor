@@ -1,7 +1,7 @@
 # import tiled
 # import tiled.client
 import logging
-from typing import Dict, List, Self
+from typing import Dict, List, Optional, Self
 
 import numpy as np
 import pint
@@ -16,12 +16,12 @@ def validate_rank_of_data(instance, attribute, value):
     # Ensure rank_of_data is between 1 and 3.
     if not (0 <= value <= 3):
         raise ValueError(f"{attribute.name} must be between 0 and 3, got {value}.")
-    # Check that rank_of_data does not exceed the number of dimensions in internal_data.
-    # This assumes that internal_data is provided and is a valid xarray DataArray.
-    if instance.internal_data is not None and value > instance.internal_data.ndim:
+    # Check that rank_of_data does not exceed the number of dimensions in signal.
+    # This assumes that signal is provided and is a valid numpy array.
+    if instance.signal is not None and value > instance.signal.ndim:
         raise ValueError(
-            f"{attribute.name} ({value}) cannot exceed the dimensionality of internal_data "
-            f"(ndim={instance.internal_data.ndim})."
+            f"{attribute.name} ({value}) cannot exceed the dimensionality of signal "
+            f"(ndim={instance.signal.ndim})."
         )
 
 
@@ -35,30 +35,13 @@ class BaseData:
     # Unit information using Pint units - required input (ingest, internal, and display)
     ingest_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
     internal_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
-    normalization_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
-    normalization_factor_unit: pint.Unit = field(validator=v.instance_of(pint.Unit))
     display_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
 
     # Core data array stored as an xarray DataArray
-    raw_data: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
+    signal: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
 
     # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
     variances: Dict[str, np.ndarray] = field(factory=dict, validator=[v.instance_of(dict)])
-
-    # array with some normalization (exposure time, solid-angle ....)
-    normalization: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
-
-    # Scalers to put on the denominator, sparated from the array for distinct uncertainty
-    normalization_factor: float = field(
-        factory=float, validator=[v.instance_of(float), validate_rank_of_data]
-    )
-
-    normalization_factor_variance: float = field(
-        factory=float, validator=[v.instance_of(float), validate_rank_of_data]
-    )
-
-    # Provenance can be a list containing either ProcessStep or lists of ProcessStep
-    provenance: List = field(factory=list)
 
     axes: List[Self | None] = field(factory=list, validator=[v.instance_of(list)])
 
@@ -66,13 +49,31 @@ class BaseData:
     # Must be between 0 and 3 and not exceed the dimensionality of internal_data.
     rank_of_data: int = field(factory=int, validator=[v.instance_of(int), validate_rank_of_data])
 
+    # Scalers to put on the denominator, sparated from the array for distinct uncertainty
+    normalization: Optional[np.ndarray] = field(
+        default=None, validator=v.optional(v.instance_of(np.ndarray))
+    )
+    normalization_factor: float = field(default=1.0, validator=v.instance_of(float))
+    normalization_factor_variance: float = field(default=0.0, validator=v.instance_of(float))
+    normalization_units: pint.Unit = field(
+        default=pint.Unit("dimensionless"), validator=v.instance_of(pint.Unit)
+    )
+    normalization_factor_units: pint.Unit = field(
+        default=pint.Unit("dimensionless"), validator=v.instance_of(pint.Unit)
+    )
+    # array with some normalization (exposure time, solid-angle ....)
+
+    def __attrs_post_init__(self):
+        if self.normalization is None:
+            self.normalization = np.ones(self.signal.shape)
+
     @property
     def mean(self) -> np.ndarray:
         """
-        Returns the raw_data array with the normalization applied.
+        Returns the signal array with the normalization applied.
         The result is cast to internal units.
         """
-        return self.raw_data / self.normalization
+        return self.signal / self.normalization
 
     def std(self, kind) -> np.ndarray:
         """
@@ -98,7 +99,7 @@ class BaseData:
         Returns the internal_data array with the scalar applied and converted
         to display units using Pint's unit conversion.
         """
-        return self._unit_scale(self.display_units) * self.raw_data / self.normalization
+        return self._unit_scale(self.display_units) * self.signal / self.normalization
 
     @property
     def mask(self) -> np.ndarray:
@@ -109,10 +110,10 @@ class BaseData:
     def mask(self, value):
         """Apply a mask to the data"""
         idx = np.where(value)
-        self.raw_data[idx] = 0
+        self.signal[idx] = 0
         self.normalization[idx] = 0
         for var in self.variances.values():
             var[idx] = 0
 
     def add_poisson_noise(self):
-        self.varinces["poisson"] = np.random.poisson(self.raw_data)
+        self.varinces["poisson"] = np.random.poisson(self.signal)
