@@ -1,6 +1,9 @@
 import pytest
 from pathlib import Path
 import numpy as np
+from pint import UnitRegistry
+
+ureg = UnitRegistry()
 
 from ...runner.pipeline import Pipeline
 from ...dataclasses.process_step import ProcessStep
@@ -12,15 +15,15 @@ from ...io.io_sources import IoSources
 from ...modules.base_modules.poisson_uncertainties import PoissonUncertainties
 
 TEST_IO_SOURCES = IoSources()
-
+TEST_DATA = DataBundle()
 
 @pytest.fixture
 def flat_data():
     data = DataBundle()
     data["signal"] = BaseData(
-        ingest_units="counts",
-        internal_units="counts",
-        display_units="counts",
+        ingest_units=ureg.counts,
+        internal_units=ureg.counts,
+        display_units=ureg.counts,
         signal=100 * np.ones((1030, 1065)),
     )
     return data
@@ -49,7 +52,7 @@ def test_processstep_pipeline():
 
 def test_actual_processstep(flat_data):
     "test running the PoissonUncertainties Process step"
-    graph = set(PoissonUncertainties(TEST_IO_SOURCES))
+    graph = {PoissonUncertainties(TEST_IO_SOURCES): {}}
 
     pipeline = Pipeline(graph=graph)
     pipeline.prepare()
