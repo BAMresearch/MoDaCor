@@ -43,11 +43,12 @@ class Pipeline(TopologicalSorter):
         """
         pipeline_to_add = Pipeline(graph=branch_graph)
         pipeline_to_add_ordered = [*pipeline_to_add.static_order()]
-        self.add(branching_node, *pipeline_to_add_ordered)
         # add the last node of the incoming as a predecessor to the connection point
         self.graph[branching_node].update({pipeline_to_add_ordered[-1]})
         # add the rest of the graph
         self.graph = self.graph | branch_graph
+        # reinitialize the TopologicalSorter
+        super().__init__(graph=self.graph)
 
     def add_outgoing_branch(self, branch_graph: dict, branching_node):
         """
