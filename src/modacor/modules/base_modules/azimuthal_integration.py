@@ -89,8 +89,11 @@ class AzimuthalIntegration(ProcessStep):
         )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            integrated.mean = integrated.sum_signal / integrated.sum_normalization
+            integrated.signal = integrated.sum_signal / integrated.sum_normalization
+            integrated.normalization = np.ones_like(integrated.sum_signal)
+
             for key, var in source.variances.items():
                 integrated.sum_variance[key] = self.sparse_squared.dot(var)
-                integrated.std = np.sqrt(integrated.sum_signal) / integrated.sum_normalization
-                integrated.sem = np.sqrt(integrated.sum_signal / integrated.sum_normalization_squared)
+                integrated.std[key] = np.sqrt(integrated.sum_signal) / integrated.sum_normalization
+                integrated.sem[key] = np.sqrt(integrated.sum_signal / integrated.sum_normalization_squared)
+                integrated.variance[key] = integrated.std[key] ** 2
