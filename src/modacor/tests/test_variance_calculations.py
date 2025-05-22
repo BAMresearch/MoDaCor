@@ -7,7 +7,6 @@ with variance propagation by comparing against reference results from the
 with associated variances.
 """
 import numpy as np
-from uncertainties.unumpy import nominal_values, std_devs, uarray
 
 from ..math import variance_calculations as varc
 
