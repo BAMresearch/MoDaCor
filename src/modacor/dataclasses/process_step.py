@@ -89,7 +89,7 @@ class ProcessStep:
             self.__prepared = True
         self.produced_outputs = self.calculate(data, **kwargs)
         for _key, value in self.produced_outputs.items():
-            data.data[_key] = value
+            data[_key] = value
         self.executed = True
         return data
 
