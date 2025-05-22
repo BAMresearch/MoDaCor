@@ -61,7 +61,8 @@ def test_branch_addition(linear_pipeline, pipeline_to_add={5: {6}}, at_node=2):
 
 def test_branch_addition_method(linear_pipeline, branch_graph={5: {6}}, branching_node=2):
     pipeline = Pipeline(graph=linear_pipeline)
-    pipeline.add_incoming_branch({5: {6}}, branching_node=2)
+    branch = Pipeline(graph=branch_graph)
+    pipeline.add_incoming_branch(branch, branching_node=2)
     assert [*pipeline.static_order()] == [1, 6, 5, 2, 3]
     assert pipeline.graph == {3: {2, 1}, 2: {1, 5}, 5: {6}}
 
@@ -70,6 +71,7 @@ def test_diverging_branch_addition(
     linear_pipeline, branch_graph={5: {6}, 6: set()}, branching_node=2
 ):
     pipeline = Pipeline(graph=linear_pipeline)
-    pipeline.add_outgoing_branch(branch_graph, branching_node)
+    branch = Pipeline(graph=branch_graph)
+    pipeline.add_outgoing_branch(branch, branching_node)
     assert [*pipeline.static_order()] == [1, 2, 3, 6, 5]
     assert pipeline.graph == {3: {2, 1}, 2: {1}, 5: {6}, 6: {2}}
