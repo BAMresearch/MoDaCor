@@ -26,13 +26,14 @@ __license__ = "BSD-3-Clause"
 __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
 
+import unittest
 from logging import WARNING
 from os.path import abspath
 
 import h5py
 import numpy as np
 
-from modacor.io.hdf.hdf_loader import *
+from ....io.hdf.hdf_loader import *
 
 
 class TestHDFLoader(unittest.TestCase):
