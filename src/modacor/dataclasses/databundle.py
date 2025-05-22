@@ -8,19 +8,6 @@ __version__ = "20250521.1"
 __status__ = "Production"  # "Development", "Production"
 
 
-# add a validator that checks if the keys in the axes list are in the data dictionary
-def validate_axes(instance, attribute, value):
-    """
-    Custom validator to check if the keys in the axes list are in the data dictionary.
-    """
-    if not all(key in instance.data for key in value):
-        raise ValueError(
-            f"""Missing axes must be present in data dictionary
-                         : {set(value) - set(instance.data.keys())}"""
-        )
-    return True
-
-
 class DataBundle(dict):
     """
     DataBundle is a specialized data class for storing related data.
@@ -31,5 +18,5 @@ class DataBundle(dict):
     """
 
     description: str | None = None
-    # as per NXcanSAS, matches the data dimensions to axes
+    # as per NXcanSAS, tells which basedata to plot
     default_plot: str | None = None
