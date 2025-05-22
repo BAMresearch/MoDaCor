@@ -85,5 +85,5 @@ linkcheck_ignore = [
     + r".*",
     # attempted fix of '406 Client Error: Not Acceptable for url'
     # https://github.com/sphinx-doc/sphinx/issues/1331
-    join(project_meta["project"]["urls"]["repository"], "commit", r"[0-9a-fA-F]+")
+    join(project_meta["project"]["urls"]["repository"], "commit", r"[0-9a-fA-F]+"),
 ]

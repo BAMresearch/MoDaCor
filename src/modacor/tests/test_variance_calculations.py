@@ -6,6 +6,7 @@ with variance propagation by comparing against reference results from the
 `uncertainties` package. Randomly generated arrays simulate real-world numeric data
 with associated variances.
 """
+
 import numpy as np
 from uncertainties.unumpy import nominal_values, std_devs, uarray
 

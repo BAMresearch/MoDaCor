@@ -70,6 +70,6 @@ def divide(x, vx, y, vy=0):
                     ∂/∂y = -x / y^2
     """
     result = x / y
-    dx_, dy_ = 1 / y, -x / (y ** 2)
+    dx_, dy_ = 1 / y, -x / (y**2)
     variance = dx_**2 * vx + dy_**2 * vy
     return result, variance
