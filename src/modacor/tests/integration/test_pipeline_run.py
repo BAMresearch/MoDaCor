@@ -1,14 +1,30 @@
 import pytest
 from pathlib import Path
+import numpy as np
 
 from ...runner.pipeline import Pipeline
 from ...dataclasses.process_step import ProcessStep
 from ...dataclasses.process_step_describer import ProcessStepDescriber
-from ...io.io_sources import IoSources
 from ...dataclasses.databundle import DataBundle
+from ...dataclasses.basedata import BaseData
+from ...io.io_sources import IoSources
+
+from ...modules.base_modules.poisson_uncertainties import PoissonUncertainties
 
 TEST_IO_SOURCES = IoSources()
-TEST_DATA = DataBundle()
+
+
+@pytest.fixture
+def flat_data():
+    data = DataBundle()
+    data["signal"] = BaseData(
+        ingest_units="counts",
+        internal_units="counts",
+        display_units="counts",
+        signal=100 * np.ones((1030, 1065)),
+    )
+    return data
+
 
 class DummyProcessStep(ProcessStep):
     def calculate(self, data):
@@ -26,6 +42,19 @@ def test_processstep_pipeline():
     while pipeline.is_active():
         for node in pipeline.get_ready():
             sequence.append(node)
-            node.execute(data = TEST_DATA)
+            node.execute(data=TEST_DATA)
             pipeline.done(node)
     assert pipeline._nfinished == len(steps)
+
+
+def test_actual_processstep(flat_data):
+    "test running the PoissonUncertainties Process step"
+    graph = set(PoissonUncertainties(TEST_IO_SOURCES))
+
+    pipeline = Pipeline(graph=graph)
+    pipeline.prepare()
+    while pipeline.is_active():
+        for node in pipeline.get_ready():
+            node.execute(data=flat_data)
+            pipeline.done(node)
+    assert data["signal"].variances["Poisson"].mean().astype(int) == 10
