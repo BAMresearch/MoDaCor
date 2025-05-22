@@ -2,6 +2,7 @@
 # # -*- coding: utf-8 -*-
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -13,7 +14,8 @@ class MessageHandler:
     Args:
         level (int): The logging level to use. Defaults to logging.INFO.
     """
-    def __init__(self, level: int = logging.INFO, name: str = 'MoDaCor', **kwargs):
+
+    def __init__(self, level: int = logging.INFO, name: str = "MoDaCor", **kwargs):
         self.level = level
         self.name = name
 
@@ -23,7 +25,7 @@ class MessageHandler:
         self.consoleLogHandler = logging.StreamHandler()
         self.consoleLogHandler.setLevel(level)
 
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         self.consoleLogHandler.setFormatter(formatter)
         self.logger.addHandler(self.consoleLogHandler)
 
@@ -33,20 +35,20 @@ class MessageHandler:
 
         if name is None:
             name = self.name
-        
+
         self.logger(message, level=level, name=name)
 
     def info(self, message: str):
-        self.log(message, level=logging.INFO, name='MoDaCor')
+        self.log(message, level=logging.INFO, name="MoDaCor")
 
     def warning(self, message: str):
-        self.log(message, level=logging.WARNING, name='MoDaCor')
+        self.log(message, level=logging.WARNING, name="MoDaCor")
 
     def error(self, message: str):
-        self.log(message, level=logging.ERROR, name='MoDaCor')
+        self.log(message, level=logging.ERROR, name="MoDaCor")
 
     def critical(self, message: str):
-        self.log(message, level=logging.CRITICAL, name='MoDaCor')
-    
+        self.log(message, level=logging.CRITICAL, name="MoDaCor")
+
     def debug(self, message: str):
-        self.log(message, level=logging.DEBUG, name='MoDaCor')
+        self.log(message, level=logging.DEBUG, name="MoDaCor")
