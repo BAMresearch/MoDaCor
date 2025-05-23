@@ -24,7 +24,7 @@ def flat_data():
         ingest_units=ureg.counts,
         internal_units=ureg.counts,
         display_units=ureg.counts,
-        signal=100 * np.ones((1030, 1065)),
+        signal=100 * np.ones((10, 10)),
     )
     return data
 
