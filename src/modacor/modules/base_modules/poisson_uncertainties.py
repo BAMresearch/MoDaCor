@@ -36,12 +36,13 @@ class PoissonUncertainties(ProcessStep):
         step_note="This is a simple Poisson uncertainty calculation based on the signal intensity",
     )
 
-    def calculate(self, data: DataBundle, **kwargs: Any):
+    def calculate(self):
         """
         Calculate the Poisson uncertainties for the data
         """
 
         # Get the data
+        data = self.processing_data
         signal = data["signal"].signal
 
         # Add the variance to the data
