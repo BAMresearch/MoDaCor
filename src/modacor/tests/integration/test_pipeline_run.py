@@ -1,9 +1,6 @@
 import pytest
 from pathlib import Path
 import numpy as np
-from pint import UnitRegistry
-
-ureg = UnitRegistry()
 
 from ...runner.pipeline import Pipeline
 from ...dataclasses.process_step import ProcessStep
@@ -11,6 +8,7 @@ from ...dataclasses.process_step_describer import ProcessStepDescriber
 from ...dataclasses.databundle import DataBundle
 from ...dataclasses.basedata import BaseData
 from ...io.io_sources import IoSources
+from modacor import ureg
 
 from ...modules.base_modules.poisson_uncertainties import PoissonUncertainties
 
