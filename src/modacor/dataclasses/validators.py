@@ -5,7 +5,7 @@ from __future__ import annotations
 from numbers import Integral
 from typing import Any, Type
 
-import pint
+from modacor import ureg
 
 from .databundle import DataBundle
 from .messagehandler import MessageHandler
@@ -31,7 +31,7 @@ def is_list_of_ints(instance: Type, attribute: str, value: Any):
 def check_data(
     data: DataBundle,
     data_element_name: str = None,
-    required_unit: pint.Unit = None,
+    required_unit: ureg.Unit = None,
     message_handler: MessageHandler = _dummy_handler,
 ) -> bool:
     """
@@ -52,7 +52,7 @@ def check_data(
 def check_data_element_and_units(
     data: DataBundle,
     data_element_name: str,
-    required_unit: pint.Unit,
+    required_unit: ureg.Unit,
     message_handler: MessageHandler,
 ) -> bool:
     """
