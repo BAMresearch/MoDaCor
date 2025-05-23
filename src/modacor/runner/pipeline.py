@@ -37,7 +37,7 @@ class Pipeline(TopologicalSorter):
         id_graph = {}
         for module_name, module_data in yaml_obj["steps"].items():
             # we need to instantiate ProcessSteps here, but
-            # we only have the name of the derived module class in the config atm
+            # need to implement a ProcessStep registry
             step_id = module_data.get("step_id")
             process_step_instances[step_id] = ProcessStep(io_sources=None)
             id_graph[step_id] = module_data.get("requires_steps")
