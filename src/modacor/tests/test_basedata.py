@@ -2,6 +2,8 @@ import numpy as np
 import pint
 import pytest
 
+from modacor import ureg
+
 # import tiled.client  # not sure what the class of tiled.client is...
 from ..dataclasses.basedata import BaseData  # adjust the import path as needed
 
@@ -12,16 +14,11 @@ class DummyClient:
 
 
 @pytest.fixture
-def ureg():
-    return pint.UnitRegistry()
-
-
-@pytest.fixture
 def sample_data():
     return np.arange(5)
 
 
-def test_data_and_display_data_properties(ureg, sample_data):
+def test_data_and_display_data_properties(sample_data):
     # Create an instance of BaseData with test values
     bd = BaseData(
         ingest_units=ureg.m,  # meters
@@ -49,7 +46,7 @@ def test_data_and_display_data_properties(ureg, sample_data):
     assert (bd.display_data == expected_display).all(), "display_data property did not convert units correctly."
 
 
-def test_rank_validation_exceeds_ndim(ureg):
+def test_rank_validation_exceeds_ndim():
     # Create a 2D DataArray
     arr = np.arange(4).reshape((2, 2))
 
