@@ -43,9 +43,7 @@ def test_data_and_display_data_properties(sample_data):
     # The conversion from meters to centimeters yields a factor of 100.
     conversion_factor = (1 * ureg.Unit("m")).to("cm").magnitude  # should be 100.0
     expected_display = sample_data * 2.0 * conversion_factor
-    assert (
-        bd.display_data == expected_display
-    ).all(), "display_data property did not convert units correctly."
+    assert (bd.display_data == expected_display).all(), "display_data property did not convert units correctly."
 
 
 def test_rank_validation_exceeds_ndim():

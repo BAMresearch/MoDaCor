@@ -4,11 +4,11 @@ import numpy as np
 import pint
 import pytest
 
-from modacor.dataclasses.basedata import BaseData
-from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep
-from modacor.dataclasses.processing_data import ProcessingData
-from modacor.io import IoSources
+from ..dataclasses.basedata import BaseData
+from ..dataclasses.databundle import DataBundle
+from ..dataclasses.process_step import ProcessStep
+from ..dataclasses.processing_data import ProcessingData
+from ..io import IoSources
 
 TEST_IO_SOURCES = IoSources()
 

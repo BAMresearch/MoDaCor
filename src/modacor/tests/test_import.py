@@ -20,9 +20,9 @@ def test_import_all():
         try:
             _ = importlib.import_module(j)
         except Exception as err:
-            print(f"{type(err)} in {j}: {err}.")
+            print(f"{type(err).__name__} in {j}: {err}.")
             cnt += 1
-    assert cnt == 0
+    assert cnt == 0, f"{cnt} submodules could not import properly"
 
 
 if __name__ == "__main__":
