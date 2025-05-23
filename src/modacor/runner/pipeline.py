@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from graphlib import TopologicalSorter
 from pathlib import Path
+import yaml
 
 from attrs import define, field
 from attrs import validators as v
