@@ -1,3 +1,5 @@
+__all__ = ["BaseData"]
+
 # import tiled
 # import tiled.client
 import logging
@@ -34,7 +36,7 @@ class BaseData:
     """
 
     # Core data array stored as an xarray DataArray
-    signal: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
+    signal: np.ndarray = field(default=np.array(()), validator=[v.instance_of(np.ndarray)])
 
     # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
     variances: Dict[str, np.ndarray] = field(factory=dict, validator=[v.instance_of(dict)])
