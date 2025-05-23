@@ -55,6 +55,11 @@ class ProcessStep:
     # internal variables:
     __prepared: bool = field(default=False, validator=v.instance_of(bool))
 
+    # add hash function. equality can be checked
+    def __hash__(self):
+        return hash((self.documentation.__repr__(), self.configuration.__repr__(), self.step_id))
+
+
     def prepare_execution(self):
         """
         Prepare the execution of the ProcessStep
