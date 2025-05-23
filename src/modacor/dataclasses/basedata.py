@@ -4,9 +4,10 @@ import logging
 from typing import Dict, List, Optional, Self
 
 import numpy as np
-import pint
 from attrs import define, field
 from attrs import validators as v
+
+from modacor import ureg
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +52,15 @@ class BaseData:
     normalization_factor: float = field(default=1.0, validator=v.instance_of(float))
     normalization_factor_variance: float = field(default=0.0, validator=v.instance_of(float))
     # Unit information using Pint units - required input (ingest, internal, and display)
-    signal_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
-
-    normalization_units: pint.Unit = field(
-        default=pint.Unit("dimensionless"), validator=v.instance_of(pint.Unit)
+    signal_units: ureg.Unit = field(
+        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
     )
-    normalization_factor_units: pint.Unit = field(
-        default=pint.Unit("dimensionless"), validator=v.instance_of(pint.Unit)
+
+    normalization_units: ureg.Unit = field(
+        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
+    )
+    normalization_factor_units: ureg.Unit = field(
+        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
     )
     # array with some normalization (exposure time, solid-angle ....)
 
