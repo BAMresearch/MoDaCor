@@ -1,12 +1,15 @@
+__all__ = ["BaseData"]
+
 # import tiled
 # import tiled.client
 import logging
 from typing import Dict, List, Optional, Self
 
 import numpy as np
-import pint
 from attrs import define, field
 from attrs import validators as v
+
+from modacor import ureg
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +23,7 @@ def validate_rank_of_data(instance, attribute, value):
     # This assumes that signal is provided and is a valid numpy array.
     if instance.signal is not None and value > instance.signal.ndim:
         raise ValueError(
-            f"{attribute.name} ({value}) cannot exceed the dimensionality of signal "
-            f"(ndim={instance.signal.ndim})."
+            f"{attribute.name} ({value}) cannot exceed the dimensionality of signal (ndim={instance.signal.ndim})."
         )
 
 
@@ -32,13 +34,8 @@ class BaseData:
     It is designed to be used as a base class for more specialized data classes.
     """
 
-    # Unit information using Pint units - required input (ingest, internal, and display)
-    ingest_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
-    internal_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
-    display_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
-
     # Core data array stored as an xarray DataArray
-    signal: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
+    signal: np.ndarray = field(default=np.array(()), validator=[v.instance_of(np.ndarray)])
 
     # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
     variances: Dict[str, np.ndarray] = field(factory=dict, validator=[v.instance_of(dict)])
@@ -50,24 +47,30 @@ class BaseData:
     rank_of_data: int = field(factory=int, validator=[v.instance_of(int), validate_rank_of_data])
 
     # Scalers to put on the denominator, sparated from the array for distinct uncertainty
-    normalization: Optional[np.ndarray] = field(
-        default=None, validator=v.optional(v.instance_of(np.ndarray))
-    )
+    normalization: Optional[np.ndarray] = field(default=None, validator=v.optional(v.instance_of(np.ndarray)))
     normalization_factor: float = field(default=1.0, validator=v.instance_of(float))
     normalization_factor_variance: float = field(default=0.0, validator=v.instance_of(float))
-    normalization_units: pint.Unit = field(
-        default=pint.Unit("dimensionless"), validator=v.instance_of(pint.Unit)
+    # Unit information using Pint units - required input (ingest, internal, and display)
+    signal_units: ureg.Unit = field(
+        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
     )
-    normalization_factor_units: pint.Unit = field(
-        default=pint.Unit("dimensionless"), validator=v.instance_of(pint.Unit)
+
+    normalization_units: ureg.Unit = field(
+        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
+    )
+    normalization_factor_units: ureg.Unit = field(
+        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
     )
     # array with some normalization (exposure time, solid-angle ....)
 
+    @property
+    def shape(self):
+        return self.signal.shape
+
     def __attrs_post_init__(self):
         if self.normalization is None:
-            self.normalization = np.ones(self.signal.shape)
+            self.normalization = np.ones(self.shape)
 
-    @property
     def mean(self) -> np.ndarray:
         """
         Returns the signal array with the normalization applied.
@@ -81,13 +84,6 @@ class BaseData:
         The result is cast to internal units.
         """
         return np.sqrt(self.variances[kind] / self.normalization)
-
-    def sem(self, kind) -> np.ndarray:
-        """
-        Returns the uncertainties, i.e. standard deviation
-        The result is cast to internal units.
-        """
-        return np.sqrt(self.variances[kind]) / self.normalization
 
     @property
     def _unit_scale(self, display_units) -> float:

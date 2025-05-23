@@ -124,9 +124,7 @@ def test_split_data_reference__invalid(io_sources):
         io_sources.split_data_reference("invalid_reference")
 
 
-@pytest.mark.parametrize(
-    "ref", ["test::ref", "test::ref::extra", "test::/entry/data", "test::/entry/data::extra"]
-)
+@pytest.mark.parametrize("ref", ["test::ref", "test::ref::extra", "test::/entry/data", "test::/entry/data::extra"])
 def test_split_data_reference__valid(io_sources, ref):
     source_ref, data_key = io_sources.split_data_reference(ref)
     assert source_ref == "test"

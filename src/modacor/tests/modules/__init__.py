@@ -25,24 +25,3 @@
 __license__ = "BSD-3-Clause"
 __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
-__all__ = ["IoRegistry", "register_as_io_source"]
-
-
-from modacor.io.io_source import IoSource
-
-IoRegistry: dict[str, IoSource] = {}
-
-
-def register_as_io_source(cls):
-    """
-    Decorator to register a class as an IO source in the IoRegistry.
-    """
-    if not issubclass(cls, IoSource):
-        raise TypeError("The class must be a subclass of IoSource to be registered.")
-    type_ref = getattr(cls, "type_reference", None)
-    if not isinstance(type_ref, str):
-        raise AttributeError("The class must have a class attribute 'type_reference' of type string.")
-    if type_ref in IoRegistry:
-        raise ValueError(f"Class with type_reference '{type_ref}' is already registered.")
-    IoRegistry[type_ref] = cls
-    return cls

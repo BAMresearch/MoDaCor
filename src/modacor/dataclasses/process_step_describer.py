@@ -33,17 +33,13 @@ def validate_required_data_keys(instance, attribute, value):
 @define
 class ProcessStepDescriber:
     calling_name: str = field()  # short name to identify the calling process for the UI
-    calling_id: str = (
-        field()
-    )  # not sure what we were planning here. some UID perhaps? difference with calling_module
+    calling_id: str = field()  # not sure what we were planning here. some UID perhaps? difference with calling_module
     calling_module_path: Path = field(
         validator=v.instance_of(Path)
     )  # partial path to the module from src/modacor/modules onwards
     calling_version: str = field()  # module version being executed
     required_data_keys: list[str] = field(factory=list)  # list of data keys required by the process
-    required_arguments: list[str] = field(
-        factory=list
-    )  # list of argument key-val combos required by the process
+    required_arguments: list[str] = field(factory=list)  # list of argument key-val combos required by the process
     calling_arguments: dict[str, Any] = field(factory=dict, validator=validate_required_keys)
     works_on: dict[str, list] = field(
         factory=dict, validator=v.instance_of(dict)

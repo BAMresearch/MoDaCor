@@ -22,27 +22,42 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
+__all__ = ["ProcessingData"]
 __license__ = "BSD-3-Clause"
-__copyright__ = "Copyright 2025 MoDaCor Authors"
-__status__ = "Alpha"
-__all__ = ["IoRegistry", "register_as_io_source"]
+__version__ = "0.0.1"
+
+from typing import Any
+
+from modacor.dataclasses.databundle import DataBundle
 
 
-from modacor.io.io_source import IoSource
-
-IoRegistry: dict[str, IoSource] = {}
-
-
-def register_as_io_source(cls):
+class ProcessingData(dict):
     """
-    Decorator to register a class as an IO source in the IoRegistry.
+    The ProcessingData class is a dictionary-like object that stores reference
+    to DataBundles.
     """
-    if not issubclass(cls, IoSource):
-        raise TypeError("The class must be a subclass of IoSource to be registered.")
-    type_ref = getattr(cls, "type_reference", None)
-    if not isinstance(type_ref, str):
-        raise AttributeError("The class must have a class attribute 'type_reference' of type string.")
-    if type_ref in IoRegistry:
-        raise ValueError(f"Class with type_reference '{type_ref}' is already registered.")
-    IoRegistry[type_ref] = cls
-    return cls
+
+    def __setitem__(self, key: str, item: DataBundle | Any):
+        """
+        Assign a value to a dictionary key.
+
+        Parameters
+        ----------
+        key : str
+            The dictionary key.
+        item : DataBundle | Any
+            The value / object to be added to the dictionary.
+
+        Raises
+        ------
+        TypeError
+            If the item is not an instance of DataBundle.
+        TypeError
+            If the key is not a string.
+        """
+        if not isinstance(item, DataBundle):
+            raise TypeError(f"Expected a DataBundle instance, got {type(item).__name__}.")
+        if not isinstance(key, str):
+            raise TypeError(f"Expected a string key, got {type(key).__name__}.")
+        super().__setitem__(key, item)
