@@ -60,4 +60,4 @@ def test_actual_processstep(flat_data):
         for node in pipeline.get_ready():
             node.execute(data=flat_data)
             pipeline.done(node)
-    assert data["signal"].variances["Poisson"].mean().astype(int) == 10
+    assert node.produced_outputs["signal"].variances["Poisson"].mean().astype(int) == 100
