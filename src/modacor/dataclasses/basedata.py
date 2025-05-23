@@ -32,11 +32,6 @@ class BaseData:
     It is designed to be used as a base class for more specialized data classes.
     """
 
-    # Unit information using Pint units - required input (ingest, internal, and display)
-    ingest_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
-    internal_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
-    display_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
-
     # Core data array stored as an xarray DataArray
     signal: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
 
@@ -55,6 +50,9 @@ class BaseData:
     )
     normalization_factor: float = field(default=1.0, validator=v.instance_of(float))
     normalization_factor_variance: float = field(default=0.0, validator=v.instance_of(float))
+    # Unit information using Pint units - required input (ingest, internal, and display)
+    signal_units: pint.Unit = field(validator=v.instance_of(pint.Unit))
+
     normalization_units: pint.Unit = field(
         default=pint.Unit("dimensionless"), validator=v.instance_of(pint.Unit)
     )
