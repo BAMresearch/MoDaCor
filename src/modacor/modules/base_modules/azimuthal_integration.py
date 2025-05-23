@@ -78,12 +78,13 @@ class AzimuthalIntegration(ProcessStep):
     def calculate(self, data: DataBundle, dataset="image", **kwargs: Any):
         print("calculates")
         source = data[dataset]
-        signal = source.signal
-        normalization = source.normalization
+        signal_img = source.signal.ravel()
+        normalization_img = source.normalization.ravel()
+
         integrated = IntegratedData(
-            sum_signal=self.sparse.dot(signal),
-            sum_normalization=self.sparse.dot(normalization),
-            sum_normalization_squared=self.sparse_squared.dot(normalization * normalization),
+            sum_signal=self.sparse.dot(signal_img),
+            sum_normalization=self.sparse.dot(normalization_img),
+            sum_normalization_squared=self.sparse_squared.dot(normalization_img * normalization_img),
             normalization_factor=source.normalization_factor,
             normalization_factor_variance=source.normalization_factor_variance,
             sem={},
@@ -96,7 +97,16 @@ class AzimuthalIntegration(ProcessStep):
 
             for key, var in source.variances.items():
                 integrated.sum_variance[key] = self.sparse_squared.dot(var)
-                integrated.std[key] = np.sqrt(integrated.sum_signal) / integrated.sum_normalization
-                integrated.sem[key] = np.sqrt(integrated.sum_signal / integrated.sum_normalization_squared)
-                integrated.variance[key] = integrated.std[key] ** 2
+                integrated.sem[key] = np.sqrt(integrated.sum_signal) / integrated.sum_normalization
+                integrated.std[key] = np.sqrt(integrated.sum_signal / integrated.sum_normalization_squared)
+                integrated.variance[key] = integrated.sum_variance[key] / integrated.sum_normalization**2
+
+        # now create the variance along an azimuthal ring
+        avg_img = self._sparse.T.dot(integrated.signal)  # backproject the average value to the image
+        delta = np.divide(signal_img, normalization_img, where=normalization_img != 0) - avg_img
+        sum_var = self.sparse_squared.dot((delta * normalization_img) ** 2)
+        integrated.sum_variance["azim"] = sum_var
+        integrated.sem["azim"] = np.sqrt(sum_var) / integrated.sum_normalization
+        integrated.std["azim"] = np.sqrt(sum_var / integrated.sum_normalization_squared)
+        integrated.variance["azim"] = sum_var / (integrated.sum_normalization**2)
         return integrated
