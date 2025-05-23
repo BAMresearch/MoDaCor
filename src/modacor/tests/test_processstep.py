@@ -12,7 +12,6 @@ from modacor.io import IoSources
 
 TEST_IO_SOURCES = IoSources()
 
-
 _TEST_KEYS = {
     "test_str": {
         "type": str,
@@ -74,11 +73,9 @@ class TestProcessingStep(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         _data = self.processing_data.get("dummy_key", DataBundle())
-        _data["new_key"] = BaseData(pint.Unit("m"), pint.Unit("m"), pint.Unit("m"))
-        _data["new_key"].signal = np.arange(100).reshape(10, 10)
-        _data2 = self.processing_data.get("bundle2")
-        _data2["new_key"] = BaseData(pint.Unit("m"), pint.Unit("m"), pint.Unit("m"))
-        _data2["new_key"].signal = np.zeros(20)
+        _data["new_key"] = BaseData(signal=np.arange(100).reshape(10, 10))
+        _data2 = self.processing_data.get("bundle2", DataBundle())
+        _data2["new_key"] = BaseData(signal=np.zeros(20))
         return {"dummy_key": _data, "bundle2": _data2}
 
 
@@ -97,11 +94,8 @@ def processing_data():
     data = ProcessingData()
     data["bundle1"] = DataBundle()
     data["bundle2"] = DataBundle()
-    data["bundle1"]["key1"] = BaseData(pint.Unit("m"), pint.Unit("m"), pint.Unit("m"))
-    data["bundle1"]["key1"].signal = np.arange(50)
-
-    data["bundle2"]["key2"] = BaseData(pint.Unit("m"), pint.Unit("m"), pint.Unit("m"))
-    data["bundle2"]["key2"].signal = np.ones((10, 10))
+    data["bundle1"]["key1"] = BaseData(signal=np.arange(50))
+    data["bundle2"]["key2"] = BaseData(signal=np.ones((10, 10)))
     return data
 
 
