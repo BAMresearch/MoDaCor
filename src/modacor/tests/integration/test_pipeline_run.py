@@ -19,9 +19,7 @@ TEST_DATA = DataBundle()
 def flat_data():
     data = DataBundle()
     data["signal"] = BaseData(
-        ingest_units=ureg.counts,
-        internal_units=ureg.counts,
-        display_units=ureg.counts,
+        signal_units=ureg.counts,
         signal=100 * np.ones((10, 10)),
     )
     return data
