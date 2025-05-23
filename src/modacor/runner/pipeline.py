@@ -27,9 +27,25 @@ class Pipeline(TopologicalSorter):
         super().__init__(graph=self.graph)
 
     @classmethod
-    def from_json(cls, path_to_json: Path):
-        # functionality postponed
-        return cls(name="dummy")
+    def from_yaml(cls, path_to_yaml: Path):
+        """
+        Instantiate a Pipeline from a yaml configuration file.
+        """
+
+        yaml_obj = yaml.safe_load(path_to_yaml)
+        process_step_instances = {}
+        id_graph = {}
+        for module_name, module_data in yaml_obj["steps"].items():
+            # we need to instantiate ProcessSteps here, but
+            # we only have the name of the derived module class in the config atm
+            step_id = module_data.get("step_id")
+            process_step_instances[step_id] = ProcessStep(io_sources=None)
+            id_graph[step_id] = module_data.get("requires_steps")
+        # translate step_id graph into ProcessStep graph
+        graph = {}
+        for k, v in id_graph.items():
+            graph[process_step_instances[k]] = {process_step_instances[i] for i in v}
+        return cls(name=yaml_obj["name"], graph=graph)
 
     @classmethod
     def from_dict(cls, graph_dict: dict, name=""):
