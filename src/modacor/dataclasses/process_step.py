@@ -109,7 +109,6 @@ class ProcessStep:
     def __hash__(self):
         return hash((self.documentation.__repr__(), self.configuration.__repr__(), self.step_id))
 
-
     def prepare_execution(self):
         """
         Prepare the execution of the ProcessStep

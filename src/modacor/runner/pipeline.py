@@ -83,12 +83,12 @@ class Pipeline(TopologicalSorter):
         # reinitialize the TopologicalSorter
         super().__init__(graph=self.graph)
 
-    def run(self, data: DataBundle, **kwargs):
+    def run(self, **kwargs):
         """
-        run pipeline. to be extended for different schedulers
+        run pipeline with simple scheduling.
         """
         self.prepare()
         while self.is_active():
             for node in self.get_ready():
-                node.execute(data, **kwargs)
+                node.execute(**kwargs)
                 self.done(node)

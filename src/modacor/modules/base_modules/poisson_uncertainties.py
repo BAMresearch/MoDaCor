@@ -46,3 +46,4 @@ class PoissonUncertainties(ProcessStep):
 
         # Add the variance to the data
         data["signal"].variances["Poisson"] = np.clip(signal, 1, None)
+        return {"signal": data["signal"]}
