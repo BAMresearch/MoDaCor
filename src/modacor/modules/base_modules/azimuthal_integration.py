@@ -56,7 +56,7 @@ class AzimuthalIntegration(ProcessStep):
         :param range_: 2-list of the lower and upper bound in the Q-range
         :return: the sparse matrix
         """
-        positions = self.bundle[name].ravel()
+        positions = self.data[name].ravel()
         if range_ is None:
             range_ = [positions.min(), positions.max()]
         # increase slightly the range to include the upper bound pixel
@@ -72,11 +72,13 @@ class AzimuthalIntegration(ProcessStep):
         return self.sparse
 
     def prepare(self):
-        print("prepare")
         self._build_sparse(**self.configuration)
 
     def calculate(self, data: DataBundle, dataset="image", **kwargs: Any):
-        print("calculates")
+        # work around for `prepare` no being called:
+        if "sparse" not in dir(self):
+            self.prepare()
+
         source = data[dataset]
         signal_img = source.signal.ravel()
         normalization_img = source.normalization.ravel()
