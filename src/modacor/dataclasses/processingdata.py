@@ -1,4 +1,4 @@
-# src/modacor/dataclasses/pipelinedata.py
+# src/modacor/dataclasses/processingdata.py
 # -*- coding: utf-8 -*-
 __author__ = "Brian R. Pauw"
 __copyright__ = "MoDaCor team"
@@ -8,7 +8,7 @@ __version__ = "20250522.1"
 __status__ = "Production"  # "Development", "Production"
 
 
-class PipelineData(dict):
+class ProcessingData(dict):
     """
     Contains a collection of DataBundles used in a given pipeline
     """
