@@ -3,7 +3,7 @@ from __future__ import annotations
 __author__ = "Jérôme Kieffer"
 __copyright__ = "MoDaCor team"
 __license__ = "BSD3"
-__date__ = "22/05/2025"
+__date__ = "23/05/2025"
 
 import warnings
 from pathlib import Path
@@ -72,13 +72,15 @@ class AzimuthalIntegration(ProcessStep):
         return self.sparse
 
     def prepare(self):
+        print("prepare")
         self._build_sparse(**self.configuration)
 
-    def calculate(self, apply_scalers, **kwargs):
-        source = self.bundle["signal"]
+    def calculate(self, data: DataBundle, dataset="image", **kwargs: Any):
+        print("calculates")
+        source = data[dataset]
         signal = source.signal
         normalization = source.normalization
-        integrated = self.bundle["integrated_1d"] = IntegratedData(
+        integrated = IntegratedData(
             sum_signal=self.sparse.dot(signal),
             sum_normalization=self.sparse.dot(normalization),
             sum_normalization_squared=self.sparse_squared.dot(normalization * normalization),
@@ -97,3 +99,4 @@ class AzimuthalIntegration(ProcessStep):
                 integrated.std[key] = np.sqrt(integrated.sum_signal) / integrated.sum_normalization
                 integrated.sem[key] = np.sqrt(integrated.sum_signal / integrated.sum_normalization_squared)
                 integrated.variance[key] = integrated.std[key] ** 2
+        return integrated
