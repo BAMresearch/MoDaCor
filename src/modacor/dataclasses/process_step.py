@@ -31,7 +31,7 @@ __version__ = "0.0.1"
 from abc import abstractmethod
 from numbers import Integral
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Type
 
 from attrs import define, field
 from attrs import validators as v
@@ -77,7 +77,8 @@ class ProcessStep:
 
     # dynamic instance configuration
     configuration: dict = field(
-        factory=lambda: ProcessStep.default_config(), validator=v.instance_of(dict)
+        factory=dict,
+        validator=lambda inst, attrs, val: inst.is_process_step_dict,
     )
 
     # flags and attributes for running the pipeline
@@ -99,6 +100,12 @@ class ProcessStep:
     processing_data: ProcessingData = field(
         default=None, validator=v.optional(v.instance_of(ProcessingData))
     )
+
+    def __attrs_post_init__(self):
+        """
+        Post-initialization method to set up the process step.
+        """
+        self.configuration = self.default_config()
 
     def prepare_execution(self):
         """
@@ -122,7 +129,10 @@ class ProcessStep:
             self.__prepared = True
         self.produced_outputs = self.calculate()
         for _key, value in self.produced_outputs.items():
-            data[_key].update(value)
+            if _key in data:
+                data[_key].update(value)
+            else:
+                data[_key] = value
         self.executed = True
 
     def reset(self):
@@ -140,16 +150,16 @@ class ProcessStep:
         self.__prepared = False
 
     @classmethod
-    def is_process_step_dict(cls, instance: type, attribute: str, item: Any) -> bool:
+    def is_process_step_dict(cls, instance: Type | None, attribute: str | None, item: Any) -> bool:
         """
         Check if the value is a dictionary with the correct keys and types.
         """
         if not isinstance(item, dict):
             return False
-        for _key, _config in cls.CONFIG_KEYS.items():
-            if _key not in item:
+        for _key, _value in item.items():
+            if _key not in cls.CONFIG_KEYS:
                 return False
-            _value = item.get(_key)
+            _config = cls.CONFIG_KEYS[_key]
             if _value is None:
                 if _config["allow_none"]:
                     continue
