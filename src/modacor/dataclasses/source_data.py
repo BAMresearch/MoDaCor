@@ -33,7 +33,7 @@ class SourceData:
     """
 
     # data, units and variance are required
-    data: np.ndarray = field(validator=v.instance_of(np.ndarray))
+    value: np.ndarray = field(validator=v.instance_of(np.ndarray))
     units: pint.Unit = field(validator=v.instance_of(ureg.Unit))
     variance: pint.Unit = field(validator=v.instance_of(ureg.Unit))
     attributes: Dict[str, Any] = field(factory=dict)

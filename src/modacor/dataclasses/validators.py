@@ -5,6 +5,8 @@ from __future__ import annotations
 from numbers import Integral
 from typing import Any, Type
 
+import numpy as np
+
 from modacor import ureg
 
 from .databundle import DataBundle
@@ -46,6 +48,18 @@ def check_data(
         if not (intensity_object.internal_units == required_unit):
             message_handler.error(f"{data_element_name} should have units of {required_unit}.")
             return False
+    return True
+
+
+def arrays_are_equal_shape(
+    array1: np.ndarray,
+    array2: np.ndarray,
+) -> bool:
+    """
+    Check if two arrays have the same shape.
+    """
+    if array1.shape != array2.shape:
+        return False
     return True
 
 

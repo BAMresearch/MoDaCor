@@ -29,8 +29,7 @@ def validate_rank_of_data(instance, attribute, value):
 @define
 class BaseData:
     """
-    BaseData is a data class that stores the core data array and its associated metadata.
-    It is designed to be used as a base class for more specialized data classes.
+    BaseData is a data class that stores a data array and its associated metadata.
     """
 
     # Core data array stored as an xarray DataArray
