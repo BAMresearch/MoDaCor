@@ -43,8 +43,12 @@ class PoissonUncertainties(ProcessStep):
 
         # Get the data
         data = self.processing_data
-        signal = data["signal"].signal
+        output = {}
+        for key in self.configuration["with_processing_keys"]:
+            databundle = data.get(key)
+            signal = databundle["signal"].signal
 
-        # Add the variance to the data
-        data["signal"].variances["Poisson"] = np.clip(signal, 1, None)
-        return {"signal": data["signal"]}
+            # Add the variance to the data
+            databundle["signal"].variances["Poisson"] = np.clip(signal, 1, None)
+            output[key] = databundle
+        return output
