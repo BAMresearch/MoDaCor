@@ -22,8 +22,8 @@ def flat_data():
     data = ProcessingData()
     data["bundle1"] = DataBundle()
     data["bundle2"] = DataBundle()
-    data["bundle1"]["key1"] = BaseData(signal=np.arange(50))
-    data["bundle2"]["key2"] = BaseData(signal=np.ones((10, 10)))
+    data["bundle1"]["signal"] = BaseData(signal=np.arange(50))
+    data["bundle2"]["signal"] = BaseData(signal=np.ones((10, 10)))
     return data
 
 
@@ -60,4 +60,4 @@ def test_actual_processstep(flat_data):
             node.processing_data = flat_data
             node.execute(flat_data)
             pipeline.done(node)
-    assert node.produced_outputs["signal"].variances["Poisson"].mean().astype(int) == 100
+    assert node.produced_outputs["bundle2"]["signal"].variances["Poisson"].mean().astype(int) == 1
