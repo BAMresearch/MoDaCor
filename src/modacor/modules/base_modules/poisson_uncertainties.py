@@ -36,14 +36,19 @@ class PoissonUncertainties(ProcessStep):
         step_note="This is a simple Poisson uncertainty calculation based on the signal intensity",
     )
 
-    def calculate(self, data: DataBundle, **kwargs: Any):
+    def calculate(self):
         """
         Calculate the Poisson uncertainties for the data
         """
 
         # Get the data
-        signal = data["signal"].signal
+        data = self.processing_data
+        output = {}
+        for key in self.configuration["with_processing_keys"]:
+            databundle = data.get(key)
+            signal = databundle["signal"].signal
 
-        # Add the variance to the data
-        data["signal"].variances["Poisson"] = np.clip(signal, 1, None)
-        return {"signal": data["signal"]}
+            # Add the variance to the data
+            databundle["signal"].variances["Poisson"] = np.clip(signal, 1, None)
+            output[key] = databundle
+        return output

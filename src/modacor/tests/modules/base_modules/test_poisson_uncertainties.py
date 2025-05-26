@@ -28,7 +28,10 @@ __status__ = "Alpha"
 
 
 from modacor.modules.base_modules.poisson_uncertainties import *
+from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.io_sources import IoSources
 
 from os.path import abspath
 from logging import WARNING
@@ -39,19 +42,23 @@ import tempfile
 import unittest
 import h5py
 
+TEST_IO_SOURCES = IoSources()
+
 
 class TestPoissonUncertainties(unittest.TestCase):
     """Testing class for modacor/modules/base_modules/poisson_uncertainties.py"""
 
     def setUp(self):
-        self.test_data = np.arange(0,100).reshape((10, 10))
-        self.test_data_bundle = DataBundle(signal = self.test_data)
-
+        self.test_processing_data = ProcessingData()
+        self.test_data = BaseData(signal=np.arange(0, 100).reshape((10, 10)))
+        self.test_data_bundle = DataBundle(signal=self.test_data)
+        self.test_processing_data["bundle"] = self.test_data_bundle
 
     def tearDown(self):
         pass
 
-
     def test_poisson_calculation(self):
-        poisson_uncertainties = PoissonUncertainties()
-        poisson_uncertainties.calculate(self.test_data_bundle)
+        poisson_uncertainties = PoissonUncertainties(io_sources=TEST_IO_SOURCES)
+        poisson_uncertainties.modify_config("with_processing_keys", ["bundle"])
+        poisson_uncertainties.processing_data = self.test_processing_data
+        poisson_uncertainties.calculate()
