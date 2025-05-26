@@ -26,7 +26,7 @@ def test_data_and_display_data_properties(sample_data):
     )
 
     # Test the 'data' property
-    expected_data = sample_data * 2.0
+    expected_data = sample_data / 2.0
     # Here we check that the computed values match the expected ones.
     assert (bd.mean() == expected_data).all(), "data property did not apply the scalar correctly."
 
