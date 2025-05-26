@@ -17,6 +17,7 @@ TEST_IO_SOURCES = IoSources()
 TEST_DATA = ProcessingData()
 TEST_DATA["data"] = DataBundle()
 
+
 @pytest.fixture
 def flat_data():
     data = ProcessingData()
@@ -51,7 +52,10 @@ def test_processstep_pipeline(flat_data):
 
 def test_actual_processstep(flat_data):
     "test running the PoissonUncertainties Process step"
-    graph = {PoissonUncertainties(TEST_IO_SOURCES): {}}
+    step = PoissonUncertainties(TEST_IO_SOURCES)
+    # we need to supply a list of values here
+    step.modify_config("with_processing_keys", ["bundle2"])
+    graph = {step: {}}
 
     pipeline = Pipeline(graph=graph)
     pipeline.prepare()
