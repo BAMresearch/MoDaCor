@@ -1,9 +1,10 @@
 # import tiled
 # import tiled.client
 import logging
-from typing import Dict, List, Optional, Self
+from typing import Any, Dict, List, Optional, Self
 
 import numpy as np
+import pint
 from attrs import define, field
 from attrs import validators as v
 
@@ -12,17 +13,43 @@ from modacor import ureg
 logger = logging.getLogger(__name__)
 
 
-# Custom validator for the rank_of_data field
 def validate_rank_of_data(instance, attribute, value):
-    # Ensure rank_of_data is between 1 and 3.
-    if not (0 <= value <= 3):
+    # Must be between 0 and 3
+    if not 0 <= value <= 3:
         raise ValueError(f"{attribute.name} must be between 0 and 3, got {value}.")
-    # Check that rank_of_data does not exceed the number of dimensions in signal.
-    # This assumes that signal is provided and is a valid numpy array.
+
+    # For array‐like signals, rank cannot exceed ndim
     if instance.signal is not None and value > instance.signal.ndim:
         raise ValueError(
-            f"{attribute.name} ({value}) cannot exceed the dimensionality of signal "
-            f"(ndim={instance.signal.ndim})."
+            f"{attribute.name} ({value}) cannot exceed signal dim (ndim={instance.signal.ndim})."
+        )
+
+
+def signal_converter(value):
+    """
+    Convert the input value to a numpy array if it is not already one.
+    """
+    return np.array(value, dtype=float) if not isinstance(value, np.ndarray) else value
+
+
+def validate_broadcast(signal: np.ndarray, arr: np.ndarray, name: str) -> None:
+    """
+    Raise if `arr` cannot broadcast to `signal.shape`.
+    Scalars (size=1) and None are always accepted.
+    """
+    if arr.size == 1:
+        return  # compatible with any shape
+
+    try:
+        out_shape = np.broadcast_shapes(signal.shape, arr.shape)
+    except ValueError:
+        raise ValueError(
+            f"'{name}' with shape {arr.shape} cannot broadcast to signal shape {signal.shape}."
+        )
+
+    if out_shape != signal.shape:
+        raise ValueError(
+            f"'{name}' with shape {arr.shape} does not broadcast to signal shape {signal.shape}."
         )
 
 
@@ -32,88 +59,49 @@ class BaseData:
     BaseData is a data class that stores a data array and its associated metadata.
     """
 
+    # required:
     # Core data array stored as an xarray DataArray
-    signal: np.ndarray = field(factory=np.ndarray, validator=[v.instance_of(np.ndarray)])
-
+    signal: np.ndarray = field(converter=signal_converter, validator=v.instance_of(np.ndarray))
     # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
-    variances: Dict[str, np.ndarray] = field(factory=dict, validator=[v.instance_of(dict)])
+    variances: Dict[str, np.ndarray] = field(validator=v.instance_of(dict))
+    # Unit of signal*scalar - required input 'dimensionless' for dimensionless data
+    units: ureg.Unit = field(validator=v.instance_of(ureg.Unit))  # type: ignore
+    # optional:
+    # weights for the signal, can be used for weighted averaging
+    weighting: np.ndarray = field(
+        default=np.array(1.0),
+        converter=signal_converter,
+        validator=v.instance_of(np.ndarray),
+    )
+    # scalar for the signal, should be applied before certain operations to signal,
+    # at which point signal_variance is normalized to scalar^2, and scalar to scalar (=1)
+    scalar: float = field(default=1.0, converter=float, validator=v.instance_of(float))
+    scalar_variance: float = field(default=0.0, converter=float, validator=v.instance_of(float))
 
-    axes: List[Self | None] = field(factory=list, validator=[v.instance_of(list)])
-
+    # metadata
+    axes: List[Self | None] = field(factory=list, validator=v.instance_of(list))
     # Rank of the data with custom validation:
-    # Must be between 0 and 3 and not exceed the dimensionality of internal_data.
-    rank_of_data: int = field(factory=int, validator=[v.instance_of(int), validate_rank_of_data])
-
-    # Scalers to put on the denominator, sparated from the array for distinct uncertainty
-    normalization: Optional[np.ndarray] = field(
-        default=None, validator=v.optional(v.instance_of(np.ndarray))
+    # Must be between 0 and 3 and not exceed the dimensionality of signal.
+    rank_of_data: int = field(
+        default=0, converter=int, validator=[v.instance_of(int), validate_rank_of_data]
     )
-    normalization_factor: float = field(default=1.0, validator=v.instance_of(float))
-    normalization_factor_variance: float = field(default=0.0, validator=v.instance_of(float))
-    # Unit information using Pint units - required input (ingest, internal, and display)
-    signal_units: ureg.Unit = field(
-        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
-    )
-
-    normalization_units: ureg.Unit = field(
-        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
-    )
-    normalization_factor_units: ureg.Unit = field(
-        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
-    )
-    # array with some normalization (exposure time, solid-angle ....)
 
     def __attrs_post_init__(self):
-        if self.normalization is None:
-            self.normalization = np.ones(self.signal.shape)
-
-    @property
-    def mean(self) -> np.ndarray:
         """
-        Returns the signal array with the normalization applied.
-        The result is cast to internal units.
+        Post-initialization to ensure that the shapes of elements in variances dict,
+        and the shapes of weighting are compatible with the signal array.
         """
-        return self.signal / self.normalization
+        # Validate variances
+        for kind, var in self.variances.items():
+            validate_broadcast(self.signal, var, f"variances[{kind}]")
 
-    def std(self, kind) -> np.ndarray:
+        # Validate weighting
+        validate_broadcast(self.signal, self.weighting, "weighting")
+
+    def apply_scalar(self) -> None:
         """
-        Returns the uncertainties, i.e. standard deviation
-        The result is cast to internal units.
+        Apply the internal scalar to the signal and update the scalar and scalar_variance.
         """
-        return np.sqrt(self.variances[kind] / self.normalization)
-
-    def sem(self, kind) -> np.ndarray:
-        """
-        Returns the uncertainties, i.e. standard deviation
-        The result is cast to internal units.
-        """
-        return np.sqrt(self.variances[kind]) / self.normalization
-
-    @property
-    def _unit_scale(self, display_units) -> float:
-        return (1 * self.internal_units).to(display_units).magnitude
-
-    @property
-    def display_data(self) -> np.ndarray:
-        """
-        Returns the internal_data array with the scalar applied and converted
-        to display units using Pint's unit conversion.
-        """
-        return self._unit_scale(self.display_units) * self.signal / self.normalization
-
-    @property
-    def mask(self) -> np.ndarray:
-        """calculate the mask for the array"""
-        return self.normalization == 0
-
-    @mask.setter
-    def mask(self, value):
-        """Apply a mask to the data"""
-        idx = np.where(value)
-        self.signal[idx] = 0
-        self.normalization[idx] = 0
-        for var in self.variances.values():
-            var[idx] = 0
-
-    def add_poisson_noise(self):
-        self.varinces["poisson"] = np.random.poisson(self.signal)
+        self.signal *= self.scalar
+        self.scalar_variance /= self.scalar**2
+        self.scalar = 1.0  # normalize by self == 1
