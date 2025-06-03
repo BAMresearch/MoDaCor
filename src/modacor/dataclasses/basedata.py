@@ -105,3 +105,24 @@ class BaseData:
         self.signal *= self.scalar
         self.scalar_variance /= self.scalar**2
         self.scalar = 1.0  # normalize by self == 1
+
+    def to_units(self, new_units: pint.Unit) -> None:
+        """
+        Convert the signal and variances to new units.
+        """
+        if not isinstance(new_units, ureg.Unit):
+            raise TypeError(f"new_units must be a pint.Unit, got {type(new_units)}.")
+
+        if not self.units.is_compatible_with(new_units):
+            raise ValueError(
+                f"Cannot convert from {self.units} to {new_units}. Units are not compatible."
+            )
+
+        # Convert signal
+        cfact = new_units.m_from(self.units)
+        self.signal *= cfact
+        self.units = new_units
+
+        # Convert variances
+        for kind in self.variances.keys():
+            self.variances[kind] *= cfact**2
