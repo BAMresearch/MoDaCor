@@ -63,3 +63,4 @@ class TestPoissonUncertainties(unittest.TestCase):
         poisson_uncertainties = PoissonUncertainties(IoSources())
         poisson_uncertainties.calculate(self.test_data_bundle)  # adds to variance
         assert "Poisson" in self.test_data_bundle["signal"].uncertainties
+        assert np.isclose(self.test_data_bundle["signal"].uncertainties["Poisson"].mean(), 6.625, atol=0.01)
