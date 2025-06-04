@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from graphlib import TopologicalSorter
 from pathlib import Path
+import yaml
 
 from attrs import define, field
 from attrs import validators as v
@@ -26,9 +27,25 @@ class Pipeline(TopologicalSorter):
         super().__init__(graph=self.graph)
 
     @classmethod
-    def from_json(cls, path_to_json: Path):
-        # functionality postponed
-        return cls(name="dummy")
+    def from_yaml(cls, path_to_yaml: Path):
+        """
+        Instantiate a Pipeline from a yaml configuration file.
+        """
+
+        yaml_obj = yaml.safe_load(path_to_yaml)
+        process_step_instances = {}
+        id_graph = {}
+        for module_name, module_data in yaml_obj["steps"].items():
+            # we need to instantiate ProcessSteps here, but
+            # need to implement a ProcessStep registry
+            step_id = module_data.get("step_id")
+            process_step_instances[step_id] = ProcessStep(io_sources=None)
+            id_graph[step_id] = module_data.get("requires_steps")
+        # translate step_id graph into ProcessStep graph
+        graph = {}
+        for k, v in id_graph.items():
+            graph[process_step_instances[k]] = {process_step_instances[i] for i in v}
+        return cls(name=yaml_obj["name"], graph=graph)
 
     @classmethod
     def from_dict(cls, graph_dict: dict, name=""):
@@ -66,12 +83,12 @@ class Pipeline(TopologicalSorter):
         # reinitialize the TopologicalSorter
         super().__init__(graph=self.graph)
 
-    def run(self, data: DataBundle, **kwargs):
+    def run(self, **kwargs):
         """
-        run pipeline. to be extended for different schedulers
+        run pipeline with simple scheduling.
         """
         self.prepare()
         while self.is_active():
             for node in self.get_ready():
-                node.execute(data, **kwargs)
+                node.execute(**kwargs)
                 self.done(node)

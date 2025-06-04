@@ -27,26 +27,27 @@ __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
 
 
-from modacor.io.hdf.hdf_loader import *
-
-from os import unlink
-import numpy as np
 import tempfile
 import unittest
+from os import unlink
+
 import h5py
+import numpy as np
+
+from ....io.hdf.hdf_loader import *
 
 
 class TestHDFLoader(unittest.TestCase):
     """Testing class for modacor/io/hdf/hdf_loader.py"""
 
     def setUp(self):
-        self.test_hdf_loader = HDFLoader(source_reference = 'Test Data')
+        self.test_hdf_loader = HDFLoader(source_reference="Test Data")
         self.temp_file_handle = tempfile.NamedTemporaryFile(delete=False, delete_on_close=False)
         self.temp_file_path = self.temp_file_handle.name
         self.temp_file_handle.close()
         self.temp_dataset_name = "dataset"
         self.temp_dataset_shape = (10, 2)
-        self.temp_hdf_file = h5py.File(self.temp_file_path, 'w')
+        self.temp_hdf_file = h5py.File(self.temp_file_path, "w")
         self.temp_hdf_file[self.temp_dataset_name] = np.zeros(self.temp_dataset_shape)
         self.temp_file_handle.close()
 

@@ -102,11 +102,7 @@ def main():
                     cov_report_path=project_meta["tool"]["coverage"]["report"]["path"],
                     # Python version to use for general tasks: docs (when tox did not set one)
                     py_ver=".".join(sys.version.split(".")[:2]),
-                    pypi_token=(
-                        "_".join(pypi_host + ["token"]).upper()
-                        if len(pypi_host)
-                        else "TEST_PYPI_TOKEN"
-                    ),
+                    pypi_token=("_".join(pypi_host + ["token"]).upper() if len(pypi_host) else "TEST_PYPI_TOKEN"),
                     pypi_repo="".join(pypi_host) if len(pypi_host) else "testpypi",
                 )
             )

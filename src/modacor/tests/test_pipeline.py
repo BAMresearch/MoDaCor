@@ -1,5 +1,6 @@
 import pytest
 from pathlib import Path
+import yaml
 
 from ..runner.pipeline import Pipeline
 from ..dataclasses.process_step import ProcessStep
@@ -21,6 +22,47 @@ class DummyProcessStepDescriber:
 
 class DummyProcessStep:
     pass
+
+
+@pytest.fixture
+def yaml_one_step():
+    return """
+    name: one_step
+    steps:
+      multiply by xy:
+        module: PoissonUncertainties
+        step_id: 3
+        requires_steps: []
+        configuration:
+          multiplier: 3
+          signal: sample::signal
+        io_sources:
+        - sample
+    """
+
+
+@pytest.fixture
+def yaml_linear_pipeline():
+    return """
+    name: simple_pipeline
+    steps:
+      poisson:
+        module: PoissonUncertainties
+        step_id: 1
+      another poisson:
+        module: PoissonUncertainties
+        step_id: 2
+        requires_steps: [1]
+      multiply by xy:
+        module: PoissonUncertainties
+        step_id: 3
+        requires_steps: [2]
+        configuration:
+          multiplier: 3
+          signal: sample::signal
+        io_sources:
+        - sample
+    """
 
 
 def test_linear_pipeline(linear_pipeline):
@@ -75,3 +117,16 @@ def test_diverging_branch_addition(
     pipeline.add_outgoing_branch(branch, branching_node)
     assert [*pipeline.static_order()] == [1, 2, 3, 6, 5]
     assert pipeline.graph == {3: {2, 1}, 2: {1}, 5: {6}, 6: {2}}
+
+
+def test_yaml_format(yaml_linear_pipeline):
+    yaml_obj = yaml.safe_load(yaml_linear_pipeline)
+    assert "steps" in yaml_obj
+    assert "poisson" in yaml_obj["steps"]
+    assert type(yaml_obj["steps"]["multiply by xy"]["configuration"]) == dict
+
+
+def test_pipeline_from_yaml(yaml_one_step):
+    pipeline = Pipeline.from_yaml(yaml_one_step)
+    assert pipeline.name == "one_step"
+    assert type(pipeline) == Pipeline

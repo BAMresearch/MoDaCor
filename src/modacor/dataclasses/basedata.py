@@ -1,3 +1,5 @@
+__all__ = ["BaseData"]
+
 # import tiled
 # import tiled.client
 import logging
@@ -20,9 +22,7 @@ def validate_rank_of_data(instance, attribute, value) -> None:
 
     # For array‐like signals, rank cannot exceed ndim
     if instance.signal is not None and value > instance.signal.ndim:
-        raise ValueError(
-            f"{attribute.name} ({value}) cannot exceed signal dim (ndim={instance.signal.ndim})."
-        )
+        raise ValueError(f"{attribute.name} ({value}) cannot exceed signal dim (ndim={instance.signal.ndim}).")
 
 
 def signal_converter(value: int | float | np.ndarray) -> np.ndarray:
@@ -43,14 +43,10 @@ def validate_broadcast(signal: np.ndarray, arr: np.ndarray, name: str) -> None:
     try:
         out_shape = np.broadcast_shapes(signal.shape, arr.shape)
     except ValueError:
-        raise ValueError(
-            f"'{name}' with shape {arr.shape} cannot broadcast to signal shape {signal.shape}."
-        )
+        raise ValueError(f"'{name}' with shape {arr.shape} cannot broadcast to signal shape {signal.shape}.")
     # and find out whether the resulting shape does not change the shape of signal
     if out_shape != signal.shape:
-        raise ValueError(
-            f"'{name}' with shape {arr.shape} does not broadcast to signal shape {signal.shape}."
-        )
+        raise ValueError(f"'{name}' with shape {arr.shape} does not broadcast to signal shape {signal.shape}.")
 
 
 @define
@@ -130,9 +126,7 @@ class BaseData:
     axes: List[Self | None] = field(factory=list, validator=v.instance_of(list))
     # Rank of the data with custom validation:
     # Must be between 0 and 3 and not exceed the dimensionality of signal.
-    rank_of_data: int = field(
-        default=0, converter=int, validator=[v.instance_of(int), validate_rank_of_data]
-    )
+    rank_of_data: int = field(default=0, converter=int, validator=[v.instance_of(int), validate_rank_of_data])
 
     def __attrs_post_init__(self):
         """
@@ -207,9 +201,7 @@ class BaseData:
             raise TypeError(f"new_units must be a pint.Unit, got {type(new_units)}.")
 
         if not self.units.is_compatible_with(new_units):
-            raise ValueError(
-                f"Cannot convert from {self.units} to {new_units}. Units are not compatible."
-            )
+            raise ValueError(f"Cannot convert from {self.units} to {new_units}. Units are not compatible.")
 
         # Convert signal
         cfact = new_units.m_from(self.units)

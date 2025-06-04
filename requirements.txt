@@ -10,3 +10,4 @@ stamina
 tox
 scipy
 uncertainties
+pyyaml

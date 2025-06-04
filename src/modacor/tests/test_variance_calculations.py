@@ -6,11 +6,10 @@ with variance propagation by comparing against reference results from the
 `uncertainties` package. Randomly generated arrays simulate real-world numeric data
 with associated variances.
 """
-
 import numpy as np
-from uncertainties.unumpy import nominal_values, std_devs, uarray
 
 from ..math import variance_calculations as varc
+from uncertainties import unumpy
 
 samples = 1000
 
@@ -32,14 +31,14 @@ def test_add():
     y = generate_samples(samples)
     dy = generate_error(y, add_zero_errors=True)
 
-    u_x = uarray(x, dx)
-    u_y = uarray(y, dy)
+    u_x = unumpy.uarray(x, dx)
+    u_y = unumpy.uarray(y, dy)
     expected = u_x + u_y
 
     result, variances = varc.add(x, dx**2, y, dy**2)
 
-    assert np.allclose(result, nominal_values(expected))
-    assert np.allclose(variances, std_devs(expected) ** 2)
+    assert np.allclose(result, unumpy.nominal_values(expected))
+    assert np.allclose(variances, unumpy.std_devs(expected) ** 2)
 
 
 def test_subtract():
@@ -48,14 +47,14 @@ def test_subtract():
     y = generate_samples(samples)
     dy = generate_error(y, add_zero_errors=True)
 
-    u_x = uarray(x, dx)
-    u_y = uarray(y, dy)
+    u_x = unumpy.uarray(x, dx)
+    u_y = unumpy.uarray(y, dy)
     expected = u_x - u_y
 
     result, variances = varc.subtract(x, dx**2, y, dy**2)
 
-    assert np.allclose(result, nominal_values(expected))
-    assert np.allclose(variances, std_devs(expected) ** 2)
+    assert np.allclose(result, unumpy.nominal_values(expected))
+    assert np.allclose(variances, unumpy.std_devs(expected) ** 2)
 
 
 def test_multiply():
@@ -64,14 +63,14 @@ def test_multiply():
     y = generate_samples(samples)
     dy = generate_error(y, add_zero_errors=True)
 
-    u_x = uarray(x, dx)
-    u_y = uarray(y, dy)
+    u_x = unumpy.uarray(x, dx)
+    u_y = unumpy.uarray(y, dy)
     expected = u_x * u_y
 
     result, variances = varc.multiply(x, dx**2, y, dy**2)
 
-    assert np.allclose(result, nominal_values(expected))
-    assert np.allclose(variances, std_devs(expected) ** 2)
+    assert np.allclose(result, unumpy.nominal_values(expected))
+    assert np.allclose(variances, unumpy.std_devs(expected) ** 2)
 
 
 def test_divide():
@@ -80,11 +79,11 @@ def test_divide():
     y = generate_samples(samples, low=1e3)  # avoid divide by very small
     dy = generate_error(y, add_zero_errors=True)
 
-    u_x = uarray(x, dx)
-    u_y = uarray(y, dy)
+    u_x = unumpy.uarray(x, dx)
+    u_y = unumpy.uarray(y, dy)
     expected = u_x / u_y
 
     result, variances = varc.divide(x, dx**2, y, dy**2)
 
-    assert np.allclose(result, nominal_values(expected))
-    assert np.allclose(variances, std_devs(expected) ** 2)
+    assert np.allclose(result, unumpy.nominal_values(expected))
+    assert np.allclose(variances, unumpy.std_devs(expected) ** 2)
