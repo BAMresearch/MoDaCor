@@ -1,7 +1,7 @@
 # import tiled
 # import tiled.client
 import logging
-from typing import Any, Dict, List, Optional, Self
+from typing import Dict, List, Self
 
 import numpy as np
 import pint
@@ -13,7 +13,7 @@ from modacor import ureg
 logger = logging.getLogger(__name__)
 
 
-def validate_rank_of_data(instance, attribute, value):
+def validate_rank_of_data(instance, attribute, value) -> None:
     # Must be between 0 and 3
     if not 0 <= value <= 3:
         raise ValueError(f"{attribute.name} must be between 0 and 3, got {value}.")
@@ -25,7 +25,7 @@ def validate_rank_of_data(instance, attribute, value):
         )
 
 
-def signal_converter(value):
+def signal_converter(value: int | float | np.ndarray) -> np.ndarray:
     """
     Convert the input value to a numpy array if it is not already one.
     """
@@ -39,14 +39,14 @@ def validate_broadcast(signal: np.ndarray, arr: np.ndarray, name: str) -> None:
     """
     if arr.size == 1:
         return  # compatible with any shape
-
+    # find out if it can be broadcast at all
     try:
         out_shape = np.broadcast_shapes(signal.shape, arr.shape)
     except ValueError:
         raise ValueError(
             f"'{name}' with shape {arr.shape} cannot broadcast to signal shape {signal.shape}."
         )
-
+    # and find out whether the resulting shape does not change the shape of signal
     if out_shape != signal.shape:
         raise ValueError(
             f"'{name}' with shape {arr.shape} does not broadcast to signal shape {signal.shape}."
@@ -63,7 +63,8 @@ class BaseData:
     # Core data array stored as an xarray DataArray
     signal: np.ndarray = field(converter=signal_converter, validator=v.instance_of(np.ndarray))
     # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
-    variances: Dict[str, np.ndarray] = field(validator=v.instance_of(dict))
+    uncertainties: Dict[str, np.ndarray] = field(validator=v.instance_of(dict))
+    # variances: Dict[str, np.ndarray] = field(validator=v.instance_of(dict))
     # Unit of signal*scalar - required input 'dimensionless' for dimensionless data
     units: ureg.Unit = field(validator=v.instance_of(ureg.Unit))  # type: ignore
     # optional:
@@ -76,7 +77,8 @@ class BaseData:
     # scalar for the signal, should be applied before certain operations to signal,
     # at which point signal_variance is normalized to scalar^2, and scalar to scalar (=1)
     scalar: float = field(default=1.0, converter=float, validator=v.instance_of(float))
-    scalar_variance: float = field(default=0.0, converter=float, validator=v.instance_of(float))
+    scalar_uncertainty: float = field(default=0.0, converter=float, validator=v.instance_of(float))
+    # scalar_variance: float = field(default=0.0, converter=float, validator=v.instance_of(float))
 
     # metadata
     axes: List[Self | None] = field(factory=list, validator=v.instance_of(list))
@@ -97,6 +99,51 @@ class BaseData:
 
         # Validate weighting
         validate_broadcast(self.signal, self.weighting, "weighting")
+
+    @property
+    def scalar_variance(self) -> float:
+        """
+        Calculate the variance of the scalar.
+        If scalar_uncertainty is provided, it is used to calculate the variance.
+        Otherwise, it defaults to 0.0.
+        """
+        return self.scalar_uncertainty**2
+
+    @scalar_variance.setter
+    def scalar_variance(self, value: float) -> None:
+        """
+        Set the scalar variance.
+        """
+        if not isinstance(value, (int, float, np.ndarray)):
+            raise TypeError(f"scalar_variance must be a number, got {type(value)}.")
+        if isinstance(value, np.ndarray):
+            if value.size != 1:
+                raise ValueError("scalar_variance must be a scalar value, got an array.")
+            value = value.item()
+        self.scalar_uncertainty = value**0.5  # much faster than np.sqrt(value)
+
+    @property
+    def variances(self) -> Dict[str, np.ndarray]:
+        """
+        Get the variances dictionary, calculated from uncertainties.
+        """
+        return {kind: var**2 for kind, var in self.uncertainties.items()}
+
+    @variances.setter
+    def variances(self, value: Dict[str, np.ndarray]) -> None:
+        """
+        Set the uncertainties dictionary via the variances.
+        """
+        if not isinstance(value, dict):
+            raise TypeError(f"variances must be a dict, got {type(value)}.")
+        if not all(isinstance(v, (np.ndarray, int, float)) for v in value.values()):
+            raise TypeError("All variances must be int, float or numpy arrays.")
+        # validate using validate_broadcast
+        for kind, var in value.items():
+            if not isinstance(var, np.ndarray):
+                var = np.array(var, dtype=float)
+            validate_broadcast(self.signal, var, f"variances[{kind}]")
+        self.uncertainties.update({kind: var**0.5 for kind, var in value.items()})
 
     def apply_scalar(self) -> None:
         """
@@ -124,5 +171,5 @@ class BaseData:
         self.units = new_units
 
         # Convert variances
-        for kind in self.variances.keys():
-            self.variances[kind] *= cfact**2
+        for kind in self.uncertainties.keys():
+            self.uncertainties[kind] *= cfact
