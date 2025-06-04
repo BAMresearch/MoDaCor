@@ -56,7 +56,53 @@ def validate_broadcast(signal: np.ndarray, arr: np.ndarray, name: str) -> None:
 @define
 class BaseData:
     """
-    BaseData is a data class that stores a data array and its associated metadata.
+    BaseData stores a core data array (`signal`) with associated uncertainties, units,
+    and metadata. It validates that any weighting or uncertainty arrays broadcast to
+    the shape of `signal`, and provides utilities for scalar operations and unit conversion.
+
+    Attributes
+    ----------
+    signal : np.ndarray
+        The primary data array. All weighting/uncertainty arrays must be broadcastable
+        to this shape.
+    uncertainties : Dict[str, np.ndarray]
+        Uncertainty (as one‐sigma standard deviation) arrays keyed by type (e.g., “poisson”,
+        “SEM”). Each array must broadcast to `signal.shape`. Variances are computed as
+        `uncertainties[k]**2`.
+    units : pint.Unit
+        Physical units of `signal*scalar` and their uncertainties.
+    weighting : np.ndarray, optional
+        Weights for `signal` (default is a scalar 1.0) for use in averaging operations.
+        Must broadcast to `signal.shape`.
+    scalar : float, default=1.0
+        Multiplicative factor for `signal`. Calling `apply_scalar()` multiplies `signal`
+        by this and adjusts its variance/uncertainty accordingly.
+    scalar_uncertainty : float, default=0.0
+        One‐sigma uncertainty (std) on `scalar`, used in `scalar_variance`.
+    axes : List[BaseData | None]
+        Optional metadata for each axis of `signal`. Defaults to an empty list.
+    rank_of_data : int, default=0
+        Rank (0–3) of the data; 1 is line data, 2 is image data. Must not exceed
+        `signal.ndim`.
+
+    Properties
+    ----------
+    scalar_variance : float
+        Returns `scalar_uncertainty**2`. Setting this expects a numeric (or size‐1 array)
+        and stores `scalar_uncertainty = sqrt(value)`.
+    variances : Dict[str, np.ndarray]
+        Returns `{k: u**2 for k, u in uncertainties.items()}`. Assigning expects a dict
+        of variance arrays; each is validated against `signal.shape` and
+        converted into `uncertainties[k] = sqrt(var)`.
+
+    Methods
+    -------
+    apply_scalar():
+        Multiplies `signal` by `scalar`, normalizes `scalar_uncertainty` by `scalar`,
+        and finally resets `scalar` to 1.0.
+    to_units(new_units: pint.Unit):
+        Converts internal `signal` and all `uncertainties` to `new_units` if compatible with
+        the existing `units`. Raises `TypeError` or `ValueError` on invalid input.
     """
 
     # required:
@@ -150,7 +196,7 @@ class BaseData:
         Apply the internal scalar to the signal and update the scalar and scalar_variance.
         """
         self.signal *= self.scalar
-        self.scalar_variance /= self.scalar**2
+        self.scalar_uncertainty /= self.scalar
         self.scalar = 1.0  # normalize by self == 1
 
     def to_units(self, new_units: pint.Unit) -> None:
