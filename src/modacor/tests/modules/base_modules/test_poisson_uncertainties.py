@@ -36,22 +36,30 @@ import unittest
 # from os import unlink
 import numpy as np
 
+from modacor import ureg
+from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.modules.base_modules.poisson_uncertainties import *
-
-# import h5py
+from modacor.io.io_sources import IoSources
+from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertainties
 
 
 class TestPoissonUncertainties(unittest.TestCase):
     """Testing class for modacor/modules/base_modules/poisson_uncertainties.py"""
 
     def setUp(self):
-        self.test_data = np.arange(0, 100).reshape((10, 10))
+        self.test_data = BaseData(
+            signal=np.arange(100, dtype=float).reshape((10, 10)),
+            uncertainties={
+                "SEM": 0.2,  # scalar uncertainty, not used in this test
+            },
+            units=ureg.counts,
+        )
         self.test_data_bundle = DataBundle(signal=self.test_data)
 
     def tearDown(self):
         pass
 
     def test_poisson_calculation(self):
-        poisson_uncertainties = PoissonUncertainties()
-        poisson_uncertainties.calculate(self.test_data_bundle)
+        poisson_uncertainties = PoissonUncertainties(IoSources())
+        poisson_uncertainties.calculate(self.test_data_bundle)  # adds to variance
+        assert "Poisson" in self.test_data_bundle["signal"].uncertainties
