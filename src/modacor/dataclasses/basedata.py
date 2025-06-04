@@ -6,11 +6,11 @@ import logging
 from typing import Dict, List, Self
 
 import numpy as np
+
+# from modacor import ureg
 import pint
 from attrs import define, field
 from attrs import validators as v
-
-from modacor import ureg
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,14 @@ def signal_converter(value: int | float | np.ndarray) -> np.ndarray:
     Convert the input value to a numpy array if it is not already one.
     """
     return np.array(value, dtype=float) if not isinstance(value, np.ndarray) else value
+
+
+def dict_signal_converter(value: Dict[str, int | float | np.ndarray]) -> Dict[str, np.ndarray]:
+    """
+    Convert a dictionary of values to a dictionary of numpy arrays.
+    Each value in the dictionary is converted to a numpy array if it is not already one.
+    """
+    return {k: signal_converter(v) for k, v in value.items()}
 
 
 def validate_broadcast(signal: np.ndarray, arr: np.ndarray, name: str) -> None:
@@ -65,6 +73,10 @@ class BaseData:
         Uncertainty (as one‐sigma standard deviation) arrays keyed by type (e.g., “poisson”,
         “SEM”). Each array must broadcast to `signal.shape`. Variances are computed as
         `uncertainties[k]**2`.
+        Uncertainty propagation in operations that combine BaseData elements will try to
+        apply the incoming uncertainties by matched key,
+        If only a single uncertainty is found (ideally named 'propagate_to_all'), it will be
+        applied to all uncertainties.
     units : pint.Unit
         Physical units of `signal*scalar` and their uncertainties.
     weighting : np.ndarray, optional
@@ -105,10 +117,10 @@ class BaseData:
     # Core data array stored as an xarray DataArray
     signal: np.ndarray = field(converter=signal_converter, validator=v.instance_of(np.ndarray))
     # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
-    uncertainties: Dict[str, np.ndarray] = field(validator=v.instance_of(dict))
+    uncertainties: Dict[str, np.ndarray] = field(converter=dict_signal_converter, validator=v.instance_of(dict))
     # variances: Dict[str, np.ndarray] = field(validator=v.instance_of(dict))
     # Unit of signal*scalar - required input 'dimensionless' for dimensionless data
-    units: ureg.Unit = field(validator=v.instance_of(ureg.Unit))  # type: ignore
+    units: pint.Unit = field(validator=v.instance_of(pint.Unit))  # type: ignore
     # optional:
     # weights for the signal, can be used for weighted averaging
     weighting: np.ndarray = field(

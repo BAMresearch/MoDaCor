@@ -72,14 +72,13 @@ class StaticMetadata(IoSource):
                 else:
                     # invalid entry, raise an error or log it
                     self.logger.error(
-                        f"Invalid entry for key '{key}': {entry}. Expected 'value', 'units', and"
-                        " 'variance'."
+                        f"Invalid entry for key '{key}': {entry}. Expected 'value', 'units', and 'variance'."
                     )
             else:
                 # Store other metadata as static metadata
                 self._static_metadata_cache[key] = entry
 
-    def get_static_metadata(self, data_key: str):
+    def get_static_metadata(self, data_key: str) -> Any:
         if data_key not in self._static_metadata_cache:
             self.logger.error(f"Static metadata key '{data_key}' not in cache.")
             return None
