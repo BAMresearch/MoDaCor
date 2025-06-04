@@ -250,13 +250,6 @@ class BaseData:
             validate_broadcast(self.signal, arr, f"variances[{kind}]")
             self.uncertainties[kind] = arr**0.5
 
-        # validate using validate_broadcast
-        # for kind, var in value.items():
-        #     if not isinstance(var, np.ndarray):
-        #         var = np.array(var, dtype=float)
-        #     validate_broadcast(self.signal, var, f"variances[{kind}]")
-        # self.uncertainties.update({kind: var**0.5 for kind, var in value.items()})
-
     def apply_scalar(self) -> None:
         """
         Apply the internal scalar to the signal and update the scalar and scalar_variance.
