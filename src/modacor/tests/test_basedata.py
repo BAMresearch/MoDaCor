@@ -183,6 +183,10 @@ def test_rank_of_data_validation_errors(simple_basedata):
     bd.rank_of_data = 1  # <= ndim
     assert bd.rank_of_data == 1
 
+    # invalid rank, 3 > ndim
+    with pytest.raises(ValueError):
+        bd.rank_of_data = 3
+
     # invalid rank > 3
     with pytest.raises(ValueError):
         bd.rank_of_data = 5
