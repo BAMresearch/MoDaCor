@@ -3,16 +3,58 @@ __all__ = ["BaseData"]
 # import tiled
 # import tiled.client
 import logging
+from collections.abc import MutableMapping
 from typing import Dict, List, Self
 
 import numpy as np
 
 # from modacor import ureg
 import pint
-from attrs import define, field
+from attrs import define, field, setters
 from attrs import validators as v
 
 logger = logging.getLogger(__name__)
+
+
+# make a varianceDict that quacks like a dict, but is secretly a view on the uncertainties dict
+class _VarianceDict(MutableMapping):
+    def __init__(self, parent: "BaseData"):
+        self._parent = parent
+
+    def __getitem__(self, key):
+        # Return variance = (one‐sigma uncertainty)**2
+        return (self._parent.uncertainties[key]) ** 2
+
+    def __iter__(self):
+        # Iterate over keys in the underlying uncertainties dict
+        return iter(self._parent.uncertainties)
+
+    def __len__(self):
+        return len(self._parent.uncertainties)
+
+    def __setitem__(self, key, var):
+        # Accept scalar or array‐like, coerce to ndarray
+        arr = np.asarray(var, dtype=float)
+        # Validate broadcast to signal
+        validate_broadcast(self._parent.signal, arr, f"variances[{key}]")
+        # Store sqrt(var) as the one‐sigma uncertainty
+        self._parent.uncertainties[key] = np.asarray(arr**0.5)
+
+    def __delitem__(self, key):
+        del self._parent.uncertainties[key]
+
+    def __repr__(self):
+        """
+        Display exactly like a normal dict of {key: variance_array}, so that
+        printing `a.variances` looks familiar.
+        """
+        # Build a plain Python dict of {key: self[key]} for repr
+        d = {k: self[k] for k in self._parent.uncertainties}
+        return repr(d)
+
+    def __str__(self):
+        # Optional: same as __repr__
+        return self.__repr__()
 
 
 def validate_rank_of_data(instance, attribute, value) -> None:
@@ -115,30 +157,38 @@ class BaseData:
 
     # required:
     # Core data array stored as an xarray DataArray
-    signal: np.ndarray = field(converter=signal_converter, validator=v.instance_of(np.ndarray))
+    signal: np.ndarray = field(
+        converter=signal_converter, validator=v.instance_of(np.ndarray), on_setattr=setters.validate
+    )
     # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
-    uncertainties: Dict[str, np.ndarray] = field(converter=dict_signal_converter, validator=v.instance_of(dict))
+    uncertainties: Dict[str, np.ndarray] = field(
+        converter=dict_signal_converter, validator=v.instance_of(dict), on_setattr=setters.validate
+    )
     # variances: Dict[str, np.ndarray] = field(validator=v.instance_of(dict))
     # Unit of signal*scalar - required input 'dimensionless' for dimensionless data
-    units: pint.Unit = field(validator=v.instance_of(pint.Unit))  # type: ignore
+    units: pint.Unit = field(validator=v.instance_of(pint.Unit), on_setattr=setters.validate)  # type: ignore
     # optional:
     # weights for the signal, can be used for weighted averaging
     weighting: np.ndarray = field(
         default=np.array(1.0),
         converter=signal_converter,
         validator=v.instance_of(np.ndarray),
+        on_setattr=setters.validate,
     )
     # scalar for the signal, should be applied before certain operations to signal,
     # at which point signal_variance is normalized to scalar^2, and scalar to scalar (=1)
-    scalar: float = field(default=1.0, converter=float, validator=v.instance_of(float))
-    scalar_uncertainty: float = field(default=0.0, converter=float, validator=v.instance_of(float))
-    # scalar_variance: float = field(default=0.0, converter=float, validator=v.instance_of(float))
+    scalar: float = field(default=1.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate)
+    scalar_uncertainty: float = field(
+        default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate
+    )
 
     # metadata
-    axes: List[Self | None] = field(factory=list, validator=v.instance_of(list))
+    axes: List[Self | None] = field(factory=list, validator=v.instance_of(list), on_setattr=setters.validate)
     # Rank of the data with custom validation:
     # Must be between 0 and 3 and not exceed the dimensionality of signal.
-    rank_of_data: int = field(default=0, converter=int, validator=[v.instance_of(int), validate_rank_of_data])
+    rank_of_data: int = field(
+        default=0, converter=int, validator=[v.instance_of(int), validate_rank_of_data], on_setattr=setters.validate
+    )
 
     def __attrs_post_init__(self):
         """
@@ -175,11 +225,14 @@ class BaseData:
         self.scalar_uncertainty = value**0.5  # much faster than np.sqrt(value)
 
     @property
-    def variances(self) -> Dict[str, np.ndarray]:
+    def variances(self) -> _VarianceDict:
         """
-        Get the variances dictionary, calculated from uncertainties.
+        A dict‐like view of variances.
+        • Reading:    bd.variances['foo']  → returns uncertainties['foo']**2
+        • Writing:    bd.variances['foo'] = var_array  → validates + sets uncertainties['foo']=sqrt(var_array)
+        • Deleting:   del bd.variances['foo']  → removes 'foo' from uncertainties
         """
-        return {kind: var**2 for kind, var in self.uncertainties.items()}
+        return _VarianceDict(self)
 
     @variances.setter
     def variances(self, value: Dict[str, np.ndarray]) -> None:
@@ -190,12 +243,12 @@ class BaseData:
             raise TypeError(f"variances must be a dict, got {type(value)}.")
         if not all(isinstance(v, (np.ndarray, int, float)) for v in value.values()):
             raise TypeError("All variances must be int, float or numpy arrays.")
-        # validate using validate_broadcast
+        # (Optionally clear existing uncertainties, or merge—here we'll just overwrite keys:)
+        self.uncertainties.clear()  # clear existing uncertainties
         for kind, var in value.items():
-            if not isinstance(var, np.ndarray):
-                var = np.array(var, dtype=float)
-            validate_broadcast(self.signal, var, f"variances[{kind}]")
-        self.uncertainties.update({kind: var**0.5 for kind, var in value.items()})
+            arr = np.asarray(var, dtype=float)
+            validate_broadcast(self.signal, arr, f"variances[{kind}]")
+            self.uncertainties[kind] = arr**0.5
 
     def apply_scalar(self) -> None:
         """
