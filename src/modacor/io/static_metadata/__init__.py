@@ -25,33 +25,3 @@
 __license__ = "BSD-3-Clause"
 __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
-
-
-# import tempfile
-import unittest
-
-# from os.path import abspath
-# from logging import WARNING
-# from os.path import abspath
-# from os import unlink
-import numpy as np
-
-from modacor.dataclasses.databundle import DataBundle
-from modacor.modules.base_modules.poisson_uncertainties import *
-
-# import h5py
-
-
-class TestPoissonUncertainties(unittest.TestCase):
-    """Testing class for modacor/modules/base_modules/poisson_uncertainties.py"""
-
-    def setUp(self):
-        self.test_data = np.arange(0, 100).reshape((10, 10))
-        self.test_data_bundle = DataBundle(signal=self.test_data)
-
-    def tearDown(self):
-        pass
-
-    def test_poisson_calculation(self):
-        poisson_uncertainties = PoissonUncertainties()
-        poisson_uncertainties.calculate(self.test_data_bundle)
