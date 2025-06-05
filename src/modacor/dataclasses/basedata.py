@@ -270,22 +270,23 @@ class BaseData:
         self.scalar_uncertainty /= self.scalar
         self.scalar = 1.0  # normalize by self == 1
 
-    # move to a separate processing module for separation of concerns:
-    # def to_units(self, new_units: pint.Unit) -> None:
-    #     """
-    #     Convert the signal and variances to new units.
-    #     """
-    #     if not isinstance(new_units, ureg.Unit):
-    #         raise TypeError(f"new_units must be a pint.Unit, got {type(new_units)}.")
+    def to_units(self, new_units: pint.Unit) -> None:
+        """
+        Convert the signal and variances to new units.
+        """
+        if not isinstance(new_units, ureg.Unit):
+            raise TypeError(f"new_units must be a pint.Unit, got {type(new_units)}.")
 
-    #     if not self.units.is_compatible_with(new_units):
-    #         raise ValueError(f"""
-    #           Cannot convert from {self.units} to {new_units}. Units are not compatible.
-    #         """)
+        if not self.units.is_compatible_with(new_units):
+            raise ValueError(
+                f"""
+              Cannot convert from {self.units} to {new_units}. Units are not compatible.
+            """
+            )
 
-    #     # Convert signal
-    #     cfact = new_units.m_from(self.units)
-    #     self.scalar *= cfact
-    #     self.units = new_units
-    #     # Convert uncertainty
-    #     self.scalar_uncertainty *= cfact
+        # Convert signal
+        cfact = new_units.m_from(self.units)
+        self.scalar *= cfact
+        self.units = new_units
+        # Convert uncertainty
+        self.scalar_uncertainty *= cfact
