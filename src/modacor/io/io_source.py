@@ -79,19 +79,36 @@ class IoSource:
 
     def get_data(self, index: int, data_key: str) -> np.ndarray:
         """
-        Get data and metadata from the IO source using the provided data key.
+        Get data from the IO source using the provided data key.
 
         Parameters
         ----------
         index : int
             The index to access the data.
         data_key : str
-            The key to access the data.
+            The key to access the data, e.g. '/entry1/instrument/detector00/data'.
 
         Returns
         -------
         np.ndarray :
-            The data associated with the provided key.
+            The data array associated with the provided key. For scalars, this is a 0-d array.
+        """
+        raise NotImplementedError("This method should be implemented in subclasses.")
+
+    def get_data_attributes(self, data_key: str) -> dict[str, Any]:
+        """
+        Get data attributes from the IO source if the format supports it else empty dict.
+
+        Parameters
+        ----------
+        data_key : str
+            The key to the data for which attributes are requested.
+
+        Returns
+        -------
+        dict[str, Any] :
+            The attributes associated with the data.
+            Returns an empty dictionary if nothing available or unsupported.
         """
         raise NotImplementedError("This method should be implemented in subclasses.")
 

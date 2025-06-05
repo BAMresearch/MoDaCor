@@ -8,8 +8,6 @@ from typing import Any
 
 import yaml
 
-from modacor.dataclasses.source_data import SourceData
-
 __coding__ = "utf-8"
 __author__ = "Brian R. Pauw"
 __license__ = "BSD3"
@@ -19,7 +17,6 @@ __version__ = "20250524.1"
 __status__ = "Development"  # "Development", "Production"
 from logging import WARNING
 
-import h5py
 import numpy as np
 
 from modacor.administration.licenses import BSD3Clause as __license__  # noqa: F401
@@ -30,7 +27,18 @@ from ..io_source import IoSource
 # end of header and standard imports
 
 
-class StaticMetadata(IoSource):
+def get_from_nested_dict_by_path(data, path):
+    """
+    Get a value from a nested dictionary using a slash-separated path.
+    """
+    # remove leading and trailing slashes
+    path = path.strip("/")
+    for key in path.split("/"):
+        data = data[key]
+    return data
+
+
+class StaticData(IoSource):
     """
     This IoSource is used to load and make experiment metadata available to
     the processing pipeline modules.
@@ -41,8 +49,8 @@ class StaticMetadata(IoSource):
     The entries are returned as BaseData elements, with units and uncertainties.
     """
 
-    _data_cache: dict[str, SourceData] = None
-    _static_metadata_cache: dict[str, Any] = None
+    _yaml_data: dict[str, Any] = dict()
+    _data_cache: dict[str, np.ndarray] = None
 
     def __init__(self, source_reference: str, logging_level=WARNING):
         super().__init__(source_reference)
@@ -58,39 +66,23 @@ class StaticMetadata(IoSource):
         """
         assert file_path.exists(), f"Static metadataa file {file_path} does not exist."
         with open(file_path, "r") as f:
-            data = yaml.safe_load(f)
-
-        for key, entry in data.items():
-            if isinstance(entry, dict):
-                if all(k in entry for k in ("value", "units", "variance")):
-                    self._data_cache[key] = SourceData(
-                        value=np.array(entry.pop("value", [])),
-                        units=entry.pop("units", "rankine"),
-                        variance=np.array(entry.pop("variance", [])),
-                        attributes=entry if entry else {},
-                    )
-                else:
-                    # invalid entry, raise an error or log it
-                    self.logger.error(
-                        f"Invalid entry for key '{key}': {entry}. Expected 'value', 'units', and 'variance'."
-                    )
-            else:
-                # Store other metadata as static metadata
-                self._static_metadata_cache[key] = entry
+            self._yaml_data.update(yaml.safe_load(f))
 
     def get_static_metadata(self, data_key: str) -> Any:
-        if data_key not in self._static_metadata_cache:
-            self.logger.error(f"Static metadata key '{data_key}' not in cache.")
+        """Returns static metadata, which can be anything"""
+        try:
+            return get_from_nested_dict_by_path(self._yaml_data, data_key)
+        except KeyError as e:
+            self.logger.error(f"Static metadata key '{data_key}' not in YAML data: {e}")
             return None
 
-        return self._static_metadata_cache.get(data_key)
-
-    def get_data(self, data_key: str) -> SourceData:
+    def get_data(self, data_key: str) -> np.ndarray:
         """
-        Get the data from the HDF5 file.
+        Get the data from the static metadata.
         """
         if data_key not in self._data_cache:
-            self.logger.error(f"Data key '{data_key}' not in static metadata cache.")
-            return None
+            self.logger.info(f"Data key '{data_key}' not in static metadata cache yet.")
+            # try to convert from the yaml data into an np.asarray
+            self._data_cache.update({data_key: self.get_static_metadata(data_key)})
 
-        return self._data_cache.get(data_key)
+        return np.asarray(self._data_cache.get(data_key), dtype=float)
