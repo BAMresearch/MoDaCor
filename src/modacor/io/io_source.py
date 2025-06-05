@@ -30,9 +30,8 @@ __all__ = ["IoSource"]
 
 from typing import Any
 
+import numpy as np
 from attrs import define, field
-
-from modacor.dataclasses.source_data import SourceData
 
 
 def default_config() -> dict[str, Any]:
@@ -78,7 +77,7 @@ class IoSource:
 
     configuration: dict[str, Any] = field(factory=default_config)
 
-    def get_data(self, index: int, data_key: str) -> SourceData:
+    def get_data(self, index: int, data_key: str) -> np.ndarray:
         """
         Get data and metadata from the IO source using the provided data key.
 
