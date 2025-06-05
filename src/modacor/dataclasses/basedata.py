@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 # make a varianceDict that quacks like a dict, but is secretly a view on the uncertainties dict
-class _VarianceDict(MutableMapping):
+class _VarianceDict(MutableMapping, dict):
     def __init__(self, parent: "BaseData"):
         self._parent = parent
 
@@ -31,6 +31,18 @@ class _VarianceDict(MutableMapping):
 
     def __len__(self):
         return len(self._parent.uncertainties)
+
+    def keys(self):
+        # Return keys of the underlying uncertainties dict
+        return self._parent.uncertainties.keys()
+
+    def items(self):
+        # Return items as (key, variance) pairs
+        tmp = {key: self[key] for key in self._parent.uncertainties}
+        return tmp.items()
+
+    def __contains__(self, x) -> bool:
+        return x in self._parent.uncertainties
 
     def __setitem__(self, key, var):
         # Accept scalar or array‐like, coerce to ndarray
