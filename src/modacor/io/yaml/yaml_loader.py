@@ -38,7 +38,7 @@ def get_from_nested_dict_by_path(data, path):
     return data
 
 
-class StaticData(IoSource):
+class YamlLoader(IoSource):
     """
     This IoSource is used to load and make experiment metadata available to
     the processing pipeline modules.
