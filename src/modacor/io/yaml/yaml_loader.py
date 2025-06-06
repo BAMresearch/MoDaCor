@@ -1,30 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
 # /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
-
-import yaml
-
 __coding__ = "utf-8"
 __author__ = "Brian R. Pauw"
 __license__ = "BSD3"
 __copyright__ = "Copyright 2025, The MoDaCor team"
-__date__ = "24/05/2025"
-__version__ = "20250524.1"
+__date__ = "06/06/2025"
+__version__ = "20250505.1"
 __status__ = "Development"  # "Development", "Production"
+
 from logging import WARNING
+from pathlib import Path
+from typing import Any
 
 import numpy as np
+import yaml
 
 from modacor.administration.licenses import BSD3Clause as __license__  # noqa: F401
 from modacor.dataclasses.messagehandler import MessageHandler
 
 from ..io_source import IoSource
-
-# end of header and standard imports
 
 
 def get_from_nested_dict_by_path(data, path):
