@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 # /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -7,7 +8,7 @@ __coding__ = "utf-8"
 __author__ = "Brian R. Pauw"
 __license__ = "BSD3"
 __copyright__ = "Copyright 2025, The MoDaCor team"
-__date__ = "05/06/2025"
+__date__ = "06/06/2025"
 __version__ = "20250505.1"
 __status__ = "Development"  # "Development", "Production"
 
