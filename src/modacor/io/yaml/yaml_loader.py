@@ -6,11 +6,10 @@ from __future__ import annotations
 
 __coding__ = "utf-8"
 __author__ = "Brian R. Pauw"
-__license__ = "BSD3"
 __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "06/06/2025"
-__version__ = "20250505.1"
 __status__ = "Development"  # "Development", "Production"
+# end of header and standard imports
 
 from logging import WARNING
 from pathlib import Path
