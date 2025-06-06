@@ -1,0 +1,26 @@
+--- # Datafile with examples of static metadata for MoDaCor's static IoSource
+instrument:
+  name: "MOUSE"
+  type: "X-ray scattering"
+  manufacturer: "In-house modified Xenocs"
+  model: "Xeuss 2.0"
+  serial_number: "1"
+probe_properties:
+  wavelength:
+    value: 0.1542
+    unit: "nm"
+    uncertainty: 0.0002
+geometry:
+  sample_position:
+    x:
+      value: 0.0
+      unit: "m"
+      uncertainty: 0.000
+    y:
+      value: 0.0
+      unit: "m"
+      uncertainty: 0.000
+    z:
+      value: 0.0
+      unit: "m"
+      uncertainty: 0.000
