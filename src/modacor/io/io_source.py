@@ -27,11 +27,14 @@ __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
 __all__ = ["IoSource"]
 
-
-from typing import Any
+from typing import Any, Optional, Tuple, Union
 
 import numpy as np
 from attrs import define, field
+
+# for type hinting of slicing:
+Index = Union[int, slice, type(Ellipsis)]
+ArraySlice = Union[Index, Tuple[Index, ...]]
 
 
 def default_config() -> dict[str, Any]:
@@ -77,21 +80,59 @@ class IoSource:
 
     configuration: dict[str, Any] = field(factory=default_config)
 
-    def get_data(self, index: int, data_key: str) -> np.ndarray:
+    def get_data(self, data_key: str, load_slice: Optional[ArraySlice] = None) -> np.ndarray:
         """
         Get data from the IO source using the provided data key.
 
         Parameters
         ----------
-        index : int
-            The index to access the data.
         data_key : str
             The key to access the data, e.g. '/entry1/instrument/detector00/data'.
+        load_slice : Optional[ArraySlice]
+            A slice or tuple of slices to apply to the data. If None, the entire data is returned.
+            Slicing is not yet implemented, so this will raise NotImplementedError if used.
+            Consider using the numpy.s_ or numpy.index_exp for simplifying the slicing syntax.
 
         Returns
         -------
         np.ndarray :
             The data array associated with the provided key. For scalars, this is a 0-d array.
+        """
+        if load_slice is not None:
+            raise NotImplementedError("Slicing is not yet implemented.")
+        raise NotImplementedError("This method should be implemented in subclasses.")
+
+    def get_data_shape(self, data_key: str) -> Tuple[int, ...]:
+        """
+        Get the shape of the data from the IO source if the format supports it else empty tuple.
+
+        Parameters
+        ----------
+        data_key : str
+            The key to the data for which the shape is requested.
+
+        Returns
+        -------
+        Tuple[int, ...] :
+            The shape of the data associated with the provided key.
+            Returns an empty tuple if nothing available or unsupported.
+        """
+        raise NotImplementedError("This method should be implemented in subclasses.")
+
+    def get_data_dtype(self, data_key: str) -> Optional[np.dtype]:
+        """
+        Get the data type of the data from the IO source if the format supports it else None.
+
+        Parameters
+        ----------
+        data_key : str
+            The key to the data for which the dtype is requested.
+
+        Returns
+        -------
+        Optional[np.dtype] :
+            The data type of the data associated with the provided key.
+            Returns None if nothing available or unsupported.
         """
         raise NotImplementedError("This method should be implemented in subclasses.")
 
