@@ -31,18 +31,17 @@ from logging import WARNING
 from os.path import abspath
 
 import h5py
-import numpy as np
 
-from modacor.dataclasses.messagehandler import *
+from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.messagehandler import MessageHandler
 
 from ..io_source import IoSource
-from ..io_sources import IoSources
 
 
 class HDFLoader(IoSource):
-    def __init__(self, source_reference: str, logging_level = WARNING):
+    def __init__(self, source_reference: str, logging_level=WARNING):
         super().__init__(source_reference)
-        self.hdf_logger = MessageHandler(level = logging_level, name = 'hdf5logger')
+        self.hdf_logger = MessageHandler(level=logging_level, name="hdf5logger")
         self._file_path = None
         self._file_reference = None
         self._file_datasets = []
@@ -74,7 +73,20 @@ class HDFLoader(IoSource):
             raise OSError(error)
 
     def _find_datasets(self, path_name, path_object):
-        """An internal function to be used to walk the tree of an HDF5 file and return a list of the datasets within"""
+        """
+        An internal function to be used to walk the tree of an HDF5 file and return a list of
+        the datasets within
+        """
         if isinstance(self._file_reference[path_name], h5py._hl.dataset.Dataset):
             self._file_datasets.append(path_name)
             self._file_datasets_shapes[path_name] = self._file_reference[path_name].shape
+
+    def get_data(self, data_key: str) -> BaseData:
+        raise (NotImplementedError("get_data method not yet implemented in HDFLoader class."))
+
+    def get_static_metadata(self, data_key):
+        raise (
+            NotImplementedError(
+                "get_static_metadata method not yet implemented in HDFLoader class."
+            )
+        )
