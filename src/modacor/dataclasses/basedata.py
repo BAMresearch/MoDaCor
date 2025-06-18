@@ -20,11 +20,11 @@ from collections.abc import MutableMapping
 from typing import Dict, List, Self
 
 import numpy as np
-
-# from modacor import ureg
 import pint
 from attrs import define, field, setters
 from attrs import validators as v
+
+from modacor import ureg
 
 logger = logging.getLogger(__name__)
 
@@ -296,10 +296,15 @@ class BaseData:
         # self.offset_uncertainty /= self.scaling
         self.offset = 0.0  # applied, so no further offset
 
-    def to_units(self, new_units: pint.Unit) -> None:
+    def to_units(self, new_units: pint.Unit, multiplicative_conversion=True) -> None:
         """
-        Convert the signal and variances to new units.
+        Convert the signal and uncertainties to new units.
         """
+        try:
+            new_units = ureg.Unit(new_units)  # ensure new_units is a pint.Unit
+        except pint.errors.UndefinedUnitError as e:
+            raise ValueError(f"Invalid unit provided: {new_units}.") from e
+
         if not isinstance(new_units, ureg.Unit):
             raise TypeError(f"new_units must be a pint.Unit, got {type(new_units)}.")
 
@@ -310,9 +315,20 @@ class BaseData:
             """
             )
 
-        # Convert signal
-        cfact = new_units.m_from(self.units)
-        self.scaling *= cfact
-        self.units = new_units
-        # Convert uncertainty
-        self.scaling_uncertainty *= cfact
+        # If the units are the same, no conversion is needed
+        if self.units == new_units:
+            logger.debug("No unit conversion needed, units are the same.")
+            return
+
+        logger.debug(f"Converting from {self.units} to {new_units}.")
+
+        if multiplicative_conversion:
+            # simple unit conversion, can be done to scalar
+            # Convert signal
+            cfact = new_units.m_from(self.units)
+            self.scaling *= cfact
+            self.units = new_units
+            # Convert uncertainty
+            self.scaling_uncertainty *= cfact
+        else:
+            raise NotImplementedError("Non-multiplicative unit conversion is not implemented yet.")

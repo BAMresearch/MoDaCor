@@ -203,3 +203,25 @@ def test_rank_of_data_validation_errors(simple_basedata):
     # invalid rank > 3
     with pytest.raises(ValueError):
         bd.rank_of_data = 5
+
+
+def test_apply_offset(simple_basedata):
+    bd = simple_basedata
+    original = bd.signal.copy()
+    bd.offset = 3.5
+    bd.offset_uncertainty = 0.5
+    bd.apply_offset()
+    expected = original + 3.5
+    np.testing.assert_allclose(bd.signal, expected)
+
+
+def test_to_units_converts_properly():
+    sig = np.array([[1.0, 2.0], [3.0, 4.0]])
+    bd = BaseData(signal=sig.copy(), units=ureg.meter)
+
+    bd.to_units(ureg.centimeter)
+    bd.apply_scaling()  # unit conversion is applied to scalar
+    bd.apply_offset()
+    expected = sig * 100  # m to cm
+    assert bd.units == ureg.centimeter
+    np.testing.assert_allclose(bd.signal, expected)
