@@ -69,7 +69,7 @@ _TEST_LISTS = [["", "2"], ["", 12], [12, 42], [12, None], ["b", None]]
 _TEST_TUPLES = [("12", "b"), ("", 12), (12, 42), ("a", None), (12, None)]
 
 
-class TestProcessingStep(ProcessStep):
+class TESTProcessingStep(ProcessStep):
     CONFIG_KEYS = {_k: _v for _k, _v in _TEST_KEYS.items()}
 
     def calculate(self) -> dict[str, DataBundle]:
@@ -84,7 +84,7 @@ class TestProcessingStep(ProcessStep):
 def class_with_config_keys(request):
     _keys = request.param
 
-    class TestClass(TestProcessingStep):
+    class TestClass(TESTProcessingStep):
         CONFIG_KEYS = {_key: _TEST_KEYS[_key] for _key in _keys}
 
     return _keys, TestClass
@@ -147,9 +147,9 @@ def test_minimal_instantiation():
 
 
 def test_instantiation_of_subclass():
-    instance = TestProcessingStep(TEST_IO_SOURCES)
-    assert all(k in instance.configuration for k in TestProcessingStep.CONFIG_KEYS)
-    assert isinstance(instance, TestProcessingStep)
+    instance = TESTProcessingStep(TEST_IO_SOURCES)
+    assert all(k in instance.configuration for k in TESTProcessingStep.CONFIG_KEYS)
+    assert isinstance(instance, TESTProcessingStep)
 
 
 def test_process_step__reset():
@@ -179,7 +179,7 @@ def test_modify_config__invalid_key(class_with_config_keys):
 
 
 def test_calculate():
-    ps = TestProcessingStep(TEST_IO_SOURCES)
+    ps = TESTProcessingStep(TEST_IO_SOURCES)
     ps.processing_data = ProcessingData()
     _return = ps.calculate()
     assert isinstance(_return, dict)
@@ -192,7 +192,7 @@ def test_calculate__abstract():
 
 
 def test_execute(processing_data):
-    ps = TestProcessingStep(TEST_IO_SOURCES)
+    ps = TESTProcessingStep(TEST_IO_SOURCES)
     ps.execute(processing_data)
     assert ps.executed is True
     assert ps._ProcessStep__prepared is True

@@ -22,7 +22,7 @@ default_context:
     release_date:              'today'
     year_from:                 '2025'
     year_to:                   '2025'
-    version:                   '0.0.0'
+    version:                   '1.0.0'
     pypi_host:                 'test.pypi.org'
     license:                   'MIT license'
     sphinx_theme:              'furo'
