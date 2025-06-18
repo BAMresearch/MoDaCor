@@ -25,38 +25,3 @@
 __license__ = "BSD-3-Clause"
 __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
-
-
-import unittest
-
-import numpy as np
-
-from modacor import ureg
-from modacor.dataclasses.basedata import BaseData
-from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.processing_data import ProcessingData
-from modacor.io.io_sources import IoSources
-from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertainties
-
-# import h5py
-
-TEST_IO_SOURCES = IoSources()
-
-
-class TestPoissonUncertainties(unittest.TestCase):
-    """Testing class for modacor/modules/base_modules/poisson_uncertainties.py"""
-
-    def setUp(self):
-        self.test_processing_data = ProcessingData()
-        self.test_data = BaseData(signal=np.arange(0, 100).reshape((10, 10)), units=ureg.Unit("count"))
-        self.test_data_bundle = DataBundle(signal=self.test_data)
-        self.test_processing_data["bundle"] = self.test_data_bundle
-
-    def tearDown(self):
-        pass
-
-    def test_poisson_calculation(self):
-        poisson_uncertainties = PoissonUncertainties(io_sources=TEST_IO_SOURCES)
-        poisson_uncertainties.modify_config("with_processing_keys", ["bundle"])
-        poisson_uncertainties.processing_data = self.test_processing_data
-        poisson_uncertainties.calculate()
