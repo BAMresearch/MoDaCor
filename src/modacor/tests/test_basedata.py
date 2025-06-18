@@ -143,12 +143,12 @@ def test_variances_setter_updates_uncertainties_and_validates_shape(simple_based
         bd.variances = {"poisson": np.ones((3, 2))}
 
 
-def test_scalar_variance_property_and_setter(simple_basedata):
+def test_scaling_variance_property_and_setter(simple_basedata):
     bd = simple_basedata
     # default scalar_uncertainty = 0 → variance = 0
     assert bd.scaling_variance == 0.0
 
-    # set scalar_variance via scalar
+    # set scaling_variance via scalar
     bd.scaling_variance = 9.0
     assert bd.scaling_uncertainty == pytest.approx(3.0)
     assert bd.scaling_variance == pytest.approx(9.0)
@@ -178,7 +178,7 @@ def test_apply_scalar_affects_signal_and_uncertainty(simple_basedata):
     bd = simple_basedata
     # Set a non-default scalar and uncertainty
     bd.scaling = 2.0
-    bd.scaling_uncertainty = 0.5  # so scalar_variance = 0.25
+    bd.scaling_uncertainty = 0.5  # so scaling_variance = 0.25
     original_signal = bd.signal.copy()
     bd.apply_scaling()
 
