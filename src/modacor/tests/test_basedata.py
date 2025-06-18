@@ -220,8 +220,7 @@ def test_to_units_converts_properly():
     bd = BaseData(signal=sig.copy(), units=ureg.meter)
 
     bd.to_units(ureg.centimeter)
-    bd.apply_scaling()  # unit conversion is applied to scalar
-    bd.apply_offset()
+    bd.apply_scaling_and_offset()  # unit conversion is applied to scalar
     expected = sig * 100  # m to cm
     assert bd.units == ureg.centimeter
     np.testing.assert_allclose(bd.signal, expected)

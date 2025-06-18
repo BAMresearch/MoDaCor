@@ -296,6 +296,10 @@ class BaseData:
         # self.offset_uncertainty /= self.scaling
         self.offset = 0.0  # applied, so no further offset
 
+    def apply_scaling_and_offset(self) -> None:
+        self.apply_scaling()
+        self.apply_offset()
+
     def to_units(self, new_units: pint.Unit, multiplicative_conversion=True) -> None:
         """
         Convert the signal and uncertainties to new units.
