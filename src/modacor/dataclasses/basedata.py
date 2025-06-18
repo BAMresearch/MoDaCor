@@ -1,3 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# /usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from __future__ import annotations
+
+__coding__ = "utf-8"
+__authors__ = ["Brian R. Pauw, Jérôme Kieffer"]  # add names to the list as appropriate
+__copyright__ = "Copyright 2025, The MoDaCor team"
+__date__ = "18/06/2025"
+__status__ = "Development"  # "Development", "Production"
+# end of header and standard imports
+
 __all__ = ["BaseData"]
 
 # import tiled
@@ -45,7 +58,7 @@ class _VarianceDict(MutableMapping, dict):
         return x in self._parent.uncertainties
 
     def __setitem__(self, key, var):
-        # Accept scalar or array‐like, coerce to ndarray
+        # Accept scaling or array‐like, coerce to ndarray
         arr = np.asarray(var, dtype=float)
         # Validate broadcast to signal
         validate_broadcast(self._parent.signal, arr, f"variances[{key}]")
@@ -115,32 +128,32 @@ def validate_broadcast(signal: np.ndarray, arr: np.ndarray, name: str) -> None:
 class BaseData:
     """
     BaseData stores a core data array (`signal`) with associated uncertainties, units,
-    and metadata. It validates that any weighting or uncertainty arrays broadcast to
-    the shape of `signal`, and provides utilities for scalar operations and unit conversion.
+    and metadata. It validates that any weights or uncertainty arrays broadcast to
+    the shape of `signal`, and provides utilities for scaling operations and unit conversion.
 
     Attributes
     ----------
     signal : np.ndarray
-        The primary data array. All weighting/uncertainty arrays must be broadcastable
+        The primary data array. All weights/uncertainty arrays must be broadcastable
         to this shape.
+    units : pint.Unit
+        Physical units of `signal*scaling` and their uncertainties.
     uncertainties : Dict[str, np.ndarray]
         Uncertainty (as one‐sigma standard deviation) arrays keyed by type (e.g., “poisson”,
         “SEM”). Each array must broadcast to `signal.shape`. Variances are computed as
         `uncertainties[k]**2`.
         Uncertainty propagation in operations that combine BaseData elements will try to
         apply the incoming uncertainties by matched key,
-        If only a single uncertainty is found (ideally named 'propagate_to_all'), it will be
+        If only a single uncertainty is found (that should be named 'propagate_to_all'), it will be
         applied to all uncertainties.
-    units : pint.Unit
-        Physical units of `signal*scalar` and their uncertainties.
-    weighting : np.ndarray, optional
-        Weights for `signal` (default is a scalar 1.0) for use in averaging operations.
+    weights : np.ndarray, optional
+        Weights for `signal` (default is a scaling 1.0) for use in averaging operations.
         Must broadcast to `signal.shape`.
-    scalar : float, default=1.0
-        Multiplicative factor for `signal`. Calling `apply_scalar()` multiplies `signal`
+    scaling : float, default=1.0
+        Multiplicative factor for `signal`. Calling `apply_scaling()` multiplies `signal`
         by this and adjusts its variance/uncertainty accordingly.
-    scalar_uncertainty : float, default=0.0
-        One‐sigma uncertainty (std) on `scalar`, used in `scalar_variance`.
+    scaling_uncertainty : float, default=0.0
+        One‐sigma uncertainty (std) on `scaling`, used in `scaling_variance`.
     axes : List[BaseData | None]
         Optional metadata for each axis of `signal`. Defaults to an empty list.
     rank_of_data : int, default=0
@@ -149,9 +162,9 @@ class BaseData:
 
     Properties
     ----------
-    scalar_variance : float
-        Returns `scalar_uncertainty**2`. Setting this expects a numeric (or size‐1 array)
-        and stores `scalar_uncertainty = sqrt(value)`.
+    scaling_variance : float
+        Returns `scaling_uncertainty**2`. Setting this expects a numeric (or size‐1 array)
+        and stores `scaling_uncertainty = sqrt(value)`.
     variances : Dict[str, np.ndarray]
         Returns `{k: u**2 for k, u in uncertainties.items()}`. Assigning expects a dict
         of variance arrays; each is validated against `signal.shape` and
@@ -159,9 +172,9 @@ class BaseData:
 
     Methods
     -------
-    apply_scalar():
-        Multiplies `signal` by `scalar`, normalizes `scalar_uncertainty` by `scalar`,
-        and finally resets `scalar` to 1.0.
+    apply_scaling():
+        Multiplies `signal` by `scaling`, normalizes `scaling_uncertainty` by `scaling`,
+        and finally resets `scaling` to 1.0.
     to_units(new_units: pint.Unit):
         Converts internal `signal` and all `uncertainties` to `new_units` if compatible with
         the existing `units`. Raises `TypeError` or `ValueError` on invalid input.
@@ -172,25 +185,29 @@ class BaseData:
     signal: np.ndarray = field(
         converter=signal_converter, validator=v.instance_of(np.ndarray), on_setattr=setters.validate
     )
-    # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
-    uncertainties: Dict[str, np.ndarray] = field(
-        converter=dict_signal_converter, validator=v.instance_of(dict), on_setattr=setters.validate
-    )
-    # variances: Dict[str, np.ndarray] = field(validator=v.instance_of(dict))
-    # Unit of signal*scalar - required input 'dimensionless' for dimensionless data
+    # Unit of signal*scaling+offset - required input 'dimensionless' for dimensionless data
     units: pint.Unit = field(validator=v.instance_of(pint.Unit), on_setattr=setters.validate)  # type: ignore
     # optional:
+    # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
+    uncertainties: Dict[str, np.ndarray] = field(
+        factory=dict, converter=dict_signal_converter, validator=v.instance_of(dict), on_setattr=setters.validate
+    )
     # weights for the signal, can be used for weighted averaging
-    weighting: np.ndarray = field(
+    weights: np.ndarray = field(
         default=np.array(1.0),
         converter=signal_converter,
         validator=v.instance_of(np.ndarray),
         on_setattr=setters.validate,
     )
-    # scalar for the signal, should be applied before certain operations to signal,
-    # at which point signal_variance is normalized to scalar^2, and scalar to scalar (=1)
-    scalar: float = field(default=1.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate)
-    scalar_uncertainty: float = field(
+    # scaling for the signal, should be applied before certain operations to signal,
+    # at which point signal_variance is normalized to scaling^2, and scaling to scaling (=1)
+    scaling: float = field(default=1.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate)
+    scaling_uncertainty: float = field(
+        default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate
+    )
+
+    offset: float = field(default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate)
+    offset_uncertainty: float = field(
         default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate
     )
 
@@ -205,36 +222,36 @@ class BaseData:
     def __attrs_post_init__(self):
         """
         Post-initialization to ensure that the shapes of elements in variances dict,
-        and the shapes of weighting are compatible with the signal array.
+        and the shapes of weights are compatible with the signal array.
         """
         # Validate variances
         for kind, var in self.variances.items():
             validate_broadcast(self.signal, var, f"variances[{kind}]")
 
-        # Validate weighting
-        validate_broadcast(self.signal, self.weighting, "weighting")
+        # Validate weights
+        validate_broadcast(self.signal, self.weights, "weights")
 
     @property
-    def scalar_variance(self) -> float:
+    def scaling_variance(self) -> float:
         """
-        Calculate the variance of the scalar.
-        If scalar_uncertainty is provided, it is used to calculate the variance.
+        Calculate the variance of the scaling.
+        If scaling_uncertainty is provided, it is used to calculate the variance.
         Otherwise, it defaults to 0.0.
         """
-        return self.scalar_uncertainty**2
+        return self.scaling_uncertainty**2
 
-    @scalar_variance.setter
-    def scalar_variance(self, value: float) -> None:
+    @scaling_variance.setter
+    def scaling_variance(self, value: float) -> None:
         """
-        Set the scalar variance.
+        Set the scaling variance.
         """
         if not isinstance(value, (int, float, np.ndarray)):
-            raise TypeError(f"scalar_variance must be a number, got {type(value)}.")
+            raise TypeError(f"scaling_variance must be a number, got {type(value)}.")
         if isinstance(value, np.ndarray):
             if value.size != 1:
-                raise ValueError("scalar_variance must be a scalar value, got an array.")
+                raise ValueError("scaling_variance must be a scaling value, got an array.")
             value = value.item()
-        self.scalar_uncertainty = value**0.5  # much faster than np.sqrt(value)
+        self.scaling_uncertainty = value**0.5  # much faster than np.sqrt(value)
 
     @property
     def variances(self) -> _VarianceDict:
@@ -262,30 +279,40 @@ class BaseData:
             validate_broadcast(self.signal, arr, f"variances[{kind}]")
             self.uncertainties[kind] = arr**0.5
 
-    def apply_scalar(self) -> None:
+    def apply_scaling(self) -> None:
         """
-        Apply the internal scalar to the signal and update the scalar and scalar_variance.
+        Apply the internal scaling to the signal and update the scaling and scaling_uncertainty.
         """
-        self.signal *= self.scalar
-        self.scalar_uncertainty /= self.scalar
-        self.scalar = 1.0  # normalize by self == 1
+        self.signal *= self.scaling
+        self.scaling_uncertainty /= self.scaling
+        self.scaling = 1.0  # normalize by self == 1
 
-    # move to a separate processing module for separation of concerns:
-    # def to_units(self, new_units: pint.Unit) -> None:
-    #     """
-    #     Convert the signal and variances to new units.
-    #     """
-    #     if not isinstance(new_units, ureg.Unit):
-    #         raise TypeError(f"new_units must be a pint.Unit, got {type(new_units)}.")
+    def apply_offset(self) -> None:
+        """
+        Apply the internal offset to the signal and update the offset and offset_uncertainty.
+        """
+        self.signal += self.offset
+        # offset uncertainty remains unchanged
+        # self.offset_uncertainty /= self.scaling
+        self.offset = 0.0  # applied, so no further offset
 
-    #     if not self.units.is_compatible_with(new_units):
-    #         raise ValueError(f"""
-    #           Cannot convert from {self.units} to {new_units}. Units are not compatible.
-    #         """)
+    def to_units(self, new_units: pint.Unit) -> None:
+        """
+        Convert the signal and variances to new units.
+        """
+        if not isinstance(new_units, ureg.Unit):
+            raise TypeError(f"new_units must be a pint.Unit, got {type(new_units)}.")
 
-    #     # Convert signal
-    #     cfact = new_units.m_from(self.units)
-    #     self.scalar *= cfact
-    #     self.units = new_units
-    #     # Convert uncertainty
-    #     self.scalar_uncertainty *= cfact
+        if not self.units.is_compatible_with(new_units):
+            raise ValueError(
+                f"""
+              Cannot convert from {self.units} to {new_units}. Units are not compatible.
+            """
+            )
+
+        # Convert signal
+        cfact = new_units.m_from(self.units)
+        self.scaling *= cfact
+        self.units = new_units
+        # Convert uncertainty
+        self.scaling_uncertainty *= cfact

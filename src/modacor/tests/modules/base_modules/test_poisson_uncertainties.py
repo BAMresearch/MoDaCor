@@ -20,9 +20,9 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
-
-# from modacor.modules.base_modules.poisson_uncertainties import *
 from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertainties
+
+# import h5py
 
 TEST_IO_SOURCES = IoSources()
 
@@ -31,9 +31,8 @@ class TestPoissonUncertainties(unittest.TestCase):
     """Testing class for modacor/modules/base_modules/poisson_uncertainties.py"""
 
     def setUp(self):
-        signal = np.arange(0, 100).reshape((10, 10))
         self.test_processing_data = ProcessingData()
-        self.test_data = BaseData(signal, units=ureg.Unit("count"))
+        self.test_data = BaseData(signal=np.arange(0, 100).reshape((10, 10)), units=ureg.Unit("count"))
         self.test_data_bundle = DataBundle(signal=self.test_data)
         self.test_processing_data["bundle"] = self.test_data_bundle
 
