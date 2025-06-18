@@ -27,23 +27,16 @@ __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
 
 
-import tempfile
 import unittest
-from logging import WARNING
-from os import unlink
-from os.path import abspath
 
-# from os.path import abspath
-# from logging import WARNING
-# from os.path import abspath
-# from os import unlink
 import numpy as np
 
+from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
-from modacor.modules.base_modules.poisson_uncertainties import *
+from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertainties
 
 # import h5py
 
@@ -55,7 +48,7 @@ class TestPoissonUncertainties(unittest.TestCase):
 
     def setUp(self):
         self.test_processing_data = ProcessingData()
-        self.test_data = BaseData(signal=np.arange(0, 100).reshape((10, 10)))
+        self.test_data = BaseData(signal=np.arange(0, 100).reshape((10, 10)), units=ureg.Unit("count"))
         self.test_data_bundle = DataBundle(signal=self.test_data)
         self.test_processing_data["bundle"] = self.test_data_bundle
 
