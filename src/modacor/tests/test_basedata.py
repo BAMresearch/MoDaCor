@@ -143,12 +143,12 @@ def test_variances_setter_updates_uncertainties_and_validates_shape(simple_based
         bd.variances = {"poisson": np.ones((3, 2))}
 
 
-def test_scalar_variance_property_and_setter(simple_basedata):
+def test_scaling_variance_property_and_setter(simple_basedata):
     bd = simple_basedata
     # default scalar_uncertainty = 0 → variance = 0
     assert bd.scaling_variance == 0.0
 
-    # set scalar_variance via scalar
+    # set scaling_variance via scalar
     bd.scaling_variance = 9.0
     assert bd.scaling_uncertainty == pytest.approx(3.0)
     assert bd.scaling_variance == pytest.approx(9.0)
@@ -178,7 +178,7 @@ def test_apply_scalar_affects_signal_and_uncertainty(simple_basedata):
     bd = simple_basedata
     # Set a non-default scalar and uncertainty
     bd.scaling = 2.0
-    bd.scaling_uncertainty = 0.5  # so scalar_variance = 0.25
+    bd.scaling_uncertainty = 0.5  # so scaling_variance = 0.25
     original_signal = bd.signal.copy()
     bd.apply_scaling()
 
@@ -203,3 +203,24 @@ def test_rank_of_data_validation_errors(simple_basedata):
     # invalid rank > 3
     with pytest.raises(ValueError):
         bd.rank_of_data = 5
+
+
+def test_apply_offset(simple_basedata):
+    bd = simple_basedata
+    original = bd.signal.copy()
+    bd.offset = 3.5
+    bd.offset_uncertainty = 0.5
+    bd.apply_offset()
+    expected = original + 3.5
+    np.testing.assert_allclose(bd.signal, expected)
+
+
+def test_to_units_converts_properly():
+    sig = np.array([[1.0, 2.0], [3.0, 4.0]])
+    bd = BaseData(signal=sig.copy(), units=ureg.meter)
+
+    bd.to_units(ureg.centimeter)
+    bd.apply_scaling_and_offset()  # unit conversion is applied to scalar
+    expected = sig * 100  # m to cm
+    assert bd.units == ureg.centimeter
+    np.testing.assert_allclose(bd.signal, expected)

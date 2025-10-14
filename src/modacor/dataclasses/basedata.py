@@ -20,11 +20,11 @@ from collections.abc import MutableMapping
 from typing import Dict, List, Self
 
 import numpy as np
-
-# from modacor import ureg
 import pint
 from attrs import define, field, setters
 from attrs import validators as v
+
+from modacor import ureg
 
 logger = logging.getLogger(__name__)
 
@@ -199,17 +199,17 @@ class BaseData:
         validator=v.instance_of(np.ndarray),
         on_setattr=setters.validate,
     )
-    # scaling for the signal, should be applied before certain operations to signal,
-    # at which point signal_variance is normalized to scaling^2, and scaling to scaling (=1)
-    scaling: float = field(default=1.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate)
-    scaling_uncertainty: float = field(
-        default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate
-    )
+    # # scaling for the signal, should be applied before certain operations to signal,
+    # # at which point signal_variance is normalized to scaling^2, and scaling to scaling (=1)
+    # scaling: float = field(default=1.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate)
+    # scaling_uncertainty: float = field(
+    #     default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate
+    # )
 
-    offset: float = field(default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate)
-    offset_uncertainty: float = field(
-        default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate
-    )
+    # offset: float = field(default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate)
+    # offset_uncertainty: float = field(
+    #     default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate
+    # )
 
     # metadata
     axes: List[Self | None] = field(factory=list, validator=v.instance_of(list), on_setattr=setters.validate)
@@ -231,27 +231,27 @@ class BaseData:
         # Validate weights
         validate_broadcast(self.signal, self.weights, "weights")
 
-    @property
-    def scaling_variance(self) -> float:
-        """
-        Calculate the variance of the scaling.
-        If scaling_uncertainty is provided, it is used to calculate the variance.
-        Otherwise, it defaults to 0.0.
-        """
-        return self.scaling_uncertainty**2
+    # @property
+    # def scaling_variance(self) -> float:
+    #     """
+    #     Calculate the variance of the scaling.
+    #     If scaling_uncertainty is provided, it is used to calculate the variance.
+    #     Otherwise, it defaults to 0.0.
+    #     """
+    #     return self.scaling_uncertainty**2
 
-    @scaling_variance.setter
-    def scaling_variance(self, value: float) -> None:
-        """
-        Set the scaling variance.
-        """
-        if not isinstance(value, (int, float, np.ndarray)):
-            raise TypeError(f"scaling_variance must be a number, got {type(value)}.")
-        if isinstance(value, np.ndarray):
-            if value.size != 1:
-                raise ValueError("scaling_variance must be a scaling value, got an array.")
-            value = value.item()
-        self.scaling_uncertainty = value**0.5  # much faster than np.sqrt(value)
+    # @scaling_variance.setter
+    # def scaling_variance(self, value: float) -> None:
+    #     """
+    #     Set the scaling variance.
+    #     """
+    #     if not isinstance(value, (int, float, np.ndarray)):
+    #         raise TypeError(f"scaling_variance must be a number, got {type(value)}.")
+    #     if isinstance(value, np.ndarray):
+    #         if value.size != 1:
+    #             raise ValueError("scaling_variance must be a scaling value, got an array.")
+    #         value = value.item()
+    #     self.scaling_uncertainty = value**0.5  # much faster than np.sqrt(value)
 
     @property
     def variances(self) -> _VarianceDict:
@@ -279,27 +279,36 @@ class BaseData:
             validate_broadcast(self.signal, arr, f"variances[{kind}]")
             self.uncertainties[kind] = arr**0.5
 
-    def apply_scaling(self) -> None:
-        """
-        Apply the internal scaling to the signal and update the scaling and scaling_uncertainty.
-        """
-        self.signal *= self.scaling
-        self.scaling_uncertainty /= self.scaling
-        self.scaling = 1.0  # normalize by self == 1
+    # def apply_scaling(self) -> None:
+    #     """
+    #     Apply the internal scaling to the signal and update the scaling and scaling_uncertainty.
+    #     """
+    #     self.signal *= self.scaling
+    #     self.scaling_uncertainty /= self.scaling
+    #     self.scaling = 1.0  # normalize by self == 1
 
-    def apply_offset(self) -> None:
-        """
-        Apply the internal offset to the signal and update the offset and offset_uncertainty.
-        """
-        self.signal += self.offset
-        # offset uncertainty remains unchanged
-        # self.offset_uncertainty /= self.scaling
-        self.offset = 0.0  # applied, so no further offset
+    # def apply_offset(self) -> None:
+    #     """
+    #     Apply the internal offset to the signal and update the offset and offset_uncertainty.
+    #     """
+    #     self.signal += self.offset
+    #     # offset uncertainty remains unchanged
+    #     # self.offset_uncertainty /= self.scaling
+    #     self.offset = 0.0  # applied, so no further offset
 
-    def to_units(self, new_units: pint.Unit) -> None:
+    # def apply_scaling_and_offset(self) -> None:
+    #     self.apply_scaling()
+    #     self.apply_offset()
+
+    def to_units(self, new_units: pint.Unit, multiplicative_conversion=True) -> None:
         """
-        Convert the signal and variances to new units.
+        Convert the signal and uncertainties to new units.
         """
+        try:
+            new_units = ureg.Unit(new_units)  # ensure new_units is a pint.Unit
+        except pint.errors.UndefinedUnitError as e:
+            raise ValueError(f"Invalid unit provided: {new_units}.") from e
+
         if not isinstance(new_units, ureg.Unit):
             raise TypeError(f"new_units must be a pint.Unit, got {type(new_units)}.")
 
@@ -310,9 +319,55 @@ class BaseData:
             """
             )
 
-        # Convert signal
-        cfact = new_units.m_from(self.units)
-        self.scaling *= cfact
-        self.units = new_units
-        # Convert uncertainty
-        self.scaling_uncertainty *= cfact
+        # If the units are the same, no conversion is needed
+        if self.units == new_units:
+            logger.debug("No unit conversion needed, units are the same.")
+            return
+
+        logger.debug(f"Converting from {self.units} to {new_units}.")
+
+        if multiplicative_conversion:
+            # simple unit conversion, can be done to scalar
+            # Convert signal
+            cfact = new_units.m_from(self.units)
+            self.signal *= cfact
+            self.units = new_units
+            # Convert uncertainty
+            for key in self.uncertainties:  # fastest as far as my limited testing goes against iterating over items():
+                self.uncertainties[key] *= cfact
+
+        else:
+            new_signal = ureg.Quantity(self.signal, self.units).to(new_units).magnitude
+            # Convert uncertainties
+            for key in self.uncertainties:
+                # I am not sure but I think this would be the right way for non-multiplicative conversions
+                self.uncertainties[key] *= new_signal / self.signal
+
+    def __mul__(self, other: BaseData | float | int | np.ndarray) -> BaseData:
+        """
+        Multiply the BaseData signal by another BaseData or a scalar.
+        If multiplying by another BaseData, uncertainties are combined.
+        """
+        if isinstance(other, BaseData):
+            # Combine signals and uncertainties
+            self.signal *= other.signal
+            # Combine uncertainties
+            for key, value in other.uncertainties.items():
+                if key in self.uncertainties:
+                    # Combine uncertainties of the same type
+                    self.uncertainties[key] = np.sqrt(self.uncertainties[key] ** 2 + value**2)
+                else:
+                    # Add new uncertainty type
+                    self.uncertainties[key] = value
+            # Combine units
+            self.units *= other.units
+            # Combine weights
+            self.weights *= other.weights
+            # Combine axes
+            # question on how best to do this..
+
+    def __rmul__(self, other: BaseData | float | int | np.ndarray) -> BaseData:
+        """
+        Reverse multiplication, same as __mul__.
+        """
+        return self.__mul__(other)
