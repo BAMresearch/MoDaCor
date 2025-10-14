@@ -186,7 +186,7 @@ class BaseData:
         converter=signal_converter, validator=v.instance_of(np.ndarray), on_setattr=setters.validate
     )
     # Unit of signal*scaling+offset - required input 'dimensionless' for dimensionless data
-    units: pint.Unit = field(validator=v.instance_of(pint.Unit), on_setattr=setters.validate)  # type: ignore
+    units: pint.Unit = field(validator=v.instance_of(pint.Unit), converter=ureg.Unit, on_setattr=setters.validate)  # type: ignore
     # optional:
     # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
     uncertainties: Dict[str, np.ndarray] = field(
@@ -199,17 +199,6 @@ class BaseData:
         validator=v.instance_of(np.ndarray),
         on_setattr=setters.validate,
     )
-    # # scaling for the signal, should be applied before certain operations to signal,
-    # # at which point signal_variance is normalized to scaling^2, and scaling to scaling (=1)
-    # scaling: float = field(default=1.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate)
-    # scaling_uncertainty: float = field(
-    #     default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate
-    # )
-
-    # offset: float = field(default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate)
-    # offset_uncertainty: float = field(
-    #     default=0.0, converter=float, validator=v.instance_of(float), on_setattr=setters.validate
-    # )
 
     # metadata
     axes: List[Self | None] = field(factory=list, validator=v.instance_of(list), on_setattr=setters.validate)
@@ -230,28 +219,6 @@ class BaseData:
 
         # Validate weights
         validate_broadcast(self.signal, self.weights, "weights")
-
-    # @property
-    # def scaling_variance(self) -> float:
-    #     """
-    #     Calculate the variance of the scaling.
-    #     If scaling_uncertainty is provided, it is used to calculate the variance.
-    #     Otherwise, it defaults to 0.0.
-    #     """
-    #     return self.scaling_uncertainty**2
-
-    # @scaling_variance.setter
-    # def scaling_variance(self, value: float) -> None:
-    #     """
-    #     Set the scaling variance.
-    #     """
-    #     if not isinstance(value, (int, float, np.ndarray)):
-    #         raise TypeError(f"scaling_variance must be a number, got {type(value)}.")
-    #     if isinstance(value, np.ndarray):
-    #         if value.size != 1:
-    #             raise ValueError("scaling_variance must be a scaling value, got an array.")
-    #         value = value.item()
-    #     self.scaling_uncertainty = value**0.5  # much faster than np.sqrt(value)
 
     @property
     def variances(self) -> _VarianceDict:
@@ -278,27 +245,6 @@ class BaseData:
             arr = np.asarray(var, dtype=float)
             validate_broadcast(self.signal, arr, f"variances[{kind}]")
             self.uncertainties[kind] = arr**0.5
-
-    # def apply_scaling(self) -> None:
-    #     """
-    #     Apply the internal scaling to the signal and update the scaling and scaling_uncertainty.
-    #     """
-    #     self.signal *= self.scaling
-    #     self.scaling_uncertainty /= self.scaling
-    #     self.scaling = 1.0  # normalize by self == 1
-
-    # def apply_offset(self) -> None:
-    #     """
-    #     Apply the internal offset to the signal and update the offset and offset_uncertainty.
-    #     """
-    #     self.signal += self.offset
-    #     # offset uncertainty remains unchanged
-    #     # self.offset_uncertainty /= self.scaling
-    #     self.offset = 0.0  # applied, so no further offset
-
-    # def apply_scaling_and_offset(self) -> None:
-    #     self.apply_scaling()
-    #     self.apply_offset()
 
     def to_units(self, new_units: pint.Unit, multiplicative_conversion=True) -> None:
         """
@@ -371,3 +317,9 @@ class BaseData:
         Reverse multiplication, same as __mul__.
         """
         return self.__mul__(other)
+
+    def __repr__(self):
+        return f"BaseData(signal={self.signal}, uncertainties={self.uncertainties}, units={self.units})"
+
+    def __str__(self):
+        return f'{self.signal} {self.units} ± {[f"{u} ({k})" for k, u in self.uncertainties.items()]}'
