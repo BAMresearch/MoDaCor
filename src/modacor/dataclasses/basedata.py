@@ -24,6 +24,9 @@ import pint
 from attrs import define, field, setters
 from attrs import validators as v
 
+# trial uncertainties handling via auto_uncertainties. This seems much more performant for arrays than the built-in uncertainties package
+from auto_uncertainties import Uncertainty
+
 from modacor import ureg
 
 logger = logging.getLogger(__name__)
@@ -149,11 +152,6 @@ class BaseData:
     weights : np.ndarray, optional
         Weights for `signal` (default is a scaling 1.0) for use in averaging operations.
         Must broadcast to `signal.shape`.
-    scaling : float, default=1.0
-        Multiplicative factor for `signal`. Calling `apply_scaling()` multiplies `signal`
-        by this and adjusts its variance/uncertainty accordingly.
-    scaling_uncertainty : float, default=0.0
-        One‐sigma uncertainty (std) on `scaling`, used in `scaling_variance`.
     axes : List[BaseData | None]
         Optional metadata for each axis of `signal`. Defaults to an empty list.
     rank_of_data : int, default=0
@@ -162,19 +160,17 @@ class BaseData:
 
     Properties
     ----------
-    scaling_variance : float
-        Returns `scaling_uncertainty**2`. Setting this expects a numeric (or size‐1 array)
-        and stores `scaling_uncertainty = sqrt(value)`.
     variances : Dict[str, np.ndarray]
         Returns `{k: u**2 for k, u in uncertainties.items()}`. Assigning expects a dict
         of variance arrays; each is validated against `signal.shape` and
         converted into `uncertainties[k] = sqrt(var)`.
+    shape : tuple[int, ...]
+        Shape of the `signal` array.
+    size : int
+        Size of the `signal` array.
 
     Methods
     -------
-    apply_scaling():
-        Multiplies `signal` by `scaling`, normalizes `scaling_uncertainty` by `scaling`,
-        and finally resets `scaling` to 1.0.
     to_units(new_units: pint.Unit):
         Converts internal `signal` and all `uncertainties` to `new_units` if compatible with
         the existing `units`. Raises `TypeError` or `ValueError` on invalid input.
@@ -246,6 +242,30 @@ class BaseData:
             validate_broadcast(self.signal, arr, f"variances[{kind}]")
             self.uncertainties[kind] = arr**0.5
 
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """
+        Get the shape of the BaseData signal.
+
+        Returns
+        -------
+        tuple[int, ...] :
+            The shape of the signal.
+        """
+        return self.signal.shape
+
+    @property
+    def size(self) -> int:
+        """
+        Get the size of the BaseData signal.
+
+        Returns
+        -------
+        int :
+            The size of the signal.
+        """
+        return self.signal.size
+
     def to_units(self, new_units: pint.Unit, multiplicative_conversion=True) -> None:
         """
         Convert the signal and uncertainties to new units.
@@ -288,35 +308,6 @@ class BaseData:
             for key in self.uncertainties:
                 # I am not sure but I think this would be the right way for non-multiplicative conversions
                 self.uncertainties[key] *= new_signal / self.signal
-
-    def __mul__(self, other: BaseData | float | int | np.ndarray) -> BaseData:
-        """
-        Multiply the BaseData signal by another BaseData or a scalar.
-        If multiplying by another BaseData, uncertainties are combined.
-        """
-        if isinstance(other, BaseData):
-            # Combine signals and uncertainties
-            self.signal *= other.signal
-            # Combine uncertainties
-            for key, value in other.uncertainties.items():
-                if key in self.uncertainties:
-                    # Combine uncertainties of the same type
-                    self.uncertainties[key] = np.sqrt(self.uncertainties[key] ** 2 + value**2)
-                else:
-                    # Add new uncertainty type
-                    self.uncertainties[key] = value
-            # Combine units
-            self.units *= other.units
-            # Combine weights
-            self.weights *= other.weights
-            # Combine axes
-            # question on how best to do this..
-
-    def __rmul__(self, other: BaseData | float | int | np.ndarray) -> BaseData:
-        """
-        Reverse multiplication, same as __mul__.
-        """
-        return self.__mul__(other)
 
     def __repr__(self):
         return f"BaseData(signal={self.signal}, uncertainties={self.uncertainties}, units={self.units})"
