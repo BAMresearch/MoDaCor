@@ -54,7 +54,7 @@ class YAMLLoader(IoSource):
     _static_metadata_cache: dict[str, Any] = None
 
     def __init__(self, source_reference: str, logging_level=WARNING, resource_location: Path | str | None = None):
-        super().__init__(source_reference)
+        super().__init__(source_reference=source_reference)
         self.logger = MessageHandler(level=logging_level, name="YAMLLoader")
         self._file_path = Path(resource_location) if resource_location is not None else None
         self._file_datasets = []

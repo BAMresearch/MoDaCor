@@ -62,9 +62,9 @@ class IoSource:
             slices can be separated by double semicolon ';;'.
     """
 
-    type_reference: str = field(default="IoSource", validator=attrs.validators.instance_of(str))
     configuration: dict[str, Any] = field(factory=default_config)
     source_reference: str = field(default="", converter=str, validator=attrs.validators.instance_of(str))
+    type_reference: str = "IoSource"
 
     def get_data(self, data_key: str, load_slice: Optional[ArraySlice] = None) -> np.ndarray:
         """
