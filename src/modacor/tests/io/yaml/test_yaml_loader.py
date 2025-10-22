@@ -16,23 +16,23 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ....io.yaml.yaml_loader import YamlLoader
+from ....io.yaml.yaml_loader import YAMLLoader
 
 filepath = Path(__file__).parent / "static_data_example.yaml"
 
 
 def test_yaml_loader_initialization():
     """
-    Test the initialization of the YamlLoader class.
+    Test the initialization of the YAMLLoader class.
     """
-    source = YamlLoader("defaults")
+    source = YAMLLoader("defaults")
     source._load_from_yaml(filepath)
     assert isinstance(source._yaml_data, dict)
     assert isinstance(source._data_cache, dict)
 
 
 def test_yaml_loader_get_value():
-    source = YamlLoader("defaults")
+    source = YAMLLoader("defaults")
     source._load_from_yaml(filepath)
     # at this point, data_cache should be empty:
     assert source._data_cache == {}
