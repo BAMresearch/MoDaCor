@@ -24,10 +24,12 @@ import pint
 from attrs import define, field, setters
 from attrs import validators as v
 
-# trial uncertainties handling via auto_uncertainties. This seems much more performant for arrays than the built-in uncertainties package
-from auto_uncertainties import Uncertainty
-
 from modacor import ureg
+
+# trial uncertainties handling via auto_uncertainties. This seems much more performant for arrays than the built-in uncertainties package
+# update: this will have to be done for now in the modules.
+# from auto_uncertainties import Uncertainty
+
 
 logger = logging.getLogger(__name__)
 
