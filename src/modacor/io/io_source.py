@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import attrs
+
 __coding__ = "utf-8"
 __authors__ = ["Malte Storm", "Brian R. Pauw"]  # add names to the list as appropriate
 __copyright__ = "Copyright 2025, The MoDaCor team"
@@ -60,12 +62,9 @@ class IoSource:
             slices can be separated by double semicolon ';;'.
     """
 
-    type_reference = "IoSource"
+    type_reference: str = field(default="IoSource", validator=attrs.validators.instance_of(str))
     configuration: dict[str, Any] = field(factory=default_config)
-    source_reference: str = ""
-
-    def __init__(self, source_reference: str):
-        self.source_reference = source_reference
+    source_reference: str = field(default="", converter=str, validator=attrs.validators.instance_of(str))
 
     def get_data(self, data_key: str, load_slice: Optional[ArraySlice] = None) -> np.ndarray:
         """

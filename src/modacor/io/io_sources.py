@@ -45,12 +45,12 @@ class IoSources:
         source_reference : str
             The reference name of the source to register.
         """
+        if not isinstance(source, IoSource):
+            raise TypeError("source_class must be a subclass of IoSource")
         if source_reference is None:
             source_reference = source.source_reference
         if not isinstance(source_reference, str):
             raise TypeError("source_name must be a string")
-        if not isinstance(source, IoSource):
-            raise TypeError("source_class must be a subclass of IoSource")
         if source_reference in self.defined_sources:
             raise ValueError(f"Source {source_reference} already registered.")
         self.defined_sources[source_reference] = source
