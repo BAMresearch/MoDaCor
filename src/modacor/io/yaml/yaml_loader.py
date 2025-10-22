@@ -11,6 +11,8 @@ __date__ = "06/06/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
+__all__ = ["YAMLLoader"]
+
 from logging import WARNING
 from pathlib import Path
 from typing import Any
