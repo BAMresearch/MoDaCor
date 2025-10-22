@@ -33,17 +33,20 @@ class IoSources:
 
     defined_sources: dict[str, IoSource] = field(factory=dict)
 
-    def register_source(self, source_reference: str, source: IoSource):
+    def register_source(self, source: IoSource, source_reference: str | None = None):
         """
-        Register a new source class with the given name.
+        Register a new source class with the given name. If no source_reference is provided, the
+        source's own source_reference attribute will be used.
 
         Parameters
         ----------
-        source_reference : str
-            The reference name of the source to register.
         source : IoSource
             The class of the source to register.
+        source_reference : str
+            The reference name of the source to register.
         """
+        if source_reference is None:
+            source_reference = source.source_reference
         if not isinstance(source_reference, str):
             raise TypeError("source_name must be a string")
         if not isinstance(source, IoSource):

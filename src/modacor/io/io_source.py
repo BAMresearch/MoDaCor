@@ -61,8 +61,11 @@ class IoSource:
     """
 
     type_reference = "IoSource"
-
     configuration: dict[str, Any] = field(factory=default_config)
+    source_reference: str = ""
+
+    def __init__(self, source_reference: str):
+        self.source_reference = source_reference
 
     def get_data(self, data_key: str, load_slice: Optional[ArraySlice] = None) -> np.ndarray:
         """
