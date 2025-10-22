@@ -1,39 +1,25 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright 2025 MoDaCor Authors
-#
-# Redistribution and use in source and binary forms, with or without modification,
-# are permitted provided that the following conditions are met:
-# 1. Redistributions of source code must retain the above copyright notice, this
-#    list of conditions and the following disclaimer.
-# 2. Redistributions in binary form must reproduce the above copyright notice,
-#    this list of conditions and the following disclaimer in the documentation
-#    and/or other materials provided with the distribution.
-# 3. Neither the name of the copyright holder nor the names of its contributors
-#    may be used to endorse or promote products derived from this software without
-#    specific prior written permission.
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND
-# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# /usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-__license__ = "BSD-3-Clause"
-__copyright__ = "Copyright 2025 MoDaCor Authors"
-__status__ = "Alpha"
+from __future__ import annotations
+
+__coding__ = "utf-8"
+__author__ = "Brian R. Pauw"
+__copyright__ = "Copyright 2025, The MoDaCor team"
+__date__ = "06/06/2025"
+__status__ = "Development"  # "Development", "Production"
+# end of header and standard imports
+
 __all__ = ["IoSources"]
 
 
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 from attrs import define, field
 
-from modacor.io.io_source import IoSource
+from modacor.io.io_source import ArraySlice, IoSource
 
 
 @define
@@ -47,21 +33,24 @@ class IoSources:
 
     defined_sources: dict[str, IoSource] = field(factory=dict)
 
-    def register_source(self, source_reference: str, source: IoSource):
+    def register_source(self, source: IoSource, source_reference: str | None = None):
         """
-        Register a new source class with the given name.
+        Register a new source class with the given name. If no source_reference is provided, the
+        source's own source_reference attribute will be used.
 
         Parameters
         ----------
-        source_reference : str
-            The reference name of the source to register.
         source : IoSource
             The class of the source to register.
+        source_reference : str
+            The reference name of the source to register.
         """
-        if not isinstance(source_reference, str):
-            raise TypeError("source_name must be a string")
         if not isinstance(source, IoSource):
             raise TypeError("source_class must be a subclass of IoSource")
+        if source_reference is None:
+            source_reference = source.source_reference
+        if not isinstance(source_reference, str):
+            raise TypeError("source_name must be a string")
         if source_reference in self.defined_sources:
             raise ValueError(f"Source {source_reference} already registered.")
         self.defined_sources[source_reference] = source
@@ -109,7 +98,72 @@ class IoSources:
             )
         return _split[0], _split[1]
 
-    def get_data(self, data_reference: str, index: int) -> np.ndarray:
+    def get_data(self, data_reference: str, load_slice: Optional[ArraySlice] = ...) -> np.ndarray:
+        """
+        Get data from the specified source using the provided data key.
+
+        The data_reference is composed of the source reference and the internal
+        data reference, separated by "::".
+
+        Parameters
+        ----------
+        data_reference : str
+            The reference name of the source to access.
+        load_slice : Optional[ArraySlice]
+            A slice or tuple of slices to apply to the data. If None or ellipsis, the entire data is returned.
+
+        Returns
+        -------
+        Any :
+            The data associated with the provided key.
+        """
+        _source_ref, _data_key = self.split_data_reference(data_reference)
+        _source = self.get_source(_source_ref)
+        return _source.get_data(_data_key, load_slice=load_slice)
+
+    def get_data_shape(self, data_reference: str) -> np.ndarray:
+        """
+        Get data from the specified source using the provided data key.
+
+        The data_reference is composed of the source reference and the internal
+        data reference, separated by "::".
+
+        Parameters
+        ----------
+        data_reference : str
+            The reference name of the source to access.
+
+        Returns
+        -------
+        Any :
+            The data associated with the provided key.
+        """
+        _source_ref, _data_key = self.split_data_reference(data_reference)
+        _source = self.get_source(_source_ref)
+        return _source.get_data_shape(_data_key)
+
+    def get_data_dtype(self, data_reference: str) -> np.ndarray:
+        """
+        Get data from the specified source using the provided data key.
+
+        The data_reference is composed of the source reference and the internal
+        data reference, separated by "::".
+
+        Parameters
+        ----------
+        data_reference : str
+            The reference name of the source to access.
+
+        Returns
+        -------
+        Any :
+            The data associated with the provided key.
+        """
+        _source_ref, _data_key = self.split_data_reference(data_reference)
+        _source = self.get_source(_source_ref)
+        return _source.get_data_dtype(_data_key)
+
+    def get_data_attributes(self, data_reference: str) -> np.ndarray:
         """
         Get data from the specified source using the provided data key.
 
@@ -130,76 +184,7 @@ class IoSources:
         """
         _source_ref, _data_key = self.split_data_reference(data_reference)
         _source = self.get_source(_source_ref)
-        return _source.get_data(index, _data_key)
-
-    def get_data_shape(self, data_reference: str, index: int) -> np.ndarray:
-        """
-        Get data from the specified source using the provided data key.
-
-        The data_reference is composed of the source reference and the internal
-        data reference, separated by "::".
-
-        Parameters
-        ----------
-        data_reference : str
-            The reference name of the source to access.
-        index : int
-            The index to access the data.
-
-        Returns
-        -------
-        Any :
-            The data associated with the provided key.
-        """
-        _source_ref, _data_key = self.split_data_reference(data_reference)
-        _source = self.get_source(_source_ref)
-        return _source.get_data_shape(index, _data_key)
-
-    def get_data_dtype(self, data_reference: str, index: int) -> np.ndarray:
-        """
-        Get data from the specified source using the provided data key.
-
-        The data_reference is composed of the source reference and the internal
-        data reference, separated by "::".
-
-        Parameters
-        ----------
-        data_reference : str
-            The reference name of the source to access.
-        index : int
-            The index to access the data.
-
-        Returns
-        -------
-        Any :
-            The data associated with the provided key.
-        """
-        _source_ref, _data_key = self.split_data_reference(data_reference)
-        _source = self.get_source(_source_ref)
-        return _source.get_data_dtype(index, _data_key)
-
-    def get_data_attributes(self, data_reference: str, index: int) -> np.ndarray:
-        """
-        Get data from the specified source using the provided data key.
-
-        The data_reference is composed of the source reference and the internal
-        data reference, separated by "::".
-
-        Parameters
-        ----------
-        data_reference : str
-            The reference name of the source to access.
-        index : int
-            The index to access the data.
-
-        Returns
-        -------
-        Any :
-            The data associated with the provided key.
-        """
-        _source_ref, _data_key = self.split_data_reference(data_reference)
-        _source = self.get_source(_source_ref)
-        return _source.get_data_attributes(index, _data_key)
+        return _source.get_data_attributes(_data_key)
 
     def get_static_metadata(self, data_reference: str) -> Any:
         """

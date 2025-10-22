@@ -54,13 +54,14 @@ class YAMLLoader(IoSource):
     _static_metadata_cache: dict[str, Any] = None
 
     def __init__(self, source_reference: str, logging_level=WARNING, resource_location: Path | str | None = None):
-        super().__init__(source_reference)
+        super().__init__(source_reference=source_reference)
         self.logger = MessageHandler(level=logging_level, name="YAMLLoader")
         self._file_path = Path(resource_location) if resource_location is not None else None
         self._file_datasets = []
         self._file_datasets_shapes = {}
         self._data_cache = {}  # for values that are float
         self._static_metadata_cache = {}  # for other elements such as strings and tags
+        self._preload()  # load the yaml data immediately
 
     def _preload(self) -> None:
         """

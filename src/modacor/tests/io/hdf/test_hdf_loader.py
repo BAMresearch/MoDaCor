@@ -26,18 +26,20 @@ class TestHDFLoader(unittest.TestCase):
     """Testing class for modacor/io/hdf/hdf_loader.py"""
 
     def setUp(self):
-        self.test_hdf_loader = HDFLoader(source_reference="Test Data")
         self.temp_file_handle = tempfile.NamedTemporaryFile(delete=False, delete_on_close=False)
         self.temp_file_path = self.temp_file_handle.name
         self.temp_file_handle.close()
         self.temp_dataset_name = "dataset"
         self.temp_dataset_shape = (10, 2)
-        self.temp_hdf_file = h5py.File(self.temp_file_path, "w")
-        self.temp_hdf_file[self.temp_dataset_name] = np.zeros(self.temp_dataset_shape)
-        self.temp_file_handle.close()
+        with h5py.File(self.temp_file_path, "w") as hdf_file:
+            hdf_file.create_dataset(
+                self.temp_dataset_name, data=np.zeros(self.temp_dataset_shape), dtype="float64", compression="gzip"
+            )
+
+        self.test_hdf_loader = HDFLoader(source_reference="Test Data", resource_location=self.temp_file_path)
 
     def tearDown(self):
-        self.test_h5_loader = None
+        self.test_hdf_loader = None
         self.test_file_path = None
         self.test_dataset_name = None
         self.test_dataset_shape = None

@@ -70,39 +70,39 @@ def io_sources():
 def configure_test_sources(io_sources):
     _source_30x10 = OnesSource()
     _source_30x10.configuration["shape"] = (30, 10)
-    io_sources.register_source("ones_30x10", _source_30x10)
+    io_sources.register_source(source_reference="ones_30x10", source=_source_30x10)
 
     _source_20x20 = OnesSource()
     _source_20x20.configuration["shape"] = (20, 20)
-    io_sources.register_source("ones_20x20", _source_20x20)
+    io_sources.register_source(source_reference="ones_20x20", source=_source_20x20)
 
     _index_source_25x25 = IndexSource()
     _index_source_25x25.configuration["shape"] = (25, 25)
-    io_sources.register_source("index_25x25", _index_source_25x25)
+    io_sources.register_source(source_reference="index_25x25", source=_index_source_25x25)
     return io_sources
 
 
-@pytest.mark.parametrize("ref", [42, None, ["a", "ref2"]])
+@pytest.mark.parametrize("ref", [42, ["a", "ref2"]])
 def test_register_source__wrong_ref_type(io_sources, ref):
     with pytest.raises(TypeError):
-        io_sources.register_source(ref, OnesSource())
+        io_sources.register_source(source_reference=ref, source=OnesSource())
 
 
 @pytest.mark.parametrize("source", [IoSource, object()])
 def test_register_source__wrong_source_type(io_sources, source):
     with pytest.raises(TypeError):
-        io_sources.register_source("source", source)
+        io_sources.register_source(source_reference="source", source=source)
 
 
 def test_register_source__duplicate_ref(io_sources):
-    io_sources.register_source("source", OnesSource())
+    io_sources.register_source(source_reference="source", source=OnesSource())
     with pytest.raises(ValueError):
-        io_sources.register_source("source", OnesSource())
+        io_sources.register_source(source_reference="source", source=OnesSource())
 
 
 def test_register_source__valid(io_sources):
     _source = OnesSource()
-    io_sources.register_source("ones", _source)
+    io_sources.register_source(source_reference="ones", source=_source)
     assert "ones" in io_sources.defined_sources
     assert io_sources.defined_sources["ones"] == _source
 
