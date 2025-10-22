@@ -9,9 +9,8 @@ __status__ = "Development"  # "Development", "Production"
 
 from pathlib import Path
 from typing import Any
-from pathlib import Path
-import numpy as np
 
+import numpy as np
 
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep

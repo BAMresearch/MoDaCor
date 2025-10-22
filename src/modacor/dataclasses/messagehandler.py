@@ -3,7 +3,7 @@
 
 import logging
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 
 class MessageHandler:
@@ -29,26 +29,26 @@ class MessageHandler:
         self.consoleLogHandler.setFormatter(formatter)
         self.logger.addHandler(self.consoleLogHandler)
 
-    def log(self, message: str, level: int = None, name: str = None):
+    def log(self, message: str, level: int = None) -> None:  # , name: str = None):
         if level is None:
             level = self.level
 
-        if name is None:
-            name = self.name
-
-        self.logger(message, level=level, name=name)
+        # if name is None:
+        #     name = self.name
+        # does not take a name: # self.logger = logging.getLogger(name)
+        self.logger.log(msg=message, level=level)
 
     def info(self, message: str):
-        self.log(message, level=logging.INFO, name="MoDaCor")
+        self.log(message, level=logging.INFO)
 
     def warning(self, message: str):
-        self.log(message, level=logging.WARNING, name="MoDaCor")
+        self.log(message, level=logging.WARNING)
 
     def error(self, message: str):
-        self.log(message, level=logging.ERROR, name="MoDaCor")
+        self.log(message, level=logging.ERROR)
 
     def critical(self, message: str):
-        self.log(message, level=logging.CRITICAL, name="MoDaCor")
+        self.log(message, level=logging.CRITICAL)
 
     def debug(self, message: str):
-        self.log(message, level=logging.DEBUG, name="MoDaCor")
+        self.log(message, level=logging.DEBUG)

@@ -132,6 +132,75 @@ class IoSources:
         _source = self.get_source(_source_ref)
         return _source.get_data(index, _data_key)
 
+    def get_data_shape(self, data_reference: str, index: int) -> np.ndarray:
+        """
+        Get data from the specified source using the provided data key.
+
+        The data_reference is composed of the source reference and the internal
+        data reference, separated by "::".
+
+        Parameters
+        ----------
+        data_reference : str
+            The reference name of the source to access.
+        index : int
+            The index to access the data.
+
+        Returns
+        -------
+        Any :
+            The data associated with the provided key.
+        """
+        _source_ref, _data_key = self.split_data_reference(data_reference)
+        _source = self.get_source(_source_ref)
+        return _source.get_data_shape(index, _data_key)
+
+    def get_data_dtype(self, data_reference: str, index: int) -> np.ndarray:
+        """
+        Get data from the specified source using the provided data key.
+
+        The data_reference is composed of the source reference and the internal
+        data reference, separated by "::".
+
+        Parameters
+        ----------
+        data_reference : str
+            The reference name of the source to access.
+        index : int
+            The index to access the data.
+
+        Returns
+        -------
+        Any :
+            The data associated with the provided key.
+        """
+        _source_ref, _data_key = self.split_data_reference(data_reference)
+        _source = self.get_source(_source_ref)
+        return _source.get_data_dtype(index, _data_key)
+
+    def get_data_attributes(self, data_reference: str, index: int) -> np.ndarray:
+        """
+        Get data from the specified source using the provided data key.
+
+        The data_reference is composed of the source reference and the internal
+        data reference, separated by "::".
+
+        Parameters
+        ----------
+        data_reference : str
+            The reference name of the source to access.
+        index : int
+            The index to access the data.
+
+        Returns
+        -------
+        Any :
+            The data associated with the provided key.
+        """
+        _source_ref, _data_key = self.split_data_reference(data_reference)
+        _source = self.get_source(_source_ref)
+        return _source.get_data_attributes(index, _data_key)
+
     def get_static_metadata(self, data_reference: str) -> Any:
         """
         Get static metadata from the specified source using the provided data key.
