@@ -4,6 +4,7 @@ import numpy as np
 import pint
 import pytest
 
+from .. import ureg
 from ..dataclasses.basedata import BaseData
 from ..dataclasses.databundle import DataBundle
 from ..dataclasses.process_step import ProcessStep
@@ -73,9 +74,9 @@ class TESTProcessingStep(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         _data = self.processing_data.get("dummy_key", DataBundle())
-        _data["new_key"] = BaseData(signal=np.arange(100).reshape(10, 10))
+        _data["new_key"] = BaseData(signal=np.arange(100).reshape(10, 10), uncertainties={"sem": 0.0}, units=ureg.meter)
         _data2 = self.processing_data.get("bundle2", DataBundle())
-        _data2["new_key"] = BaseData(signal=np.zeros(20))
+        _data2["new_key"] = BaseData(signal=np.zeros(20), uncertainties={"sem": 0.0}, units=ureg.meter)
         return {"dummy_key": _data, "bundle2": _data2}
 
 
@@ -94,8 +95,8 @@ def processing_data():
     data = ProcessingData()
     data["bundle1"] = DataBundle()
     data["bundle2"] = DataBundle()
-    data["bundle1"]["key1"] = BaseData(signal=np.arange(50))
-    data["bundle2"]["key2"] = BaseData(signal=np.ones((10, 10)))
+    data["bundle1"]["key1"] = BaseData(signal=np.arange(50), uncertainties={"sem": 0.0}, units=ureg.meter)
+    data["bundle2"]["key2"] = BaseData(signal=np.ones((10, 10)), uncertainties={"sem": 0.0}, units=ureg.meter)
     return data
 
 
@@ -116,9 +117,7 @@ def test_process_step_default_config__specific(class_with_config_keys):
 
 
 @pytest.mark.parametrize("item", _TEST_VALUES + _TEST_LISTS + _TEST_TUPLES)
-@pytest.mark.parametrize(
-    "class_with_config_keys", [[_k] for _k in _TEST_KEYS.keys()], indirect=True
-)
+@pytest.mark.parametrize("class_with_config_keys", [[_k] for _k in _TEST_KEYS.keys()], indirect=True)
 def test_is_process_step_dict__w_correct_key(class_with_config_keys, item):
     _keys, _class = class_with_config_keys
     _config = _class.CONFIG_KEYS[_keys[0]]
@@ -126,9 +125,7 @@ def test_is_process_step_dict__w_correct_key(class_with_config_keys, item):
     if item is None:
         assert _class.is_process_step_dict(None, None, _test_dict) == _config["allow_none"]
     elif not _config["allow_iterable"]:
-        assert _class.is_process_step_dict(None, None, _test_dict) == isinstance(
-            item, _config["type"]
-        )
+        assert _class.is_process_step_dict(None, None, _test_dict) == isinstance(item, _config["type"])
     elif _config["allow_iterable"]:
         assert _class.is_process_step_dict(None, None, _test_dict) == (
             (isinstance(item, Iterable) and not isinstance(item, str))

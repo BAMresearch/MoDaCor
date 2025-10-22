@@ -1,115 +1,318 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# /usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from __future__ import annotations
+
+__coding__ = "utf-8"
+__authors__ = ["Brian R. Pauw, Jérôme Kieffer"]  # add names to the list as appropriate
+__copyright__ = "Copyright 2025, The MoDaCor team"
+__date__ = "18/06/2025"
+__status__ = "Development"  # "Development", "Production"
+# end of header and standard imports
+
 __all__ = ["BaseData"]
 
 # import tiled
 # import tiled.client
 import logging
-from typing import Dict, List, Optional, Self
+from collections.abc import MutableMapping
+from typing import Dict, List, Self
 
 import numpy as np
-from attrs import define, field
+import pint
+from attrs import define, field, setters
 from attrs import validators as v
 
 from modacor import ureg
 
+# trial uncertainties handling via auto_uncertainties. This seems much more performant for arrays than the built-in uncertainties package
+# update: this will have to be done for now in the modules.
+# from auto_uncertainties import Uncertainty
+
+
 logger = logging.getLogger(__name__)
 
 
-# Custom validator for the rank_of_data field
-def validate_rank_of_data(instance, attribute, value):
-    # Ensure rank_of_data is between 1 and 3.
-    if not (0 <= value <= 3):
+# make a varianceDict that quacks like a dict, but is secretly a view on the uncertainties dict
+class _VarianceDict(MutableMapping, dict):
+    def __init__(self, parent: "BaseData"):
+        self._parent = parent
+
+    def __getitem__(self, key):
+        # Return variance = (one‐sigma uncertainty)**2
+        return (self._parent.uncertainties[key]) ** 2
+
+    def __iter__(self):
+        # Iterate over keys in the underlying uncertainties dict
+        return iter(self._parent.uncertainties)
+
+    def __len__(self):
+        return len(self._parent.uncertainties)
+
+    def keys(self):
+        # Return keys of the underlying uncertainties dict
+        return self._parent.uncertainties.keys()
+
+    def items(self):
+        # Return items as (key, variance) pairs
+        tmp = {key: self[key] for key in self._parent.uncertainties}
+        return tmp.items()
+
+    def __contains__(self, x) -> bool:
+        return x in self._parent.uncertainties
+
+    def __setitem__(self, key, var):
+        # Accept scaling or array‐like, coerce to ndarray
+        arr = np.asarray(var, dtype=float)
+        # Validate broadcast to signal
+        validate_broadcast(self._parent.signal, arr, f"variances[{key}]")
+        # Store sqrt(var) as the one‐sigma uncertainty
+        self._parent.uncertainties[key] = np.asarray(arr**0.5)
+
+    def __delitem__(self, key):
+        del self._parent.uncertainties[key]
+
+    def __repr__(self):
+        """
+        Display exactly like a normal dict of {key: variance_array}, so that
+        printing `a.variances` looks familiar.
+        """
+        # Build a plain Python dict of {key: self[key]} for repr
+        d = {k: self[k] for k in self._parent.uncertainties}
+        return repr(d)
+
+    def __str__(self):
+        # Optional: same as __repr__
+        return self.__repr__()
+
+
+def validate_rank_of_data(instance, attribute, value) -> None:
+    # Must be between 0 and 3
+    if not 0 <= value <= 3:
         raise ValueError(f"{attribute.name} must be between 0 and 3, got {value}.")
-    # Check that rank_of_data does not exceed the number of dimensions in signal.
-    # This assumes that signal is provided and is a valid numpy array.
+
+    # For array‐like signals, rank cannot exceed ndim
     if instance.signal is not None and value > instance.signal.ndim:
-        raise ValueError(
-            f"{attribute.name} ({value}) cannot exceed the dimensionality of signal (ndim={instance.signal.ndim})."
-        )
+        raise ValueError(f"{attribute.name} ({value}) cannot exceed signal dim (ndim={instance.signal.ndim}).")
+
+
+def signal_converter(value: int | float | np.ndarray) -> np.ndarray:
+    """
+    Convert the input value to a numpy array if it is not already one.
+    """
+    return np.array(value, dtype=float) if not isinstance(value, np.ndarray) else value
+
+
+def dict_signal_converter(value: Dict[str, int | float | np.ndarray]) -> Dict[str, np.ndarray]:
+    """
+    Convert a dictionary of values to a dictionary of numpy arrays.
+    Each value in the dictionary is converted to a numpy array if it is not already one.
+    """
+    return {k: signal_converter(v) for k, v in value.items()}
+
+
+def validate_broadcast(signal: np.ndarray, arr: np.ndarray, name: str) -> None:
+    """
+    Raise if `arr` cannot broadcast to `signal.shape`.
+    Scalars (size=1) and None are always accepted.
+    """
+    if arr.size == 1:
+        return  # compatible with any shape
+    # find out if it can be broadcast at all
+    try:
+        out_shape = np.broadcast_shapes(signal.shape, arr.shape)
+    except ValueError:
+        raise ValueError(f"'{name}' with shape {arr.shape} cannot broadcast to signal shape {signal.shape}.")
+    # and find out whether the resulting shape does not change the shape of signal
+    if out_shape != signal.shape:
+        raise ValueError(f"'{name}' with shape {arr.shape} does not broadcast to signal shape {signal.shape}.")
 
 
 @define
 class BaseData:
     """
-    BaseData is a data class that stores the core data array and its associated metadata.
-    It is designed to be used as a base class for more specialized data classes.
+    BaseData stores a core data array (`signal`) with associated uncertainties, units,
+    and metadata. It validates that any weights or uncertainty arrays broadcast to
+    the shape of `signal`, and provides utilities for scaling operations and unit conversion.
+
+    Attributes
+    ----------
+    signal : np.ndarray
+        The primary data array. All weights/uncertainty arrays must be broadcastable
+        to this shape.
+    units : pint.Unit
+        Physical units of `signal*scaling` and their uncertainties.
+    uncertainties : Dict[str, np.ndarray]
+        Uncertainty (as one‐sigma standard deviation) arrays keyed by type (e.g., “poisson”,
+        “SEM”). Each array must broadcast to `signal.shape`. Variances are computed as
+        `uncertainties[k]**2`.
+        Uncertainty propagation in operations that combine BaseData elements will try to
+        apply the incoming uncertainties by matched key,
+        If only a single uncertainty is found (that should be named 'propagate_to_all'), it will be
+        applied to all uncertainties.
+    weights : np.ndarray, optional
+        Weights for `signal` (default is a scaling 1.0) for use in averaging operations.
+        Must broadcast to `signal.shape`.
+    axes : List[BaseData | None]
+        Optional metadata for each axis of `signal`. Defaults to an empty list.
+    rank_of_data : int, default=0
+        Rank (0–3) of the data; 1 is line data, 2 is image data. Must not exceed
+        `signal.ndim`.
+
+    Properties
+    ----------
+    variances : Dict[str, np.ndarray]
+        Returns `{k: u**2 for k, u in uncertainties.items()}`. Assigning expects a dict
+        of variance arrays; each is validated against `signal.shape` and
+        converted into `uncertainties[k] = sqrt(var)`.
+    shape : tuple[int, ...]
+        Shape of the `signal` array.
+    size : int
+        Size of the `signal` array.
+
+    Methods
+    -------
+    to_units(new_units: pint.Unit):
+        Converts internal `signal` and all `uncertainties` to `new_units` if compatible with
+        the existing `units`. Raises `TypeError` or `ValueError` on invalid input.
     """
 
+    # required:
     # Core data array stored as an xarray DataArray
-    signal: np.ndarray = field(default=np.array(()), validator=[v.instance_of(np.ndarray)])
-
+    signal: np.ndarray = field(
+        converter=signal_converter, validator=v.instance_of(np.ndarray), on_setattr=setters.validate
+    )
+    # Unit of signal*scaling+offset - required input 'dimensionless' for dimensionless data
+    units: pint.Unit = field(validator=v.instance_of(pint.Unit), converter=ureg.Unit, on_setattr=setters.validate)  # type: ignore
+    # optional:
     # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
-    variances: Dict[str, np.ndarray] = field(factory=dict, validator=[v.instance_of(dict)])
+    uncertainties: Dict[str, np.ndarray] = field(
+        factory=dict, converter=dict_signal_converter, validator=v.instance_of(dict), on_setattr=setters.validate
+    )
+    # weights for the signal, can be used for weighted averaging
+    weights: np.ndarray = field(
+        default=np.array(1.0),
+        converter=signal_converter,
+        validator=v.instance_of(np.ndarray),
+        on_setattr=setters.validate,
+    )
 
-    axes: List[Self | None] = field(factory=list, validator=[v.instance_of(list)])
-
+    # metadata
+    axes: List[Self | None] = field(factory=list, validator=v.instance_of(list), on_setattr=setters.validate)
     # Rank of the data with custom validation:
-    # Must be between 0 and 3 and not exceed the dimensionality of internal_data.
-    rank_of_data: int = field(factory=int, validator=[v.instance_of(int), validate_rank_of_data])
-
-    # Scalers to put on the denominator, sparated from the array for distinct uncertainty
-    normalization: Optional[np.ndarray] = field(default=None, validator=v.optional(v.instance_of(np.ndarray)))
-    normalization_factor: float = field(default=1.0, validator=v.instance_of(float))
-    normalization_factor_variance: float = field(default=0.0, validator=v.instance_of(float))
-    # Unit information using Pint units - required input (ingest, internal, and display)
-    signal_units: ureg.Unit = field(
-        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
+    # Must be between 0 and 3 and not exceed the dimensionality of signal.
+    rank_of_data: int = field(
+        default=0, converter=int, validator=[v.instance_of(int), validate_rank_of_data], on_setattr=setters.validate
     )
-
-    normalization_units: ureg.Unit = field(
-        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
-    )
-    normalization_factor_units: ureg.Unit = field(
-        default=ureg.Unit("dimensionless"), validator=v.instance_of(ureg.Unit)
-    )
-    # array with some normalization (exposure time, solid-angle ....)
-
-    @property
-    def shape(self):
-        return self.signal.shape
 
     def __attrs_post_init__(self):
-        if self.normalization is None:
-            self.normalization = np.ones(self.shape)
+        """
+        Post-initialization to ensure that the shapes of elements in variances dict,
+        and the shapes of weights are compatible with the signal array.
+        """
+        # Validate variances
+        for kind, var in self.variances.items():
+            validate_broadcast(self.signal, var, f"variances[{kind}]")
 
-    def mean(self) -> np.ndarray:
-        """
-        Returns the signal array with the normalization applied.
-        The result is cast to internal units.
-        """
-        return self.signal / self.normalization
-
-    def std(self, kind) -> np.ndarray:
-        """
-        Returns the uncertainties, i.e. standard deviation
-        The result is cast to internal units.
-        """
-        return np.sqrt(self.variances[kind] / self.normalization)
+        # Validate weights
+        validate_broadcast(self.signal, self.weights, "weights")
 
     @property
-    def _unit_scale(self, display_units) -> float:
-        return (1 * self.internal_units).to(display_units).magnitude
+    def variances(self) -> _VarianceDict:
+        """
+        A dict‐like view of variances.
+        • Reading:    bd.variances['foo']  → returns uncertainties['foo']**2
+        • Writing:    bd.variances['foo'] = var_array  → validates + sets uncertainties['foo']=sqrt(var_array)
+        • Deleting:   del bd.variances['foo']  → removes 'foo' from uncertainties
+        """
+        return _VarianceDict(self)
+
+    @variances.setter
+    def variances(self, value: Dict[str, np.ndarray]) -> None:
+        """
+        Set the uncertainties dictionary via the variances.
+        """
+        if not isinstance(value, dict):
+            raise TypeError(f"variances must be a dict, got {type(value)}.")
+        if not all(isinstance(v, (np.ndarray, int, float)) for v in value.values()):
+            raise TypeError("All variances must be int, float or numpy arrays.")
+        # (Optionally clear existing uncertainties, or merge—here we'll just overwrite keys:)
+        self.uncertainties.clear()  # clear existing uncertainties
+        for kind, var in value.items():
+            arr = np.asarray(var, dtype=float)
+            validate_broadcast(self.signal, arr, f"variances[{kind}]")
+            self.uncertainties[kind] = arr**0.5
 
     @property
-    def display_data(self) -> np.ndarray:
+    def shape(self) -> tuple[int, ...]:
         """
-        Returns the internal_data array with the scalar applied and converted
-        to display units using Pint's unit conversion.
+        Get the shape of the BaseData signal.
+
+        Returns
+        -------
+        tuple[int, ...] :
+            The shape of the signal.
         """
-        return self._unit_scale(self.display_units) * self.signal / self.normalization
+        return self.signal.shape
 
     @property
-    def mask(self) -> np.ndarray:
-        """calculate the mask for the array"""
-        return self.normalization == 0
+    def size(self) -> int:
+        """
+        Get the size of the BaseData signal.
 
-    @mask.setter
-    def mask(self, value):
-        """Apply a mask to the data"""
-        idx = np.where(value)
-        self.signal[idx] = 0
-        self.normalization[idx] = 0
-        for var in self.variances.values():
-            var[idx] = 0
+        Returns
+        -------
+        int :
+            The size of the signal.
+        """
+        return self.signal.size
 
-    def add_poisson_noise(self):
-        self.varinces["poisson"] = np.random.poisson(self.signal)
+    def to_units(self, new_units: pint.Unit, multiplicative_conversion=True) -> None:
+        """
+        Convert the signal and uncertainties to new units.
+        """
+        try:
+            new_units = ureg.Unit(new_units)  # ensure new_units is a pint.Unit
+        except pint.errors.UndefinedUnitError as e:
+            raise ValueError(f"Invalid unit provided: {new_units}.") from e
+
+        if not isinstance(new_units, ureg.Unit):
+            raise TypeError(f"new_units must be a pint.Unit, got {type(new_units)}.")
+
+        if not self.units.is_compatible_with(new_units):
+            raise ValueError(
+                f"""
+              Cannot convert from {self.units} to {new_units}. Units are not compatible.
+            """
+            )
+
+        # If the units are the same, no conversion is needed
+        if self.units == new_units:
+            logger.debug("No unit conversion needed, units are the same.")
+            return
+
+        logger.debug(f"Converting from {self.units} to {new_units}.")
+
+        if multiplicative_conversion:
+            # simple unit conversion, can be done to scalar
+            # Convert signal
+            cfact = new_units.m_from(self.units)
+            self.signal *= cfact
+            self.units = new_units
+            # Convert uncertainty
+            for key in self.uncertainties:  # fastest as far as my limited testing goes against iterating over items():
+                self.uncertainties[key] *= cfact
+
+        else:
+            new_signal = ureg.Quantity(self.signal, self.units).to(new_units).magnitude
+            # Convert uncertainties
+            for key in self.uncertainties:
+                # I am not sure but I think this would be the right way for non-multiplicative conversions
+                self.uncertainties[key] *= new_signal / self.signal
+
+    def __repr__(self):
+        return f"BaseData(signal={self.signal}, uncertainties={self.uncertainties}, units={self.units})"
+
+    def __str__(self):
+        return f'{self.signal} {self.units} ± {[f"{u} ({k})" for k, u in self.uncertainties.items()]}'

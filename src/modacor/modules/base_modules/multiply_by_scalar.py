@@ -17,7 +17,7 @@ from modacor.dataclasses.processingdata import ProcessingData
 from modacor.math.variance_calculations import divide
 
 
-class MultiplyByVariable(ProcessStep):
+class MultiplyByScalar(ProcessStep):
     """
     Adding Poisson uncertainties to the data
     """
