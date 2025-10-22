@@ -29,10 +29,10 @@ class HDFLoader(IoSource):
     _data_cache: dict[str, np.ndarray] = None
     _file_path: Path | None = None
 
-    def __init__(self, source_reference: str, logging_level=WARNING, resource_path: Path | str | None = None):
+    def __init__(self, source_reference: str, logging_level=WARNING, resource_location: Path | str | None = None):
         super().__init__(source_reference)
         self.logger = MessageHandler(level=logging_level, name="HDFLoader")
-        self._file_path = Path(resource_path) if resource_path is not None else None
+        self._file_path = Path(resource_location) if resource_location is not None else None
         # self._file_reference = None  # let's not leave open file references lying around if we can help it.
         self._file_datasets = []
         self._file_datasets_shapes = {}

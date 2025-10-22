@@ -25,14 +25,14 @@ def test_yaml_loader_initialization():
     """
     Test the initialization of the YAMLLoader class.
     """
-    source = YAMLLoader("defaults", resource_path=filepath)
+    source = YAMLLoader("defaults", resource_location=filepath)
     source._preload()
     assert isinstance(source._yaml_data, dict)
     assert isinstance(source._data_cache, dict)
 
 
 def test_yaml_loader_get_value():
-    source = YAMLLoader("defaults", resource_path=filepath)
+    source = YAMLLoader("defaults", resource_location=filepath)
     source._preload()
     # at this point, data_cache should be empty:
     assert source._data_cache == {}
