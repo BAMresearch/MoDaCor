@@ -67,7 +67,7 @@ class YAMLLoader(IoSource):
         This method should be implemented to parse the YAML file and populate
         the _data_cache with SourceData objects.
         """
-        assert self._file_path.exists(), f"Static metadata file {self._file_path} does not exist."
+        assert self._file_path.is_file(), self.logger.error(f"Static metadata file {self._file_path} does not exist.")
         with open(self._file_path, "r") as f:
             self._yaml_data.update(yaml.safe_load(f))
 
