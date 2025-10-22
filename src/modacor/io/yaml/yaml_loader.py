@@ -50,21 +50,25 @@ class YAMLLoader(IoSource):
 
     _yaml_data: dict[str, Any] = dict()
     _data_cache: dict[str, np.ndarray] = None
+    _file_path: Path | None = None
 
-    def __init__(self, source_reference: str, logging_level=WARNING):
+    def __init__(self, source_reference: str, logging_level=WARNING, resource_path: Path | str | None = None):
         super().__init__(source_reference)
-        self.logger = MessageHandler(level=logging_level, name="StaticMetadata")
-        self._data_cache = {}  # for values with units and uncertainties
+        self.logger = MessageHandler(level=logging_level, name="YAMLLoader")
+        self._file_path = Path(resource_path) if resource_path is not None else None
+        self._file_datasets = []
+        self._file_datasets_shapes = {}
+        self._data_cache = {}  # for values that are float
         self._static_metadata_cache = {}  # for other elements such as strings and tags
 
-    def _load_from_yaml(self, file_path: Path) -> None:
+    def _preload(self) -> None:
         """
         Load static metadata from a YAML file.
         This method should be implemented to parse the YAML file and populate
         the _data_cache with SourceData objects.
         """
-        assert file_path.exists(), f"Static metadataa file {file_path} does not exist."
-        with open(file_path, "r") as f:
+        assert self._file_path.exists(), f"Static metadata file {self._file_path} does not exist."
+        with open(self._file_path, "r") as f:
             self._yaml_data.update(yaml.safe_load(f))
 
     def get_static_metadata(self, data_key: str) -> Any:
