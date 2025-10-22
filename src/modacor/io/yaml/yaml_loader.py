@@ -61,6 +61,7 @@ class YAMLLoader(IoSource):
         self._file_datasets_shapes = {}
         self._data_cache = {}  # for values that are float
         self._static_metadata_cache = {}  # for other elements such as strings and tags
+        self._preload()  # load the yaml data immediately
 
     def _preload(self) -> None:
         """

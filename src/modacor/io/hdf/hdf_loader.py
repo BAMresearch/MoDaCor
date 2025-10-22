@@ -44,6 +44,7 @@ class HDFLoader(IoSource):
         self._file_datasets_dtypes = {}
         self._data_cache = {}
         self._static_metadata_cache = {}
+        self._preload()  # load the HDF5 file structure immediately so we have some information, but not the data
 
     def _preload(self):
         assert self._file_path.is_file(), self.logger.error(f"HDF5 file {self._file_path} does not exist.")
