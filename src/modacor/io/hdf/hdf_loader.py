@@ -1,75 +1,57 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright 2025 MoDaCor Authors
-#
-# Redistribution and use in source and binary forms, with or without modification,
-# are permitted provided that the following conditions are met:
-# 1. Redistributions of source code must retain the above copyright notice, this
-#    list of conditions and the following disclaimer.
-# 2. Redistributions in binary form must reproduce the above copyright notice,
-#    this list of conditions and the following disclaimer in the documentation
-#    and/or other materials provided with the distribution.
-# 3. Neither the name of the copyright holder nor the names of its contributors
-#    may be used to endorse or promote products derived from this software without
-#    specific prior written permission.
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND
-# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# /usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-__license__ = "BSD-3-Clause"
-__copyright__ = "Copyright 2025 MoDaCor Authors"
-__status__ = "Alpha"
+from __future__ import annotations
 
+from typing import Any, Optional
+
+__coding__ = "utf-8"
+__author__ = "Tim Snow, Brian R. Pauw"
+__copyright__ = "Copyright 2025, The MoDaCor team"
+__date__ = "22/10/2025"
+__status__ = "Development"  # "Development", "Production"
+# end of header and standard imports
+
+__all__ = ["HDFLoader"]
 
 from logging import WARNING
-from os.path import abspath
+from pathlib import Path
 
 import h5py
+import numpy as np
 
-from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.messagehandler import MessageHandler
+
+# from modacor.dataclasses.basedata import BaseData
+from modacor.io.io_source import ArraySlice
 
 from ..io_source import IoSource
 
 
 class HDFLoader(IoSource):
-    def __init__(self, source_reference: str, logging_level=WARNING):
+    _data_cache: dict[str, np.ndarray] = None
+    _file_path: Path | None = None
+    _static_metadata_cache: dict[str, Any] = None
+
+    def __init__(self, source_reference: str, logging_level=WARNING, resource_location: Path | str | None = None):
         super().__init__(source_reference)
-        self.hdf_logger = MessageHandler(level=logging_level, name="hdf5logger")
-        self._file_path = None
-        self._file_reference = None
+        self.logger = MessageHandler(level=logging_level, name="HDFLoader")
+        self._file_path = Path(resource_location) if resource_location is not None else None
+        # self._file_reference = None  # let's not leave open file references lying around if we can help it.
         self._file_datasets = []
         self._file_datasets_shapes = {}
+        self._file_datasets_dtypes = {}
+        self._data_cache = {}
+        self._static_metadata_cache = {}
 
-    def _open_file(self, file_path=None):
-        if file_path is None:
-            error = "No filepath given"
-            self.hdf_logger.log.error(error)
-            raise OSError(error)
-
+    def _preload(self):
+        assert self._file_path.is_file(), self.logger.error(f"HDF5 file {self._file_path} does not exist.")
         try:
-            self._file_reference = h5py.File(file_path, "r")
-            self._file_path = abspath(file_path)
-            self._file_reference.visititems(self._find_datasets)
+            with h5py.File(self._file_path, "r") as f:
+                f.visititems(self._find_datasets)
         except OSError as error:
-            self.hdf_logger.logger.error(error)
-            raise OSError(error)
-
-    def _close_file(self):
-        try:
-            self._file_reference.close()
-            self._file_path = None
-            self._file_reference = None
-            self._file_datasets.clear()
-            self._file_datasets_shapes.clear()
-        except OSError as error:
-            self.hdf_logger.log.error(error)
+            self.logger.log.error(error)
             raise OSError(error)
 
     def _find_datasets(self, path_name, path_object):
@@ -77,16 +59,43 @@ class HDFLoader(IoSource):
         An internal function to be used to walk the tree of an HDF5 file and return a list of
         the datasets within
         """
-        if isinstance(self._file_reference[path_name], h5py._hl.dataset.Dataset):
+        if isinstance(path_object, h5py._hl.dataset.Dataset):
             self._file_datasets.append(path_name)
-            self._file_datasets_shapes[path_name] = self._file_reference[path_name].shape
-
-    def get_data(self, data_key: str) -> BaseData:
-        raise (NotImplementedError("get_data method not yet implemented in HDFLoader class."))
+            self._file_datasets_shapes[path_name] = path_object.shape
+            self._file_datasets_dtypes[path_name] = path_object.dtype
 
     def get_static_metadata(self, data_key):
-        raise (
-            NotImplementedError(
-                "get_static_metadata method not yet implemented in HDFLoader class."
-            )
-        )
+        if data_key not in self._static_metadata_cache:
+            with h5py.File(self._file_path, "r") as f:
+                value = f[data_key][()]
+                # decode bytes to string if necessary
+                if isinstance(value, bytes):
+                    value = value.decode("utf-8")
+                self._static_metadata_cache[data_key] = value
+        return self._static_metadata_cache[data_key]
+
+    def get_data(self, data_key: str, load_slice: ArraySlice = ...) -> np.ndarray:
+        if data_key not in self._data_cache:
+            with h5py.File(self._file_path, "r") as f:
+                data_array = f[data_key][load_slice]  # if load_slice is not None else f[data_key][()]
+                self._data_cache[data_key] = np.array(data_array)
+        return self._data_cache[data_key]
+
+    def get_data_shape(self, data_key: str) -> tuple[int, ...]:
+        if data_key in self._file_datasets_shapes:
+            return self._file_datasets_shapes[data_key]
+        return ()
+
+    def get_data_dtype(self, data_key: str) -> np.dtype | None:
+        if data_key in self._file_datasets_dtypes:
+            return self._file_datasets_dtypes[data_key]
+        return None
+
+    def get_data_attributes(self, data_key: str) -> dict[str, Any]:
+        attributes = {}
+        with h5py.File(self._file_path, "r") as f:
+            if data_key in f:
+                dataset = f[data_key]
+                for attr_key in dataset.attrs:
+                    attributes[attr_key] = dataset.attrs[attr_key]
+        return attributes

@@ -20,8 +20,8 @@ from typing import Any
 import numpy as np
 import yaml
 
-from modacor.administration.licenses import BSD3Clause as __license__  # noqa: F401
 from modacor.dataclasses.messagehandler import MessageHandler
+from modacor.io.io_source import ArraySlice
 
 from ..io_source import IoSource
 
@@ -50,21 +50,26 @@ class YAMLLoader(IoSource):
 
     _yaml_data: dict[str, Any] = dict()
     _data_cache: dict[str, np.ndarray] = None
+    _file_path: Path | None = None
+    _static_metadata_cache: dict[str, Any] = None
 
-    def __init__(self, source_reference: str, logging_level=WARNING):
+    def __init__(self, source_reference: str, logging_level=WARNING, resource_location: Path | str | None = None):
         super().__init__(source_reference)
-        self.logger = MessageHandler(level=logging_level, name="StaticMetadata")
-        self._data_cache = {}  # for values with units and uncertainties
+        self.logger = MessageHandler(level=logging_level, name="YAMLLoader")
+        self._file_path = Path(resource_location) if resource_location is not None else None
+        self._file_datasets = []
+        self._file_datasets_shapes = {}
+        self._data_cache = {}  # for values that are float
         self._static_metadata_cache = {}  # for other elements such as strings and tags
 
-    def _load_from_yaml(self, file_path: Path) -> None:
+    def _preload(self) -> None:
         """
         Load static metadata from a YAML file.
         This method should be implemented to parse the YAML file and populate
         the _data_cache with SourceData objects.
         """
-        assert file_path.exists(), f"Static metadataa file {file_path} does not exist."
-        with open(file_path, "r") as f:
+        assert self._file_path.is_file(), self.logger.error(f"Static metadata file {self._file_path} does not exist.")
+        with open(self._file_path, "r") as f:
             self._yaml_data.update(yaml.safe_load(f))
 
     def get_static_metadata(self, data_key: str) -> Any:
@@ -75,7 +80,7 @@ class YAMLLoader(IoSource):
             self.logger.error(f"Static metadata key '{data_key}' not in YAML data: {e}")
             return None
 
-    def get_data(self, data_key: str) -> np.ndarray:
+    def get_data(self, data_key: str, load_slice: ArraySlice = ...) -> np.ndarray:
         """
         Get the data from the static metadata.
         """
@@ -84,4 +89,24 @@ class YAMLLoader(IoSource):
             # try to convert from the yaml data into an np.asarray
             self._data_cache.update({data_key: self.get_static_metadata(data_key)})
 
-        return np.asarray(self._data_cache.get(data_key), dtype=float)
+        return np.asarray(self._data_cache.get(data_key), dtype=float)[load_slice]
+
+    def get_data_shape(self, data_key: str) -> tuple[int, ...]:
+        """
+        Get the shape of the data from the static metadata.
+        """
+        if data_key in self._data_cache:
+            return np.asarray(self._data_cache.get(data_key)).shape
+        return ()
+
+    def get_data_dtype(self, data_key: str) -> np.dtype | None:
+        """
+        Get the data type of the data from the static metadata.
+        """
+        if data_key in self._data_cache:
+            return np.asarray(self._data_cache.get(data_key)).dtype
+        return None
+
+    def get_data_attributes(self, data_key):
+        # not implemented for YAML, so just call the superclass method
+        return super().get_data_attributes(data_key)
