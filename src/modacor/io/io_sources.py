@@ -98,7 +98,7 @@ class IoSources:
             )
         return _split[0], _split[1]
 
-    def get_data(self, data_reference: str, load_slice: Optional[ArraySlice] = None) -> np.ndarray:
+    def get_data(self, data_reference: str, load_slice: Optional[ArraySlice] = ...) -> np.ndarray:
         """
         Get data from the specified source using the provided data key.
 
