@@ -16,9 +16,10 @@ __version__ = "20251029.1"
 
 from pathlib import Path
 
-from modacor import ureg
-from modacor.dataclasses.basedata import BaseData
+# from modacor import ureg
+# from modacor.dataclasss.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
@@ -28,7 +29,7 @@ from modacor.math.basic_operations import divide_basedata_elements
 
 class Divide(ProcessStep):
     """
-    Divide BaseData by another BaseData
+    Divide DataBundle by a BaseData from an IoSource
     """
 
     documentation = ProcessStepDescriber(
@@ -52,28 +53,19 @@ class Divide(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         # build up the divisor BaseData object from the IoSources
-        # t = sources.get_data('sample::entry/instrument/detector/frame_exposure_time')
-        # t_u_key = sources.get_data_attributes('sample::entry/instrument/detector/frame_exposure_time')['uncertainties']
-        # t_u = {'propagate_to_all': sources.get_data(f'sample::entry/instrument/detector/{t_u_key}')} if t_u_key is not None else {}
-        # t_units = sources.get_data_attributes('sample::entry/instrument/detector/frame_exposure_time')['units']
-        # t_bd = BaseData(signal=t, uncertainties=t_u, units=ureg.Unit(t_units))
 
-        s_source = self.configuration.get("divisor_source")
-        u_sources = self.configuration.get("divisor_uncertainties_sources", {})
-        unit_source = self.configuration.get("divisor_units_source", None)
-        divisor = BaseData(
-            signal=self.io_sources.get_data(s_source),
-            units=ureg.Unit(self.io_sources.get_data(unit_source)) if unit_source is not None else ureg.dimensionless,
-            uncertainties={k: self.io_sources.get_data(v) for k, v in u_sources},
+        divisor = basedata_from_sources(
+            io_sources=self.io_sources,
+            signal_source=self.configuration.get("divisor_source"),
+            units_source=self.configuration.get("divisor_units_source", None),
+            uncertainty_sources=self.configuration.get("divisor_uncertainties_sources", {}),
         )
-        # Get the data
-        data = self.processing_data
 
         output = {}
+        # actual work happens here:
         for key in self.configuration["with_processing_keys"]:
-            databundle = data.get(key)
-            signal = databundle["signal"]
+            databundle = self.processing_data.get(key)
             # divide the data
-
-            output[key] = divide_basedata_elements(signal, divisor)
+            databundle["signal"] = divide_basedata_elements(databundle["signal"], divisor)
+            output[key] = databundle
         return output
