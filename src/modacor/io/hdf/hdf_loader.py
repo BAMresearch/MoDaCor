@@ -67,12 +67,17 @@ class HDFLoader(IoSource):
 
     def get_static_metadata(self, data_key):
         if data_key not in self._static_metadata_cache:
-            with h5py.File(self._file_path, "r") as f:
-                value = f[data_key][()]
-                # decode bytes to string if necessary
-                if isinstance(value, bytes):
-                    value = value.decode("utf-8")
-                self._static_metadata_cache[data_key] = value
+            # if there's an "@" in the key, it's an attribute, we need to split it
+            if "@" in data_key:
+                dkey, akey = data_key.rsplit("@", 1)
+                self._static_metadata_cache[data_key] = self.get_data_attributes(dkey).get(akey, None)
+            else:
+                with h5py.File(self._file_path, "r") as f:
+                    value = f[data_key][()]
+                    # decode bytes to string if necessary
+                    if isinstance(value, bytes):
+                        value = value.decode("utf-8")
+                    self._static_metadata_cache[data_key] = value
         return self._static_metadata_cache[data_key]
 
     def get_data(self, data_key: str, load_slice: ArraySlice = ...) -> np.ndarray:

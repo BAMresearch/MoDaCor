@@ -41,7 +41,7 @@ class TestPoissonUncertainties(unittest.TestCase):
 
     def test_poisson_calculation(self):
         poisson_uncertainties = PoissonUncertainties(io_sources=TEST_IO_SOURCES)
-        poisson_uncertainties.modify_config("with_processing_keys", ["bundle"])
+        poisson_uncertainties.modify_config_by_kwargs(with_processing_keys=["bundle"])
         poisson_uncertainties.processing_data = self.test_processing_data
         poisson_uncertainties.calculate()
         assert "Poisson" in self.test_processing_data["bundle"]["signal"].variances.keys()

@@ -54,6 +54,8 @@ class IoSource:
             The rank of the data.
         data_key : str
             The key to access the data.
+            Special note for get_static_metadata: If the key contains an @ character, the part before the @ is
+            considered the group/dataset path, and the part after the @ is considered the attribute name.
         data_rank_dims : tuple[int]
             The dimensions of the data rank.
         non_data_slicing : str
@@ -142,6 +144,9 @@ class IoSource:
     def get_static_metadata(self, data_key: str) -> Any:
         """
         Get static metadata from the IO source using the provided data key.
+        If the key contains an @ character, the part before the @ is
+        considered the group/dataset path, and the part after the @ is considered the attribute name.
+        Useful, for example, to get units from HDF5 attributes.
 
         Parameters
         ----------
