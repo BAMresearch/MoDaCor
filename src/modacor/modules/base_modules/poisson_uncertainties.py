@@ -8,13 +8,14 @@ __status__ = "Development"  # "Development", "Production"
 
 
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 
-from modacor.dataclasses.databundle import DataBundle
+# from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+
+# from typing import Any
 
 
 class PoissonUncertainties(ProcessStep):
