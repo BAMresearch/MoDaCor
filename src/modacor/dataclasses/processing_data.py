@@ -62,12 +62,14 @@ class ProcessingData(dict):
             raise TypeError(f"Expected a string key, got {type(key).__name__}.")
         super().__setitem__(key, item)
 
-    def __str__(self):
+    def __repr__(self):
         """
         Print the information of all DataBundles stored in the ProcessingData.
         """
+        result = []
         for key in self.keys():
-            print(f"DataBundle '{key}': contains datasets {list(self[key].keys())}")
+            result.append(f"DataBundle '{key}': contains datasets {list(self[key].keys())}")
             for dkey in self[key].keys():
-                print(f" Dataset '{dkey}': shape {self[key][dkey].signal.shape}, units {self[key][dkey].units}")
-                print(f"         available uncertainties: {list(self[key][dkey].uncertainties.keys())}")
+                result.append(f" Dataset '{dkey}': shape {self[key][dkey].signal.shape}, units {self[key][dkey].units}")
+                result.append(f"         available uncertainties: {list(self[key][dkey].uncertainties.keys())}")
+        return "\n".join(result)
