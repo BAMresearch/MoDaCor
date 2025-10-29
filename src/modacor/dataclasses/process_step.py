@@ -102,6 +102,7 @@ class ProcessStep:
         Post-initialization method to set up the process step.
         """
         self.configuration = self.default_config()
+        self.configuration.update(self.documentation.calling_arguments)
 
     # add hash function. equality can be checked
     def __hash__(self):
@@ -141,20 +142,20 @@ class ProcessStep:
         self.executed = False
         self.produced_outputs = {}
 
-    def modify_config(self, by_dict: dict | None = None, **kwargs) -> None:
-        """Modify the configuration of the process step"""
-        if by_dict is not None:
-            for key, value in by_dict.items():
-                if key in self.configuration:
-                    self.configuration[key] = value
-                else:
-                    raise KeyError(f"Key {key} not found in configuration")  # noqa
-        for key, value in kwargs.items():
+    def modify_config_by_dict(self, by_dict: dict = {}) -> None:
+        """Modify the configuration of the process step by a dictionary"""
+        for key, value in by_dict.items():
             if key in self.configuration:
                 self.configuration[key] = value
             else:
                 raise KeyError(f"Key {key} not found in configuration")  # noqa
+        # restart preparation after configuration change:
         self.__prepared = False
+
+    def modify_config_by_kwargs(self, **kwargs) -> None:
+        """Modify the configuration of the process step by keyword arguments"""
+        if kwargs:
+            self.modify_config_by_dict(kwargs)
 
     @classmethod
     def is_process_step_dict(cls, instance: Type | None, attribute: str | None, item: Any) -> bool:
