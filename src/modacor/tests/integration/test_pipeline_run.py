@@ -65,7 +65,7 @@ def test_actual_processstep(flat_data):
     "test running the PoissonUncertainties Process step"
     step = PoissonUncertainties(TEST_IO_SOURCES)
     # we need to supply a list of values here
-    step.modify_config("with_processing_keys", ["bundle2"])
+    step.modify_config_by_kwargs(with_processing_keys=["bundle2"])
     graph = {step: {}}
 
     pipeline = Pipeline(graph=graph)
