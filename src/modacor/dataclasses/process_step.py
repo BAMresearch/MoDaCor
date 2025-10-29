@@ -95,9 +95,7 @@ class ProcessStep:
 
     # internal variables:
     __prepared: bool = field(default=False, validator=v.instance_of(bool))
-    processing_data: ProcessingData = field(
-        default=None, validator=v.optional(v.instance_of(ProcessingData))
-    )
+    processing_data: ProcessingData = field(default=None, validator=v.optional(v.instance_of(ProcessingData)))
 
     def __attrs_post_init__(self):
         """
@@ -143,12 +141,19 @@ class ProcessStep:
         self.executed = False
         self.produced_outputs = {}
 
-    def modify_config(self, key: str, value: Any):
+    def modify_config(self, by_dict: dict | None = None, **kwargs) -> None:
         """Modify the configuration of the process step"""
-        if key in self.configuration:
-            self.configuration[key] = value
-        else:
-            raise KeyError(f"Key {key} not found in configuration")  # noqa
+        if by_dict is not None:
+            for key, value in by_dict.items():
+                if key in self.configuration:
+                    self.configuration[key] = value
+                else:
+                    raise KeyError(f"Key {key} not found in configuration")  # noqa
+        for key, value in kwargs.items():
+            if key in self.configuration:
+                self.configuration[key] = value
+            else:
+                raise KeyError(f"Key {key} not found in configuration")  # noqa
         self.__prepared = False
 
     @classmethod
@@ -167,10 +172,7 @@ class ProcessStep:
                     continue
                 return False
             if isinstance(_value, Iterable) and not isinstance(_value, str):
-                if not (
-                    _config["allow_iterable"]
-                    and all([isinstance(_i, _config["type"]) for _i in _value])
-                ):
+                if not (_config["allow_iterable"] and all([isinstance(_i, _config["type"]) for _i in _value])):
                     return False
                 continue
             if not isinstance(_value, _config["type"]):
