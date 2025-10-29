@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 __coding__ = "utf-8"
 __author__ = "Tim Snow, Brian R. Pauw"
@@ -35,7 +35,7 @@ class HDFLoader(IoSource):
     _static_metadata_cache: dict[str, Any] = None
 
     def __init__(self, source_reference: str, logging_level=WARNING, resource_location: Path | str | None = None):
-        super().__init__(source_reference)
+        super().__init__(source_reference=source_reference)
         self.logger = MessageHandler(level=logging_level, name="HDFLoader")
         self._file_path = Path(resource_location) if resource_location is not None else None
         # self._file_reference = None  # let's not leave open file references lying around if we can help it.
@@ -44,6 +44,7 @@ class HDFLoader(IoSource):
         self._file_datasets_dtypes = {}
         self._data_cache = {}
         self._static_metadata_cache = {}
+        self._preload()  # load the HDF5 file structure immediately so we have some information, but not the data
 
     def _preload(self):
         assert self._file_path.is_file(), self.logger.error(f"HDF5 file {self._file_path} does not exist.")
