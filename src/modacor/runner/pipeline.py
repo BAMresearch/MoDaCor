@@ -20,8 +20,8 @@ class Pipeline(TopologicalSorter):
     Pipeline nodes are assumed to be of type ProcessStep
     """
 
-    name: str = field(default="Unnamed Pipeline")
     graph: dict[ProcessStep] = field(factory=dict)
+    name: str = field(default="Unnamed Pipeline")
 
     def __attrs_post_init__(self):
         super().__init__(graph=self.graph)
