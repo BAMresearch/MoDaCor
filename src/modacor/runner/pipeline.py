@@ -20,8 +20,8 @@ class Pipeline(TopologicalSorter):
     Pipeline nodes are assumed to be of type ProcessStep
     """
 
-    name: str = field(default="Unnamed Pipeline")
     graph: dict[ProcessStep] = field(factory=dict)
+    name: str = field(default="Unnamed Pipeline")
 
     def __attrs_post_init__(self):
         super().__init__(graph=self.graph)
@@ -39,7 +39,9 @@ class Pipeline(TopologicalSorter):
             # we need to instantiate ProcessSteps here, but
             # need to implement a ProcessStep registry
             step_id = module_data.get("step_id")
-            process_step_instances[step_id] = ProcessStep(io_sources=None)
+            configuration = module_data.get("configuration")
+            process_step_instances[step_id] = ProcessStep(io_sources=None, step_id = step_id,
+                                                          configuration = configuration)
             id_graph[step_id] = module_data.get("requires_steps")
         # translate step_id graph into ProcessStep graph
         graph = {}
