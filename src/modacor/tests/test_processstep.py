@@ -210,3 +210,16 @@ def test_execute(processing_data):
     assert "dummy_key" in processing_data
     assert isinstance(processing_data["bundle2"]["key2"], BaseData)
     assert isinstance(processing_data["bundle2"]["new_key"], BaseData)
+
+
+def test_call(processing_data):
+    ps = TESTProcessingStep(TEST_IO_SOURCES)
+    ps(processing_data)
+    assert ps.executed is True
+    assert ps._ProcessStep__prepared is True
+    assert isinstance(ps.produced_outputs, dict)
+    assert isinstance(ps.produced_outputs["dummy_key"], DataBundle)
+    assert isinstance(ps.produced_outputs["bundle2"], DataBundle)
+    assert "dummy_key" in processing_data
+    assert isinstance(processing_data["bundle2"]["key2"], BaseData)
+    assert isinstance(processing_data["bundle2"]["new_key"], BaseData)
