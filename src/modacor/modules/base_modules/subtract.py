@@ -11,7 +11,7 @@ __date__ = "29/10/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-__all__ = ["Multiply"]
+__all__ = ["Subtract"]
 __version__ = "20251029.1"
 
 from pathlib import Path
@@ -22,47 +22,50 @@ from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 # from modacor.dataclasses.processing_data import ProcessingData
-from modacor.math.basic_operations import multiply_basedata_elements
+from modacor.math.basic_operations import subtract_basedata_elements
 
 
-class Multiply(ProcessStep):
+class Subtract(ProcessStep):
     """
-    Multiply a DataBundle by a BaseData from an IoSource
+    Subtract a DataBundle by a BaseData from an IoSource
     """
 
     documentation = ProcessStepDescriber(
-        calling_name="Multiply by IoSource data",
-        calling_id="MultiplyBySourceData",
+        calling_name="Subtract by IoSource data",
+        calling_id="SubtractBySourceData",
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
         works_on={"signal": ["signal", "uncertainties", "units"]},
         calling_arguments={
-            "multiplier_source": None,  # IoSources key for signal
-            "multiplier_units_source": None,  # IoSources key for units
-            "multiplier_uncertainties_sources": {},  # dict of uncertainty name: source, or 'propagate_to_all': source
+            "subtrahend_source": None,  # IoSources key for signal
+            "subtrahend_units_source": None,  # IoSources key for units
+            "subtrahend_uncertainties_sources": {},  # dict of uncertainty name: source, or 'propagate_to_all': source
         },
-        step_keywords=["multiply", "scalar", "array"],
-        step_doc="Multiply a DataBundle element by a multiplier loaded from a data source",
+        step_keywords=["subtract", "scalar", "array"],
+        step_doc="Subtract a DataBundle element by a subtrahend loaded from a data source",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
         step_note="""This loads a scalar (value, units and uncertainty)
             from an IOSource and applies it to the data signal""",
     )
 
     def calculate(self) -> dict[str, DataBundle]:
-        # build up the multiplier BaseData object from the IoSources
-        multiplier = basedata_from_sources(
+        # build up the subtrahend BaseData object from the IoSources
+        subtrahend = basedata_from_sources(
             io_sources=self.io_sources,
-            signal_source=self.configuration.get("multiplier_source"),
-            units_source=self.configuration.get("multiplier_units_source", None),
-            uncertainty_sources=self.configuration.get("multiplier_uncertainties_sources", {}),
+            signal_source=self.configuration.get("subtrahend_source"),
+            units_source=self.configuration.get("subtrahend_units_source", None),
+            uncertainty_sources=self.configuration.get("subtrahend_uncertainties_sources", {}),
         )
+        # Get the data
+        data = self.processing_data
 
         output = {}
         # actual work happens here:
         for key in self.configuration["with_processing_keys"]:
-            databundle = self.processing_data.get(key)
-            # multiply the data
-            databundle["signal"] = multiply_basedata_elements(databundle["signal"], multiplier)
+            databundle = data.get(key)
+            # subtract the data
+            # databundle['signal'] is a BaseData object
+            databundle["signal"] = subtract_basedata_elements(databundle["signal"], subtrahend)
             output[key] = databundle
         return output

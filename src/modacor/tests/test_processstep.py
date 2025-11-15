@@ -166,7 +166,15 @@ def test_process_step__reset():
 @pytest.mark.parametrize("class_with_config_keys", [["test_str"]], indirect=True)
 def test_modify_config__valid_key(class_with_config_keys):
     instance = class_with_config_keys[1](TEST_IO_SOURCES)
-    instance.modify_config("test_str", "new_value")
+    instance.modify_config_by_kwargs(test_str="new_value")
+    assert instance.configuration["test_str"] == "new_value"
+    assert not instance._ProcessStep__prepared
+
+
+@pytest.mark.parametrize("class_with_config_keys", [["test_str"]], indirect=True)
+def test_modify_config__by_dict(class_with_config_keys):
+    instance = class_with_config_keys[1](TEST_IO_SOURCES)
+    instance.modify_config_by_dict({"test_str": "new_value"})
     assert instance.configuration["test_str"] == "new_value"
     assert not instance._ProcessStep__prepared
 
@@ -175,7 +183,7 @@ def test_modify_config__valid_key(class_with_config_keys):
 def test_modify_config__invalid_key(class_with_config_keys):
     instance = class_with_config_keys[1](TEST_IO_SOURCES)
     with pytest.raises(KeyError):
-        instance.modify_config("silly_key", "new_value")
+        instance.modify_config_by_kwargs(silly_key="new_value")
 
 
 def test_calculate():
@@ -194,6 +202,19 @@ def test_calculate__abstract():
 def test_execute(processing_data):
     ps = TESTProcessingStep(TEST_IO_SOURCES)
     ps.execute(processing_data)
+    assert ps.executed is True
+    assert ps._ProcessStep__prepared is True
+    assert isinstance(ps.produced_outputs, dict)
+    assert isinstance(ps.produced_outputs["dummy_key"], DataBundle)
+    assert isinstance(ps.produced_outputs["bundle2"], DataBundle)
+    assert "dummy_key" in processing_data
+    assert isinstance(processing_data["bundle2"]["key2"], BaseData)
+    assert isinstance(processing_data["bundle2"]["new_key"], BaseData)
+
+
+def test_call(processing_data):
+    ps = TESTProcessingStep(TEST_IO_SOURCES)
+    ps(processing_data)
     assert ps.executed is True
     assert ps._ProcessStep__prepared is True
     assert isinstance(ps.produced_outputs, dict)
