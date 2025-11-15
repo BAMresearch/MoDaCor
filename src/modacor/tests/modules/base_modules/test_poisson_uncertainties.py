@@ -45,3 +45,17 @@ class TestPoissonUncertainties(unittest.TestCase):
         poisson_uncertainties.processing_data = self.test_processing_data
         poisson_uncertainties.calculate()
         assert "Poisson" in self.test_processing_data["bundle"]["signal"].variances.keys()
+
+    def test_poisson_execution(self):
+        poisson_uncertainties = PoissonUncertainties(io_sources=TEST_IO_SOURCES)
+        poisson_uncertainties.modify_config_by_kwargs(with_processing_keys=["bundle"])
+        poisson_uncertainties(self.test_processing_data)
+        assert "Poisson" in self.test_processing_data["bundle"]["signal"].variances.keys()
+
+    def test_poisson_result_values(self):
+        poisson_uncertainties = PoissonUncertainties(io_sources=TEST_IO_SOURCES)
+        poisson_uncertainties.modify_config_by_kwargs(with_processing_keys=["bundle"])
+        poisson_uncertainties(self.test_processing_data)
+        expected_variances = np.arange(0, 100).reshape((10, 10)).astype(float).clip(min=1)
+        actual_variances = self.test_processing_data["bundle"]["signal"].variances["Poisson"]
+        np.testing.assert_allclose(expected_variances, actual_variances)
