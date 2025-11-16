@@ -22,12 +22,12 @@ from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 
 # adjust this import path to where you put the step:
-from modacor.modules.base_modules.reduce_dim_weighted_average import WeightedAverage  # noqa: E402
+from modacor.modules.base_modules.reduce_dim_weighted import ReduceDimWeighted  # noqa: E402
 
 TEST_IO_SOURCES = IoSources()
 
 
-class TestWeightedAverage(unittest.TestCase):
+class TestReduceDimWeighted(unittest.TestCase):
     """Testing class for modacor/modules/base_modules/reduce_dim_weighted_average.py"""
 
     def setUp(self):
@@ -68,7 +68,7 @@ class TestWeightedAverage(unittest.TestCase):
         and propagate uncertainties as:
             σ_mean = sqrt(σ1^2 + σ2^2) / N.
         """
-        avg_step = WeightedAverage(io_sources=TEST_IO_SOURCES)
+        avg_step = ReduceDimWeighted(io_sources=TEST_IO_SOURCES)
         avg_step.modify_config_by_kwargs(
             with_processing_keys=["bundle"],
             axes=0,
@@ -107,7 +107,7 @@ class TestWeightedAverage(unittest.TestCase):
             σ^2 = (1^2 σ1^2 + 2^2 σ2^2) / (1+2)^2
         with σ1 = σ2 = 0.1.
         """
-        avg_step = WeightedAverage(io_sources=TEST_IO_SOURCES)
+        avg_step = ReduceDimWeighted(io_sources=TEST_IO_SOURCES)
         avg_step.modify_config_by_kwargs(
             with_processing_keys=["bundle"],
             axes=0,
@@ -136,6 +136,45 @@ class TestWeightedAverage(unittest.TestCase):
 
         self.assertEqual(result_bd.units, ureg.Unit("count"))
 
+    def test_weighted_sum_axis0(self):
+        """
+        Weighted sum over axis=0 using BaseData.weights.
+
+        For each column:
+            S = Σ w_i x_i = 1*x1 + 2*x2
+            σ_S^2 = Σ w_i^2 σ_i^2 = (1^2 + 2^2) * σ^2
+        with σ = 0.1 everywhere.
+        """
+        avg_step = ReduceDimWeighted(io_sources=TEST_IO_SOURCES)
+        avg_step.modify_config_by_kwargs(
+            with_processing_keys=["bundle"],
+            axes=0,
+            use_weights=True,
+            nan_policy="propagate",
+            reduction="sum",  # NEW
+        )
+        avg_step.processing_data = self.test_processing_data
+
+        avg_step.calculate()
+
+        result_bd: BaseData = self.test_processing_data["bundle"]["signal"]
+
+        # Expected weighted sum along axis 0
+        w1, w2 = 1.0, 2.0
+        expected_sum = w1 * self.signal[0, :] + w2 * self.signal[1, :]
+        np.testing.assert_allclose(result_bd.signal, expected_sum)
+
+        # Uncertainty:
+        # σ_S^2 = (w1^2 + w2^2) * σ^2
+        sigma = 0.1
+        var_factor = w1**2 + w2**2  # 1 + 4 = 5
+        expected_sigma = np.sqrt(var_factor * sigma**2)
+        expected_u = np.full_like(expected_sum, expected_sigma)
+        np.testing.assert_allclose(result_bd.uncertainties["u"], expected_u)
+
+        # Units preserved
+        self.assertEqual(result_bd.units, ureg.Unit("count"))
+
     # ------------------------------------------------------------------
     # nan_policy='omit'
     # ------------------------------------------------------------------
@@ -160,7 +199,7 @@ class TestWeightedAverage(unittest.TestCase):
         )
         self.test_processing_data["bundle"]["signal"] = bd_nan
 
-        avg_step = WeightedAverage(io_sources=TEST_IO_SOURCES)
+        avg_step = ReduceDimWeighted(io_sources=TEST_IO_SOURCES)
         avg_step.modify_config_by_kwargs(
             with_processing_keys=["bundle"],
             axes=0,
@@ -200,7 +239,7 @@ class TestWeightedAverage(unittest.TestCase):
         """
         Ensure the ProcessStep __call__ interface works, like for PoissonUncertainties.
         """
-        avg_step = WeightedAverage(io_sources=TEST_IO_SOURCES)
+        avg_step = ReduceDimWeighted(io_sources=TEST_IO_SOURCES)
         avg_step.modify_config_by_kwargs(
             with_processing_keys=["bundle"],
             axes=0,

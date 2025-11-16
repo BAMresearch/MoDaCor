@@ -10,7 +10,7 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 
-__all__ = ["WeightedAverage"]
+__all__ = ["ReduceDimWeighted"]
 __version__ = "20251116.1"
 
 from pathlib import Path
@@ -24,7 +24,7 @@ from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
-class WeightedAverage(ProcessStep):
+class ReduceDimWeighted(ProcessStep):
     """
     Compute a (possibly weighted) average of a BaseData signal over one or more axes,
     propagating uncertainties.
@@ -42,7 +42,7 @@ class WeightedAverage(ProcessStep):
 
     documentation = ProcessStepDescriber(
         calling_name="Weighted average over axes",
-        calling_id="WeightedAverage",
+        calling_id="ReduceDimWeighted",
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
@@ -54,6 +54,8 @@ class WeightedAverage(ProcessStep):
             "use_weights": True,
             # 'omit' → ignore NaNs (nanmean-style); 'propagate' → NaNs propagate (mean-style).
             "nan_policy": "omit",
+            # Reduction method: 'mean' (default, weighted or unweighted), or 'sum' (weighted or unweighted).
+            "reduction": "mean",
         },
         step_keywords=["average", "mean", "weighted", "nanmean", "reduce", "axis"],
         step_doc=(
@@ -91,9 +93,19 @@ class WeightedAverage(ProcessStep):
         axis: int | tuple[int, ...] | None,
         use_weights: bool,
         nan_policy: str,
+        reduction: str = "mean",  # NEW
     ) -> BaseData:
+        """
+        Compute weighted reduction ('mean' or 'sum') of a BaseData over axis,
+        with uncertainty propagation.
+
+        reduction:
+            'mean' → μ = Σ w x / Σ w
+            'sum'  → S = Σ w x
+        """
         x = np.asarray(bd.signal, dtype=float)
 
+        # Choose weights
         if use_weights:
             w = np.asarray(bd.weights, dtype=float)
             w = np.broadcast_to(w, x.shape)
@@ -116,13 +128,19 @@ class WeightedAverage(ProcessStep):
         w_sum = np.sum(w_eff, axis=axis)
         wx_sum = np.sum(w_eff * x_eff, axis=axis)
 
-        # Safe denominator: NaN where w_sum == 0
-        denom = np.where(w_sum == 0, np.nan, w_sum)
-
-        # μ = Σ w_i x_i / Σ w_i
-        mean = wx_sum / denom
-
+        # Σ w_i^2 σ_i^2 for each key
         uncertainties_out: dict[str, np.ndarray] = {}
+
+        # Precompute denom for mean case
+        if reduction == "mean":
+            denom = np.where(w_sum == 0, np.nan, w_sum)
+            signal_out = wx_sum / denom
+        elif reduction == "sum":
+            # For sum, just take Σ w x (or Σ x when use_weights=False)
+            signal_out = wx_sum
+        else:
+            raise ValueError(f"Invalid reduction: {reduction!r}. Use 'mean' or 'sum'.")
+
         for key, err in bd.uncertainties.items():
             err_arr = np.asarray(err, dtype=float)
             err_arr = np.broadcast_to(err_arr, x.shape)
@@ -134,27 +152,27 @@ class WeightedAverage(ProcessStep):
 
             var_sum = np.sum((w_eff**2) * (err_arr_eff**2), axis=axis)
 
-            # σ_μ = sqrt(Σ w_i^2 σ_i^2) / Σ w_i, same denom as mean
-            sigma = np.sqrt(var_sum) / denom
+            if reduction == "mean":
+                sigma = np.sqrt(var_sum) / denom
+            else:  # 'sum'
+                sigma = np.sqrt(var_sum)
 
             uncertainties_out[key] = sigma
 
         return BaseData(
-            signal=mean,
+            signal=signal_out,
             units=bd.units,
             uncertainties=uncertainties_out,
-            weights=np.array(1.0),
+            weights=np.array(1.0) if reduction == "mean" else w_sum,
         )
 
     # ---------------------------- main API ---------------------------------
 
     def calculate(self) -> dict[str, DataBundle]:
-        """
-        Perform the weighted average over configured axes for each selected DataBundle.
-        """
         axis = self._normalize_axes(self.configuration.get("axes"))
         use_weights = bool(self.configuration.get("use_weights", True))
         nan_policy = self.configuration.get("nan_policy", "omit")
+        reduction = self.configuration.get("reduction", "mean")  # NEW
 
         output: dict[str, DataBundle] = {}
 
@@ -167,9 +185,9 @@ class WeightedAverage(ProcessStep):
                 axis=axis,
                 use_weights=use_weights,
                 nan_policy=nan_policy,
+                reduction=reduction,  # NEW
             )
 
-            # Replace the signal with the reduced BaseData
             databundle["signal"] = averaged
             output[key] = databundle
 
