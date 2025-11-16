@@ -22,12 +22,12 @@ from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 
 # adjust this import path to where you put the step:
-from modacor.modules.base_modules.reduce_dim_weighted import ReduceDimWeighted  # noqa: E402
+from modacor.modules.base_modules.reduce_dimensionality import ReduceDimensionality  # noqa: E402
 
 TEST_IO_SOURCES = IoSources()
 
 
-class TestReduceDimWeighted(unittest.TestCase):
+class TestReduceDimensionality(unittest.TestCase):
     """Testing class for modacor/modules/base_modules/reduce_dim_weighted_average.py"""
 
     def setUp(self):
@@ -68,7 +68,7 @@ class TestReduceDimWeighted(unittest.TestCase):
         and propagate uncertainties as:
             σ_mean = sqrt(σ1^2 + σ2^2) / N.
         """
-        avg_step = ReduceDimWeighted(io_sources=TEST_IO_SOURCES)
+        avg_step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
         avg_step.modify_config_by_kwargs(
             with_processing_keys=["bundle"],
             axes=0,
@@ -107,7 +107,7 @@ class TestReduceDimWeighted(unittest.TestCase):
             σ^2 = (1^2 σ1^2 + 2^2 σ2^2) / (1+2)^2
         with σ1 = σ2 = 0.1.
         """
-        avg_step = ReduceDimWeighted(io_sources=TEST_IO_SOURCES)
+        avg_step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
         avg_step.modify_config_by_kwargs(
             with_processing_keys=["bundle"],
             axes=0,
@@ -145,7 +145,7 @@ class TestReduceDimWeighted(unittest.TestCase):
             σ_S^2 = Σ w_i^2 σ_i^2 = (1^2 + 2^2) * σ^2
         with σ = 0.1 everywhere.
         """
-        avg_step = ReduceDimWeighted(io_sources=TEST_IO_SOURCES)
+        avg_step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
         avg_step.modify_config_by_kwargs(
             with_processing_keys=["bundle"],
             axes=0,
@@ -199,7 +199,7 @@ class TestReduceDimWeighted(unittest.TestCase):
         )
         self.test_processing_data["bundle"]["signal"] = bd_nan
 
-        avg_step = ReduceDimWeighted(io_sources=TEST_IO_SOURCES)
+        avg_step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
         avg_step.modify_config_by_kwargs(
             with_processing_keys=["bundle"],
             axes=0,
@@ -239,7 +239,7 @@ class TestReduceDimWeighted(unittest.TestCase):
         """
         Ensure the ProcessStep __call__ interface works, like for PoissonUncertainties.
         """
-        avg_step = ReduceDimWeighted(io_sources=TEST_IO_SOURCES)
+        avg_step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
         avg_step.modify_config_by_kwargs(
             with_processing_keys=["bundle"],
             axes=0,

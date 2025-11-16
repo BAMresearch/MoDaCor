@@ -10,7 +10,7 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 
-__all__ = ["ReduceDimWeighted"]
+__all__ = ["ReduceDimensionality"]
 __version__ = "20251116.1"
 
 from pathlib import Path
@@ -24,7 +24,7 @@ from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
-class ReduceDimWeighted(ProcessStep):
+class ReduceDimensionality(ProcessStep):
     """
     Compute a (possibly weighted) average of a BaseData signal over one or more axes,
     propagating uncertainties.
@@ -41,8 +41,8 @@ class ReduceDimWeighted(ProcessStep):
     """
 
     documentation = ProcessStepDescriber(
-        calling_name="Weighted average over axes",
-        calling_id="ReduceDimWeighted",
+        calling_name="average or sum, weighted or unweighted, over axes",
+        calling_id="ReduceDimensionality",
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
@@ -57,7 +57,7 @@ class ReduceDimWeighted(ProcessStep):
             # Reduction method: 'mean' (default, weighted or unweighted), or 'sum' (weighted or unweighted).
             "reduction": "mean",
         },
-        step_keywords=["average", "mean", "weighted", "nanmean", "reduce", "axis"],
+        step_keywords=["average", "mean", "weighted", "nanmean", "reduce", "axis", "sum"],
         step_doc=(
             "Compute (default weighted) mean of the BaseData signal over the given axes, "
             "with proper uncertainty propagation."
