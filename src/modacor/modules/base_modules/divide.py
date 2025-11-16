@@ -23,9 +23,6 @@ from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
-# from modacor.dataclasses.processing_data import ProcessingData
-from modacor.math.basic_operations import divide_basedata_elements
-
 
 class Divide(ProcessStep):
     """
@@ -61,11 +58,13 @@ class Divide(ProcessStep):
             uncertainty_sources=self.configuration.get("divisor_uncertainties_sources", {}),
         )
 
-        output = {}
+        output: dict[str, DataBundle] = {}
+
         # actual work happens here:
         for key in self.configuration["with_processing_keys"]:
             databundle = self.processing_data.get(key)
             # divide the data
-            databundle["signal"] = divide_basedata_elements(databundle["signal"], divisor)
+            # Rely on BaseData.__truediv__ for units + uncertainty propagation
+            databundle["signal"] /= divisor
             output[key] = databundle
         return output

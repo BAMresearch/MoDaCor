@@ -21,9 +21,6 @@ from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
-# from modacor.dataclasses.processing_data import ProcessingData
-from modacor.math.basic_operations import subtract_basedata_elements
-
 
 class Subtract(ProcessStep):
     """
@@ -60,12 +57,12 @@ class Subtract(ProcessStep):
         # Get the data
         data = self.processing_data
 
-        output = {}
+        output: dict[str, DataBundle] = {}
         # actual work happens here:
         for key in self.configuration["with_processing_keys"]:
             databundle = data.get(key)
             # subtract the data
             # databundle['signal'] is a BaseData object
-            databundle["signal"] = subtract_basedata_elements(databundle["signal"], subtrahend)
+            databundle["signal"] -= subtrahend
             output[key] = databundle
         return output

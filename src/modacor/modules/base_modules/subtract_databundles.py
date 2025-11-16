@@ -20,9 +20,6 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
-# from modacor.dataclasses.processing_data import ProcessingData
-from modacor.math.basic_operations import subtract_basedata_elements
-
 
 class SubtractDatabundles(ProcessStep):
     """
@@ -57,6 +54,6 @@ class SubtractDatabundles(ProcessStep):
         minuend = self.processing_data.get(minuend_key)
         subtrahend = self.processing_data.get(self.configuration["with_processing_keys"][1])
         # subtract the data
-        minuend["signal"] = subtract_basedata_elements(minuend["signal"], subtrahend["signal"])
-        output = {minuend_key: minuend}
+        minuend["signal"] -= subtrahend["signal"]
+        output: dict[str, DataBundle] = {minuend_key: minuend}
         return output

@@ -1,7 +1,6 @@
 from typing import Iterable
 
 import numpy as np
-import pint
 import pytest
 
 from .. import ureg

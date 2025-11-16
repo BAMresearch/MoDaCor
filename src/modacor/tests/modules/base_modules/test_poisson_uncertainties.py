@@ -7,7 +7,7 @@ from __future__ import annotations
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
 __copyright__ = "Copyright 2025, The MoDaCor team"
-__date__ = "18/06/2025"
+__date__ = "15/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
