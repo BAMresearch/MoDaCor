@@ -30,14 +30,11 @@ def yaml_one_step():
     name: one_step
     steps:
       multiply by xy:
-        module: PoissonUncertainties
+        module: Multiply
         step_id: 3
         requires_steps: []
         configuration:
           multiplier: 3
-          signal: sample::signal
-        io_sources:
-        - sample
     """
 
 
