@@ -29,12 +29,12 @@ def yaml_one_step():
     return """
     name: one_step
     steps:
-      multiply by xy:
-        module: Multiply
+      divide by xy:
+        module: Divide
         step_id: 3
         requires_steps: []
         configuration:
-          multiplier: 3
+          divisor_source: 3
     """
 
 
