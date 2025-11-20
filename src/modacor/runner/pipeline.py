@@ -94,21 +94,27 @@ class Pipeline(TopologicalSorter):
         graph: dict[ProcessStep, set[ProcessStep]] = {node: set(deps) for node, deps in graph_dict.items()}
         return cls(name=name or "Unnamed Pipeline", graph=graph)
 
+    def _reinitialize(self) -> None:
+        """Recreate the underlying TopologicalSorter with the current graph."""
+        super().__init__(graph=self.graph)
+
     def add_incoming_branch(self, branch: Self, branching_node):
         """
-        Add a pipeline as a branch whose outcome shall be combined the existing pipeline.
+        Add a pipeline as a branch whose outcome shall be combined the existing pipeline at branching_node.
 
         This assumes that the branch to be added has a single exit point.
 
         """
-        pipeline_to_add = Pipeline(graph=branch.graph)
-        pipeline_to_add_ordered = [*pipeline_to_add.static_order()]
-        # add the last node of the incoming as a predecessor to the connection point
-        self.graph[branching_node].update({pipeline_to_add_ordered[-1]})
-        # add the rest of the graph
-        self.graph = self.graph | branch.graph
-        # reinitialize the TopologicalSorter
-        super().__init__(graph=self.graph)
+        ordered_branch = list(branch.static_order())
+        if not ordered_branch:
+            return self
+
+        last_node = ordered_branch[-1]
+        self.graph.setdefault(branching_node, set()).add(last_node)
+        # Add the rest of the graph
+        self.graph |= branch.graph
+        self._reinitialize()
+        return self
 
     def add_outgoing_branch(self, branch: Self, branching_node):
         """
@@ -117,14 +123,15 @@ class Pipeline(TopologicalSorter):
         This assumes that the branch to be added has a single entry point.
 
         """
-        pipeline_to_add = Pipeline(graph=branch.graph)
-        pipeline_to_add_ordered = [*pipeline_to_add.static_order()]
-        # add the connection node as a predecessor to the first node of the outgoing branch
-        branch.graph[pipeline_to_add_ordered[0]].update({branching_node})
-        # add the rest of the graph
-        self.graph = self.graph | branch.graph
-        # reinitialize the TopologicalSorter
-        super().__init__(graph=self.graph)
+        ordered_branch = list(branch.static_order())
+        if not ordered_branch:
+            return self
+
+        first_node = ordered_branch[0]
+        branch.graph.setdefault(first_node, set()).add(branching_node)
+        self.graph |= branch.graph
+        self._reinitialize()
+        return self
 
     def run(self, **kwargs):
         """
