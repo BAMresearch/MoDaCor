@@ -7,7 +7,7 @@ from __future__ import annotations
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw, Jérôme Kieffer"]  # add names to the list as appropriate
 __copyright__ = "Copyright 2025, The MoDaCor team"
-__date__ = "18/06/2025"
+__date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
@@ -16,8 +16,10 @@ __all__ = ["BaseData"]
 # import tiled
 # import tiled.client
 import logging
+import numbers
+import operator
 from collections.abc import MutableMapping
-from typing import Dict, List, Self
+from typing import Any, Callable, Dict, List, Self
 
 import numpy as np
 import pint
@@ -27,16 +29,14 @@ from attrs import validators as v
 from modacor import ureg
 
 # trial uncertainties handling via auto_uncertainties. This seems much more performant for arrays than the built-in uncertainties package
-# update: this will have to be done for now in the modules.
 # from auto_uncertainties import Uncertainty
-
 
 logger = logging.getLogger(__name__)
 
 
 # make a varianceDict that quacks like a dict, but is secretly a view on the uncertainties dict
 class _VarianceDict(MutableMapping, dict):
-    def __init__(self, parent: "BaseData"):
+    def __init__(self, parent: BaseData):
         self._parent = parent
 
     def __getitem__(self, key):
@@ -129,8 +129,281 @@ def validate_broadcast(signal: np.ndarray, arr: np.ndarray, name: str) -> None:
         raise ValueError(f"'{name}' with shape {arr.shape} does not broadcast to signal shape {signal.shape}.")
 
 
+def _copy_uncertainties(unc_dict: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+    """Deep-copy the uncertainties dict (to avoid aliasing between objects)."""
+    return {k: np.array(v, copy=True) for k, v in unc_dict.items()}
+
+
+def _binary_basedata_op(
+    left: BaseData,
+    right: BaseData,
+    op: Callable[[Any, Any], Any],
+) -> BaseData:
+    """
+    Apply a binary arithmetic operation to two BaseData objects, propagating
+    uncertainties using standard first-order, uncorrelated error propagation.
+
+    Rules:
+    - result = op(A, B), where A = left.signal * left.units, B = right.signal * right.units
+    - For each uncertainty key present on `left`:
+        * If `right` has the same key, use that.
+        * Else, if `right` has 'propagate_to_all', use that.
+        * Else, result.uncertainties[key] = NaN.
+    - Binary formulas:
+        * Addition / subtraction:
+            σ_result^2 = σ_A^2 + σ_B^2  (σ_A, σ_B in the same units as the result)
+        * Multiplication / division:
+            σ_result / |result| = sqrt( (σ_A / A)^2 + (σ_B / B)^2 )
+    """
+    # Let pint handle dimensional checks and broadcasting for the nominal values
+    A_q = left.signal * left.units
+    B_q = right.signal * right.units
+    base_result = op(A_q, B_q)  # pint.Quantity
+    base_signal = np.asarray(base_result.magnitude)
+    result_units = base_result.units
+
+    # Pre-allocate result uncertainties for all keys present on left
+    result = BaseData(
+        signal=base_signal,
+        units=result_units,
+        uncertainties={key: np.full(base_signal.shape, np.nan, dtype=float) for key in left.uncertainties.keys()},
+    )
+
+    propagate_all = right.uncertainties.get("propagate_to_all", None)
+
+    # Broadcast signals to the result shape (pure magnitudes)
+    A_val = np.broadcast_to(np.asarray(left.signal, dtype=float), base_signal.shape)
+    B_val = np.broadcast_to(np.asarray(right.signal, dtype=float), base_signal.shape)
+
+    # For multiplication / division, we need |result| as magnitudes for relative errors
+    R_val = np.asarray(base_signal, dtype=float)
+
+    for key in result.uncertainties.keys():
+        left_err = left.uncertainties.get(key)
+        if left_err is None:
+            # no uncertainty on left for this key
+            continue
+
+        right_err = right.uncertainties.get(key, propagate_all)
+        if right_err is None:
+            # neither matching key nor propagate_to_all on right → leave NaN
+            continue
+
+        # Turn uncertainties into broadcastable float arrays
+        left_err_arr = np.asarray(left_err, dtype=float)
+        right_err_arr = np.asarray(right_err, dtype=float)
+
+        left_err_b = np.broadcast_to(left_err_arr, base_signal.shape)
+        right_err_b = np.broadcast_to(right_err_arr, base_signal.shape)
+
+        if op in (operator.add, operator.sub):
+            # Addition / subtraction: σ_result^2 = σ_A^2 + σ_B^2
+            # Make sure σ_A and σ_B are in the same units as the result
+            sigma_A_q = (left_err_b * left.units).to(result_units)
+            sigma_B_q = (right_err_b * right.units).to(result_units)
+            sigma = np.sqrt(sigma_A_q.magnitude**2 + sigma_B_q.magnitude**2)
+        elif op in (operator.mul, operator.truediv):
+            # Multiplication / division:
+            #   σ_result / |result| = sqrt((σ_A / A)^2 + (σ_B / B)^2)
+            # with A, B and their σ in consistent units → ratio is dimensionless.
+            with np.errstate(divide="ignore", invalid="ignore"):
+                rel_A = np.where(A_val == 0.0, 0.0, left_err_b / A_val)
+                rel_B = np.where(B_val == 0.0, 0.0, right_err_b / B_val)
+
+            rel_R = np.sqrt(rel_A**2 + rel_B**2)
+            sigma = rel_R * np.abs(R_val)
+        else:
+            raise NotImplementedError(f"Operation {op} not supported in _binary_basedata_op")  # noqa: E713
+
+        result.uncertainties[key] = sigma
+
+    return result
+
+
+def _unary_basedata_op(
+    element: BaseData,
+    func: Callable[[np.ndarray], np.ndarray],
+    dfunc: Callable[[np.ndarray], np.ndarray],
+    out_units: pint.Unit,
+    domain: Callable[[np.ndarray], np.ndarray] | None = None,
+) -> BaseData:
+    """
+    Generic unary op: y = func(x), σ_y ≈ |dfunc(x)| σ_x, with an optional domain.
+
+    Outside the domain, signal and uncertainties are set to NaN (using np.where-style masking).
+    """
+    x = np.asarray(element.signal)
+    if domain is None:
+        valid = np.ones_like(x, dtype=bool)
+    else:
+        valid = domain(x)
+
+    y = np.full_like(x, np.nan, dtype=float)
+    y[valid] = func(x[valid])
+
+    deriv = np.zeros_like(x, dtype=float)
+    deriv[valid] = np.abs(dfunc(x[valid]))
+
+    result = BaseData(
+        signal=y,
+        units=out_units,
+        uncertainties={},
+    )
+
+    for key, err in element.uncertainties.items():
+        validate_broadcast(x, np.asarray(err), f"uncertainties['{key}']")
+        err_b = np.broadcast_to(err, x.shape)
+
+        sigma_y = np.full_like(x, np.nan, dtype=float)
+        sigma_y[valid] = deriv[valid] * np.abs(err_b[valid])
+        result.uncertainties[key] = sigma_y
+
+    return result
+
+
+class UncertaintyOpsMixin:
+    """
+    Mixin that adds arithmetic with uncertainty propagation to BaseData.
+
+    Assumptions
+    -----------
+    - `signal` is a numpy array of nominal values.
+    - `uncertainties` maps keys -> absolute 1σ uncertainty arrays (broadcastable to signal).
+    - Binary operations assume uncorrelated uncertainties between operands.
+    - Unary operations use first-order linear error propagation.
+    """
+
+    # ---- binary dunder ops ----
+
+    def _binary_op(
+        self: BaseData,
+        other: Any,
+        op: Callable[[Any, Any], Any],
+        swapped: bool = False,
+    ) -> BaseData:
+        if not isinstance(self, BaseData):
+            return NotImplemented
+
+        # --- numbers.Real: treat as dimensionless for * and /, same units for + and -
+        if isinstance(other, numbers.Real):
+            scalar = float(other)
+            if op in (operator.mul, operator.truediv):
+                # dimensionless scalar
+                scalar_units = ureg.dimensionless
+            else:
+                # additive scalar, interpret as self.units
+                scalar_units = self.units
+
+            signal = np.full_like(self.signal, scalar, dtype=float)
+            other = BaseData(
+                signal=signal,
+                units=scalar_units,
+                uncertainties={k: np.zeros_like(v, dtype=float) for k, v in self.uncertainties.items()},
+            )
+
+        # --- pint.Quantity: for +/-, use same units as self; for */÷, keep its own units
+        elif isinstance(other, pint.Quantity):
+            if op in (operator.add, operator.sub):
+                q = other.to(self.units)
+                scalar_units = self.units
+            else:
+                q = other
+                scalar_units = q.units
+
+            scalar = float(q.magnitude)
+            signal = np.full_like(self.signal, scalar, dtype=float)
+            other = BaseData(
+                signal=signal,
+                units=scalar_units,
+                uncertainties={k: np.zeros_like(v, dtype=float) for k, v in self.uncertainties.items()},
+            )
+
+        elif not isinstance(other, BaseData):
+            # unsupported type
+            return NotImplemented
+
+        # Now both operands are BaseData
+        if swapped:
+            left, right = other, self
+        else:
+            left, right = self, other
+
+        return _binary_basedata_op(left, right, op)
+
+    def __add__(self, other: Any) -> BaseData:
+        return self._binary_op(other, operator.add)
+
+    def __radd__(self, other: Any) -> BaseData:
+        return self._binary_op(other, operator.add, swapped=True)
+
+    def __sub__(self, other: Any) -> BaseData:
+        return self._binary_op(other, operator.sub)
+
+    def __rsub__(self, other: Any) -> BaseData:
+        return self._binary_op(other, operator.sub, swapped=True)
+
+    def __mul__(self, other: Any) -> BaseData:
+        return self._binary_op(other, operator.mul)
+
+    def __rmul__(self, other: Any) -> BaseData:
+        return self._binary_op(other, operator.mul, swapped=True)
+
+    def __truediv__(self, other: Any) -> BaseData:
+        return self._binary_op(other, operator.truediv)
+
+    def __rtruediv__(self, other: Any) -> BaseData:
+        return self._binary_op(other, operator.truediv, swapped=True)
+
+    # ---- unary dunder + convenience methods ----
+
+    def __neg__(self) -> BaseData:
+        return BaseData(
+            signal=-self.signal,
+            units=self.units,
+            uncertainties=_copy_uncertainties(self.uncertainties),
+        )
+
+    def __pow__(self, exponent: float, modulo=None) -> BaseData:
+        if modulo is not None:
+            return NotImplemented
+        return powered_basedata_element(self, exponent)
+
+    def sqrt(self) -> BaseData:
+        return sqrt_basedata_element(self)
+
+    def square(self) -> BaseData:
+        return square_basedata_element(self)
+
+    def log(self) -> BaseData:
+        return log_basedata_element(self)
+
+    def exp(self) -> BaseData:
+        return exp_basedata_element(self)
+
+    def sin(self) -> BaseData:
+        return sin_basedata_element(self)
+
+    def cos(self) -> BaseData:
+        return cos_basedata_element(self)
+
+    def tan(self) -> BaseData:
+        return tan_basedata_element(self)
+
+    def arcsin(self) -> BaseData:
+        return arcsin_basedata_element(self)
+
+    def arccos(self) -> BaseData:
+        return arccos_basedata_element(self)
+
+    def arctan(self) -> BaseData:
+        return arctan_basedata_element(self)
+
+    def reciprocal(self) -> BaseData:
+        return reciprocal_basedata_element(self)
+
+
 @define
-class BaseData:
+class BaseData(UncertaintyOpsMixin):
     """
     BaseData stores a core data array (`signal`) with associated uncertainties, units,
     and metadata. It validates that any weights or uncertainty arrays broadcast to
@@ -316,3 +589,150 @@ class BaseData:
 
     def __str__(self):
         return f'{self.signal} {self.units} ± {[f"{u} ({k})" for k, u in self.uncertainties.items()]}'
+
+
+# ---------------------------------------------------------------------------
+# Unary operations built on the generic helper
+# ---------------------------------------------------------------------------
+
+
+def negate_basedata_element(element: BaseData) -> BaseData:
+    """Negate a BaseData element with uncertainty and units propagation."""
+    return BaseData(
+        signal=-element.signal,
+        units=element.units,
+        uncertainties=_copy_uncertainties(element.uncertainties),
+    )
+
+
+def sqrt_basedata_element(element: BaseData) -> BaseData:
+    """Square root: y = sqrt(x), σ_y ≈ σ_x / (2 sqrt(x)). x must be >= 0."""
+    return _unary_basedata_op(
+        element=element,
+        func=np.sqrt,
+        dfunc=lambda x: 0.5 / np.sqrt(x),
+        out_units=element.units**0.5,
+        domain=lambda x: x >= 0,
+    )
+
+
+def square_basedata_element(element: BaseData) -> BaseData:
+    """Square: y = x^2, σ_y ≈ |2x| σ_x."""
+    return _unary_basedata_op(
+        element=element,
+        func=lambda x: x**2,
+        dfunc=lambda x: 2.0 * x,
+        out_units=element.units**2,
+    )
+
+
+def powered_basedata_element(element: BaseData, exponent: float) -> BaseData:
+    """Power: y = x**n, σ_y ≈ |n x^(n-1)| σ_x."""
+    # If exponent is non-integer, restrict to x >= 0 to avoid complex results.
+    exp_float = float(exponent)
+    if float(exp_float).is_integer():
+        domain = None  # all real x are allowed
+    else:
+        domain = lambda x: x >= 0  # noqa: E731
+
+    return _unary_basedata_op(
+        element=element,
+        func=lambda x: x**exp_float,
+        dfunc=lambda x: exp_float * (x ** (exp_float - 1.0)),
+        out_units=element.units**exponent,
+        domain=domain,
+    )
+
+
+def log_basedata_element(element: BaseData) -> BaseData:
+    """Natural log: y = ln(x), σ_y ≈ |1/x| σ_x. x must be > 0."""
+    return _unary_basedata_op(
+        element=element,
+        func=np.log,
+        dfunc=lambda x: 1.0 / x,
+        out_units=ureg.dimensionless,
+        domain=lambda x: x > 0,
+    )
+
+
+def exp_basedata_element(element: BaseData) -> BaseData:
+    """Exponential: y = exp(x), σ_y ≈ exp(x) σ_x. Argument should be dimensionless."""
+    return _unary_basedata_op(
+        element=element,
+        func=np.exp,
+        dfunc=np.exp,
+        out_units=ureg.dimensionless,
+    )
+
+
+def sin_basedata_element(element: BaseData) -> BaseData:
+    """Sine: y = sin(x), σ_y ≈ |cos(x)| σ_x. x in radians."""
+    return _unary_basedata_op(
+        element=element,
+        func=np.sin,
+        dfunc=np.cos,
+        out_units=ureg.dimensionless,
+    )
+
+
+def cos_basedata_element(element: BaseData) -> BaseData:
+    """Cosine: y = cos(x), σ_y ≈ |sin(x)| σ_x. x in radians."""
+    return _unary_basedata_op(
+        element=element,
+        func=np.cos,
+        dfunc=np.sin,  # derivative is -sin(x), abs removes sign
+        out_units=ureg.dimensionless,
+    )
+
+
+def tan_basedata_element(element: BaseData) -> BaseData:
+    """Tangent: y = tan(x), σ_y ≈ |1/cos^2(x)| σ_x. x in radians."""
+    return _unary_basedata_op(
+        element=element,
+        func=np.tan,
+        dfunc=lambda x: 1.0 / (np.cos(x) ** 2),
+        out_units=ureg.dimensionless,
+    )
+
+
+def arcsin_basedata_element(element: BaseData) -> BaseData:
+    """Arcsin: y = arcsin(x), σ_y ≈ |1/sqrt(1-x^2)| σ_x. x dimensionless, |x| <= 1."""
+    return _unary_basedata_op(
+        element=element,
+        func=np.arcsin,
+        dfunc=lambda x: 1.0 / np.sqrt(1.0 - x**2),
+        out_units=ureg.radian,
+        domain=lambda x: np.abs(x) <= 1.0,
+    )
+
+
+def arccos_basedata_element(element: BaseData) -> BaseData:
+    """Arccos: y = arccos(x), σ_y ≈ |1/sqrt(1-x^2)| σ_x. x dimensionless, |x| <= 1."""
+    return _unary_basedata_op(
+        element=element,
+        func=np.arccos,
+        dfunc=lambda x: 1.0 / np.sqrt(1.0 - x**2),  # abs removes the sign
+        out_units=ureg.radian,
+        domain=lambda x: np.abs(x) <= 1.0,
+    )
+
+
+def arctan_basedata_element(element: BaseData) -> BaseData:
+    """Arctan: y = arctan(x), σ_y ≈ |1/(1+x^2)| σ_x. x dimensionless."""
+    return _unary_basedata_op(
+        element=element,
+        func=np.arctan,
+        dfunc=lambda x: 1.0 / (1.0 + x**2),
+        out_units=ureg.radian,
+    )
+
+
+def reciprocal_basedata_element(element: BaseData) -> BaseData:
+    """Reciprocal: y = 1/x, σ_y ≈ |1/x^2| σ_x."""
+    return _unary_basedata_op(
+        element=element,
+        func=lambda x: 1.0 / x,
+        dfunc=lambda x: 1.0 / (x**2),
+        out_units=element.units**-1,  # <-- unit, not quantity
+        domain=lambda x: x != 0,
+    )

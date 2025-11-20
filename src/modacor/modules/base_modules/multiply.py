@@ -21,9 +21,6 @@ from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
-# from modacor.dataclasses.processing_data import ProcessingData
-from modacor.math.basic_operations import multiply_basedata_elements
-
 
 class Multiply(ProcessStep):
     """
@@ -58,11 +55,11 @@ class Multiply(ProcessStep):
             uncertainty_sources=self.configuration.get("multiplier_uncertainties_sources", {}),
         )
 
-        output = {}
+        output: dict[str, DataBundle] = {}
         # actual work happens here:
         for key in self.configuration["with_processing_keys"]:
             databundle = self.processing_data.get(key)
             # multiply the data
-            databundle["signal"] = multiply_basedata_elements(databundle["signal"], multiplier)
+            databundle["signal"] *= multiplier
             output[key] = databundle
         return output

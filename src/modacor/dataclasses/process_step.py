@@ -104,6 +104,10 @@ class ProcessStep:
         self.configuration = self.default_config()
         self.configuration.update(self.documentation.calling_arguments)
 
+    def __call__(self, processing_data: ProcessingData) -> None:
+        """Allow the process step to be called like a function"""
+        self.execute(processing_data)
+
     # add hash function. equality can be checked
     def __hash__(self):
         return hash((self.documentation.__repr__(), self.configuration.__repr__(), self.step_id))
