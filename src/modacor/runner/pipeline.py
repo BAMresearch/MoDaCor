@@ -2,12 +2,13 @@
 # # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import importlib
+import re
 from graphlib import TopologicalSorter
 from pathlib import Path
-import yaml
-import re
-import importlib
+from typing import Iterable, Mapping, Self
 
+import yaml
 from attrs import define, field
 from attrs import validators as v
 
@@ -29,41 +30,69 @@ class Pipeline(TopologicalSorter):
     Pipeline nodes are assumed to be of type ProcessStep
     """
 
-    graph: dict[ProcessStep] = field(factory=dict)
+    graph: dict[ProcessStep, set[ProcessStep]] = field(factory=dict)
     name: str = field(default="Unnamed Pipeline")
 
     def __attrs_post_init__(self):
         super().__init__(graph=self.graph)
 
     @classmethod
-    def from_yaml(cls, path_to_yaml: Path):
+    def from_yaml_file(cls, yaml_file: Path):
+        """
+        Instantiate a Pipeline from a yaml configuration file.
+        """
+        with open(yaml_file, "r", encoding="utf-8") as f:
+            yaml_string = f.read()
+        return cls.from_yaml(yaml_string)
+
+    @classmethod
+    def from_yaml(cls, yaml_string: str):
         """
         Instantiate a Pipeline from a yaml configuration file.
         """
 
-        yaml_obj = yaml.safe_load(path_to_yaml)
-        process_step_instances = {}
-        id_graph = {}
-        for module_name, module_data in yaml_obj["steps"].items():
-            # we need to instantiate ProcessSteps here, but
-            # need to implement a ProcessStep registry
-            step_id = module_data.get("step_id")
-            configuration = module_data.get("configuration")
-            module_ref = module_data.get("module")
-            # here we could provide the option for user_modules, but path is not specified yet
-            module_spec = importlib.import_module(f"modacor.modules.base_modules.{_find_python_module(module_ref)}")
-            process_step_instances[step_id] = eval(f"module_spec.{module_ref}(io_sources=None, step_id = {step_id})")
-            process_step_instances[step_id].modify_config_by_dict(configuration)
-            id_graph[step_id] = module_data.get("requires_steps")
-        # translate step_id graph into ProcessStep graph
-        graph = {}
-        for k, v in id_graph.items():
-            graph[process_step_instances[k]] = {process_step_instances[i] for i in v}
-        return cls(name=yaml_obj["name"], graph=graph)
+        yaml_obj = yaml.safe_load(yaml_string)
+
+        steps_cfg = yaml_obj.get("steps", {}) or {}
+
+        process_step_instances: dict[str, ProcessStep] = {}
+        dependency_ids: dict[str, set[str]] = {}
+
+        for _step_name, module_data in steps_cfg.items():
+            step_id = module_data["step_id"]
+            module_ref = module_data["module"]
+            configuration = module_data.get("configuration") or {}
+            requires_steps = module_data.get("requires_steps") or []
+
+            module = importlib.import_module(f"modacor.modules.base_modules.{_find_python_module(module_ref)}")
+            step_cls = getattr(module, module_ref)
+            step_instance: ProcessStep = step_cls(io_sources=None, step_id=step_id)
+            step_instance.modify_config_by_dict(configuration)
+
+            process_step_instances[step_id] = step_instance
+            dependency_ids[step_id] = set(requires_steps)
+
+        # Translate step_id graph into ProcessStep graph
+        graph: dict[ProcessStep, set[ProcessStep]] = {}
+        for step_id, deps in dependency_ids.items():
+            graph[process_step_instances[step_id]] = {process_step_instances[dep_id] for dep_id in deps}
+
+        name = yaml_obj.get("name", "Unnamed Pipeline")
+        return cls(name=name, graph=graph)
 
     @classmethod
-    def from_dict(cls, graph_dict: dict, name=""):
-        return cls(name=name, graph=graph_dict)
+    def from_dict(
+        cls,
+        graph_dict: Mapping[ProcessStep, Iterable[ProcessStep]],
+        name: str = "",
+    ) -> "Pipeline":
+        """
+        Instantiate a Pipeline from a mapping.
+
+        The mapping must be of the form: node -> iterable of prerequisite nodes.
+        """
+        graph: dict[ProcessStep, set[ProcessStep]] = {node: set(deps) for node, deps in graph_dict.items()}
+        return cls(name=name or "Unnamed Pipeline", graph=graph)
 
     def add_incoming_branch(self, branch: Self, branching_node):
         """
