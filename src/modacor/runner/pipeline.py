@@ -5,13 +5,22 @@ from __future__ import annotations
 from graphlib import TopologicalSorter
 from pathlib import Path
 import yaml
+import re
+import importlib
 
 from attrs import define, field
 from attrs import validators as v
 
 from ..dataclasses.process_step import ProcessStep
+from ..io.io_sources import IoSources
 
 __all__ = ["Pipeline"]
+
+
+def _find_python_module(modacor_module_name):
+    "convert from PascalCase to snake_case"
+    submodule = re.sub(r"(?<!^)([A-Z])", r"_\1", modacor_module_name)
+    return submodule.lower()
 
 
 @define
@@ -20,8 +29,8 @@ class Pipeline(TopologicalSorter):
     Pipeline nodes are assumed to be of type ProcessStep
     """
 
-    name: str = field(default="Unnamed Pipeline")
     graph: dict[ProcessStep] = field(factory=dict)
+    name: str = field(default="Unnamed Pipeline")
 
     def __attrs_post_init__(self):
         super().__init__(graph=self.graph)
@@ -39,7 +48,12 @@ class Pipeline(TopologicalSorter):
             # we need to instantiate ProcessSteps here, but
             # need to implement a ProcessStep registry
             step_id = module_data.get("step_id")
-            process_step_instances[step_id] = ProcessStep(io_sources=None)
+            configuration = module_data.get("configuration")
+            module_ref = module_data.get("module")
+            # here we could provide the option for user_modules, but path is not specified yet
+            module_spec = importlib.import_module(f"modacor.modules.base_modules.{_find_python_module(module_ref)}")
+            process_step_instances[step_id] = eval(f"module_spec.{module_ref}(io_sources=None, step_id = {step_id})")
+            process_step_instances[step_id].modify_config_by_dict(configuration)
             id_graph[step_id] = module_data.get("requires_steps")
         # translate step_id graph into ProcessStep graph
         graph = {}

@@ -166,7 +166,15 @@ def test_process_step__reset():
 @pytest.mark.parametrize("class_with_config_keys", [["test_str"]], indirect=True)
 def test_modify_config__valid_key(class_with_config_keys):
     instance = class_with_config_keys[1](TEST_IO_SOURCES)
-    instance.modify_config("test_str", "new_value")
+    instance.modify_config_by_kwargs(test_str="new_value")
+    assert instance.configuration["test_str"] == "new_value"
+    assert not instance._ProcessStep__prepared
+
+
+@pytest.mark.parametrize("class_with_config_keys", [["test_str"]], indirect=True)
+def test_modify_config__by_dict(class_with_config_keys):
+    instance = class_with_config_keys[1](TEST_IO_SOURCES)
+    instance.modify_config_by_dict({"test_str": "new_value"})
     assert instance.configuration["test_str"] == "new_value"
     assert not instance._ProcessStep__prepared
 
@@ -175,7 +183,7 @@ def test_modify_config__valid_key(class_with_config_keys):
 def test_modify_config__invalid_key(class_with_config_keys):
     instance = class_with_config_keys[1](TEST_IO_SOURCES)
     with pytest.raises(KeyError):
-        instance.modify_config("silly_key", "new_value")
+        instance.modify_config_by_kwargs(silly_key="new_value")
 
 
 def test_calculate():

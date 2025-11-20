@@ -29,15 +29,12 @@ def yaml_one_step():
     return """
     name: one_step
     steps:
-      multiply by xy:
-        module: PoissonUncertainties
+      divide by xy:
+        module: Divide
         step_id: 3
         requires_steps: []
         configuration:
-          multiplier: 3
-          signal: sample::signal
-        io_sources:
-        - sample
+          divisor_source: 3
     """
 
 
