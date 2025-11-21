@@ -83,7 +83,7 @@ class ProcessStep:
 
     # flags and attributes for running the pipeline
     requires_steps: list[int] = field(factory=list, validator=is_list_of_ints)
-    step_id: int = field(default=-1, validator=v.instance_of(Integral))
+    step_id: int | str = field(default=-1, validator=v.instance_of((Integral, str)))
     executed: bool = field(default=False, validator=v.instance_of(bool))
 
     # if the process produces intermediate arrays, they are stored here, optionally cached

@@ -1,14 +1,16 @@
-import pytest
 from pathlib import Path
+
+import pytest
 import yaml
 
-from ..runner.pipeline import Pipeline
 from ..dataclasses.process_step import ProcessStep
 from ..dataclasses.process_step_describer import ProcessStepDescriber
+from ..runner.pipeline import Pipeline
 
 
 @pytest.fixture
 def linear_pipeline():
+    # Simple linear graph: 1 -> 2 -> 3
     return {3: {2, 1}, 2: {1}}
 
 
@@ -26,12 +28,12 @@ class DummyProcessStep:
 
 @pytest.fixture
 def yaml_one_step():
+    # Single-step pipeline, keyed by step_id "div"
     return """
     name: one_step
     steps:
-      divide by xy:
+      di:
         module: Divide
-        step_id: 3
         requires_steps: []
         configuration:
           divisor_source: 3
@@ -40,25 +42,24 @@ def yaml_one_step():
 
 @pytest.fixture
 def yaml_linear_pipeline():
+    # Simple 3-step linear pipeline with string step_ids
     return """
     name: simple_pipeline
     steps:
-      poisson:
+      1:
         module: PoissonUncertainties
-        step_id: 1
-      another poisson:
+        requires_steps: []
+      p2:
         module: PoissonUncertainties
-        step_id: 2
         requires_steps: [1]
-      multiply by xy:
+      mul:
         module: PoissonUncertainties
-        step_id: 3
-        requires_steps: [2]
+        requires_steps: [p2]
         configuration:
           multiplier: 3
           signal: sample::signal
         io_sources:
-        - sample
+          - sample
     """
 
 
@@ -90,7 +91,6 @@ def test_node_addition(linear_pipeline):
 def test_branch_addition(linear_pipeline, pipeline_to_add={5: {6}}, at_node=2):
     """
     add a pipeline as a branch on an existing pipeline, using the inherited add method
-
     """
     pipeline_1 = Pipeline(graph=linear_pipeline)
     pipeline_2 = Pipeline(graph=pipeline_to_add)
@@ -106,9 +106,7 @@ def test_branch_addition_method(linear_pipeline, branch_graph={5: {6}}, branchin
     assert pipeline.graph == {3: {2, 1}, 2: {1, 5}, 5: {6}}
 
 
-def test_diverging_branch_addition(
-    linear_pipeline, branch_graph={5: {6}, 6: set()}, branching_node=2
-):
+def test_diverging_branch_addition(linear_pipeline, branch_graph={5: {6}, 6: set()}, branching_node=2):
     pipeline = Pipeline(graph=linear_pipeline)
     branch = Pipeline(graph=branch_graph)
     pipeline.add_outgoing_branch(branch, branching_node)
@@ -119,11 +117,20 @@ def test_diverging_branch_addition(
 def test_yaml_format(yaml_linear_pipeline):
     yaml_obj = yaml.safe_load(yaml_linear_pipeline)
     assert "steps" in yaml_obj
-    assert "poisson" in yaml_obj["steps"]
-    assert type(yaml_obj["steps"]["multiply by xy"]["configuration"]) == dict
+    # now keyed by step_id, not by human-readable name
+    assert 1 in yaml_obj["steps"]
+    assert "p2" in yaml_obj["steps"]
+    assert "mul" in yaml_obj["steps"]
+    assert isinstance(yaml_obj["steps"]["mul"]["configuration"], dict)
 
 
 def test_pipeline_from_yaml(yaml_one_step):
     pipeline = Pipeline.from_yaml(yaml_one_step)
     assert pipeline.name == "one_step"
-    assert type(pipeline) == Pipeline
+    assert isinstance(pipeline, Pipeline)
+
+    # One node with no prerequisites
+    assert len(pipeline.graph) == 1
+    ((node, deps),) = pipeline.graph.items()
+    assert isinstance(node, ProcessStep)
+    assert deps == set()

@@ -11,13 +11,14 @@ __date__ = "18/06/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-import numpy as np
-import pytest
 import tempfile
 import unittest
 from os import unlink
 from pathlib import Path
+
 import h5py
+import numpy as np
+import pytest
 
 from modacor import ureg
 
@@ -25,9 +26,9 @@ from ...dataclasses.basedata import BaseData
 from ...dataclasses.databundle import DataBundle
 from ...dataclasses.process_step import ProcessStep
 from ...dataclasses.processing_data import ProcessingData
+from ...io.hdf.hdf_loader import HDFLoader
 from ...io.io_sources import IoSources
 from ...io.yaml.yaml_loader import YAMLLoader
-from ...io.hdf.hdf_loader import HDFLoader
 from ...modules.base_modules.poisson_uncertainties import PoissonUncertainties
 from ...runner.pipeline import Pipeline
 
@@ -98,7 +99,8 @@ class TestRealisticPipeline(unittest.TestCase):
         self.temp_file_path = self.temp_file_handle.name
         self.temp_file_handle.close()
         with open(self.temp_file_path, "w") as yaml_file:
-            yaml_file.write("""
+            yaml_file.write(
+                """
             instrument:
               name: "SAXSess I"
               type: "X-ray scattering"
@@ -117,7 +119,8 @@ class TestRealisticPipeline(unittest.TestCase):
                 value: 1e-5
                 units: "counts/second"
                 uncertainty: 0.1e-5
-              """)
+              """
+            )
         # setup two small hdf5 files for sample and background
         self.temp_dataset_shape = (10, 2)
         self.temp_time_handle = "frame_exposure_time"
@@ -147,17 +150,17 @@ class TestRealisticPipeline(unittest.TestCase):
         self.yaml_semirealistic_linear_pipeline = """
         name: freestanding_solid
         steps:
-          poisson:
+          1:
+            name: poisson
             module: PoissonUncertainties
-            step_id: 1
             requires_steps: []
             configuration:
               with_processing_keys:
                 - sample
                 - sample_background
-          normalize_by_time:
+          2:
+            name: normalize_by_time
             module: Divide
-            step_id: 2
             requires_steps: [1]
             configuration:
               divisor_source: sample::detector/frame_exposure_time
@@ -167,9 +170,9 @@ class TestRealisticPipeline(unittest.TestCase):
               with_processing_keys:
                 - sample
                 - sample_background
-          subtract dark current:
+          3:
+            name: subtract_dark_current
             module: Subtract
-            step_id: 3
             requires_steps: [2]
             configuration:
               subtrahend_source: yaml::detector/darkcurrent/value
@@ -179,9 +182,9 @@ class TestRealisticPipeline(unittest.TestCase):
               with_processing_keys:
               - sample
               - sample_background
-          subtract background:
+          bg:
+            name: subtract_background
             module: SubtractDatabundles
-            step_id: 4
             requires_steps: [3]
             configuration:
               with_processing_keys:
@@ -203,14 +206,18 @@ class TestRealisticPipeline(unittest.TestCase):
             HDFLoader(source_reference="sample_background", resource_location=self.temp_hdf_path_background)
         )
 
-        source = 'sample'
-        _=[print(f"{source}::{key} with shape {val}") for key, val in sources.get_source(source)._file_datasets_shapes.items()]
+        source = "sample"
+        _ = [
+            print(f"{source}::{key} with shape {val}")  # noqa: E231
+            for key, val in sources.get_source(source)._file_datasets_shapes.items()
+        ]
 
         processingdata = ProcessingData()
         for key in ["sample", "sample_background"]:
             processingdata[key] = DataBundle()
             processingdata[key]["signal"] = BaseData(
-                sources.get_data(f"{key}::data"), units=sources.get_data_attributes(f"{key}::data")["units"]
+                sources.get_data(f"{key}::data"),  # noqa: E231
+                units=sources.get_data_attributes(f"{key}::data")["units"],  # noqa: E231
             )
 
         pipeline = Pipeline.from_yaml(self.yaml_semirealistic_linear_pipeline)
