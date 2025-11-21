@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any
 
 __coding__ = "utf-8"
-__author__ = "Tim Snow, Brian R. Pauw"
+__authors__ = ["Tim Snow", "Brian R. Pauw"]
 __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "22/10/2025"
 __status__ = "Development"  # "Development", "Production"

@@ -1,6 +1,15 @@
-# src/modacor/dataclasses/process_step.py
-# # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: BSD-3-Clause
+# /usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 from __future__ import annotations
+
+__coding__ = "utf-8"
+__authors__ = ["Malte Storm", "Jérôme Kieffer", "Brian R. Pauw"]  # add names to the list as appropriate
+__copyright__ = "Copyright 2025, The MoDaCor team"
+__date__ = "16/11/2025"
+__status__ = "Development"  # "Development", "Production"
+# end of header and standard imports
 
 from pathlib import Path
 from typing import Any

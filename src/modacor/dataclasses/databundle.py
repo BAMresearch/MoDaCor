@@ -6,6 +6,7 @@ __license__ = "BSD3"
 __date__ = "21/05/2025"
 __version__ = "20250521.1"
 __status__ = "Production"  # "Development", "Production"
+# end of header and standard imports
 
 
 class DataBundle(dict):

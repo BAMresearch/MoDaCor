@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 __coding__ = "utf-8"
-__authors__ = ["Anja Hörmann, Brian R. Pauw"]  # add names to the list as appropriate
+__authors__ = ["Anja Hörmann", "Brian R. Pauw"]  # add names to the list as appropriate
 __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "18/06/2025"
 __status__ = "Development"  # "Development", "Production"
@@ -14,7 +14,6 @@ __status__ = "Development"  # "Development", "Production"
 import tempfile
 import unittest
 from os import unlink
-from pathlib import Path
 
 import h5py
 import numpy as np
