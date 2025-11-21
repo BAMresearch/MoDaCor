@@ -58,6 +58,20 @@ class Pipeline(TopologicalSorter):
         process_step_instances: dict[str, ProcessStep] = {}
         dependency_ids: dict[str, set[str]] = {}
 
+        # Let's make sure we have what we need.
+        all_defined_ids = set(process_step_instances.keys())
+
+        for step_id, deps in dependency_ids.items():
+            missing = deps - all_defined_ids
+            if missing:
+                missing_str = ", ".join(map(str, sorted(missing)))
+                raise ValueError(
+                    f"Step {step_id!r} requires unknown steps {missing_str}. "
+                    "Check `step_id` and `requires_steps` in the YAML; "
+                    "you may have duplicate step names or a typo."
+                )
+
+        # check complete - now instantiate all steps
         for _step_name, module_data in steps_cfg.items():
             step_id = module_data["step_id"]
             module_ref = module_data["module"]
