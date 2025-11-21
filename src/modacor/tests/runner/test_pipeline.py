@@ -1,11 +1,9 @@
-from pathlib import Path
-
 import pytest
 import yaml
 
-from ..dataclasses.process_step import ProcessStep
-from ..dataclasses.process_step_describer import ProcessStepDescriber
-from ..runner.pipeline import Pipeline
+from modacor.dataclasses.process_step import ProcessStep
+from modacor.runner.pipeline import Pipeline
+from modacor.runner.process_step_registry import ProcessStepRegistry
 
 
 @pytest.fixture
@@ -134,3 +132,45 @@ def test_pipeline_from_yaml(yaml_one_step):
     ((node, deps),) = pipeline.graph.items()
     assert isinstance(node, ProcessStep)
     assert deps == set()
+
+
+def test_pipeline_from_yaml_with_custom_registry():
+    """
+    Ensure Pipeline.from_yaml uses the given ProcessStepRegistry
+    and instantiates the correct ProcessStep subclass.
+    """
+
+    class DummyStep(ProcessStep):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.executed = False
+
+        def execute(self, **kwargs):
+            self.executed = True
+
+    ps_registry = ProcessStepRegistry()
+    ps_registry.register(DummyStep)
+
+    yaml_str = """
+    name: dummy_pipeline
+    steps:
+      s1:
+        module: DummyStep
+        requires_steps: []
+        configuration:
+    """
+
+    pipeline = Pipeline.from_yaml(yaml_str, registry=ps_registry)
+    assert isinstance(pipeline, Pipeline)
+    assert pipeline.name == "dummy_pipeline"
+
+    # There should be exactly one node in the graph
+    assert len(pipeline.graph) == 1
+    ((node, deps),) = pipeline.graph.items()
+
+    assert isinstance(node, DummyStep)
+    assert deps == set()
+
+    # Run the pipeline and check that our DummyStep.execute was called
+    pipeline.run()
+    assert node.executed is True

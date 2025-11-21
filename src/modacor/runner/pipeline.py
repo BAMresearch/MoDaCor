@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import importlib
-import re
 from graphlib import TopologicalSorter
 from pathlib import Path
 from typing import Iterable, Mapping, Self
@@ -13,14 +11,9 @@ from attrs import define, field
 
 from ..dataclasses.process_step import ProcessStep
 from ..io.io_sources import IoSources  # noqa: F401  # reserved for future use
+from .process_step_registry import DEFAULT_PROCESS_STEP_REGISTRY, ProcessStepRegistry
 
 __all__ = ["Pipeline"]
-
-
-def _find_python_module(modacor_module_name: str) -> str:
-    """Convert from PascalCase to snake_case module name."""
-    submodule = re.sub(r"(?<!^)([A-Z])", r"_\1", modacor_module_name)
-    return submodule.lower()
 
 
 @define
@@ -43,7 +36,11 @@ class Pipeline(TopologicalSorter):
     # --------------------------------------------------------------------- #
 
     @classmethod
-    def from_yaml_file(cls, yaml_file: Path | str) -> "Pipeline":
+    def from_yaml_file(
+        cls,
+        yaml_file: Path | str,
+        registry: ProcessStepRegistry | None = None,
+    ) -> "Pipeline":
         """
         Instantiate a Pipeline from a YAML configuration file.
 
@@ -51,13 +48,20 @@ class Pipeline(TopologicalSorter):
         ----------
         yaml_file:
             Path to the YAML file.
+        registry:
+            Optional ProcessStepRegistry. If omitted, the global
+            DEFAULT_PROCESS_STEP_REGISTRY is used.
         """
         yaml_path = Path(yaml_file)
         yaml_string = yaml_path.read_text(encoding="utf-8")
-        return cls.from_yaml(yaml_string)
+        return cls.from_yaml(yaml_string, registry=registry)
 
     @classmethod
-    def from_yaml(cls, yaml_string: str) -> "Pipeline":
+    def from_yaml(
+        cls,
+        yaml_string: str,
+        registry: ProcessStepRegistry | None = None,
+    ) -> "Pipeline":
         """
         Instantiate a Pipeline from a YAML configuration string.
 
@@ -89,6 +93,8 @@ class Pipeline(TopologicalSorter):
         """
         yaml_obj = yaml.safe_load(yaml_string) or {}
         steps_cfg = yaml_obj.get("steps", {}) or {}
+
+        registry = registry or DEFAULT_PROCESS_STEP_REGISTRY
 
         process_step_instances: dict[str, ProcessStep] = {}
         dependency_ids: dict[str, set[str]] = {}
@@ -124,8 +130,8 @@ class Pipeline(TopologicalSorter):
             # Normalize dependencies to strings as well
             requires_steps = {str(dep) for dep in requires_raw}
 
-            module = importlib.import_module(f"modacor.modules.base_modules.{_find_python_module(module_ref)}")
-            step_cls = getattr(module, module_ref)
+            # Resolve ProcessStep class via registry
+            step_cls = registry.get(module_ref)
 
             # Pass the normalized string step_id into the ProcessStep
             step_instance: ProcessStep = step_cls(io_sources=None, step_id=step_id)
