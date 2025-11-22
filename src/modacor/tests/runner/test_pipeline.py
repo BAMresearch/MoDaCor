@@ -329,3 +329,109 @@ def test_to_mermaid_flowchart():
 
     # Edge: 1 --> 2
     assert "1 --> 2" in mermaid_src
+
+
+def test_yaml_spec_roundtrip_with_edit():
+    """
+    End-to-end style test:
+
+    1. Load a pipeline from YAML (using a dummy ProcessStep via a custom registry).
+    2. Export to a spec for a web-based graphing tool.
+    3. Modify the spec (add a node, tweak a config).
+    4. Rebuild the pipeline from the modified spec.
+    5. Export back to YAML and assert the structure reflects the edits.
+    """
+
+    class DummyStep(ProcessStep):
+        # Extend CONFIG_KEYS so that "a" is a valid configuration key
+        CONFIG_KEYS = {
+            **ProcessStep.CONFIG_KEYS,
+            "a": {
+                "type": int,
+                "allow_iterable": False,
+                "allow_none": False,
+                "default": 0,
+            },
+        }
+
+        def calculate(self):
+            # For this test we don't care about actual computation
+            return {}
+
+    # Registry that only knows about DummyStep (no lazy imports)
+    registry = ProcessStepRegistry(base_package=None)
+    registry.register(DummyStep)
+
+    # 1. Original YAML: simple 2-step linear pipeline
+    original_yaml = """
+    name: roundtrip_pipeline
+    steps:
+      1:
+        module: DummyStep
+        requires_steps: []
+        configuration:
+          a: 1
+      2:
+        module: DummyStep
+        requires_steps: [1]
+        configuration:
+          a: 2
+    """
+
+    pipeline = Pipeline.from_yaml(original_yaml, registry=registry)
+
+    # Sanity: initial topology is 1 -> 2
+    initial_order = [node.step_id for node in pipeline.static_order()]
+    assert initial_order == ["1", "2"]
+
+    # 2. Export to spec (what the web editor would see)
+    spec = pipeline.to_spec()
+
+    # 3. Modify the spec as if the user edited the graph in a UI:
+    #    - Add a new node "3" depending on "2"
+    #    - Change the config of node "2"
+    spec["nodes"].append(
+        {
+            "id": "3",
+            "label": "Third step",
+            "module": "DummyStep",
+            "config": {"a": 3},
+        }
+    )
+    spec["edges"].append({"from": "2", "to": "3"})
+
+    for node in spec["nodes"]:
+        if node["id"] == "2":
+            node["config"]["a"] = 42
+
+    # 4. Rebuild a pipeline from the modified spec
+    modified_pipeline = Pipeline.from_spec(spec, registry=registry)
+    modified_order = [node.step_id for node in modified_pipeline.static_order()]
+    assert modified_order == ["1", "2", "3"]
+
+    # 5. Export back to YAML
+    modified_yaml = modified_pipeline.to_yaml()
+    yaml_obj = yaml.safe_load(modified_yaml)
+
+    # Basic structure
+    assert yaml_obj["name"] == "roundtrip_pipeline"
+    assert "steps" in yaml_obj
+
+    steps = yaml_obj["steps"]
+    # Keys are step_ids as strings
+    assert set(steps.keys()) == {"1", "2", "3"}
+
+    # All modules should be DummyStep
+    assert steps["1"]["module"] == "DummyStep"
+    assert steps["2"]["module"] == "DummyStep"
+    assert steps["3"]["module"] == "DummyStep"
+
+    # Requires_steps reflect the edited graph: 1 -> 2 -> 3
+    assert "requires_steps" not in steps["1"] or steps["1"]["requires_steps"] == []
+    assert steps["2"]["requires_steps"] == ["1"]
+    assert steps["3"]["requires_steps"] == ["2"]
+
+    # Config values reflect original + edits
+    assert steps["1"]["configuration"]["a"] == 1
+    assert steps["2"]["configuration"]["a"] == 42  # edited
+    assert steps["3"]["configuration"]["a"] == 3

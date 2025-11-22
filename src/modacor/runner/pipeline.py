@@ -190,10 +190,65 @@ class Pipeline(TopologicalSorter):
         graph: dict[ProcessStep, set[ProcessStep]] = {node: set(deps) for node, deps in graph_dict.items()}
         return cls(name=name or "Unnamed Pipeline", graph=graph)
 
+    # importer for future use of web tools for graphing pipelines:
+    @classmethod
+    def from_spec(
+        cls,
+        spec: dict,
+        registry: ProcessStepRegistry | None = None,
+    ) -> "Pipeline":
+        """
+        Build a Pipeline from a graph spec of the shape produced by `to_spec`.
+
+        Expected shape:
+        {
+        "name": "...",
+        "nodes": [
+            {"id": "...", "module": "...", "config": {...}},
+            ...
+        ],
+        "edges": [
+            {"from": "...", "to": "..."},
+            ...
+        ],
+        }
+        """
+        registry = registry or DEFAULT_PROCESS_STEP_REGISTRY
+
+        # 1) Build ProcessStep instances
+        process_step_instances: dict[str, ProcessStep] = {}
+        for node in spec.get("nodes", []):
+            step_id = str(node["id"])
+            module_name = node["module"]
+            config = node.get("config", {}) or {}
+
+            step_cls = registry.get(module_name)
+            step = step_cls(io_sources=None, step_id=step_id)
+            step.modify_config_by_dict(config)
+
+            process_step_instances[step_id] = step
+
+        # 2) Build prerequisite sets from edges
+        #    edges are from -> to, but TopologicalSorter wants node -> prerequisites
+        prereqs: dict[str, set[str]] = {sid: set() for sid in process_step_instances}
+        for edge in spec.get("edges", []):
+            src = str(edge["from"])
+            dst = str(edge["to"])
+            if src not in prereqs or dst not in prereqs:
+                raise ValueError(f"Edge refers to unknown node: {src!r} -> {dst!r}")
+            prereqs[dst].add(src)
+
+        # 3) Convert to ProcessStep graph
+        graph: dict[ProcessStep, set[ProcessStep]] = {}
+        for sid, deps in prereqs.items():
+            graph[process_step_instances[sid]] = {process_step_instances[dep_id] for dep_id in deps}
+
+        name = spec.get("name", "Unnamed Pipeline")
+        return cls(name=name, graph=graph)
+
     # --------------------------------------------------------------------- #
     # Graph mutation helpers
     # --------------------------------------------------------------------- #
-
     def _reinitialize(self) -> None:
         """Recreate the underlying TopologicalSorter with the current graph."""
         super().__init__(graph=self.graph)
@@ -391,3 +446,65 @@ class Pipeline(TopologicalSorter):
             lines.append(f"    {src} --> {dst}")
 
         return "\n".join(lines)
+
+    # in case we used to and from spec to modify the pipeline, we can
+    # store the new pipeline back to yaml
+    def to_yaml(self) -> str:
+        """
+        Export the pipeline to a YAML string using the same schema
+        that `from_yaml` expects (keyed by step_id).
+
+        The result looks like:
+
+        ```yaml
+        name: my_pipeline
+        steps:
+          1:
+            module: SomeStep
+            requires_steps: []
+            configuration: {...}
+          "pu":
+            module: OtherStep
+            requires_steps: [1]
+            configuration: {...}
+        ```
+        """
+        spec = self.to_spec()
+
+        # Build steps mapping keyed by step_id
+        steps: dict[str, dict[str, Any]] = {}
+
+        # Pre-compute requires_steps per node from edges
+        requires_map: dict[str, list[str]] = {n["id"]: [] for n in spec["nodes"]}
+        for edge in spec["edges"]:
+            src = str(edge["from"])
+            dst = str(edge["to"])
+            # edge: src -> dst  =>  dst.requires_steps includes src
+            if dst in requires_map:
+                requires_map[dst].append(src)
+            else:
+                requires_map[dst] = [src]
+
+        for node in spec["nodes"]:
+            sid = str(node["id"])
+            module_name = node["module"]
+            cfg = node.get("config", {}) or {}
+            requires = requires_map.get(sid, [])
+
+            step_dict: dict[str, Any] = {
+                "module": module_name,
+            }
+            if requires:
+                step_dict["requires_steps"] = requires
+            if cfg:
+                step_dict["configuration"] = cfg
+
+            steps[sid] = step_dict
+
+        yaml_obj = {
+            "name": spec.get("name", self.name or "Unnamed Pipeline"),
+            "steps": steps,
+        }
+
+        # sort_keys=False keeps insertion order, which follows node order in spec
+        return yaml.safe_dump(yaml_obj, sort_keys=False)
