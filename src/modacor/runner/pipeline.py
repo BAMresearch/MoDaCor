@@ -13,7 +13,7 @@ __status__ = "Development"  # "Development", "Production"
 
 from graphlib import TopologicalSorter
 from pathlib import Path
-from typing import Iterable, Mapping, Self
+from typing import Any, Iterable, Mapping, Self
 
 import yaml
 from attrs import define, field
@@ -247,3 +247,147 @@ class Pipeline(TopologicalSorter):
             for node in self.get_ready():
                 node.execute(**kwargs)
                 self.done(node)
+
+    # --------------------------------------------------------------------- #
+    # Introspection / visualization helpers
+    # --------------------------------------------------------------------- #
+
+    def to_spec(self) -> dict[str, Any]:
+        """
+        Export the pipeline to a JSON-serializable graph spec.
+
+        Returns
+        -------
+        dict with structure:
+        {
+          "name": "<pipeline_name>",
+          "nodes": [
+            {
+              "id": "<step_id>",
+              "label": "<human readable label>",
+              "module": "<ProcessStep class name>",
+              "module_path": "<path to module>" or "",
+              "version": "<module version>" or "",
+              "config": {...}  # current configuration dict
+            },
+            ...
+          ],
+          "edges": [
+            {"from": "<source_step_id>", "to": "<target_step_id>"},
+            ...
+          ],
+        }
+        """
+        nodes: list[dict[str, Any]] = []
+        edges: list[dict[str, str]] = []
+
+        # map ProcessStep instance -> its step_id (as string)
+        id_by_node: dict[ProcessStep, str] = {}
+
+        for node in self.graph.keys():
+            sid = str(node.step_id)
+            id_by_node[node] = sid
+
+            # Build a nice label using ProcessStepDescriber if available
+            doc = getattr(node, "documentation", None)
+            if doc is not None and getattr(doc, "calling_name", None):
+                display_label = doc.calling_name
+            else:
+                display_label = type(node).__name__
+
+            node_spec: dict[str, Any] = {
+                "id": sid,
+                "label": display_label,
+                "module": type(node).__name__,
+                "config": dict(getattr(node, "configuration", {})),
+            }
+
+            if doc is not None:
+                module_path = getattr(doc, "calling_module_path", None)
+                node_spec["module_path"] = str(module_path) if module_path is not None else ""
+                node_spec["version"] = getattr(doc, "calling_version", "") or ""
+
+            nodes.append(node_spec)
+
+        # Edges: self.graph maps node -> set(prerequisite nodes),
+        # but visually we want edges prereq -> node.
+        for node, prereqs in self.graph.items():
+            target_id = id_by_node[node]
+            for pre in prereqs:
+                edges.append(
+                    {
+                        "from": id_by_node[pre],
+                        "to": target_id,
+                    }
+                )
+
+        return {
+            "name": self.name,
+            "nodes": nodes,
+            "edges": edges,
+        }
+
+    def to_dot(self) -> str:
+        """
+        Export the pipeline as a Graphviz DOT string for visualization.
+
+        Nodes are labeled with "<step_id>: <calling_name/module_name>".
+        """
+        spec = self.to_spec()
+        lines: list[str] = [
+            f'digraph "{spec["name"]}" {{',
+            "  rankdir=LR;",  # left-to-right layout; change to TB for top-to-bottom
+        ]
+
+        # Nodes
+        for node in spec["nodes"]:
+            nid = node["id"]
+            # Show both id and label so it's easy to match YAML <-> graph
+            label = f'{node["id"]}: {node["label"]}'
+            esc_label = label.replace('"', '\\"')
+            lines.append(f'  "{nid}" [label="{esc_label}"];')  # noqa: E702, E231
+
+        # Edges
+        for edge in spec["edges"]:
+            lines.append(f'  "{edge["from"]}" -> "{edge["to"]}";')  # noqa: E702, E231
+
+        lines.append("}")
+        return "\n".join(lines)
+
+    def to_mermaid(self, direction: str = "LR") -> str:
+        """
+        Export the pipeline as a Mermaid flowchart definition.
+
+        Parameters
+        ----------
+        direction:
+            Mermaid direction: "LR" (left-right), "TB" (top-bottom), etc.
+        """
+        spec = self.to_spec()
+
+        # Mermaid node IDs must be simple identifiers (no spaces, quotes, etc.).
+        # We'll generate safe IDs but keep the original step_id visible in the label.
+        def sanitize(node_id: str) -> str:
+            return "".join(c if (c.isalnum() or c == "_") else "_" for c in node_id)
+
+        id_map: dict[str, str] = {}
+        for node in spec["nodes"]:
+            raw = str(node["id"])
+            id_map[node["id"]] = sanitize(raw)
+
+        lines: list[str] = [f"flowchart {direction}"]
+
+        # Nodes
+        for node in spec["nodes"]:
+            nid = id_map[node["id"]]
+            label = f'{node["id"]}: {node["label"]}'
+            esc_label = label.replace('"', '\\"')
+            lines.append(f'    {nid}["{esc_label}"]')
+
+        # Edges
+        for edge in spec["edges"]:
+            src = id_map[edge["from"]]
+            dst = id_map[edge["to"]]
+            lines.append(f"    {src} --> {dst}")
+
+        return "\n".join(lines)
