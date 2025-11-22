@@ -10,5 +10,4 @@ stamina
 tox
 scipy
 uncertainties
-auto-uncertainties
 pyyaml
