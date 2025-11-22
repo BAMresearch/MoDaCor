@@ -4,16 +4,16 @@
 
 from __future__ import annotations
 
-from modacor import ureg
-from modacor.dataclasses.basedata import BaseData
-from modacor.io.io_sources import IoSources
-
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw", "Armin Moser"]  # add names to the list as appropriate
 __copyright__ = "Copyright 2025, The MoDaCor team"
-__date__ = "29/10/2025"
+__date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
+
+from modacor import ureg
+from modacor.dataclasses.basedata import BaseData
+from modacor.io.io_sources import IoSources
 
 __all__ = ["basedata_from_sources"]
 

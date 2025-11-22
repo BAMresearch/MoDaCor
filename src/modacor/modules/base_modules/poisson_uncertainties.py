@@ -1,11 +1,18 @@
-__coding__ = "utf-8"
-__author__ = "Brian R. Pauw"
-__copyright__ = "MoDaCor team"
-__license__ = "BSD3"
-__date__ = "22/05/2025"
-__version__ = "20250522.1"
-__status__ = "Development"  # "Development", "Production"
+# SPDX-License-Identifier: BSD-3-Clause
+# /usr/bin/env python3
+# -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
+__coding__ = "utf-8"
+__authors__ = ["Malte Storm", "Tim Snow", "Brian R. Pauw"]  # add names to the list as appropriate
+__copyright__ = "Copyright 2025, The MoDaCor team"
+__date__ = "16/11/2025"
+__status__ = "Development"  # "Development", "Production"
+# end of header and standard imports
+
+__version__ = "20250522.1"
+__all__ = ["PoissonUncertainties"]
 
 from pathlib import Path
 

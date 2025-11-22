@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 __coding__ = "utf-8"
-__author__ = "Brian R. Pauw"
+__authors__ = ["Brian R. Pauw"]
 __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "06/06/2025"
 __status__ = "Development"  # "Development", "Production"
