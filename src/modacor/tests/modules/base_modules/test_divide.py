@@ -109,6 +109,8 @@ class TestDivideProcessingStep(unittest.TestCase):
 
         # Units should be derived via pint from count / second
         self.assertEqual(result_bd.units, self.expected_result.units)
+        # double-check as I'm having issues..
+        self.assertEqual(result_bd.units, ureg.Unit("count / second"))
 
     def test_divide_execution_via_call(self):
         """
