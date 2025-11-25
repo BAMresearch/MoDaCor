@@ -261,3 +261,48 @@ class TestReduceDimensionality(unittest.TestCase):
         # No unexpected NaNs for this simple case
         self.assertFalse(np.isnan(result_bd.signal).any())
         self.assertFalse(np.isnan(result_bd.uncertainties["u"]).any())
+
+
+def test_reduce_dimensionality_rank_and_axes_reduce_as_expected():
+    # 2D signal with matching axes metadata
+    sig = np.arange(12.0).reshape(3, 4)
+    bd = BaseData(signal=sig, units=ureg.dimensionless)
+
+    # original rank and axes
+    bd.rank_of_data = 2
+    axis0 = BaseData(signal=np.arange(3.0), units=ureg.dimensionless)
+    axis1 = BaseData(signal=np.arange(4.0), units=ureg.dimensionless)
+    bd.axes = [axis0, axis1]
+
+    # --- reduce over axis=1 -> shape (3,) ---
+    out_axis1 = ReduceDimensionality._weighted_mean_with_uncertainty(
+        bd=bd,
+        axis=1,
+        use_weights=False,
+        nan_policy="omit",
+        reduction="mean",
+    )
+
+    # shape reduced correctly
+    assert out_axis1.signal.shape == (3,)
+    # rank reduced: min(old_rank=2, new_ndim=1) -> 1
+    assert out_axis1.rank_of_data == 1
+    # axes: axis 1 removed, axis 0 preserved
+    assert len(out_axis1.axes) == 1
+    assert out_axis1.axes[0] is axis0
+
+    # --- reduce over all axes -> scalar ---
+    out_all = ReduceDimensionality._weighted_mean_with_uncertainty(
+        bd=bd,
+        axis=None,
+        use_weights=False,
+        nan_policy="omit",
+        reduction="mean",
+    )
+
+    # scalar output
+    assert out_all.signal.shape == ()
+    # rank cannot exceed new_ndim (0)
+    assert out_all.rank_of_data == 0
+    # axes should be empty for scalar
+    assert out_all.axes == []
