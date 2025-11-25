@@ -65,6 +65,20 @@ class XSGeometry(ProcessStep):
         step_doc="Add geometric information Q, Psi, Theta, and Solid Angle to the data",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
         step_note="This calculates geometric factors relevant for X-ray scattering data",
+        calling_arguments={
+            "detector_distance_source": None,
+            "detector_distance_units_source": None,
+            "detector_distance_uncertainties_sources": {},
+            "pixel_size_source": None,
+            "pixel_size_units_source": None,
+            "pixel_size_uncertainties_sources": {},
+            "beam_center_source": None,
+            "beam_center_units_source": None,
+            "beam_center_uncertainties_sources": {},
+            "wavelength_source": None,
+            "wavelength_units_source": None,
+            "wavelength_uncertainties_sources": {},
+        },
     )
 
     # ------------------------------------------------------------------
@@ -80,12 +94,13 @@ class XSGeometry(ProcessStep):
         - pixel_size
         - beam_center
         - wavelength
-        plus their *_source / *_units_source / *_uncertainties_sources.
+        for each their *_source / *_units_source / *_uncertainties_sources.
         """
         geom: Dict[str, BaseData] = {}
         for key in ["detector_distance", "pixel_size", "beam_center", "wavelength"]:
-            if key not in self.configuration:
-                raise ValueError(f"Missing required configuration parameter: {key}")
+            for subkey in [f"{key}_source", f"{key}_units_source", f"{key}_uncertainties_sources"]:
+                if subkey not in self.configuration:
+                    raise ValueError(f"Missing required configuration parameter: {subkey}")
             geom[key] = basedata_from_sources(
                 io_sources=self.io_sources,
                 signal_source=self.configuration.get(f"{key}_source"),
@@ -395,7 +410,8 @@ class XSGeometry(ProcessStep):
         super().prepare_execution()
 
         # 1. Signal & detector dimensions
-        signal_bd: BaseData = self.processing_data["signal"]["signal"]
+        pkey = self.configuration.get("with_processing_keys")
+        signal_bd: BaseData = self.processing_data[pkey[0]]["signal"]
         RoD = signal_bd.rank_of_data
         spatial_shape: tuple[int, ...] = signal_bd.shape[-RoD:] if RoD > 0 else ()
 
