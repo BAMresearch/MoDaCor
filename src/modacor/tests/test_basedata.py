@@ -178,3 +178,46 @@ def test_to_units_converts_properly():
     expected = sig * 100  # m to cm
     assert bd.units == ureg.centimeter
     np.testing.assert_allclose(bd.signal, expected)
+
+
+def test_binary_ops_preserve_rank_axes_and_weights(simple_basedata):
+    bd = simple_basedata
+
+    # Set some non-default metadata
+    bd.rank_of_data = 2
+    bd.axes = [None, None]  # two-dimensional signal
+    bd.weights = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+
+    other = BaseData(signal=np.ones_like(bd.signal), units=bd.units)
+
+    # BaseData / BaseData
+    res = bd / other
+    assert res.rank_of_data == bd.rank_of_data
+    assert res.axes == bd.axes
+    assert res.axes is not bd.axes  # new list, no aliasing
+    np.testing.assert_allclose(res.weights, bd.weights)
+
+    # BaseData / scalar
+    res2 = bd / 2.0
+    assert res2.rank_of_data == bd.rank_of_data
+    assert res2.axes == bd.axes
+    assert res2.axes is not bd.axes
+    np.testing.assert_allclose(res2.weights, bd.weights)
+
+
+def test_unary_ops_preserve_rank_axes_and_weights(simple_basedata):
+    bd = simple_basedata
+
+    bd.rank_of_data = 1
+    bd.axes = [None, None]  # arbitrary axes metadata
+    bd.weights = np.array([[1.0, 1.0, 1.0], [2.0, 2.0, 2.0]])
+
+    neg = -bd
+    sqrt_bd = bd.sqrt()
+    log_bd = bd.log()  # valid for all positive elements; 0 will yield NaN, which is fine
+
+    for out in (neg, sqrt_bd, log_bd):
+        assert out.rank_of_data == bd.rank_of_data
+        assert out.axes == bd.axes
+        assert out.axes is not bd.axes
+        np.testing.assert_allclose(out.weights, bd.weights)

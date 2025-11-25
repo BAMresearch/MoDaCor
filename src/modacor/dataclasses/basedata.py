@@ -134,6 +134,28 @@ def _copy_uncertainties(unc_dict: Dict[str, np.ndarray]) -> Dict[str, np.ndarray
     return {k: np.array(v, copy=True) for k, v in unc_dict.items()}
 
 
+def _inherit_metadata(source: BaseData, result: BaseData) -> BaseData:
+    """
+    Copy metadata-like attributes from `source` to `result` (axes, rank_of_data, weights)
+    without touching numerical content (signal, units, uncertainties).
+    """
+    # Shallow-copy axes list to avoid aliasing of the list object itself
+    result.axes = list(source.axes)
+
+    # Keep the same rank_of_data; attrs validation ensures it is still valid
+    result.rank_of_data = source.rank_of_data
+
+    # Try to propagate weights; if shapes are incompatible, keep defaults
+    try:
+        arr = np.asarray(source.weights)
+        validate_broadcast(result.signal, arr, "weights")
+        result.weights = np.broadcast_to(arr, result.signal.shape).copy()
+    except ValueError:
+        logger.debug("Could not broadcast source weights to result shape; leaving default weights on result BaseData.")
+
+    return result
+
+
 def _binary_basedata_op(
     left: BaseData,
     right: BaseData,
@@ -217,7 +239,8 @@ def _binary_basedata_op(
 
         result.uncertainties[key] = sigma
 
-    return result
+    # Inherit metadata (axes, rank_of_data, weights) from the left operand
+    return _inherit_metadata(left, result)
 
 
 def _unary_basedata_op(
@@ -258,7 +281,8 @@ def _unary_basedata_op(
         sigma_y[valid] = deriv[valid] * np.abs(err_b[valid])
         result.uncertainties[key] = sigma_y
 
-    return result
+    # Preserve metadata from the original element
+    return _inherit_metadata(element, result)
 
 
 class UncertaintyOpsMixin:
@@ -357,11 +381,7 @@ class UncertaintyOpsMixin:
     # ---- unary dunder + convenience methods ----
 
     def __neg__(self) -> BaseData:
-        return BaseData(
-            signal=-self.signal,
-            units=self.units,
-            uncertainties=_copy_uncertainties(self.uncertainties),
-        )
+        return negate_basedata_element(self)
 
     def __pow__(self, exponent: float, modulo=None) -> BaseData:
         if modulo is not None:
@@ -598,11 +618,12 @@ class BaseData(UncertaintyOpsMixin):
 
 def negate_basedata_element(element: BaseData) -> BaseData:
     """Negate a BaseData element with uncertainty and units propagation."""
-    return BaseData(
+    result = BaseData(
         signal=-element.signal,
         units=element.units,
         uncertainties=_copy_uncertainties(element.uncertainties),
     )
+    return _inherit_metadata(element, result)
 
 
 def sqrt_basedata_element(element: BaseData) -> BaseData:
