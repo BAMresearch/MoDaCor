@@ -210,7 +210,7 @@ class XSGeometry(ProcessStep):
 
         return BaseData(
             signal=signal,
-            units=ureg.dimensionless,
+            units=ureg.pixel,
             uncertainties=uncertainties,
         )
 
@@ -270,7 +270,7 @@ class XSGeometry(ProcessStep):
             x0_bd = rel_idx0_bd * px0_full
             x1_bd = BaseData(
                 signal=np.zeros_like(x0_bd.signal, dtype=float),
-                units=px0_bd.units,
+                units=x0_bd.units,
             )
 
         else:  # RoD == 2
