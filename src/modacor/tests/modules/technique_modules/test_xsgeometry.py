@@ -52,8 +52,8 @@ def make_geom_2d(n0: int, n1: int):
 
     - Detector: n0 x n1
     - Detector distance: 1.0 m with 1 mm uncertainty
-    - Pixel size: 1e-3 m in both directions (with small uncertainty)
-    - Beam center: exact center pixel (with 0.25 pixel uncertainty)
+    - Pixel size: 1e-3 m/pixel in both directions (with small uncertainty)
+    - Beam center: exact centre pixel (with 0.25 pixel uncertainty)
     - Wavelength: 1 Å (1e-10 m) with 2% uncertainty
     """
     # --- detector distance: 1.0 m ± 1 mm ---
@@ -62,33 +62,32 @@ def make_geom_2d(n0: int, n1: int):
     D_bd = BaseData(
         signal=np.array(D_value, dtype=float),
         units=ureg.meter,
-        # propagate_to_all so this uncertainty participates in all keys
         uncertainties={"propagate_to_all": np.array(D_unc, dtype=float)},
     )
 
-    # --- pixel size: 1e-3 m ± 1e-6 m (just something small) ---
+    # --- pixel size: 1e-3 m/pixel ± 1e-6 m/pixel ---
     pixel_signal = np.asarray([1e-3, 1e-3], dtype=float)
     pixel_unc = np.full_like(pixel_signal, 1e-6, dtype=float)
     pixel_size_bd = BaseData(
         signal=pixel_signal,
-        units=ureg.meter,
+        units=ureg.meter / ureg.pixel,
         uncertainties={"propagate_to_all": pixel_unc},
     )
 
-    # --- beam centre: at the centre pixel, ±0.25 pixel index ---
+    # --- beam centre: at the centre pixel, ±0.25 pixel ---
     center_row = (n0 - 1) / 2.0
     center_col = (n1 - 1) / 2.0
     beam_signal = np.asarray([center_col, center_row], dtype=float)
-    beam_unc = np.full_like(beam_signal, 0.25, dtype=float)  # ±0.25 pixel
+    beam_unc = np.full_like(beam_signal, 0.25, dtype=float)
     beam_center_bd = BaseData(
         signal=beam_signal,
-        units=ureg.dimensionless,
+        units=ureg.pixel,
         uncertainties={"pixel_index": beam_unc},
     )
 
     # --- wavelength: 1 Å ± 2% ---
     lambda_value = 1.0e-10  # 1 Å in meters
-    lambda_unc = 0.02 * lambda_value  # 2%
+    lambda_unc = 0.02 * lambda_value
     wavelength_bd = BaseData(
         signal=np.array(lambda_value, dtype=float),
         units=ureg.meter,
@@ -102,41 +101,38 @@ def make_geom_1d(n: int):
     """
     Simple 1D geometry: n pixels in a line.
 
-    - Detector distance: 1.0 m with 1 mm uncertainty
-    - Pixel size: 1e-3 m (first component used)
-    - Beam center: central pixel with ±0.25 pixel uncertainty
-    - Wavelength: 1 Å with 2% uncertainty
+    Units follow the same conventions as make_geom_2d.
     """
     # --- detector distance: 1.0 m ± 1 mm ---
     D_value = 1.0
-    D_unc = 1e-3  # 1 mm
+    D_unc = 1e-3
     D_bd = BaseData(
         signal=np.array(D_value, dtype=float),
         units=ureg.meter,
         uncertainties={"propagate_to_all": np.array(D_unc, dtype=float)},
     )
 
-    # --- pixel size: 1e-3 m ± 1e-6 m ---
+    # --- pixel size: 1e-3 m/pixel ± 1e-6 m/pixel ---
     pixel_signal = np.asarray([1e-3, 1e-3], dtype=float)
     pixel_unc = np.full_like(pixel_signal, 1e-6, dtype=float)
     pixel_size_bd = BaseData(
         signal=pixel_signal,
-        units=ureg.meter,
+        units=ureg.meter / ureg.pixel,
         uncertainties={"propagate_to_all": pixel_unc},
     )
 
-    # --- beam centre: central pixel ±0.25 pixel index ---
+    # --- beam centre: central pixel ±0.25 pixel ---
     center = (n - 1) / 2.0
     beam_signal = np.asarray([center], dtype=float)
     beam_unc = np.full_like(beam_signal, 0.25, dtype=float)
     beam_center_bd = BaseData(
         signal=beam_signal,
-        units=ureg.dimensionless,
+        units=ureg.pixel,
         uncertainties={"pixel_index": beam_unc},
     )
 
     # --- wavelength: 1 Å ± 2% ---
-    lambda_value = 1.0e-10  # 1 Å in meters
+    lambda_value = 1.0e-10
     lambda_unc = 0.02 * lambda_value
     wavelength_bd = BaseData(
         signal=np.array(lambda_value, dtype=float),
@@ -336,8 +332,8 @@ def test_xsgeometry_0d_shapes_and_units():
     spatial_shape: tuple[int, ...] = ()
     D_bd = _bd_scalar(1.0, ureg.meter)
     # pixel size / beam center technically irrelevant for RoD=0, but we supply valid shapes
-    pixel_size_bd = _bd_vector([1e-3, 1e-3], ureg.meter)
-    beam_center_bd = _bd_vector([0.0], ureg.dimensionless)
+    pixel_size_bd = _bd_vector([1e-3, 1e-3], ureg.meter / ureg.pixel)
+    beam_center_bd = _bd_vector([0.0], ureg.pixel)
     wavelength_bd = _bd_scalar(1.0, ureg.meter)
 
     px0_bd, px1_bd = step._extract_pixel_pitches(pixel_size_bd)
