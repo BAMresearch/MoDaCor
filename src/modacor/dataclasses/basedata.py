@@ -511,6 +511,14 @@ class BaseData(UncertaintyOpsMixin):
         # Validate weights
         validate_broadcast(self.signal, self.weights, "weights")
 
+        # Warn if axes length does not match signal.ndim
+        if self.axes and len(self.axes) != self.signal.ndim:
+            logger.debug(
+                "BaseData.axes length (%d) does not match signal.ndim (%d).",
+                len(self.axes),
+                self.signal.ndim,
+            )
+
     @property
     def variances(self) -> _VarianceDict:
         """
