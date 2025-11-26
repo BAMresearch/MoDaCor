@@ -603,6 +603,62 @@ class BaseData(UncertaintyOpsMixin):
         for key in self.uncertainties:  # fastest as far as my limited testing goes against iterating over items():
             self.uncertainties[key] *= cfact
 
+    def indexed(self, indexer: Any, *, rank_of_data: int | None = None) -> "BaseData":
+        """
+        Return a new BaseData corresponding to ``self`` indexed by ``indexer``.
+
+        Parameters
+        ----------
+        indexer :
+            Any valid NumPy indexer (int, slice, tuple of slices, boolean mask, ...),
+            applied consistently to ``signal`` and all uncertainty / weight arrays.
+        rank_of_data :
+            Optional explicit rank_of_data for the returned BaseData. If omitted,
+            it will default to ``min(self.rank_of_data, result.signal.ndim)``.
+
+        Notes
+        -----
+        - Units are preserved.
+        - Uncertainties and weights are sliced with the same indexer where possible.
+        - Axes handling is conservative: existing axes are kept unchanged. If you
+          want axes to track slicing semantics more strictly, a higher-level
+          helper can be added later.
+        """
+        sig = np.asarray(self.signal)[indexer]
+
+        # Slice uncertainties with the same indexer
+        new_uncs: Dict[str, np.ndarray] = {}
+        for k, u in self.uncertainties.items():
+            u_arr = np.asarray(u, dtype=float)
+            # broadcast to signal shape, then apply the same indexer
+            u_full = np.broadcast_to(u_arr, self.signal.shape)
+            new_uncs[k] = u_full[indexer].copy()
+
+        # Try to slice weights; if shapes don't line up, fall back to scalar 1.0
+        try:
+            w_arr = np.asarray(self.weights, dtype=float)
+            new_weights = w_arr[indexer].copy()
+        except Exception:
+            new_weights = np.array(1.0, dtype=float)
+
+        # Decide rank_of_data for the result
+        if rank_of_data is None:
+            new_rank = min(self.rank_of_data, np.ndim(sig))
+        else:
+            new_rank = int(rank_of_data)
+
+        result = BaseData(
+            signal=np.asarray(sig, dtype=float),
+            units=self.units,
+            uncertainties=new_uncs,
+            weights=new_weights,
+            # For now we keep axes as-is; more sophisticated axis handling can be
+            # added once the usage patterns are clear.
+            axes=list(self.axes),
+            rank_of_data=new_rank,
+        )
+        return result
+
     def copy(self, with_axes: bool = True) -> "BaseData":
         """
         Return a new BaseData with copied signal/uncertainties/weights.

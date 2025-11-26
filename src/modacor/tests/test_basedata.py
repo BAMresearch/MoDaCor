@@ -371,6 +371,96 @@ def test_unary_ops_preserve_rank_axes_and_weights(simple_basedata):
 
 
 # ---------------------------------------------------------------------------
+# indexed() tests
+# ---------------------------------------------------------------------------
+
+
+def test_indexed_scalar_component_preserves_units_and_uncertainties():
+    """
+    Indexing a 1D BaseData with an integer should return a scalar BaseData
+    with sliced signal, uncertainties, and weights, and preserved units.
+    """
+    sig = np.array([10.0, 20.0, 30.0], dtype=float)
+    uncs = {"u": np.array([1.0, 2.0, 3.0], dtype=float)}
+    weights = np.array([0.1, 0.2, 0.3], dtype=float)
+
+    bd = BaseData(
+        signal=sig,
+        units=ureg.meter,
+        uncertainties=uncs,
+        weights=weights,
+        rank_of_data=1,
+    )
+
+    # Take the middle component
+    sub = bd.indexed(1)
+
+    # Signal becomes scalar
+    assert sub.signal.shape == ()
+    assert sub.signal == pytest.approx(20.0)
+
+    # Units preserved
+    assert sub.units == ureg.meter
+
+    # Uncertainties sliced
+    assert "u" in sub.uncertainties
+    assert sub.uncertainties["u"].shape == ()
+    assert sub.uncertainties["u"] == pytest.approx(2.0)
+
+    # Weights sliced
+    assert sub.weights.shape == ()
+    assert sub.weights == pytest.approx(0.2)
+
+    # rank_of_data default: min(original_rank, ndim_of_result) → min(1, 0) = 0
+    assert sub.rank_of_data == 0
+
+
+def test_indexed_slice_reduces_dimension_and_preserves_metadata():
+    """
+    Indexing with a slice should reduce dimensionality and keep metadata
+    (axes, units, rank_of_data) consistent.
+    """
+    sig = np.arange(6, dtype=float).reshape((2, 3))
+    uncs = {"stat": np.ones_like(sig, dtype=float)}
+    weights = np.full_like(sig, 0.5, dtype=float)
+
+    bd = BaseData(
+        signal=sig,
+        units=ureg.dimensionless,
+        uncertainties=uncs,
+        weights=weights,
+        axes=[None, None],
+        rank_of_data=2,
+    )
+
+    # Take the first row
+    sub = bd.indexed(0)
+
+    # Shape reduced (2,3) -> (3,)
+    assert sub.signal.shape == (3,)
+    np.testing.assert_allclose(sub.signal, sig[0])
+
+    # Uncertainties and weights sliced consistently
+    assert "stat" in sub.uncertainties
+    np.testing.assert_allclose(sub.uncertainties["stat"], uncs["stat"][0])
+    np.testing.assert_allclose(sub.weights, weights[0])
+
+    # Units preserved
+    assert sub.units == bd.units
+
+    # Axes preserved as a *new* list
+    assert sub.axes == bd.axes
+    assert sub.axes is not bd.axes
+
+    # Default rank_of_data: min(2, 1) = 1
+    assert sub.rank_of_data == 1
+
+    # Explicit rank_of_data override works
+    sub0 = bd.indexed(0, rank_of_data=0)
+    assert sub0.rank_of_data == 0
+
+
+# ---------------------------------------------------------------------------
 # Copy tests:
 # ---------------------------------------------------------------------------
 
