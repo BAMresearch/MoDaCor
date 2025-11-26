@@ -621,7 +621,10 @@ class BaseData(UncertaintyOpsMixin):
         return new
 
     def __repr__(self):
-        return f"BaseData(signal={self.signal}, uncertainties={self.uncertainties}, units={self.units})"
+        return (
+            f"BaseData(shape={self.signal.shape}, dtype={self.signal.dtype}, units={self.units}, "
+            f"n_uncertainties={len(self.uncertainties)}, rank_of_data={self.rank_of_data})"
+        )
 
     def __str__(self):
         return f'{self.signal} {self.units} ± {[f"{u} ({k})" for k, u in self.uncertainties.items()]}'
