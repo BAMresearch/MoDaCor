@@ -200,7 +200,7 @@ def test_pipeline_from_yaml_unknown_module_raises():
 
     # Use a registry with no base_package and no registrations,
     # so any lookup will fail with KeyError.
-    registry = ProcessStepRegistry(base_package=None)
+    registry = ProcessStepRegistry()
 
     yaml_str = """
     name: bad_pipeline
@@ -359,7 +359,7 @@ def test_yaml_spec_roundtrip_with_edit():
             return {}
 
     # Registry that only knows about DummyStep (no lazy imports)
-    registry = ProcessStepRegistry(base_package=None)
+    registry = ProcessStepRegistry()
     registry.register(DummyStep)
 
     # 1. Original YAML: simple 2-step linear pipeline

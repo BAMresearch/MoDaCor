@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import logging
+
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
 __copyright__ = "Copyright 2025, The MoDaCor team"
@@ -17,7 +19,7 @@ import pytest
 from modacor import ureg
 
 # import tiled.client  # not sure what the class of tiled.client is...
-from ..dataclasses.basedata import (  # adjust the import path as needed
+from modacor.dataclasses.basedata import (  # adjust the import path as needed
     BaseData,
     signal_converter,
     validate_broadcast,
@@ -33,6 +35,11 @@ def simple_basedata():
         "sem": 0.2,  # scalar uncertainty
     }
     return BaseData(signal=sig, uncertainties=uncs, units=ureg.dimensionless)
+
+
+# ---------------------------------------------------------------------------
+# Basic helpers & broadcast tests
+# ---------------------------------------------------------------------------
 
 
 def test_signal_converter_converts_scalars_and_preserves_arrays():
@@ -90,6 +97,11 @@ def test_validate_broadcast_raises_on_incompatible_shapes():
         validate_broadcast(signal, np.ones((3, 4, 4)), "bad2")
 
 
+# ---------------------------------------------------------------------------
+# Variances / uncertainties
+# ---------------------------------------------------------------------------
+
+
 def test_initial_variances_and_uncertainties(simple_basedata):
     bd = simple_basedata
     # variances property squares each uncertainty
@@ -100,6 +112,61 @@ def test_initial_variances_and_uncertainties(simple_basedata):
     # ensure uncertainties remain unchanged
     assert "poisson" in bd.uncertainties and "sem" in bd.uncertainties
     assert bd.uncertainties["sem"] == pytest.approx(0.2)
+
+
+def test_variances_setter_updates_uncertainties_and_validates_shape(simple_basedata):
+    bd = simple_basedata
+    # valid new variances (scalar and full array)
+    new_vars = {
+        "poisson": np.full((2, 3), 0.25),
+        "sem": 0.04,
+    }
+    bd.variances = new_vars
+    # uncertainties become sqrt(var)
+    assert np.allclose(bd.uncertainties["poisson"], 0.25**0.5)
+    assert bd.uncertainties["sem"] == pytest.approx(0.04**0.5)
+
+    # invalid shape (wrong shape)
+    with pytest.raises(ValueError):
+        bd.variances = {"poisson": np.ones((3, 2))}
+
+
+def test_variances_setitem_updates_underlying_uncertainties(simple_basedata):
+    bd = simple_basedata
+
+    new_var = np.array([[4.0, 9.0, 16.0], [25.0, 36.0, 49.0]], dtype=float)
+
+    bd.variances["poisson"] = new_var
+
+    # Underlying uncertainties should now be sqrt(new_var)
+    np.testing.assert_allclose(bd.uncertainties["poisson"], np.sqrt(new_var))
+
+    # Reading variances again returns the original variance values
+    np.testing.assert_allclose(bd.variances["poisson"], new_var)
+
+
+def test_variances_setitem_rejects_incompatible_shape(simple_basedata):
+    """
+    Assigning a variance array that cannot broadcast to signal.shape should raise.
+    """
+    bd = simple_basedata
+
+    bad_var = np.ones((2,), dtype=float)  # signal has shape (2,3)
+
+    with pytest.raises(ValueError):
+        bd.variances["bad"] = bad_var
+
+
+def test_variances_setter_rejects_non_dict(simple_basedata):
+    bd = simple_basedata
+
+    with pytest.raises(TypeError):
+        bd.variances = ["not", "a", "dict"]  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# Rank-of-data validation
+# ---------------------------------------------------------------------------
 
 
 def test_validate_rank_of_data_bounds_and_ndim():
@@ -126,35 +193,6 @@ def test_validate_rank_of_data_bounds_and_ndim():
         validate_rank_of_data(dummy2, type("A", (), {"name": "rank_of_data"}), 2)
 
 
-def test_variances_setter_updates_uncertainties_and_validates_shape(simple_basedata):
-    bd = simple_basedata
-    # valid new variances (scalar and full array)
-    new_vars = {
-        "poisson": np.full((2, 3), 0.25),
-        "sem": 0.04,
-    }
-    bd.variances = new_vars
-    # uncertainties become sqrt(var)
-    assert np.allclose(bd.uncertainties["poisson"], 0.25**0.5)
-    assert bd.uncertainties["sem"] == pytest.approx(0.04**0.5)
-
-    # invalid shape (wrong shape)
-    with pytest.raises(ValueError):
-        bd.variances = {"poisson": np.ones((3, 2))}
-
-
-def test_weighting_broadcast_validation(simple_basedata):
-    bd = simple_basedata
-    # valid weighting (broadcastable to (2,3))
-    bd.weights = np.array([1.0, 2.0, 3.0])
-    bd.__attrs_post_init__()  # should not raise
-
-    # invalid weighting shape
-    with pytest.raises(ValueError):
-        bd.weights = np.ones((3, 2))
-        bd.__attrs_post_init__()
-
-
 def test_rank_of_data_validation_errors(simple_basedata):
     bd = simple_basedata
     # valid rank
@@ -170,6 +208,52 @@ def test_rank_of_data_validation_errors(simple_basedata):
         bd.rank_of_data = 5
 
 
+# ---------------------------------------------------------------------------
+# Weights broadcast validation and axes tests
+# ---------------------------------------------------------------------------
+
+
+def test_weighting_broadcast_validation(simple_basedata):
+    bd = simple_basedata
+    # valid weighting (broadcastable to (2,3))
+    bd.weights = np.array([1.0, 2.0, 3.0])
+    bd.__attrs_post_init__()  # should not raise
+
+    # invalid weighting shape
+    with pytest.raises(ValueError):
+        bd.weights = np.ones((3, 2))
+        bd.__attrs_post_init__()
+
+
+def test_axes_sanity_check_logs_when_length_mismatched(simple_basedata, caplog):
+    bd = simple_basedata
+    # signal.ndim == 2, but axes length is 1 → mismatch
+    bd.axes = [None]
+
+    with caplog.at_level(logging.DEBUG):
+        bd.__attrs_post_init__()
+
+    messages = [rec.getMessage() for rec in caplog.records]
+    assert any("BaseData.axes length" in msg for msg in messages)
+
+
+def test_axes_sanity_check_no_log_when_length_matches(simple_basedata, caplog):
+    bd = simple_basedata
+    # signal.ndim == 2, axes length == 2 → OK
+    bd.axes = [None, None]
+
+    with caplog.at_level(logging.DEBUG):
+        bd.__attrs_post_init__()
+
+    messages = [rec.getMessage() for rec in caplog.records]
+    assert not any("BaseData.axes length" in msg for msg in messages)
+
+
+# ---------------------------------------------------------------------------
+# Unit conversion behaviour
+# ---------------------------------------------------------------------------
+
+
 def test_to_units_converts_properly():
     sig = np.array([[1.0, 2.0], [3.0, 4.0]])
     bd = BaseData(signal=sig.copy(), units=ureg.meter)
@@ -178,3 +262,258 @@ def test_to_units_converts_properly():
     expected = sig * 100  # m to cm
     assert bd.units == ureg.centimeter
     np.testing.assert_allclose(bd.signal, expected)
+
+
+def test_to_units_multiplicative_conversion_scales_signal_and_uncertainties():
+    sig = np.array([1.0, 2.0, 3.0], dtype=float)
+    uncs = {"stat": np.array([0.1, 0.2, 0.3], dtype=float)}
+    bd = BaseData(signal=sig.copy(), units=ureg.meter, uncertainties=uncs)
+
+    signal_before = bd.signal.copy()
+    uncs_before = {k: v.copy() for k, v in bd.uncertainties.items()}
+
+    # Use same pint logic as BaseData.to_units
+    cfact = ureg.millimeter.m_from(ureg.meter)
+
+    bd.to_units(ureg.millimeter, multiplicative_conversion=True)
+
+    # Units updated
+    assert bd.units == ureg.millimeter
+
+    # Signal scaled
+    np.testing.assert_allclose(bd.signal, signal_before * cfact)
+
+    # Each uncertainty scaled by the same factor
+    for key, unc_after in bd.uncertainties.items():
+        np.testing.assert_allclose(unc_after, uncs_before[key] * cfact)
+
+
+def test_to_units_same_units_is_noop(simple_basedata):
+    bd = simple_basedata
+
+    signal_before = bd.signal.copy()
+    uncs_before = {k: v.copy() for k, v in bd.uncertainties.items()}
+
+    bd.to_units(ureg.dimensionless, multiplicative_conversion=True)
+
+    # Nothing should have changed
+    np.testing.assert_allclose(bd.signal, signal_before)
+    for key, unc_after in bd.uncertainties.items():
+        np.testing.assert_allclose(unc_after, uncs_before[key])
+    assert bd.units == ureg.dimensionless
+
+
+def test_to_units_incompatible_units_raises(simple_basedata):
+    bd = simple_basedata
+    # dimensionless vs. time is not compatible
+    with pytest.raises(ValueError):
+        bd.to_units(ureg.second, multiplicative_conversion=True)
+
+
+def test_to_units_non_multiplicative_path_not_implemented(simple_basedata):
+    """
+    Once the non-multiplicative branch in BaseData.to_units is guarded
+    with NotImplementedError, this ensures we don't silently do the wrong thing.
+    """
+    bd = simple_basedata
+    bd.units = ureg.kelvin
+
+    with pytest.raises(NotImplementedError):
+        bd.to_units(ureg.rankine, multiplicative_conversion=False)
+
+
+# ---------------------------------------------------------------------------
+# Metadata preservation in ops
+# ---------------------------------------------------------------------------
+
+
+def test_binary_ops_preserve_rank_axes_and_weights(simple_basedata):
+    bd = simple_basedata
+
+    # Set some non-default metadata
+    bd.rank_of_data = 2
+    bd.axes = [None, None]  # two-dimensional signal
+    bd.weights = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+
+    other = BaseData(signal=np.ones_like(bd.signal), units=bd.units)
+
+    # BaseData / BaseData
+    res = bd / other
+    assert res.rank_of_data == bd.rank_of_data
+    assert res.axes == bd.axes
+    assert res.axes is not bd.axes  # new list, no aliasing
+    np.testing.assert_allclose(res.weights, bd.weights)
+
+    # BaseData / scalar
+    res2 = bd / 2.0
+    assert res2.rank_of_data == bd.rank_of_data
+    assert res2.axes == bd.axes
+    assert res2.axes is not bd.axes
+    np.testing.assert_allclose(res2.weights, bd.weights)
+
+
+def test_unary_ops_preserve_rank_axes_and_weights(simple_basedata):
+    bd = simple_basedata
+
+    bd.rank_of_data = 1
+    bd.axes = [None, None]  # arbitrary axes metadata
+    bd.weights = np.array([[1.0, 1.0, 1.0], [2.0, 2.0, 2.0]])
+
+    neg = -bd
+    sqrt_bd = bd.sqrt()
+    log_bd = bd.log()  # valid for all positive elements; 0 will yield NaN, which is fine
+
+    for out in (neg, sqrt_bd, log_bd):
+        assert out.rank_of_data == bd.rank_of_data
+        assert out.axes == bd.axes
+        assert out.axes is not bd.axes
+        np.testing.assert_allclose(out.weights, bd.weights)
+
+
+# ---------------------------------------------------------------------------
+# indexed() tests
+# ---------------------------------------------------------------------------
+
+
+def test_indexed_scalar_component_preserves_units_and_uncertainties():
+    """
+    Indexing a 1D BaseData with an integer should return a scalar BaseData
+    with sliced signal, uncertainties, and weights, and preserved units.
+    """
+    sig = np.array([10.0, 20.0, 30.0], dtype=float)
+    uncs = {"u": np.array([1.0, 2.0, 3.0], dtype=float)}
+    weights = np.array([0.1, 0.2, 0.3], dtype=float)
+
+    bd = BaseData(
+        signal=sig,
+        units=ureg.meter,
+        uncertainties=uncs,
+        weights=weights,
+        rank_of_data=1,
+    )
+
+    # Take the middle component
+    sub = bd.indexed(1)
+
+    # Signal becomes scalar
+    assert sub.signal.shape == ()
+    assert sub.signal == pytest.approx(20.0)
+
+    # Units preserved
+    assert sub.units == ureg.meter
+
+    # Uncertainties sliced
+    assert "u" in sub.uncertainties
+    assert sub.uncertainties["u"].shape == ()
+    assert sub.uncertainties["u"] == pytest.approx(2.0)
+
+    # Weights sliced
+    assert sub.weights.shape == ()
+    assert sub.weights == pytest.approx(0.2)
+
+    # rank_of_data default: min(original_rank, ndim_of_result) → min(1, 0) = 0
+    assert sub.rank_of_data == 0
+
+
+def test_indexed_slice_reduces_dimension_and_preserves_metadata():
+    """
+    Indexing with a slice should reduce dimensionality and keep metadata
+    (axes, units, rank_of_data) consistent.
+    """
+    sig = np.arange(6, dtype=float).reshape((2, 3))
+    uncs = {"stat": np.ones_like(sig, dtype=float)}
+    weights = np.full_like(sig, 0.5, dtype=float)
+
+    bd = BaseData(
+        signal=sig,
+        units=ureg.dimensionless,
+        uncertainties=uncs,
+        weights=weights,
+        axes=[None, None],
+        rank_of_data=2,
+    )
+
+    # Take the first row
+    sub = bd.indexed(0)
+
+    # Shape reduced (2,3) -> (3,)
+    assert sub.signal.shape == (3,)
+    np.testing.assert_allclose(sub.signal, sig[0])
+
+    # Uncertainties and weights sliced consistently
+    assert "stat" in sub.uncertainties
+    np.testing.assert_allclose(sub.uncertainties["stat"], uncs["stat"][0])
+    np.testing.assert_allclose(sub.weights, weights[0])
+
+    # Units preserved
+    assert sub.units == bd.units
+
+    # Axes preserved as a *new* list
+    assert sub.axes == bd.axes
+    assert sub.axes is not bd.axes
+
+    # Default rank_of_data: min(2, 1) = 1
+    assert sub.rank_of_data == 1
+
+    # Explicit rank_of_data override works
+    sub0 = bd.indexed(0, rank_of_data=0)
+    assert sub0.rank_of_data == 0
+
+
+# ---------------------------------------------------------------------------
+# Copy tests:
+# ---------------------------------------------------------------------------
+
+
+def test_copy_creates_independent_arrays_and_axes_list(simple_basedata):
+    bd = simple_basedata
+
+    # Set some metadata so we can check it is carried over
+    bd.rank_of_data = 2
+    bd.axes = [None, None]
+    bd.weights = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+
+    bd_copy = bd.copy()
+
+    # Different object
+    assert bd_copy is not bd
+    assert isinstance(bd_copy, BaseData)
+
+    # Signal copied, not aliased
+    np.testing.assert_allclose(bd_copy.signal, bd.signal)
+    assert bd_copy.signal is not bd.signal
+
+    # Weights copied, not aliased
+    np.testing.assert_allclose(bd_copy.weights, bd.weights)
+    assert bd_copy.weights is not bd.weights
+
+    # Uncertainties copied, not aliased
+    assert set(bd_copy.uncertainties.keys()) == set(bd.uncertainties.keys())
+    for key in bd.uncertainties:
+        np.testing.assert_allclose(bd_copy.uncertainties[key], bd.uncertainties[key])
+        assert bd_copy.uncertainties[key] is not bd.uncertainties[key]
+
+    # Axes list shallow-copied: new list, same elements
+    assert bd_copy.axes == bd.axes
+    assert bd_copy.axes is not bd.axes
+    # Elements themselves are the same objects (shallow copy)
+    for a_orig, a_copy in zip(bd.axes, bd_copy.axes):
+        assert a_orig is a_copy
+
+    # rank_of_data and units preserved
+    assert bd_copy.rank_of_data == bd.rank_of_data
+    assert bd_copy.units == bd.units
+
+
+def test_copy_without_axes_uses_empty_axes(simple_basedata):
+    bd = simple_basedata
+    bd.axes = [None, None]
+
+    bd_copy = bd.copy(with_axes=False)
+
+    # Axes dropped
+    assert bd_copy.axes == []
+    # Other content still copied
+    np.testing.assert_allclose(bd_copy.signal, bd.signal)
+    for key in bd.uncertainties:
+        np.testing.assert_allclose(bd_copy.uncertainties[key], bd.uncertainties[key])
