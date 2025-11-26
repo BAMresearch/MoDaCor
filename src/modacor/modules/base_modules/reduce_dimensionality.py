@@ -20,8 +20,12 @@ import numpy as np
 
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+
+# Facility-pluggable logger; by default this uses std logging
+logger = MessageHandler(name=__name__)
 
 
 class ReduceDimensionality(ProcessStep):
@@ -81,11 +85,15 @@ class ReduceDimensionality(ProcessStep):
           - list/tuple[int] → tuple of axes
         """
         if axes is None:
+            logger.debug("ReduceDimensionality: axes=None → reducing over all axes.")
             return None
         if isinstance(axes, int):
+            logger.debug(f"ReduceDimensionality: single axis requested: axes={axes}.")
             return axes
         # list/tuple of ints
-        return tuple(int(a) for a in axes)
+        normalized = tuple(int(a) for a in axes)
+        logger.debug(f"ReduceDimensionality: multiple axes requested: axes={normalized}.")
+        return normalized
 
     @staticmethod
     def _weighted_mean_with_uncertainty(
@@ -226,5 +234,7 @@ class ReduceDimensionality(ProcessStep):
 
             databundle["signal"] = averaged
             output[key] = databundle
+
+        logger.info(f"ReduceDimensionality: calculation finished for {len(output)} keys.")
 
         return output

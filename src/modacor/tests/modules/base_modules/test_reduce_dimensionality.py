@@ -11,6 +11,8 @@ __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
+# import pytest
+import logging
 import unittest
 
 import numpy as np
@@ -306,3 +308,51 @@ def test_reduce_dimensionality_rank_and_axes_reduce_as_expected():
     assert out_all.rank_of_data == 0
     # axes should be empty for scalar
     assert out_all.axes == []
+
+
+def test_reduce_dimensionality_emits_info_and_debug_logs(caplog):
+    """
+    Ensure that ReduceDimensionality.calculate() emits at least one INFO and
+    one DEBUG log record via the MessageHandler-backed logger.
+    """
+    signal = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=float)
+    unc = 0.1 * np.ones_like(signal)
+    weights = np.array([[1.0], [2.0]], dtype=float)
+
+    processing_data = ProcessingData()
+    bd = BaseData(
+        signal=signal,
+        units=ureg.Unit("count"),
+        uncertainties={"u": unc},
+        weights=weights,
+    )
+    bundle = DataBundle(signal=bd)
+    processing_data["bundle"] = bundle
+
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["bundle"],
+        axes=0,
+        use_weights=True,
+        nan_policy="omit",
+        reduction="mean",
+    )
+    step.processing_data = processing_data
+
+    logger_name = "modacor.modules.base_modules.reduce_dimensionality"
+
+    with caplog.at_level(logging.DEBUG, logger=logger_name):
+        step.calculate()
+
+    # Sanity: output exists
+    assert "bundle" in processing_data
+    out_bd: BaseData = processing_data["bundle"]["signal"]
+    assert isinstance(out_bd, BaseData)
+
+    # Collect log records from expected logger
+    records = [rec for rec in caplog.records if rec.name == logger_name]
+    assert records, "Expected at least one log record from ReduceDimensionality logger."
+
+    levels = {rec.levelno for rec in records}
+    assert logging.INFO in levels, "Expected at least one INFO log from ReduceDimensionality."
+    assert logging.DEBUG in levels, "Expected at least one DEBUG log from ReduceDimensionality."
