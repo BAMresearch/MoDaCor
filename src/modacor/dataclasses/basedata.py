@@ -463,14 +463,14 @@ class BaseData(UncertaintyOpsMixin):
     """
 
     # required:
-    # Core data array stored as an xarray DataArray
+    # Core data array stored as a numpy ndarray
     signal: np.ndarray = field(
         converter=signal_converter, validator=v.instance_of(np.ndarray), on_setattr=setters.validate
     )
     # Unit of signal*scaling+offset - required input 'dimensionless' for dimensionless data
     units: pint.Unit = field(validator=v.instance_of(pint.Unit), converter=ureg.Unit, on_setattr=setters.validate)  # type: ignore
     # optional:
-    # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
+    # Dict of variances represented as numpy ndarray objects; defaulting to an empty dict
     uncertainties: Dict[str, np.ndarray] = field(
         factory=dict, converter=dict_signal_converter, validator=v.instance_of(dict), on_setattr=setters.validate
     )

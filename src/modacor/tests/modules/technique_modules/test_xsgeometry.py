@@ -77,7 +77,7 @@ def make_geom_2d(n0: int, n1: int):
     # --- beam centre: at the centre pixel, ±0.25 pixel ---
     center_row = (n0 - 1) / 2.0
     center_col = (n1 - 1) / 2.0
-    beam_signal = np.asarray([center_col, center_row], dtype=float)
+    beam_signal = np.asarray([center_row, center_col], dtype=float)
     beam_unc = np.full_like(beam_signal, 0.25, dtype=float)
     beam_center_bd = BaseData(
         signal=beam_signal,
@@ -152,13 +152,14 @@ def test_xsgeometry_2d_center_q_zero_and_symmetry():
     """
     For a symmetric 2D detector with the beam at the center:
     - Q at the center pixel should be ≈ 0.
-    - Q0 should be antisymmetric left-right, Q1 symmetric left-right.
-    - Q1 should be antisymmetric up-down, Q0 symmetric up-down.
-    - Psi should behave like atan2(y, x):
-        right of center  ~ 0
-        left of center   ~ ±π
-        above center     ~ +π/2
-        below center     ~ -π/2
+    - With the current convention (x0 along rows, x1 along columns):
+        * Q1 is antisymmetric left-right, Q0 symmetric left-right.
+        * Q0 is antisymmetric up-down,   Q1 symmetric up-down.
+    - Psi should behave consistently with Psi = atan2(x1, x0):
+        right of center  ~ +π/2
+        left of center   ~ -π/2
+        above center     ~  π
+        below center     ~  0
     - Omega (solid angle) should be largest at the beam center and smaller at corners.
     """
     step = XSGeometry(io_sources=IoSources())
@@ -202,6 +203,7 @@ def test_xsgeometry_2d_center_q_zero_and_symmetry():
     )
 
     center = (n0 // 2, n1 // 2)
+    # index order: (row, col) == (y, x)
     row_c, col_c = center
 
     # Q at center ≈ 0
@@ -210,7 +212,7 @@ def test_xsgeometry_2d_center_q_zero_and_symmetry():
     assert_allclose(Q1_bd.signal[center], 0.0, atol=1e-12)
     assert_allclose(Q2_bd.signal[center], 0.0, atol=1e-12)
 
-    # left-right symmetry
+    # left-right symmetry (vary columns at fixed central row)
     col_left = col_c - 1
     col_right = col_c + 1
     q0_left = Q0_bd.signal[row_c, col_left]
@@ -218,13 +220,12 @@ def test_xsgeometry_2d_center_q_zero_and_symmetry():
     q1_left = Q1_bd.signal[row_c, col_left]
     q1_right = Q1_bd.signal[row_c, col_right]
 
-    # |Q0_left| == |Q0_right|, opposite sign
-    assert_allclose(abs(q0_left), abs(q0_right), rtol=1e-6, atol=1e-12)
-    assert q0_left == pytest.approx(-q0_right, rel=1e-6, abs=1e-12)
-    # Q1 symmetric
-    assert_allclose(q1_left, q1_right, rtol=1e-6, atol=1e-12)
+    # Q1 antisymmetric, Q0 symmetric with current convention
+    assert_allclose(abs(q1_left), abs(q1_right), rtol=1e-6, atol=1e-12)
+    assert q1_left == pytest.approx(-q1_right, rel=1e-6, abs=1e-12)
+    assert_allclose(q0_left, q0_right, rtol=1e-6, atol=1e-12)
 
-    # up-down symmetry
+    # up-down symmetry (vary rows at fixed central column)
     row_up = row_c - 1
     row_down = row_c + 1
     q0_up = Q0_bd.signal[row_up, col_c]
@@ -232,31 +233,30 @@ def test_xsgeometry_2d_center_q_zero_and_symmetry():
     q1_up = Q1_bd.signal[row_up, col_c]
     q1_down = Q1_bd.signal[row_down, col_c]
 
-    # |Q1_up| == |Q1_down|, opposite sign
-    assert_allclose(abs(q1_up), abs(q1_down), rtol=1e-6, atol=1e-12)
-    assert q1_up == pytest.approx(-q1_down, rel=1e-6, abs=1e-12)
-    # Q0 symmetric
-    assert_allclose(q0_up, q0_down, rtol=1e-6, atol=1e-12)
+    # Q0 antisymmetric, Q1 symmetric
+    assert_allclose(abs(q0_up), abs(q0_down), rtol=1e-6, atol=1e-12)
+    assert q0_up == pytest.approx(-q0_down, rel=1e-6, abs=1e-12)
+    assert_allclose(q1_up, q1_down, rtol=1e-6, atol=1e-12)
 
-    # Psi behaviour (image coords: rows increase downward)
+    # Psi behaviour (x0 vertical / rows, x1 horizontal / columns)
     psi_right = Psi_bd.signal[row_c, col_right]
     psi_left = Psi_bd.signal[row_c, col_left]
     psi_up = Psi_bd.signal[row_up, col_c]
     psi_down = Psi_bd.signal[row_down, col_c]
 
-    assert psi_right == pytest.approx(0.0, abs=1e-4)
-    # left should be close to ±π
-    assert abs(abs(psi_left) - np.pi) < 1e-4
-    # above centre → x0 ~ 0, x1 < 0 → atan2(neg, 0) ≈ -π/2
-    assert psi_up == pytest.approx(-np.pi / 2.0, abs=1e-4)
-    # below centre → x1 > 0 → atan2(pos, 0) ≈ +π/2
-    assert psi_down == pytest.approx(+np.pi / 2.0, abs=1e-4)
+    # right of center -> x1 > 0, x0 ~ 0 → +π/2
+    assert psi_right == pytest.approx(+np.pi / 2.0, abs=1e-4)
+    # left of center -> x1 < 0, x0 ~ 0 → -π/2
+    assert psi_left == pytest.approx(-np.pi / 2.0, abs=1e-4)
+    # above centre -> x0 < 0, x1 ~ 0 → π
+    assert psi_up == pytest.approx(np.pi, abs=1e-4)
+    # below centre -> x0 > 0, x1 ~ 0 → 0
+    assert psi_down == pytest.approx(0.0, abs=1e-4)
 
     # Omega largest at center, smaller at corner
     omega_center = Omega_bd.signal[center]
     omega_corner = Omega_bd.signal[0, 0]
     assert omega_corner < omega_center
-    # and Omega positive everywhere
     assert np.all(Omega_bd.signal > 0.0)
 
     # sanity: theta increases with radius
@@ -414,15 +414,16 @@ def test_xsgeometry_pixel_index_uncertainty_propagates_to_coordinates():
     unc_x0 = x0_bd.uncertainties["pixel_index"]
     unc_r = r_perp_bd.uncertainties["pixel_index"]
 
-    # Off-centre pixels should have finite, non-zero uncertainties
+    # Off-centre pixels should have finite, non-zero uncertainties.
+    # Choose a pixel where x0 != 0 to avoid the relative-error degeneracy at x0 == 0.
     row_c, col_c = n0 // 2, n1 // 2
-    col_right = col_c + 1
+    row_up = row_c - 1
 
-    assert np.isfinite(unc_x0[row_c, col_right])
-    assert unc_x0[row_c, col_right] > 0.0
+    assert np.isfinite(unc_x0[row_up, col_c])
+    assert unc_x0[row_up, col_c] > 0.0
 
-    assert np.isfinite(unc_r[row_c, col_right])
-    assert unc_r[row_c, col_right] > 0.0
+    assert np.isfinite(unc_r[row_up, col_c])
+    assert unc_r[row_up, col_c] > 0.0
 
 
 @pytest.mark.filterwarnings("ignore:divide by zero encountered in divide:RuntimeWarning")
@@ -524,7 +525,7 @@ def test_xsgeometry_prepare_and_calculate_integration():
     assert "signal" in out
     databundle = out["signal"]
 
-    for key in ["Q", "Q0", "Q1", "Q2", "Psi", "Theta", "Omega"]:
+    for key in ["Q", "Q0", "Q1", "Q2", "Psi", "TwoTheta", "Omega"]:
         assert key in databundle, f"Missing geometry key '{key}' in databundle."
         assert isinstance(databundle[key], BaseData), f"{key} is not a BaseData."
 

@@ -30,24 +30,27 @@ from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 class XSGeometry(ProcessStep):
     """
-    Calculates the geometric information Q, Q0, Q1, Q2, Psi, Theta, and Omega (solid angle)
+    Calculates the geometric information Q, Q0, Q1, Q2, Psi, TwoTheta, and Omega (solid angle)
     for X-ray scattering data and adds them to the databundle.
 
-    Geometry model
+        Geometry model
     --------------
-    * The last `rank_of_data` dimensions of `signal` are the detector dimensions.
-    * `beam_center` is a BaseData vector of length RoD (dimensionless pixel indices).
+    * The last `rank_of_data` dimensions of `signal` are the detector dimensions,
+    ordered as (..., y, x) for 2D and (..., y) for 1D.
+    * `beam_center.signal` is given in [y, x] pixel coordinates for 2D,
+    and [y] for 1D.
+    * `pixel_size.signal` is [pixel_size_y, pixel_size_x] in length units / pixel.
     * `pixel_size` is a BaseData vector of length 2 or 3 (length units):
         - first component = pixel size along the "Q0" axis,
         - second component = pixel size along the "Q1" axis,
         - third component (if present) is currently unused.
     * `detector_distance` and `wavelength` are BaseData scalars with length units.
 
-    All computed outputs (Q, Q0, Q1, Q2, Psi, Theta, Omega) are BaseData objects.
+    All computed outputs (Q, Q0, Q1, Q2, Psi, TwoTheta, Omega) are BaseData objects.
     """
 
     documentation = ProcessStepDescriber(
-        calling_name="Add Q, Psi, Theta, Omega",  # Omega is Solid Angle
+        calling_name="Add Q, Psi, TwoTheta, Omega",  # Omega is Solid Angle
         calling_id="XSGeometry",
         calling_module_path=Path(__file__),
         calling_version=__version__,
@@ -57,12 +60,12 @@ class XSGeometry(ProcessStep):
             "geometry",
             "Q",
             "Psi",
-            "Theta",
+            "TwoTheta",
             "Solid Angle",
             "Omega",
             "X-ray scattering",
         ],
-        step_doc="Add geometric information Q, Psi, Theta, and Solid Angle to the data",
+        step_doc="Add geometric information Q, Psi, TwoTheta, and Solid Angle to the data",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
         step_note="This calculates geometric factors relevant for X-ray scattering data",
         calling_arguments={
@@ -133,34 +136,13 @@ class XSGeometry(ProcessStep):
 
         # Pixel size: vector of 2 or 3 components.
         if pixel_size_bd.shape not in ((2,), (3,)):
-            raise ValueError(f"Pixel size should be a 2D or 3D vector, got shape={pixel_size_bd.signal.shape}.")
+            raise ValueError(f"Pixel size should be a 2D or 3D vector, got shape={pixel_size_bd.shape}.")
 
         # Sanity check on spatial_shape vs RoD
         if RoD == 1 and len(spatial_shape) != 1:
             raise ValueError(f"RoD=1 expects 1D spatial shape, got {spatial_shape}.")
         if RoD == 2 and len(spatial_shape) != 2:
             raise ValueError(f"RoD=2 expects 2D spatial shape, got {spatial_shape}.")
-
-    @staticmethod
-    def _broadcast_like(template: BaseData, value_bd: BaseData) -> BaseData:
-        """
-        Broadcast a scalar-like BaseData `value_bd` to the shape of `template.signal`.
-        """
-        tgt_shape = template.signal.shape
-        val = np.asarray(value_bd.signal, dtype=float)
-        val_b = np.broadcast_to(val, tgt_shape)
-
-        new_uncs: Dict[str, np.ndarray] = {}
-        for k, u in value_bd.uncertainties.items():
-            u_arr = np.asarray(u, dtype=float)
-            u_b = np.broadcast_to(u_arr, tgt_shape)
-            new_uncs[k] = u_b
-
-        return BaseData(
-            signal=val_b,
-            units=value_bd.units,
-            uncertainties=new_uncs,
-        )
 
     def _make_index_basedata(
         self,
@@ -169,9 +151,9 @@ class XSGeometry(ProcessStep):
         uncertainty_key: str = "pixel_index",
     ) -> BaseData:
         """
-        Create a dimensionless BaseData representing pixel indices along a given axis.
+        Create a BaseData representing pixel indices along a given axis.
 
-        Optionally assigns an uncertainty of ±0.5 pixel to each index to reflect the
+        Each index gets an uncertainty of ±0.5 pixel to reflect the
         pixel-center assumption.
         """
         if len(shape) == 0:
@@ -225,36 +207,25 @@ class XSGeometry(ProcessStep):
             (n0,) = spatial_shape
             idx0_bd = self._make_index_basedata(shape=(n0,), axis=0)
 
-            bc0_bd = beam_center_bd.indexed(0, rank_of_data=0)
-            bc0_full = self._broadcast_like(idx0_bd, bc0_bd)
-            px0_full = self._broadcast_like(idx0_bd, px0_bd)
-
-            rel_idx0_bd = idx0_bd - bc0_full
-            x0_bd = rel_idx0_bd * px0_full
+            rel_idx0_bd = idx0_bd - beam_center_bd.indexed(0, rank_of_data=0)
+            x0_bd = rel_idx0_bd * px0_bd
             x1_bd = BaseData(
-                signal=np.zeros_like(x0_bd.signal, dtype=float),
+                signal=np.zeros_like(x0_bd.signal),
                 units=x0_bd.units,
             )
 
         else:  # RoD == 2
+            # image dimensions
             n0, n1 = spatial_shape
             # Axis 1 (columns) → x0, Axis 0 (rows) → x1
-            idx0_bd = self._make_index_basedata(shape=(n0, n1), axis=1)
-            idx1_bd = self._make_index_basedata(shape=(n0, n1), axis=0)
+            idx0_bd = self._make_index_basedata(shape=(n0, n1), axis=0)
+            idx1_bd = self._make_index_basedata(shape=(n0, n1), axis=1)
 
-            bc0_bd = beam_center_bd.indexed(0, rank_of_data=0)
-            bc1_bd = beam_center_bd.indexed(1, rank_of_data=0)
+            rel_idx0_bd = idx0_bd - beam_center_bd.indexed(0, rank_of_data=0)
+            rel_idx1_bd = idx1_bd - beam_center_bd.indexed(1, rank_of_data=0)
 
-            bc0_full = self._broadcast_like(idx0_bd, bc0_bd)
-            bc1_full = self._broadcast_like(idx1_bd, bc1_bd)
-            px0_full = self._broadcast_like(idx0_bd, px0_bd)
-            px1_full = self._broadcast_like(idx1_bd, px1_bd)
-
-            rel_idx0_bd = idx0_bd - bc0_full
-            rel_idx1_bd = idx1_bd - bc1_full
-
-            x0_bd = rel_idx0_bd * px0_full
-            x1_bd = rel_idx1_bd * px1_full
+            x0_bd = rel_idx0_bd * px0_bd
+            x1_bd = rel_idx1_bd * px1_bd
 
         # Common for RoD = 1, 2
         r_perp_bd = ((x0_bd**2) + (x1_bd**2)).sqrt()
@@ -303,8 +274,7 @@ class XSGeometry(ProcessStep):
         """
         Compute Q0, Q1, Q2 components as BaseData. Q2 is set to zero for a flat detector.
         """
-        r_perp_signal = np.asarray(r_perp_bd.signal, dtype=float)
-        safe_signal = np.where(r_perp_signal == 0.0, 1.0, r_perp_signal)
+        safe_signal = np.where(r_perp_bd.signal == 0.0, 1.0, r_perp_bd.signal)
 
         r_perp_safe_bd = BaseData(
             signal=safe_signal,
@@ -317,7 +287,7 @@ class XSGeometry(ProcessStep):
         Q0_bd = Q_bd * dir0_bd
         Q1_bd = Q_bd * dir1_bd
         Q2_bd = BaseData(
-            signal=np.zeros_like(Q_bd.signal, dtype=float),
+            signal=np.zeros_like(Q_bd.signal),
             units=Q_bd.units,
         )
 
@@ -333,10 +303,7 @@ class XSGeometry(ProcessStep):
 
         Psi = atan2(x1, x0)
         """
-        psi_signal = np.arctan2(
-            np.asarray(x1_bd.signal, dtype=float),
-            np.asarray(x0_bd.signal, dtype=float),
-        )
+        psi_signal = np.arctan2(x1_bd.signal, x0_bd.signal)
         return BaseData(
             signal=psi_signal,
             units=ureg.radian,
@@ -367,7 +334,7 @@ class XSGeometry(ProcessStep):
 
     def prepare_execution(self):
         """
-        Precalculate Q, Q0, Q1, Q2, Psi, Theta, and Omega as BaseData objects and
+        Precalculate Q, Q0, Q1, Q2, Psi, TwoTheta, and Omega as BaseData objects and
         store them in self._prepared_data.
         """
         super().prepare_execution()
@@ -445,13 +412,13 @@ class XSGeometry(ProcessStep):
             "Q1": Q1_bd,
             "Q2": Q2_bd,
             "Psi": Psi_bd,
-            "Theta": theta_bd,
+            "TwoTheta": two_theta_bd,
             "Omega": Omega_bd,
         }
 
     def calculate(self):
         """
-        Add Q, Q0, Q1, Q2, Psi, Theta, and Omega (solid angle) as BaseData objects
+        Add Q, Q0, Q1, Q2, Psi, TwoTheta, and Omega (solid angle) as BaseData objects
         to the databundles specified in 'with_processing_keys'.
         """
         data = self.processing_data
@@ -471,7 +438,7 @@ class XSGeometry(ProcessStep):
             databundle["Q1"] = self._prepared_data["Q1"]
             databundle["Q2"] = self._prepared_data["Q2"]
             databundle["Psi"] = self._prepared_data["Psi"]
-            databundle["Theta"] = self._prepared_data["Theta"]
+            databundle["TwoTheta"] = self._prepared_data["TwoTheta"]
             databundle["Omega"] = self._prepared_data["Omega"]
 
             output[key] = databundle
