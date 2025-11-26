@@ -604,6 +604,22 @@ class BaseData(UncertaintyOpsMixin):
                 # I am not sure but I think this would be the right way for non-multiplicative conversions
                 self.uncertainties[key] *= new_signal / self.signal
 
+    def copy(self, with_axes: bool = True) -> "BaseData":
+        """
+        Return a new BaseData with copied signal/uncertainties/weights.
+        Axes are shallow-copied (list copy) by default, so axis objects
+        themselves are still shared.
+        """
+        new = BaseData(
+            signal=np.array(self.signal, copy=True),
+            units=self.units,
+            uncertainties=_copy_uncertainties(self.uncertainties),
+            weights=np.array(self.weights, copy=True),
+            axes=list(self.axes) if with_axes else [],
+            rank_of_data=self.rank_of_data,
+        )
+        return new
+
     def __repr__(self):
         return f"BaseData(signal={self.signal}, uncertainties={self.uncertainties}, units={self.units})"
 
