@@ -584,24 +584,24 @@ class BaseData(UncertaintyOpsMixin):
             logger.debug("No unit conversion needed, units are the same.")
             return
 
+        if not multiplicative_conversion:
+            # This path is subtle for offset units (e.g. degC <-> K) and we
+            # don't want to silently get uncertainties wrong.
+            raise NotImplementedError(
+                "Non-multiplicative unit conversions are not yet implemented for BaseData.\n"
+                "If you need this, we should design explicit rules (e.g. using delta units)."
+            )
+
         logger.debug(f"Converting from {self.units} to {new_units}.")
 
-        if multiplicative_conversion:
-            # simple unit conversion, can be done to scalar
-            # Convert signal
-            cfact = new_units.m_from(self.units)
-            self.signal *= cfact
-            self.units = new_units
-            # Convert uncertainty
-            for key in self.uncertainties:  # fastest as far as my limited testing goes against iterating over items():
-                self.uncertainties[key] *= cfact
-
-        else:
-            new_signal = ureg.Quantity(self.signal, self.units).to(new_units).magnitude
-            # Convert uncertainties
-            for key in self.uncertainties:
-                # I am not sure but I think this would be the right way for non-multiplicative conversions
-                self.uncertainties[key] *= new_signal / self.signal
+        # simple unit conversion, can be done to scalar
+        # Convert signal
+        cfact = new_units.m_from(self.units)
+        self.signal *= cfact
+        self.units = new_units
+        # Convert uncertainty
+        for key in self.uncertainties:  # fastest as far as my limited testing goes against iterating over items():
+            self.uncertainties[key] *= cfact
 
     def copy(self, with_axes: bool = True) -> "BaseData":
         """
