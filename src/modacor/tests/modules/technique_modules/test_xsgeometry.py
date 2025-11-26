@@ -166,7 +166,7 @@ def test_xsgeometry_2d_center_q_zero_and_symmetry():
     n0, n1 = 5, 5
     spatial_shape = (n0, n1)
     D_bd, pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_2d(n0, n1)
-    px0_bd, px1_bd = step._extract_pixel_pitches(pixel_size_bd)
+    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
 
     # coordinates
     x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
@@ -278,7 +278,7 @@ def test_xsgeometry_1d_center_q_zero_and_monotonic():
     n = 7
     spatial_shape = (n,)
     D_bd, pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_1d(n)
-    px0_bd, px1_bd = step._extract_pixel_pitches(pixel_size_bd)
+    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
 
     x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
         RoD=1,
@@ -336,7 +336,7 @@ def test_xsgeometry_0d_shapes_and_units():
     beam_center_bd = _bd_vector([0.0], ureg.pixel)
     wavelength_bd = _bd_scalar(1.0, ureg.meter)
 
-    px0_bd, px1_bd = step._extract_pixel_pitches(pixel_size_bd)
+    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
     x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
         RoD=0,
         spatial_shape=spatial_shape,
@@ -396,7 +396,7 @@ def test_xsgeometry_pixel_index_uncertainty_propagates_to_coordinates():
     n0, n1 = 5, 5
     spatial_shape = (n0, n1)
     D_bd, pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_2d(n0, n1)
-    px0_bd, px1_bd = step._extract_pixel_pitches(pixel_size_bd)
+    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
 
     x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
         RoD=2,
@@ -436,7 +436,7 @@ def test_xsgeometry_Q_has_nonzero_uncertainty_off_center():
     n0, n1 = 5, 5
     spatial_shape = (n0, n1)
     D_bd, pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_2d(n0, n1)
-    px0_bd, px1_bd = step._extract_pixel_pitches(pixel_size_bd)
+    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
 
     x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
         RoD=2,

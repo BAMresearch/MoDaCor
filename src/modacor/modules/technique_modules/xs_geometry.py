@@ -132,7 +132,7 @@ class XSGeometry(ProcessStep):
                 )
 
         # Pixel size: vector of 2 or 3 components.
-        if pixel_size_bd.signal.shape not in ((2,), (3,)):
+        if pixel_size_bd.shape not in ((2,), (3,)):
             raise ValueError(f"Pixel size should be a 2D or 3D vector, got shape={pixel_size_bd.signal.shape}.")
 
         # Sanity check on spatial_shape vs RoD
@@ -140,26 +140,6 @@ class XSGeometry(ProcessStep):
             raise ValueError(f"RoD=1 expects 1D spatial shape, got {spatial_shape}.")
         if RoD == 2 and len(spatial_shape) != 2:
             raise ValueError(f"RoD=2 expects 2D spatial shape, got {spatial_shape}.")
-
-    @staticmethod
-    def _component_from_vector_bd(vector_bd: BaseData, idx: int) -> BaseData:
-        """
-        Extract a single scalar component from a vector BaseData (e.g. beam_center or pixel_size).
-        """
-        sig = np.asarray(vector_bd.signal, dtype=float)
-        if sig.ndim != 1 or not (0 <= idx < sig.size):
-            raise IndexError(f"Cannot extract component {idx} from vector with shape {sig.shape}.")
-
-        new_signal = np.array(sig[idx], dtype=float)
-        new_uncs = {
-            k: np.array(np.asarray(u, dtype=float)[idx], dtype=float) for k, u in vector_bd.uncertainties.items()
-        }
-
-        return BaseData(
-            signal=new_signal,
-            units=vector_bd.units,
-            uncertainties=new_uncs,
-        )
 
     @staticmethod
     def _broadcast_like(template: BaseData, value_bd: BaseData) -> BaseData:
@@ -186,7 +166,6 @@ class XSGeometry(ProcessStep):
         self,
         shape: tuple[int, ...],
         axis: int,
-        add_half_pixel_uncertainty: bool = True,
         uncertainty_key: str = "pixel_index",
     ) -> BaseData:
         """
@@ -204,30 +183,14 @@ class XSGeometry(ProcessStep):
             )
             signal = grids[axis]
 
-        uncertainties: Dict[str, np.ndarray] = {}
-        if add_half_pixel_uncertainty:
-            uncertainties[uncertainty_key] = np.full_like(signal, 0.5, dtype=float)
+        # always add half-pixel uncertainty estimate to pixel indices
+        uncertainties: Dict[str, np.ndarray] = {uncertainty_key: np.full_like(signal, 0.5, dtype=float)}
 
         return BaseData(
             signal=signal,
             units=ureg.pixel,
             uncertainties=uncertainties,
         )
-
-    def _extract_pixel_pitches(
-        self,
-        pixel_size_bd: BaseData,
-    ) -> Tuple[BaseData, BaseData]:
-        """
-        Extract pixel pitches along Q0 and Q1 axes (first two components of pixel_size).
-        """
-        sig = np.asarray(pixel_size_bd.signal, dtype=float)
-        if sig.shape not in ((2,), (3,)):
-            raise ValueError(f"Pixel size should be a 2D or 3D vector, got shape={sig.shape}.")
-
-        px0_bd = self._component_from_vector_bd(pixel_size_bd, 0)
-        px1_bd = self._component_from_vector_bd(pixel_size_bd, 1)
-        return px0_bd, px1_bd
 
     # ------------------------------------------------------------------
     # Coordinate calculation per dimensionality
@@ -262,7 +225,7 @@ class XSGeometry(ProcessStep):
             (n0,) = spatial_shape
             idx0_bd = self._make_index_basedata(shape=(n0,), axis=0)
 
-            bc0_bd = self._component_from_vector_bd(beam_center_bd, 0)
+            bc0_bd = beam_center_bd.indexed(0, rank_of_data=0)
             bc0_full = self._broadcast_like(idx0_bd, bc0_bd)
             px0_full = self._broadcast_like(idx0_bd, px0_bd)
 
@@ -279,8 +242,8 @@ class XSGeometry(ProcessStep):
             idx0_bd = self._make_index_basedata(shape=(n0, n1), axis=1)
             idx1_bd = self._make_index_basedata(shape=(n0, n1), axis=0)
 
-            bc0_bd = self._component_from_vector_bd(beam_center_bd, 0)
-            bc1_bd = self._component_from_vector_bd(beam_center_bd, 1)
+            bc0_bd = beam_center_bd.indexed(0, rank_of_data=0)
+            bc1_bd = beam_center_bd.indexed(1, rank_of_data=0)
 
             bc0_full = self._broadcast_like(idx0_bd, bc0_bd)
             bc1_full = self._broadcast_like(idx1_bd, bc1_bd)
@@ -425,7 +388,8 @@ class XSGeometry(ProcessStep):
         wavelength_bd = geom["wavelength"]
 
         # 3. Extract pixel pitches along Q0/Q1
-        px0_bd, px1_bd = self._extract_pixel_pitches(pixel_size_bd)
+        px0_bd = pixel_size_bd.indexed(0, rank_of_data=0)
+        px1_bd = pixel_size_bd.indexed(1, rank_of_data=0)
 
         # 4. Coordinates (x0, x1, r_perp, R)
         x0_bd, x1_bd, r_perp_bd, R_bd = self._compute_coordinates(
