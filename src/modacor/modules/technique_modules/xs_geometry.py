@@ -22,10 +22,12 @@ import numpy as np
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.helpers import basedata_from_sources
+from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
-# from typing import Any
+# Module-level handler; facilities can swap MessageHandler implementation as needed
+logger = MessageHandler(name=__name__)
 
 
 class XSGeometry(ProcessStep):
@@ -100,7 +102,14 @@ class XSGeometry(ProcessStep):
         for each their *_source / *_units_source / *_uncertainties_sources.
         """
         geom: Dict[str, BaseData] = {}
-        for key in ["detector_distance", "pixel_size", "beam_center", "wavelength"]:
+        required_keys = ["detector_distance", "pixel_size", "beam_center", "wavelength"]
+
+        logger.debug(
+            f"XSGeometry: loading geometry for keys {required_keys} "
+            f"from configuration for processing keys={self.configuration.get('with_processing_keys')}"
+        )
+
+        for key in required_keys:
             for subkey in [f"{key}_source", f"{key}_units_source", f"{key}_uncertainties_sources"]:
                 if subkey not in self.configuration:
                     raise ValueError(f"Missing required configuration parameter: {subkey}")
@@ -110,6 +119,12 @@ class XSGeometry(ProcessStep):
                 units_source=self.configuration.get(f"{key}_units_source", None),
                 uncertainty_sources=self.configuration.get(f"{key}_uncertainties_sources", {}),
             )
+
+        logger.debug(
+            "XSGeometry: loaded geometry BaseData objects: "
+            + ", ".join(f"{k}: shape={v.signal.shape}, units={v.units}" for k, v in geom.items())
+        )
+
         return geom
 
     def _validate_geometry(
@@ -143,6 +158,11 @@ class XSGeometry(ProcessStep):
             raise ValueError(f"RoD=1 expects 1D spatial shape, got {spatial_shape}.")
         if RoD == 2 and len(spatial_shape) != 2:
             raise ValueError(f"RoD=2 expects 2D spatial shape, got {spatial_shape}.")
+
+        logger.debug(
+            f"XSGeometry: validated geometry for RoD={RoD}, spatial_shape={spatial_shape}, "
+            f"beam_center.size={beam_center_bd.signal.size}, pixel_size.shape={pixel_size_bd.shape}"
+        )
 
     def _make_index_basedata(
         self,
@@ -201,6 +221,7 @@ class XSGeometry(ProcessStep):
             x1_bd = BaseData(signal=np.array(0.0), units=px1_bd.units)
             r_perp_bd = BaseData(signal=np.array(0.0), units=px0_bd.units)
             R_bd = detector_distance_bd
+            logger.debug("XSGeometry: RoD=0, using detector distance directly for R.")
             return x0_bd, x1_bd, r_perp_bd, R_bd
 
         if RoD == 1:
@@ -212,6 +233,9 @@ class XSGeometry(ProcessStep):
             x1_bd = BaseData(
                 signal=np.zeros_like(x0_bd.signal),
                 units=x0_bd.units,
+            )
+            logger.debug(
+                f"XSGeometry: computed 1D coordinates for shape={spatial_shape}, x0.units={x0_bd.units}, x1 is zero."
             )
 
         else:  # RoD == 2
@@ -227,9 +251,18 @@ class XSGeometry(ProcessStep):
             x0_bd = rel_idx0_bd * px0_bd
             x1_bd = rel_idx1_bd * px1_bd
 
+            logger.debug(
+                f"XSGeometry: computed 2D coordinates for spatial_shape={spatial_shape}, "
+                f"x0.shape={x0_bd.signal.shape}, x1.shape={x1_bd.signal.shape}"
+            )
+
         # Common for RoD = 1, 2
         r_perp_bd = ((x0_bd**2) + (x1_bd**2)).sqrt()
         R_bd = ((r_perp_bd**2) + (detector_distance_bd**2)).sqrt()
+
+        logger.debug(
+            f"XSGeometry: computed r_perp and R; r_perp.shape={r_perp_bd.signal.shape}, R.shape={R_bd.signal.shape}"  # noqa: E702
+        )
 
         return x0_bd, x1_bd, r_perp_bd, R_bd
 
@@ -249,6 +282,11 @@ class XSGeometry(ProcessStep):
         two_theta_bd = ratio_bd.arctan()  # radians
         theta_bd = 0.5 * two_theta_bd  # radians
         sin_theta_bd = theta_bd.sin()  # dimensionless
+
+        logger.debug(
+            f"XSGeometry: computed angles; two_theta.units={two_theta_bd.units}, theta.units={theta_bd.units}"  # noqa: E702
+        )
+
         return two_theta_bd, theta_bd, sin_theta_bd
 
     def _compute_Q_and_components(
@@ -275,6 +313,9 @@ class XSGeometry(ProcessStep):
         Q1_bd = Q_bd * dir1_bd
         Q2_bd = BaseData(signal=np.zeros_like(Q_bd.signal), units=Q_bd.units)
 
+        logger.debug(
+            f"XSGeometry: computed Q components; Q.shape={Q_bd.signal.shape}, Q.units={Q_bd.units}"  # noqa: E702
+        )
         return Q_bd, Q0_bd, Q1_bd, Q2_bd
 
     def _compute_psi(
@@ -288,10 +329,12 @@ class XSGeometry(ProcessStep):
         Psi = atan2(x1, x0)
         """
         psi_signal = np.arctan2(x1_bd.signal, x0_bd.signal)
-        return BaseData(
+        psi_bd = BaseData(
             signal=psi_signal,
             units=ureg.radian,
         )
+        logger.debug(f"XSGeometry: computed Psi; shape={psi_bd.signal.shape}, units={psi_bd.units}")  # noqa: E702
+        return psi_bd
 
     def _compute_solid_angle(
         self,
@@ -310,6 +353,11 @@ class XSGeometry(ProcessStep):
         area_bd = px0_bd * px1_bd
         R3_bd = R_bd**3
         Omega_bd = (area_bd * detector_distance_bd) / R3_bd  # dimensionless (sr)
+
+        logger.debug(
+            f"XSGeometry: computed solid angle; Omega.shape={Omega_bd.signal.shape}, Omega.units={Omega_bd.units}"  # noqa: E702
+        )
+
         return Omega_bd
 
     # ------------------------------------------------------------------
@@ -323,11 +371,12 @@ class XSGeometry(ProcessStep):
         """
         super().prepare_execution()
 
-        # 1. Signal & detector dimensions
         pkey = self.configuration.get("with_processing_keys")
         signal_bd: BaseData = self.processing_data[pkey[0]]["signal"]
         RoD = signal_bd.rank_of_data
         spatial_shape: tuple[int, ...] = signal_bd.shape[-RoD:] if RoD > 0 else ()
+
+        logger.info(f"XSGeometry: preparing execution for keys={pkey}, RoD={RoD}, spatial_shape={spatial_shape}")
 
         # 2. Load and validate geometry
         geom = self._load_geometry()
@@ -366,6 +415,7 @@ class XSGeometry(ProcessStep):
             x1_bd=x1_bd,
             r_perp_bd=r_perp_bd,
         )
+
         # 8. Psi
         Psi_bd = self._compute_psi(
             x0_bd=x0_bd,
@@ -394,6 +444,8 @@ class XSGeometry(ProcessStep):
             "Omega": Omega_bd,
         }
 
+        logger.info(f"XSGeometry: prepared geometry outputs for keys={pkey}: Q, Q0, Q1, Q2, Psi, TwoTheta, Omega.")
+
     def calculate(self):
         """
         Add Q, Q0, Q1, Q2, Psi, TwoTheta, and Omega (solid angle) as BaseData objects
@@ -404,11 +456,15 @@ class XSGeometry(ProcessStep):
 
         with_keys = self.configuration.get("with_processing_keys", [])
         if not with_keys:
+            logger.warning("XSGeometry: no with_processing_keys specified; nothing to calculate.")
             return output
+
+        logger.info(f"XSGeometry: adding geometry outputs to keys={with_keys}")
 
         for key in with_keys:
             databundle = data.get(key)
             if databundle is None:
+                logger.warning(f"XSGeometry: processing_data has no entry for key={key!r}; skipping.")  # noqa: E702
                 continue
 
             databundle["Q"] = self._prepared_data["Q"]
@@ -420,5 +476,7 @@ class XSGeometry(ProcessStep):
             databundle["Omega"] = self._prepared_data["Omega"]
 
             output[key] = databundle
+
+        logger.info(f"XSGeometry: geometry outputs attached for {len(output)} keys.")
 
         return output
