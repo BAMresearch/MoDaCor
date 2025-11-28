@@ -251,47 +251,31 @@ class XSGeometry(ProcessStep):
         sin_theta_bd = theta_bd.sin()  # dimensionless
         return two_theta_bd, theta_bd, sin_theta_bd
 
-    def _compute_Q(
+    def _compute_Q_and_components(
         self,
         sin_theta_bd: BaseData,
         wavelength_bd: BaseData,
-    ) -> BaseData:
-        """
-        Compute scattering vector magnitude Q as BaseData.
-
-        Q = (4π / λ) * sin(θ)
-        """
-        four_pi = 4.0 * np.pi
-        return (four_pi * sin_theta_bd) / wavelength_bd
-
-    def _compute_Q_components(
-        self,
-        Q_bd: BaseData,
         x0_bd: BaseData,
         x1_bd: BaseData,
         r_perp_bd: BaseData,
-    ) -> Tuple[BaseData, BaseData, BaseData]:
+    ) -> Tuple[BaseData, BaseData, BaseData, BaseData]:
         """
-        Compute Q0, Q1, Q2 components as BaseData. Q2 is set to zero for a flat detector.
+        Compute Q magnitude and components Q0, Q1, Q2.
         """
+        four_pi = 4.0 * np.pi
+        Q_bd = (four_pi * sin_theta_bd) / wavelength_bd
+
         safe_signal = np.where(r_perp_bd.signal == 0.0, 1.0, r_perp_bd.signal)
+        r_perp_safe_bd = BaseData(signal=safe_signal, units=r_perp_bd.units)
 
-        r_perp_safe_bd = BaseData(
-            signal=safe_signal,
-            units=r_perp_bd.units,
-        )
-
-        dir0_bd = x0_bd / r_perp_safe_bd  # cos Psi
-        dir1_bd = x1_bd / r_perp_safe_bd  # sin Psi
+        dir0_bd = x0_bd / r_perp_safe_bd
+        dir1_bd = x1_bd / r_perp_safe_bd
 
         Q0_bd = Q_bd * dir0_bd
         Q1_bd = Q_bd * dir1_bd
-        Q2_bd = BaseData(
-            signal=np.zeros_like(Q_bd.signal),
-            units=Q_bd.units,
-        )
+        Q2_bd = BaseData(signal=np.zeros_like(Q_bd.signal), units=Q_bd.units)
 
-        return Q0_bd, Q1_bd, Q2_bd
+        return Q_bd, Q0_bd, Q1_bd, Q2_bd
 
     def _compute_psi(
         self,
@@ -374,20 +358,14 @@ class XSGeometry(ProcessStep):
             detector_distance_bd=detector_distance_bd,
         )
 
-        # 6. Q magnitude
-        Q_bd = self._compute_Q(
+        # 6. Q magnitude and 7. components
+        Q_bd, Q0_bd, Q1_bd, Q2_bd = self._compute_Q_and_components(
             sin_theta_bd=sin_theta_bd,
             wavelength_bd=wavelength_bd,
-        )
-
-        # 7. Q components
-        Q0_bd, Q1_bd, Q2_bd = self._compute_Q_components(
-            Q_bd=Q_bd,
             x0_bd=x0_bd,
             x1_bd=x1_bd,
             r_perp_bd=r_perp_bd,
         )
-
         # 8. Psi
         Psi_bd = self._compute_psi(
             x0_bd=x0_bd,
