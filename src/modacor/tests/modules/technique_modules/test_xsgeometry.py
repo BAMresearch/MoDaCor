@@ -184,12 +184,9 @@ def test_xsgeometry_2d_center_q_zero_and_symmetry():
         r_perp_bd=r_perp_bd,
         detector_distance_bd=D_bd,
     )
-    Q_bd = step._compute_Q(
+    Q_bd, Q0_bd, Q1_bd, Q2_bd = step._compute_Q_and_components(
         sin_theta_bd=sin_theta_bd,
         wavelength_bd=wavelength_bd,
-    )
-    Q0_bd, Q1_bd, Q2_bd = step._compute_Q_components(
-        Q_bd=Q_bd,
         x0_bd=x0_bd,
         x1_bd=x1_bd,
         r_perp_bd=r_perp_bd,
@@ -265,6 +262,14 @@ def test_xsgeometry_2d_center_q_zero_and_symmetry():
     assert theta_row[col_left] > theta_row[col_c]
     assert theta_row[col_right] > theta_row[col_c]
 
+    Q_mag_from_components = (Q0_bd**2 + Q1_bd**2 + Q2_bd**2).sqrt()
+    assert_allclose(
+        Q_mag_from_components.signal,
+        Q_bd.signal,
+        rtol=1e-10,
+        atol=1e-12,
+    )
+
 
 def test_xsgeometry_1d_center_q_zero_and_monotonic():
     """
@@ -293,12 +298,10 @@ def test_xsgeometry_1d_center_q_zero_and_monotonic():
         r_perp_bd=r_perp_bd,
         detector_distance_bd=D_bd,
     )
-    Q_bd = step._compute_Q(
+
+    Q_bd, Q0_bd, Q1_bd, Q2_bd = step._compute_Q_and_components(
         sin_theta_bd=sin_theta_bd,
         wavelength_bd=wavelength_bd,
-    )
-    Q0_bd, Q1_bd, Q2_bd = step._compute_Q_components(
-        Q_bd=Q_bd,
         x0_bd=x0_bd,
         x1_bd=x1_bd,
         r_perp_bd=r_perp_bd,
@@ -350,12 +353,9 @@ def test_xsgeometry_0d_shapes_and_units():
         r_perp_bd=r_perp_bd,
         detector_distance_bd=D_bd,
     )
-    Q_bd = step._compute_Q(
+    Q_bd, Q0_bd, Q1_bd, Q2_bd = step._compute_Q_and_components(
         sin_theta_bd=sin_theta_bd,
         wavelength_bd=wavelength_bd,
-    )
-    Q0_bd, Q1_bd, Q2_bd = step._compute_Q_components(
-        Q_bd=Q_bd,
         x0_bd=x0_bd,
         x1_bd=x1_bd,
         r_perp_bd=r_perp_bd,
@@ -452,9 +452,12 @@ def test_xsgeometry_Q_has_nonzero_uncertainty_off_center():
         r_perp_bd=r_perp_bd,
         detector_distance_bd=D_bd,
     )
-    Q_bd = step._compute_Q(
+    Q_bd, Q0_bd, Q1_bd, Q2_bd = step._compute_Q_and_components(
         sin_theta_bd=sin_theta_bd,
         wavelength_bd=wavelength_bd,
+        x0_bd=x0_bd,
+        x1_bd=x1_bd,
+        r_perp_bd=r_perp_bd,
     )
 
     # We expect the 'pixel_index' uncertainty key to exist on Q as well
