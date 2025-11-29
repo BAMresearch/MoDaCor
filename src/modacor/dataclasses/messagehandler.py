@@ -14,7 +14,18 @@ __status__ = "Development"  # "Development", "Production"
 
 import logging
 
-# logger = logging.getLogger(__name__)
+_default_handler: MessageHandler | None = None
+
+
+def get_default_handler(level: int = logging.INFO) -> MessageHandler:
+    """
+    MoDaCor-wide default message handler. Useful for overarching logging like in the pipeline runner.
+    For specific modules or classes, it's better to create dedicated named MessageHandler instances.
+    """
+    global _default_handler
+    if _default_handler is None:
+        _default_handler = MessageHandler(level=level, name="MoDaCor")
+    return _default_handler
 
 
 class MessageHandler:
@@ -24,6 +35,7 @@ class MessageHandler:
 
     Args:
         level (int): The logging level to use. Defaults to logging.INFO.
+        name (str): Logger name (typically __name__).
     """
 
     def __init__(self, level: int = logging.INFO, name: str = "MoDaCor", **kwargs):
@@ -33,20 +45,18 @@ class MessageHandler:
         self.logger = logging.getLogger(name)
         self.logger.setLevel(level)
 
-        self.consoleLogHandler = logging.StreamHandler()
-        self.consoleLogHandler.setLevel(level)
+        # Avoid adding multiple console handlers if this handler is created multiple times
+        if not any(isinstance(h, logging.StreamHandler) for h in self.logger.handlers):
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(level)
 
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        self.consoleLogHandler.setFormatter(formatter)
-        self.logger.addHandler(self.consoleLogHandler)
+            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            console_handler.setFormatter(formatter)
+            self.logger.addHandler(console_handler)
 
-    def log(self, message: str, level: int = None) -> None:  # , name: str = None):
+    def log(self, message: str, level: int = None) -> None:
         if level is None:
             level = self.level
-
-        # if name is None:
-        #     name = self.name
-        # does not take a name: # self.logger = logging.getLogger(name)
         self.logger.log(msg=message, level=level)
 
     def info(self, message: str):

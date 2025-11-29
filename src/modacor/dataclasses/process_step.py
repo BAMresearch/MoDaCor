@@ -72,6 +72,8 @@ class ProcessStep:
 
     # if the process produces intermediate arrays, they are stored here, optionally cached
     produced_outputs: dict[str, Any] = field(factory=dict)
+    # intermediate prepared data for the process step
+    _prepared_data: dict[str, Any] = field(factory=dict)
 
     # a message handler, supporting logging, warnings, errors, etc. emitted by the process
     # during execution
@@ -129,6 +131,7 @@ class ProcessStep:
         self.__prepared = False
         self.executed = False
         self.produced_outputs = {}
+        self._prepared_data = {}
 
     def modify_config_by_dict(self, by_dict: dict = {}) -> None:
         """Modify the configuration of the process step by a dictionary"""

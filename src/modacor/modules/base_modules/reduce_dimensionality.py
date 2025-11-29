@@ -20,8 +20,12 @@ import numpy as np
 
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+
+# Facility-pluggable logger; by default this uses std logging
+logger = MessageHandler(name=__name__)
 
 
 class ReduceDimensionality(ProcessStep):
@@ -81,11 +85,15 @@ class ReduceDimensionality(ProcessStep):
           - list/tuple[int] → tuple of axes
         """
         if axes is None:
+            logger.debug("ReduceDimensionality: axes=None → reducing over all axes.")
             return None
         if isinstance(axes, int):
+            logger.debug(f"ReduceDimensionality: single axis requested: axes={axes}.")
             return axes
         # list/tuple of ints
-        return tuple(int(a) for a in axes)
+        normalized = tuple(int(a) for a in axes)
+        logger.debug(f"ReduceDimensionality: multiple axes requested: axes={normalized}.")
+        return normalized
 
     @staticmethod
     def _weighted_mean_with_uncertainty(
@@ -159,12 +167,48 @@ class ReduceDimensionality(ProcessStep):
 
             uncertainties_out[key] = sigma
 
-        return BaseData(
+        # --- build result BaseData (numeric content) ---
+        result = BaseData(
             signal=signal_out,
             units=bd.units,
             uncertainties=uncertainties_out,
             weights=np.array(1.0) if reduction == "mean" else w_sum,
         )
+
+        # --- metadata: axes + rank_of_data ---
+
+        # New dimensionality after reduction
+        new_ndim = result.signal.ndim
+
+        # Determine which axes were reduced, in normalized (non-negative) form
+        if axis is None:
+            # reducing over all axes
+            reduced_axes_tuple: tuple[int, ...] = tuple(range(x.ndim))
+        elif isinstance(axis, tuple):
+            reduced_axes_tuple = axis
+        else:
+            reduced_axes_tuple = (axis,)
+
+        reduced_axes_norm: set[int] = set()
+        for a in reduced_axes_tuple:
+            a_norm = a if a >= 0 else x.ndim + a
+            reduced_axes_norm.add(a_norm)
+
+        # Reduce axes metadata if we have a full set (one entry per dimension).
+        old_axes = bd.axes
+        if len(old_axes) == x.ndim:
+            # Keep only axes that were NOT reduced
+            new_axes = [ax for i, ax in enumerate(old_axes) if i not in reduced_axes_norm]
+        else:
+            # If metadata length does not match ndim, fall back to empty list
+            new_axes = []
+
+        result.axes = new_axes
+
+        # Rank of data: cannot exceed new ndim, and should not exceed original rank
+        result.rank_of_data = min(bd.rank_of_data, new_ndim)
+
+        return result
 
     # ---------------------------- main API ---------------------------------
 
@@ -190,5 +234,7 @@ class ReduceDimensionality(ProcessStep):
 
             databundle["signal"] = averaged
             output[key] = databundle
+
+        logger.info(f"ReduceDimensionality: calculation finished for {len(output)} keys.")
 
         return output

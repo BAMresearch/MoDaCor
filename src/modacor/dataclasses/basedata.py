@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 # make a varianceDict that quacks like a dict, but is secretly a view on the uncertainties dict
-class _VarianceDict(MutableMapping, dict):
+class _VarianceDict(MutableMapping):
     def __init__(self, parent: BaseData):
         self._parent = parent
 
@@ -49,15 +49,6 @@ class _VarianceDict(MutableMapping, dict):
 
     def __len__(self):
         return len(self._parent.uncertainties)
-
-    def keys(self):
-        # Return keys of the underlying uncertainties dict
-        return self._parent.uncertainties.keys()
-
-    def items(self):
-        # Return items as (key, variance) pairs
-        tmp = {key: self[key] for key in self._parent.uncertainties}
-        return tmp.items()
 
     def __contains__(self, x) -> bool:
         return x in self._parent.uncertainties
@@ -132,6 +123,28 @@ def validate_broadcast(signal: np.ndarray, arr: np.ndarray, name: str) -> None:
 def _copy_uncertainties(unc_dict: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
     """Deep-copy the uncertainties dict (to avoid aliasing between objects)."""
     return {k: np.array(v, copy=True) for k, v in unc_dict.items()}
+
+
+def _inherit_metadata(source: BaseData, result: BaseData) -> BaseData:
+    """
+    Copy metadata-like attributes from `source` to `result` (axes, rank_of_data, weights)
+    without touching numerical content (signal, units, uncertainties).
+    """
+    # Shallow-copy axes list to avoid aliasing of the list object itself
+    result.axes = list(source.axes)
+
+    # Keep the same rank_of_data; attrs validation ensures it is still valid
+    result.rank_of_data = source.rank_of_data
+
+    # Try to propagate weights; if shapes are incompatible, keep defaults
+    try:
+        arr = np.asarray(source.weights)
+        validate_broadcast(result.signal, arr, "weights")
+        result.weights = np.broadcast_to(arr, result.signal.shape).copy()
+    except ValueError:
+        logger.debug("Could not broadcast source weights to result shape; leaving default weights on result BaseData.")
+
+    return result
 
 
 def _binary_basedata_op(
@@ -217,7 +230,8 @@ def _binary_basedata_op(
 
         result.uncertainties[key] = sigma
 
-    return result
+    # Inherit metadata (axes, rank_of_data, weights) from the left operand
+    return _inherit_metadata(left, result)
 
 
 def _unary_basedata_op(
@@ -258,7 +272,8 @@ def _unary_basedata_op(
         sigma_y[valid] = deriv[valid] * np.abs(err_b[valid])
         result.uncertainties[key] = sigma_y
 
-    return result
+    # Preserve metadata from the original element
+    return _inherit_metadata(element, result)
 
 
 class UncertaintyOpsMixin:
@@ -357,11 +372,7 @@ class UncertaintyOpsMixin:
     # ---- unary dunder + convenience methods ----
 
     def __neg__(self) -> BaseData:
-        return BaseData(
-            signal=-self.signal,
-            units=self.units,
-            uncertainties=_copy_uncertainties(self.uncertainties),
-        )
+        return negate_basedata_element(self)
 
     def __pow__(self, exponent: float, modulo=None) -> BaseData:
         if modulo is not None:
@@ -452,14 +463,14 @@ class BaseData(UncertaintyOpsMixin):
     """
 
     # required:
-    # Core data array stored as an xarray DataArray
+    # Core data array stored as a numpy ndarray
     signal: np.ndarray = field(
         converter=signal_converter, validator=v.instance_of(np.ndarray), on_setattr=setters.validate
     )
     # Unit of signal*scaling+offset - required input 'dimensionless' for dimensionless data
     units: pint.Unit = field(validator=v.instance_of(pint.Unit), converter=ureg.Unit, on_setattr=setters.validate)  # type: ignore
     # optional:
-    # Dict of variances represented as xarray DataArray objects; defaulting to an empty dict
+    # Dict of variances represented as numpy ndarray objects; defaulting to an empty dict
     uncertainties: Dict[str, np.ndarray] = field(
         factory=dict, converter=dict_signal_converter, validator=v.instance_of(dict), on_setattr=setters.validate
     )
@@ -490,6 +501,14 @@ class BaseData(UncertaintyOpsMixin):
 
         # Validate weights
         validate_broadcast(self.signal, self.weights, "weights")
+
+        # Warn if axes length does not match signal.ndim
+        if self.axes and len(self.axes) != self.signal.ndim:
+            logger.debug(
+                "BaseData.axes length (%d) does not match signal.ndim (%d).",
+                len(self.axes),
+                self.signal.ndim,
+            )
 
     @property
     def variances(self) -> _VarianceDict:
@@ -565,27 +584,102 @@ class BaseData(UncertaintyOpsMixin):
             logger.debug("No unit conversion needed, units are the same.")
             return
 
+        if not multiplicative_conversion:
+            # This path is subtle for offset units (e.g. degC <-> K) and we
+            # don't want to silently get uncertainties wrong.
+            raise NotImplementedError(
+                "Non-multiplicative unit conversions are not yet implemented for BaseData.\n"
+                "If you need this, we should design explicit rules (e.g. using delta units)."
+            )
+
         logger.debug(f"Converting from {self.units} to {new_units}.")
 
-        if multiplicative_conversion:
-            # simple unit conversion, can be done to scalar
-            # Convert signal
-            cfact = new_units.m_from(self.units)
-            self.signal *= cfact
-            self.units = new_units
-            # Convert uncertainty
-            for key in self.uncertainties:  # fastest as far as my limited testing goes against iterating over items():
-                self.uncertainties[key] *= cfact
+        # simple unit conversion, can be done to scalar
+        # Convert signal
+        cfact = new_units.m_from(self.units)
+        self.signal *= cfact
+        self.units = new_units
+        # Convert uncertainty
+        for key in self.uncertainties:  # fastest as far as my limited testing goes against iterating over items():
+            self.uncertainties[key] *= cfact
 
+    def indexed(self, indexer: Any, *, rank_of_data: int | None = None) -> "BaseData":
+        """
+        Return a new BaseData corresponding to ``self`` indexed by ``indexer``.
+
+        Parameters
+        ----------
+        indexer :
+            Any valid NumPy indexer (int, slice, tuple of slices, boolean mask, ...),
+            applied consistently to ``signal`` and all uncertainty / weight arrays.
+        rank_of_data :
+            Optional explicit rank_of_data for the returned BaseData. If omitted,
+            it will default to ``min(self.rank_of_data, result.signal.ndim)``.
+
+        Notes
+        -----
+        - Units are preserved.
+        - Uncertainties and weights are sliced with the same indexer where possible.
+        - Axes handling is conservative: existing axes are kept unchanged. If you
+          want axes to track slicing semantics more strictly, a higher-level
+          helper can be added later.
+        """
+        sig = np.asarray(self.signal)[indexer]
+
+        # Slice uncertainties with the same indexer
+        new_uncs: Dict[str, np.ndarray] = {}
+        for k, u in self.uncertainties.items():
+            u_arr = np.asarray(u, dtype=float)
+            # broadcast to signal shape, then apply the same indexer
+            u_full = np.broadcast_to(u_arr, self.signal.shape)
+            new_uncs[k] = u_full[indexer].copy()
+
+        # Try to slice weights; if shapes don't line up, fall back to scalar 1.0
+        try:
+            w_arr = np.asarray(self.weights, dtype=float)
+            new_weights = w_arr[indexer].copy()
+        except Exception:
+            new_weights = np.array(1.0, dtype=float)
+
+        # Decide rank_of_data for the result
+        if rank_of_data is None:
+            new_rank = min(self.rank_of_data, np.ndim(sig))
         else:
-            new_signal = ureg.Quantity(self.signal, self.units).to(new_units).magnitude
-            # Convert uncertainties
-            for key in self.uncertainties:
-                # I am not sure but I think this would be the right way for non-multiplicative conversions
-                self.uncertainties[key] *= new_signal / self.signal
+            new_rank = int(rank_of_data)
+
+        result = BaseData(
+            signal=np.asarray(sig, dtype=float),
+            units=self.units,
+            uncertainties=new_uncs,
+            weights=new_weights,
+            # For now we keep axes as-is; more sophisticated axis handling can be
+            # added once the usage patterns are clear.
+            axes=list(self.axes),
+            rank_of_data=new_rank,
+        )
+        return result
+
+    def copy(self, with_axes: bool = True) -> "BaseData":
+        """
+        Return a new BaseData with copied signal/uncertainties/weights.
+        Axes are shallow-copied (list copy) by default, so axis objects
+        themselves are still shared.
+        """
+        new = BaseData(
+            signal=np.array(self.signal, copy=True),
+            units=self.units,
+            uncertainties=_copy_uncertainties(self.uncertainties),
+            weights=np.array(self.weights, copy=True),
+            axes=list(self.axes) if with_axes else [],
+            rank_of_data=self.rank_of_data,
+        )
+        return new
 
     def __repr__(self):
-        return f"BaseData(signal={self.signal}, uncertainties={self.uncertainties}, units={self.units})"
+        return (
+            f"BaseData(shape={self.signal.shape}, dtype={self.signal.dtype}, units={self.units}, "
+            f"n_uncertainties={len(self.uncertainties)}, rank_of_data={self.rank_of_data})"
+        )
 
     def __str__(self):
         return f'{self.signal} {self.units} ± {[f"{u} ({k})" for k, u in self.uncertainties.items()]}'
@@ -598,11 +692,12 @@ class BaseData(UncertaintyOpsMixin):
 
 def negate_basedata_element(element: BaseData) -> BaseData:
     """Negate a BaseData element with uncertainty and units propagation."""
-    return BaseData(
+    result = BaseData(
         signal=-element.signal,
         units=element.units,
         uncertainties=_copy_uncertainties(element.uncertainties),
     )
+    return _inherit_metadata(element, result)
 
 
 def sqrt_basedata_element(element: BaseData) -> BaseData:
