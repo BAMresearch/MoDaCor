@@ -124,20 +124,10 @@ class IndexPixels(ProcessStep):
         required_data_keys=["signal", "Q", "Psi"],
         required_arguments=[
             "with_processing_keys",
-            "output_processing_key",
             "averaging_direction",
-            "q_min",
-            "q_max",
-            "q_limits_unit",
-            "n_bins",
-            "bin_type",
-            "psi_min",
-            "psi_max",
-            "psi_limits_unit",
         ],
         calling_arguments={
             "with_processing_keys": None,
-            "output_processing_key": None,  # currently unused
             "averaging_direction": "radial",
             "q_min": None,
             "q_max": None,
