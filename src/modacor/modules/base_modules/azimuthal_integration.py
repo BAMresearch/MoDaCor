@@ -30,7 +30,7 @@ class AzimuthalIntegration(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version="0.0.1",
         required_data_keys=["signal"],
-        works_on={"data": ["signal", "variances", "normalization"]},
+        modifies={"data": ["signal", "variances", "normalization"]},
         step_keywords=["azimuthal integration"],
         step_doc="Add azimuthal integration data with variance propagated",
         step_reference="DOI 10.1107/S1600576724011038",

@@ -148,7 +148,7 @@ class IndexPixels(ProcessStep):
             "psi_max": None,
             "psi_limits_unit": None,
         },
-        works_on={},  # nothing, we only add.
+        modifies={},  # nothing, we only add.
         step_keywords=[
             "radial",
             "azimuthal",

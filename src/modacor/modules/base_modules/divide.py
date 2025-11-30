@@ -35,7 +35,7 @@ class Divide(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
-        works_on={"signal": ["signal", "uncertainties", "units"]},
+        modifies={"signal": ["signal", "uncertainties", "units"]},
         calling_arguments={
             "divisor_source": None,  # IoSources key for signal
             "divisor_units_source": None,  # IoSources key for units

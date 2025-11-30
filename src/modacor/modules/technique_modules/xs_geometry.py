@@ -57,7 +57,7 @@ class XSGeometry(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
-        works_on={},
+        modifies={},
         step_keywords=[
             "geometry",
             "Q",

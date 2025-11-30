@@ -50,7 +50,7 @@ class ProcessStepDescriber:
     required_data_keys: list[str] = field(factory=list)  # list of data keys required by the process
     required_arguments: list[str] = field(factory=list)  # list of argument key-val combos required by the process
     calling_arguments: dict[str, Any] = field(factory=dict, validator=validate_required_keys)
-    works_on: dict[str, list] = field(
+    modifies: dict[str, list] = field(
         factory=dict, validator=v.instance_of(dict)
     )  # which aspects of BaseData are modified by this
     step_keywords: list[str] = field(

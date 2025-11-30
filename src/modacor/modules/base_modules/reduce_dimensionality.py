@@ -50,7 +50,7 @@ class ReduceDimensionality(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
-        works_on={"signal": ["signal", "uncertainties", "units", "weights"]},
+        modifies={"signal": ["signal", "uncertainties", "units", "weights"]},
         calling_arguments={
             # Axis or axes to reduce. Can be int, list/tuple of ints, or None (reduce all).
             "axes": None,
