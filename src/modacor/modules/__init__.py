@@ -18,13 +18,19 @@ from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertaint
 from modacor.modules.base_modules.reduce_dimensionality import ReduceDimensionality
 from modacor.modules.base_modules.subtract import Subtract
 from modacor.modules.base_modules.subtract_databundles import SubtractDatabundles
+from modacor.modules.technique_modules.index_pixels import IndexPixels
+from modacor.modules.technique_modules.indexed_averager import IndexedAverager
+from modacor.modules.technique_modules.solid_angle_correction import SolidAngleCorrection
 from modacor.modules.technique_modules.xs_geometry import XSGeometry
 
 __all__ = [
     "Divide",
+    "IndexPixels",
+    "IndexedAverager",
     "Multiply",
     "PoissonUncertainties",
     "ReduceDimensionality",
+    "SolidAngleCorrection",
     "SubtractDatabundles",
     "Subtract",
     "XSGeometry",

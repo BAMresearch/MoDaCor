@@ -11,7 +11,7 @@ __date__ = "29/10/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-__all__ = ["Divide"]
+__all__ = ["SolidAngleCorrection"]
 __version__ = "20251029.1"
 
 from pathlib import Path
@@ -19,46 +19,32 @@ from pathlib import Path
 # from modacor import ureg
 # from modacor.dataclasss.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
-class Divide(ProcessStep):
+class SolidAngleCorrection(ProcessStep):
     """
-    Divide DataBundle by a BaseData from an IoSource
+    Normalize a signal by a solid angle "Omega" calculated using XSGeometry
     """
 
     documentation = ProcessStepDescriber(
-        calling_name="Divide by IoSource data",
-        calling_id="DivideBySourceData",
+        calling_name="Solid Angle Correction",
+        calling_id="SolidAngleCorrection",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=["signal"],
+        required_data_keys=["signal", "Omega"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
-        required_arguments={},
-        calling_arguments={
-            "divisor_source": None,  # IoSources key for signal
-            "divisor_units_source": None,  # IoSources key for units
-            "divisor_uncertainties_sources": {},  # dict of uncertainty name: source, or 'propagate_to_all': source
-        },
-        step_keywords=["divide", "scalar", "array"],
-        step_doc="Divide a DataBundle element by a divisor loaded from a data source",
+        required_arguments={},  # none required, defaults all around
+        calling_arguments={},
+        step_keywords=["divide", "normalize", "solid angle"],
+        step_doc="Divide the pixels in a signal by their solid angle coverage",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
-        step_note="""This loads a scalar (value, units and uncertainty)
-            from an IOSource and applies it to the data signal""",
+        step_note="""This divides the signal by the value previously calculated
+            using the XSGeometry module""",
     )
 
     def calculate(self) -> dict[str, DataBundle]:
-        # build up the divisor BaseData object from the IoSources
-
-        divisor = basedata_from_sources(
-            io_sources=self.io_sources,
-            signal_source=self.configuration.get("divisor_source"),
-            units_source=self.configuration.get("divisor_units_source", None),
-            uncertainty_sources=self.configuration.get("divisor_uncertainties_sources", {}),
-        )
-
         output: dict[str, DataBundle] = {}
 
         # actual work happens here:
@@ -66,6 +52,6 @@ class Divide(ProcessStep):
             databundle = self.processing_data.get(key)
             # divide the data
             # Rely on BaseData.__truediv__ for units + uncertainty propagation
-            databundle["signal"] /= divisor
+            databundle["signal"] /= databundle["Omega"]
             output[key] = databundle
         return output

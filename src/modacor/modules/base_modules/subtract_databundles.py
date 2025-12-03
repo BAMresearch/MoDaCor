@@ -32,7 +32,7 @@ class SubtractDatabundles(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
-        works_on={"signal": ["signal", "uncertainties", "units"]},
+        modifies={"signal": ["signal", "uncertainties", "units"]},
         calling_arguments={},  # no arguments needed
         step_keywords=["subtract", "background", "databundle"],
         step_doc="Subtract a DataBundle element using another DataBundle",

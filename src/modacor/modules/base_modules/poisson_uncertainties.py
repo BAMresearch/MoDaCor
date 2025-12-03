@@ -36,7 +36,7 @@ class PoissonUncertainties(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
-        works_on={"variances": ["Poisson"]},
+        modifies={"variances": ["Poisson"]},
         step_keywords=["uncertainties", "Poisson"],
         step_doc="Add Poisson uncertainties to the data",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
