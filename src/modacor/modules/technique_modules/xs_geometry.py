@@ -56,20 +56,21 @@ class XSGeometry(ProcessStep):
         calling_id="XSGeometry",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=["signal"],
-        modifies={},
-        step_keywords=[
-            "geometry",
-            "Q",
-            "Psi",
-            "TwoTheta",
-            "Solid Angle",
-            "Omega",
-            "X-ray scattering",
-        ],
-        step_doc="Add geometric information Q, Psi, TwoTheta, and Solid Angle to the data",
-        step_reference="DOI 10.1088/0953-8984/25/38/383201",
-        step_note="This calculates geometric factors relevant for X-ray scattering data",
+        required_data_keys=["signal"],  # list of databundle keys required by the process
+        required_arguments=[
+            "detector_distance_source",
+            "detector_distance_units_source",
+            "detector_distance_uncertainties_sources",
+            "pixel_size_source",
+            "pixel_size_units_source",
+            "pixel_size_uncertainties_sources",
+            "beam_center_source",
+            "beam_center_units_source",
+            "beam_center_uncertainties_sources",
+            "wavelength_source",
+            "wavelength_units_source",
+            "wavelength_uncertainties_sources",
+        ],  # list of argument key-val combos required by the process
         calling_arguments={
             "detector_distance_source": None,
             "detector_distance_units_source": None,
@@ -84,6 +85,27 @@ class XSGeometry(ProcessStep):
             "wavelength_units_source": None,
             "wavelength_uncertainties_sources": {},
         },
+        works_on={
+            "Q": ["signal", "uncertainties"],
+            "Q0": ["signal", "uncertainties"],
+            "Q1": ["signal", "uncertainties"],
+            "Q2": ["signal", "uncertainties"],
+            "Psi": ["signal", "uncertainties"],
+            "TwoTheta": ["signal", "uncertainties"],
+            "Omega": ["signal", "uncertainties"],
+        },
+        step_keywords=[
+            "geometry",
+            "Q",
+            "Psi",
+            "TwoTheta",
+            "Solid Angle",
+            "Omega",
+            "X-ray scattering",
+        ],
+        step_doc="Add geometric information Q, Psi, TwoTheta, and Solid Angle to the data",
+        step_reference="DOI 10.1088/0953-8984/25/38/383201",
+        step_note="This calculates geometric factors relevant for X-ray scattering data",
     )
 
     # ------------------------------------------------------------------
