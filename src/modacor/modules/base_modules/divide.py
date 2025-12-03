@@ -36,6 +36,7 @@ class Divide(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
+        required_arguments={},
         calling_arguments={
             "divisor_source": None,  # IoSources key for signal
             "divisor_units_source": None,  # IoSources key for units
