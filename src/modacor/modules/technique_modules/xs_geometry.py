@@ -85,7 +85,7 @@ class XSGeometry(ProcessStep):
             "wavelength_units_source": None,
             "wavelength_uncertainties_sources": {},
         },
-        works_on={
+        modifies={
             "Q": ["signal", "uncertainties"],
             "Q0": ["signal", "uncertainties"],
             "Q1": ["signal", "uncertainties"],
