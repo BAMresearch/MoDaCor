@@ -59,36 +59,7 @@ def test_register_non_process_step_raises():
 
 
 def test_get_unknown_without_base_package_raises():
-    registry = ProcessStepRegistry(base_package=None)
+    registry = ProcessStepRegistry()
 
     with pytest.raises(KeyError):
         registry.get("DoesNotExistStep")
-
-
-def test_lazy_import_success(monkeypatch):
-    """
-    Simulate a lazily-imported ProcessStep class in a fake module.
-    """
-    # This must match the base_package + snake_case(class_name) convention
-    module_name = "modacor.tests.fake_steps.dummy_lazy_step"
-
-    # Create a fake module
-    mod = types.ModuleType(module_name)
-
-    class DummyLazyStep(ProcessStep):
-        def execute(self, **kwargs):
-            pass
-
-    setattr(mod, "DummyLazyStep", DummyLazyStep)
-
-    # Inject into sys.modules so importlib can find it
-    monkeypatch.setitem(sys.modules, module_name, mod)
-
-    registry = ProcessStepRegistry(base_package="modacor.tests.fake_steps")
-
-    cls = registry.get("DummyLazyStep")
-    assert cls is DummyLazyStep
-
-    # Should be cached now
-    cls_again = registry.get("DummyLazyStep")
-    assert cls_again is DummyLazyStep
