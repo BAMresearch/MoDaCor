@@ -46,7 +46,7 @@ class AppendSource(ProcessStep):
         required_arguments=[
             "source_identifier",  # The identifier to use for the appended ioSource in the data sources. Can be a string or list of strings for multiple sources
             "source_location",  # The ioSource path or other location identifier of the object to append to the IoSources. Can be a string or list of strings for multiple sources
-            "loader_module",  # The fully qualified import path to the module to load the source_location into an ioSource object, e.g. 'modacor.io.yaml.yaml_loader.YAMLLoader' or 'modacor.io.hdf.hdf_loader.HDFLoader'. Choose only one.
+            "loader_module",  # The fully qualified import path to the module to load the source_location into an ioSource object, e.g. 'modacor.io.yaml.yaml_source.YAMLSource' or 'modacor.io.hdf.hdf_source.HDFSource'. Choose only one.
         ],
         calling_arguments={
             "source_identifier": "",
@@ -117,7 +117,7 @@ class AppendSource(ProcessStep):
         ----------
         loader_name:
             Either a fully qualified import path
-            (e.g. ``"modacor.io.hdf.hdf_loader.HDFLoader"``).
+            (e.g. ``"modacor.io.hdf.hdf_source.HDFSource"``).
         source_location:
             Path / URI / identifier understood by the loader.
         source_identifier:

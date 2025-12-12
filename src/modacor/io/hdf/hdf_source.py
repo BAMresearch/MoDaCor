@@ -13,7 +13,7 @@ __date__ = "22/10/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-__all__ = ["HDFLoader"]
+__all__ = ["HDFSource"]
 
 from logging import WARNING
 from pathlib import Path
@@ -29,14 +29,14 @@ from modacor.io.io_source import ArraySlice
 from ..io_source import IoSource
 
 
-class HDFLoader(IoSource):
+class HDFSource(IoSource):
     _data_cache: dict[str, np.ndarray] = None
     _file_path: Path | None = None
     _static_metadata_cache: dict[str, Any] = None
 
     def __init__(self, source_reference: str, logging_level=WARNING, resource_location: Path | str | None = None):
         super().__init__(source_reference=source_reference)
-        self.logger = MessageHandler(level=logging_level, name="HDFLoader")
+        self.logger = MessageHandler(level=logging_level, name="HDFSource")
         self._file_path = Path(resource_location) if resource_location is not None else None
         # self._file_reference = None  # let's not leave open file references lying around if we can help it.
         self._file_datasets = []

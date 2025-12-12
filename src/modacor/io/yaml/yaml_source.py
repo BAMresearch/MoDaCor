@@ -11,7 +11,7 @@ __date__ = "06/06/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-__all__ = ["YAMLLoader"]
+__all__ = ["YAMLSource"]
 
 from logging import WARNING
 from pathlib import Path
@@ -37,7 +37,7 @@ def get_from_nested_dict_by_path(data, path):
     return data
 
 
-class YAMLLoader(IoSource):
+class YAMLSource(IoSource):
     """
     This IoSource is used to load and make experiment metadata available to
     the processing pipeline modules.
@@ -55,7 +55,7 @@ class YAMLLoader(IoSource):
 
     def __init__(self, source_reference: str, logging_level=WARNING, resource_location: Path | str | None = None):
         super().__init__(source_reference=source_reference)
-        self.logger = MessageHandler(level=logging_level, name="YAMLLoader")
+        self.logger = MessageHandler(level=logging_level, name="YAMLSource")
         self._file_path = Path(resource_location) if resource_location is not None else None
         self._file_datasets = []
         self._file_datasets_shapes = {}
