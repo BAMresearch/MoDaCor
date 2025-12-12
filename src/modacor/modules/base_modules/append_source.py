@@ -46,12 +46,13 @@ class AppendSource(ProcessStep):
         required_arguments=[
             "source_identifier",  # The identifier to use for the appended ioSource in the data sources. Can be a string or list of strings for multiple sources
             "source_location",  # The ioSource path or other location identifier of the object to append to the IoSources. Can be a string or list of strings for multiple sources
-            "loader_module",  # The fully qualified import path to the module to load the source_location into an ioSource object, e.g. 'modacor.io.yaml.yaml_loader.YAMLLoader' or 'modacor.io.hdf.hdf_loader.HDFLoader'. Choose only one.
+            "iosource_module",  # The fully qualified import path to the module to load the source_location into an ioSource object, e.g. 'modacor.io.yaml.yaml_source.YAMLSource' or 'modacor.io.hdf.hdf_source.HDFSource'. Choose only one.
         ],
         calling_arguments={
             "source_identifier": "",
             "source_location": "",
-            "loader_module": "",
+            "iosource_module": "",
+            "iosource_method_kwargs": {},
         },
         step_keywords=["append", "source"],
         step_doc="Append an ioSource to the available data sources",
@@ -76,7 +77,7 @@ class AppendSource(ProcessStep):
 
         source_ids: str | list[str] = self.configuration["source_identifier"]
         source_locations: str | list[str] = self.configuration["source_location"]
-        loader_module: str = self.configuration["loader_module"]
+        iosource_module: str = self.configuration["iosource_module"]
 
         # Normalise to lists
         if isinstance(source_ids, str):
@@ -93,9 +94,10 @@ class AppendSource(ProcessStep):
             # Only append if not already present
             if source_id not in self.io_sources.defined_sources:
                 self._append_loader_by_name(
-                    loader_name=loader_module,
+                    loader_name=iosource_module,
                     source_location=source_location,
                     source_identifier=source_id,
+                    iosource_method_kwargs=self.configuration.get("iosource_method_kwargs", {}),
                 )
         # No data modified – only side-effect is on self.io_sources
         return output
@@ -108,6 +110,7 @@ class AppendSource(ProcessStep):
         loader_name: str,
         source_location: str,
         source_identifier: str,
+        iosource_method_kwargs: dict[str, Any] = {},
     ) -> None:
         """
         Resolve the requested loader and append the resulting ioSource to
@@ -117,14 +120,16 @@ class AppendSource(ProcessStep):
         ----------
         loader_name:
             Either a fully qualified import path
-            (e.g. ``"modacor.io.hdf.hdf_loader.HDFLoader"``).
+            (e.g. ``"modacor.io.hdf.hdf_source.HDFSource"``).
         source_location:
             Path / URI / identifier understood by the loader.
         source_identifier:
             Key under which the resulting ioSource will be stored in
             ``self.io_sources``.
+        iosource_method_kwargs:
+            Additional keyword arguments to pass to the loader callable.
         """
-        loader_callable = self._resolve_loader_callable(loader_name)
+        source_callable = self._resolve_iosource_callable(loader_name)
 
         # Ensure io_sources exists or initialize it
         if not hasattr(self, "io_sources") or self.io_sources is None:
@@ -133,10 +138,14 @@ class AppendSource(ProcessStep):
             logger.info("Initialized self.io_sources in AppendSource step.")
 
         self.io_sources.register_source(
-            loader_callable(source_reference=source_identifier, resource_location=source_location)
+            source_callable(
+                source_reference=source_identifier,
+                resource_location=source_location,
+                iosource_method_kwargs=iosource_method_kwargs,
+            )
         )
 
-    def _resolve_loader_callable(self, loader_name: str) -> Callable[..., Any]:
+    def _resolve_iosource_callable(self, loader_name: str) -> Callable[..., Any]:
         """
         Resolve the configured loader into a callable.
 
@@ -152,7 +161,7 @@ class AppendSource(ProcessStep):
             loader_obj = getattr(module, attr_name)
         except AttributeError as exc:
             raise ImportError(
-                f"Could not find '{attr_name}' in module '{module_path}' for loader_module='{loader_name}'."
+                f"Could not find '{attr_name}' in module '{module_path}' for iosource_module='{loader_name}'."
             ) from exc
 
         return loader_obj
