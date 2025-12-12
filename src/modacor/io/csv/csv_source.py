@@ -51,7 +51,7 @@ class CSVSource(IoSource):
 
     Configuration
     -------------
-    `source_format_options` is passed directly to the NumPy function `method`.
+    `iosource_method_kwargs` is passed directly to the NumPy function `method`.
     This allows you to use all standard NumPy options, e.g.:
 
     For np.genfromtxt:
@@ -82,9 +82,7 @@ class CSVSource(IoSource):
     """
 
     # external API:
-    source_reference: str = field(validator=validators.instance_of(str))
     resource_location: Path = field(converter=Path, validator=validators.instance_of((Path)))
-    source_format_options: dict[str, Any] = field(factory=dict, validator=validators.instance_of(dict))
     method: Callable[..., np.ndarray] = field(
         default=np.genfromtxt, validator=_is_callable
     )  # default to genfromtxt, better for names
@@ -96,7 +94,7 @@ class CSVSource(IoSource):
     logger: MessageHandler = field(init=False)
 
     def __attrs_post_init__(self) -> None:
-        super().__init__(source_reference=self.source_reference)
+        # super().__init__(source_reference=self.source_reference, iosource_method_kwargs=self.iosource_method_kwargs)
         self.logger = MessageHandler(level=WARNING, name="CSVSource")
         # Set file path
         if not self.resource_location.is_file():
@@ -119,15 +117,15 @@ class CSVSource(IoSource):
         Load the CSV data into a structured NumPy array using the configured
         method (np.genfromtxt or np.loadtxt).
 
-        source_format_options are passed directly to that method.
+        iosource_method_kwargs are passed directly to that method.
         """
-        self.logger.info(
+        self.logger.warning(
             f"CSVSource loading data from {self.resource_location} "
-            f"using {self.method.__name__} with options: {self.source_format_options}"
+            f"using {self.method.__name__} with options: {self.iosource_method_kwargs}"
         )
 
         try:
-            self._data_cache = self.method(self.resource_location, **self.source_format_options)
+            self._data_cache = self.method(self.resource_location, **self.iosource_method_kwargs)
         except Exception as exc:  # noqa: BLE001
             self.logger.error(f"Error while loading CSV data from {self.resource_location}: {exc}")
             raise

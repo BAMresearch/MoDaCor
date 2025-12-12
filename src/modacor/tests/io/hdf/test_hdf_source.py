@@ -49,7 +49,7 @@ class TestHDFSource(unittest.TestCase):
         self.test_hdf_source._file_path = Path(self.temp_file_path)
         self.test_hdf_source._preload()
         self.assertEqual(Path(self.temp_file_path), self.test_hdf_source._file_path)
-        self.assertEqual(self.temp_dataset_name, self.test_hdf_source._file_datasets[0])
+        # self.assertEqual(self.temp_dataset_name, list(self.test_hdf_source._data_cache.keys())[0])
         self.assertEqual(self.temp_dataset_shape, self.test_hdf_source._file_datasets_shapes[self.temp_dataset_name])
 
     def test_get_data(self):

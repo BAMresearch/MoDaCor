@@ -37,7 +37,7 @@ def test_csvsource_genfromtxt_names_true(tmp_path):
     src = CSVSource(
         source_reference="test_genfromtxt_names_true",
         resource_location=file_path,
-        source_format_options={"delimiter": ",", "names": True},
+        iosource_method_kwargs={"delimiter": ",", "names": True},
         method=np.genfromtxt,
     )
 
@@ -69,7 +69,7 @@ def test_csvsource_genfromtxt_explicit_names(tmp_path):
     src = CSVSource(
         source_reference="test_genfromtxt_explicit_names",
         resource_location=file_path,
-        source_format_options={
+        iosource_method_kwargs={
             "delimiter": ",",
             "names": ["q", "I", "I_sigma"],
         },
@@ -101,7 +101,7 @@ def test_csvsource_loadtxt_structured_dtype(tmp_path):
     src = CSVSource(
         source_reference="test_loadtxt_structured",
         resource_location=file_path,
-        source_format_options={
+        iosource_method_kwargs={
             "delimiter": " ",
             "dtype": structured_dtype,
         },
@@ -132,7 +132,7 @@ def test_csvsource_raises_if_no_dtype_names(tmp_path):
         CSVSource(
             source_reference="test_no_names",
             resource_location=file_path,
-            source_format_options={"delimiter": ","},  # no structured dtype, no names
+            iosource_method_kwargs={"delimiter": ","},  # no structured dtype, no names
             method=np.loadtxt,
         )
 
@@ -148,7 +148,7 @@ def test_csvsource_get_data_invalid_key_raises(tmp_path):
     src = CSVSource(
         source_reference="test_invalid_key",
         resource_location=file_path,
-        source_format_options={"delimiter": ",", "names": True},
+        iosource_method_kwargs={"delimiter": ",", "names": True},
         method=np.genfromtxt,
     )
 
