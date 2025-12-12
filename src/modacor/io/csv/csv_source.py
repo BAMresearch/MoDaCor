@@ -14,7 +14,6 @@ __status__ = "Development"  # "Development", "Production"
 __all__ = ["CSVSource"]
 
 from collections.abc import Callable
-from logging import WARNING
 from pathlib import Path
 from typing import Any
 
@@ -95,7 +94,7 @@ class CSVSource(IoSource):
 
     def __attrs_post_init__(self) -> None:
         # super().__init__(source_reference=self.source_reference, iosource_method_kwargs=self.iosource_method_kwargs)
-        self.logger = MessageHandler(level=WARNING, name="CSVSource")
+        self.logger = MessageHandler(level=self.logging_level, name="CSVSource")
         # Set file path
         if not self.resource_location.is_file():
             self.logger.error(f"CSVSource: file {self.resource_location} does not exist.")
@@ -119,7 +118,7 @@ class CSVSource(IoSource):
 
         iosource_method_kwargs are passed directly to that method.
         """
-        self.logger.warning(
+        self.logger.info(
             f"CSVSource loading data from {self.resource_location} "
             f"using {self.method.__name__} with options: {self.iosource_method_kwargs}"
         )
