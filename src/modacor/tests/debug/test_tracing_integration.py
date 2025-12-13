@@ -106,21 +106,26 @@ def test_pipeline_attach_tracer_event_can_embed_rendered_trace_block():
 
     tracer = PipelineTracer(
         watch={"sample": ["signal"]},
-        record_only_on_change=True,
+        record_only_on_change=False,
     )
 
     # Ensure the tracer has at least one event to render:
-    tracer.record_only_on_change = False
     tracer.after_step(step, ProcessingData())
     assert tracer.events  # sanity
 
-    ev = pipeline.attach_tracer_event(step, tracer, include_rendered=True)
+    ev = pipeline.attach_tracer_event(
+        step,
+        tracer,
+        include_rendered_trace=True,
+        include_rendered_config=True,
+        rendered_format="text/plain",
+    )
 
     assert isinstance(ev.messages, list)
-    assert ev.messages, "Expected at least one rendered message block"
-    assert ev.messages[0]["kind"] in {"rendered_trace", "rendered_trace_error"}
-    assert "format" in ev.messages[0]
-    assert "content" in ev.messages[0]
+    trace_msgs = [m for m in ev.messages if m.get("kind") in {"rendered_trace", "rendered_trace_error"}]
+    assert trace_msgs, "Expected a rendered_trace (or error) block"
+    m = trace_msgs[0]
+    assert "format" in m and "content" in m
 
 
 def test_attach_tracer_event_renders_step_local_block():
@@ -133,10 +138,42 @@ def test_attach_tracer_event_renders_step_local_block():
     )
 
     tracer.after_step(step, ProcessingData())
-    ev = pipeline.attach_tracer_event(step, tracer, include_rendered=True)
+    ev = pipeline.attach_tracer_event(
+        step,
+        tracer,
+        include_rendered_trace=True,
+        include_rendered_config=True,
+        rendered_format="text/plain",
+    )
 
-    assert ev.messages
-    m = ev.messages[0]
-    assert m["kind"] in {"rendered_trace", "rendered_trace_error"}
-    if m["kind"] == "rendered_trace":
-        assert "Step A" in m["content"]
+    trace_msgs = [m for m in ev.messages if m.get("kind") in {"rendered_trace", "rendered_trace_error"}]
+    assert trace_msgs, "Expected a rendered_trace (or error) block"
+    m = trace_msgs[0]
+
+    if m.get("kind") == "rendered_trace":
+        assert "Step A" in m.get("content", "")
+
+
+def test_attach_tracer_event_embeds_rendered_trace_and_config():
+    step = DummyStep(io_sources=None, step_id="A")
+    pipeline = Pipeline.from_dict({step: []}, name="t")
+
+    tracer = PipelineTracer(watch={"sample": ["signal"]}, record_only_on_change=False)
+    tracer.after_step(step, ProcessingData())
+
+    ev = pipeline.attach_tracer_event(
+        step,
+        tracer,
+        include_rendered_trace=True,
+        include_rendered_config=True,
+        rendered_format="text/plain",
+    )
+
+    kinds = {m.get("kind") for m in ev.messages}
+    assert "rendered_config" in kinds
+    assert "rendered_trace" in kinds  # since record_only_on_change=False guarantees a step event exists
+
+    # step-local sanity: rendered trace header contains step id
+    trace_blocks = [m for m in ev.messages if m.get("kind") == "rendered_trace"]
+    if trace_blocks:
+        assert "Step A" in trace_blocks[0].get("content", "")

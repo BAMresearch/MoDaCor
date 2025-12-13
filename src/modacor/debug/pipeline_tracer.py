@@ -471,10 +471,8 @@ def tracer_event_to_datasets_payload(tracer_step_event: dict[str, Any]) -> dict[
 
 def render_tracer_event(tracer_event: dict[str, Any], *, renderer: ReportRenderer | None = None) -> str:
     """
-    Render a single tracer event (one element of PipelineTracer.events) into a
-    pretty Unicode/HTML-ish block using the provided renderer.
-
-    This is intentionally step-local: it renders exactly one event dict.
+    Render exactly ONE tracer event (one element from PipelineTracer.events).
+    Strictly step-local: no reliance on global tracer state.
     """
     r = renderer or PlainUnicodeRenderer(wrap_in_markdown_codeblock=False)
     lines: list[str] = []
@@ -490,7 +488,6 @@ def render_tracer_event(tracer_event: dict[str, Any], *, renderer: ReportRendere
     step_id = tracer_event.get("step_id", "<??>")
     module = tracer_event.get("module", "")
     name = tracer_event.get("name", "")
-
     lines.append(r.header(f"Step {step_id} — {module} — {name}"))
 
     changed_map: dict[tuple[str, str], dict[str, Any]] = tracer_event.get("changed", {}) or {}

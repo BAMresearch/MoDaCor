@@ -22,6 +22,8 @@ from typing import Any, Iterable, Mapping, Self
 import yaml
 from attrs import define, field
 
+from modacor.debug.pipeline_tracer import tracer_event_to_datasets_payload
+
 from ..dataclasses.process_step import ProcessStep
 from ..dataclasses.trace_event import TraceEvent
 from ..io.io_sources import IoSources  # noqa: F401  # reserved for future use
@@ -47,7 +49,7 @@ class Pipeline(TopologicalSorter):
     def __attrs_post_init__(self) -> None:
         super().__init__(graph=self.graph)
 
-    # trace helpers:
+    # trace helpers, this helps to debug pipelines by storing trace events per step:
     def add_trace_event(self, event: TraceEvent) -> None:
         self.trace_events.setdefault(str(event.step_id), []).append(event)
 
@@ -55,7 +57,7 @@ class Pipeline(TopologicalSorter):
         self.trace_events.clear()
 
     # --------------------------------------------------------------------- #
-    # Construction helpers
+    # Pipeline construction helpers
     # --------------------------------------------------------------------- #
 
     @classmethod
@@ -588,34 +590,13 @@ class Pipeline(TopologicalSorter):
             "max_signal": getattr(probe, "max_signal", None),
         }
 
-    @classmethod
-    def _datasets_from_tracer_event(cls, tracer_event: dict[str, Any]) -> dict[str, Any]:
-        """
-        Convert a PipelineTracer.events entry into TraceEvent.datasets payload.
-        """
-        out: dict[str, Any] = {}
-        changed = tracer_event.get("changed", {}) or {}
-
-        for bundle_key, ds_key in sorted(changed.keys(), key=lambda x: (x[0], x[1])):
-            payload = changed[(bundle_key, ds_key)] or {}
-            prev = payload.get("prev")
-            now = payload.get("now")
-            diff = payload.get("diff", set()) or set()
-
-            out[f"{bundle_key}.{ds_key}"] = {
-                "diff": sorted(diff),
-                "prev": None if prev is None else cls._probe_to_dict(prev),
-                "now": cls._probe_to_dict(now),
-            }
-
-        return out
-
     def attach_tracer_event(
         self,
         node: ProcessStep,
         tracer: Any | None,
         *,
-        include_rendered: bool = False,
+        include_rendered_trace: bool = False,
+        include_rendered_config: bool = False,
         rendered_format: str = "text/html",
     ) -> TraceEvent:
         """
@@ -636,43 +617,90 @@ class Pipeline(TopologicalSorter):
 
         datasets: dict[str, Any] = {}
 
+        def _html_escape(s: str) -> str:
+            return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        matched_ev: dict[str, Any] | None = None
+
         # Try to find the most recent tracer event for this step_id
         if tracer is not None:
             events = getattr(tracer, "events", None)
             if isinstance(events, list) and events:
                 for ev in reversed(events):
                     if str(ev.get("step_id")) == step_id:
-                        datasets = self._datasets_from_tracer_event(ev)
-                        break
-
-        matched_ev: dict[str, Any] | None = None
-
-        if tracer is not None:
-            events = getattr(tracer, "events", None)
-            if isinstance(events, list) and events:
-                for ev in reversed(events):
-                    if str(ev.get("step_id")) == step_id:
                         matched_ev = ev
-                        datasets = self._datasets_from_tracer_event(ev)
+                        datasets = tracer_event_to_datasets_payload(ev)
                         break
 
         messages: list[dict[str, Any]] = []
 
-        if include_rendered and matched_ev is not None:
+        # --- Rendered trace (STRICTLY step-local) ---
+        if include_rendered_trace and matched_ev is not None:
             try:
-                from modacor.debug.pipeline_tracer import MarkdownCssRenderer, render_tracer_event  # noqa: WPS433
+                from modacor.debug.pipeline_tracer import (  # noqa: WPS433
+                    MarkdownCssRenderer,
+                    PlainUnicodeRenderer,
+                    render_tracer_event,
+                )
 
                 if rendered_format in {"text/html", "text/markdown"}:
                     renderer = MarkdownCssRenderer(wrap_in_markdown_codeblock=False)
                     content = render_tracer_event(matched_ev, renderer=renderer)
-                    fmt = "text/html"  # MarkdownCssRenderer emits HTML spans/<pre>
+                    fmt = "text/html"
                 else:
-                    content = render_tracer_event(matched_ev, renderer=None)
+                    renderer = PlainUnicodeRenderer(wrap_in_markdown_codeblock=False)
+                    content = render_tracer_event(matched_ev, renderer=renderer)
                     fmt = "text/plain"
 
-                messages.append({"kind": "rendered_trace", "format": fmt, "content": content})
+                messages.append(
+                    {
+                        "kind": "rendered_trace",
+                        "title": "Trace",
+                        "format": fmt,
+                        "content": content,
+                    }
+                )
             except Exception as exc:
-                messages.append({"kind": "rendered_trace_error", "format": "text/plain", "content": f"{exc!r}"})
+                messages.append(
+                    {
+                        "kind": "rendered_trace_error",
+                        "title": "Trace",
+                        "format": "text/plain",
+                        "content": f"{exc!r}",
+                    }
+                )
+
+        # --- Rendered config (STRICTLY step-local) ---
+        if include_rendered_config:
+            try:
+                cfg_yaml = yaml.safe_dump(cfg, sort_keys=False)
+
+                if rendered_format in {"text/html", "text/markdown"}:
+                    # keep styling consistent with your CSS classes
+                    # (don’t rely on MarkdownCssRenderer.codewrap here; we want to escape YAML)
+                    content = "<pre class='mdc-pre mdc-config'>\n" + _html_escape(cfg_yaml) + "\n</pre>"
+                    fmt = "text/html"
+                else:
+                    content = "Configuration:\n" + cfg_yaml
+                    fmt = "text/plain"
+
+                messages.append(
+                    {
+                        "kind": "rendered_config",
+                        "title": "Configuration",
+                        "format": fmt,
+                        "content": content,
+                    }
+                )
+            except Exception as exc:
+                messages.append(
+                    {
+                        "kind": "rendered_config_error",
+                        "title": "Configuration",
+                        "format": "text/plain",
+                        "content": f"{exc!r}",
+                    }
+                )
 
         event = TraceEvent(
             step_id=step_id,
