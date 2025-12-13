@@ -566,29 +566,39 @@ class Pipeline(TopologicalSorter):
         # sort_keys=False keeps insertion order, which follows node order in spec
         return yaml.safe_dump(yaml_obj, sort_keys=False)
 
-    # tracer event handling helpers:
-    @staticmethod
-    def _probe_to_dict(probe: Any) -> dict[str, Any]:
-        """
-        Duck-typed conversion of a BaseDataProbe-like object to JSON-safe dict.
-        """
-        if probe is None:
-            return {}
-
-        shape = getattr(probe, "shape", None)
-        nan_unc = getattr(probe, "nan_unc", {}) or {}
-
-        return {
-            "shape": list(shape) if shape is not None else None,
-            "ndim": getattr(probe, "ndim", None),
-            "rank_of_data": getattr(probe, "rank_of_data", None),
-            "units": getattr(probe, "units_str", None),
-            "dimensionality": getattr(probe, "dimensionality_str", None),
-            "nan_signal": getattr(probe, "nan_signal", None),
-            "nan_unc": {str(k): int(v) for k, v in dict(nan_unc).items()},
-            "min_signal": getattr(probe, "min_signal", None),
-            "max_signal": getattr(probe, "max_signal", None),
-        }
+    # --------------------------------------------------------------------- #
+    # Trace events / run-time introspection
+    # --------------------------------------------------------------------- #
+    #
+    # Summary
+    # -------
+    # Pipelines can optionally collect per-step TraceEvent records during execution.
+    #
+    # Design goals:
+    # - Keep Pipeline execution fast and lightweight (no arrays stored).
+    # - Keep trace events strictly step-local (each event describes only one executed node).
+    # - Support UI rendering without requiring access to live ProcessingData.
+    #
+    # What is stored:
+    # - Always: module metadata, prerequisite step_ids, and the step configuration used.
+    # - Optionally: dataset "diff" payloads produced by PipelineTracer (units/dimensionality/NaNs/etc).
+    # - Optionally: rendered, UI-ready snippets (HTML/Markdown/plain) for trace + config.
+    #
+    # What is NOT stored:
+    # - No signal arrays, maps, or large objects (TraceEvent must stay JSON-friendly).
+    # - No global or cross-step state (events can be attached/serialized independently).
+    #
+    # Integration pattern (typical runner / notebook):
+    #   node(processing_data)
+    #   tracer.after_step(node, processing_data)
+    #   pipeline.attach_tracer_event(node, tracer,
+    #                               include_rendered_trace=True,
+    #                               include_rendered_config=True)
+    #   pipeline.done(node)
+    #
+    # Export:
+    # - Pipeline.to_spec() includes node-level config + optional trace_events per node,
+    #   enabling graph viewers to show "what changed" as expandable panels.
 
     def attach_tracer_event(
         self,
