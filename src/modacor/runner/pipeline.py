@@ -11,7 +11,11 @@ __date__ = "22/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
+import json
 from graphlib import TopologicalSorter
+
+# quick hash at node-level (UI can show "config changed" without reading trace events)
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Self
 
@@ -19,6 +23,7 @@ import yaml
 from attrs import define, field
 
 from ..dataclasses.process_step import ProcessStep
+from ..dataclasses.trace_event import TraceEvent
 from ..io.io_sources import IoSources  # noqa: F401  # reserved for future use
 from .process_step_registry import DEFAULT_PROCESS_STEP_REGISTRY, ProcessStepRegistry
 
@@ -36,9 +41,18 @@ class Pipeline(TopologicalSorter):
 
     graph: dict[ProcessStep, set[ProcessStep]] = field(factory=dict)
     name: str = field(default="Unnamed Pipeline")
+    # Optional trace events collected during a run (step_id -> list of events)
+    trace_events: dict[str, list[TraceEvent]] = field(factory=dict, repr=False)
 
     def __attrs_post_init__(self) -> None:
         super().__init__(graph=self.graph)
+
+    # trace helpers:
+    def add_trace_event(self, event: TraceEvent) -> None:
+        self.trace_events.setdefault(str(event.step_id), []).append(event)
+
+    def clear_trace_events(self) -> None:
+        self.trace_events.clear()
 
     # --------------------------------------------------------------------- #
     # Construction helpers
@@ -332,35 +346,85 @@ class Pipeline(TopologicalSorter):
             ...
           ],
         }
+
+        e.g.:
+        {
+        "id": "FL",
+        "label": "Divide by relative flux",
+        "module": "Divide",
+        "requires_steps": ["DC"],
+        "config": {...},
+        "trace_events": [
+            {
+            "step_id": "FL",
+            "config_hash": "...",
+            "datasets": {
+                "sample.signal": {"diff": ["units","nan_signal"], "prev": {...}, "now": {...}}
+            }
+            }
+        ]
+        }
+
+        Adds:
+        - requires_steps per node (derived from graph prereqs)
+        - optional trace events (if Pipeline.trace_events is populated)
+        - config_hash per node (stable)
         """
         nodes: list[dict[str, Any]] = []
         edges: list[dict[str, str]] = []
 
+        # Build a stable node set (keys + prereqs, just in case)
+        all_nodes: set[ProcessStep] = set(self.graph.keys())
+        for prereqs in self.graph.values():
+            all_nodes |= set(prereqs)
+
         # map ProcessStep instance -> its step_id (as string)
-        id_by_node: dict[ProcessStep, str] = {}
+        id_by_node: dict[ProcessStep, str] = {node: str(node.step_id) for node in all_nodes}
 
-        for node in self.graph.keys():
-            sid = str(node.step_id)
-            id_by_node[node] = sid
+        # For stable output: sort by step_id
+        def _node_sort_key(n: ProcessStep) -> str:
+            return str(n.step_id)
 
-            # Build a nice label using ProcessStepDescriber if available
+        for node in sorted(all_nodes, key=_node_sort_key):
+            sid = id_by_node[node]
+
+            # Human label
             doc = getattr(node, "documentation", None)
             if doc is not None and getattr(doc, "calling_name", None):
                 display_label = doc.calling_name
             else:
                 display_label = type(node).__name__
 
+            # prereqs list (sorted for spec stability)
+            prereq_ids = sorted(id_by_node[p] for p in self.graph.get(node, set()))
+
+            cfg = dict(getattr(node, "configuration", {}))
+
             node_spec: dict[str, Any] = {
                 "id": sid,
                 "label": display_label,
                 "module": type(node).__name__,
-                "config": dict(getattr(node, "configuration", {})),
+                "config": cfg,
+                "requires_steps": prereq_ids,
+                "produced_outputs": sorted(getattr(node, "produced_outputs", {}).keys()),
             }
+
+            cfg_json = json.dumps(node_spec["config"], sort_keys=True, default=str).encode("utf-8")
+            node_spec["config_hash"] = sha256(cfg_json).hexdigest()
 
             if doc is not None:
                 module_path = getattr(doc, "calling_module_path", None)
                 node_spec["module_path"] = str(module_path) if module_path is not None else ""
                 node_spec["version"] = getattr(doc, "calling_version", "") or ""
+                calling_id = getattr(doc, "calling_id", None)
+                if calling_id:
+                    node_spec["module_id"] = calling_id
+
+            # Attach trace events if present (kept lightweight)
+            if sid in self.trace_events and self.trace_events[sid]:
+                node_spec["trace_events"] = [ev.to_dict() for ev in self.trace_events[sid]]
+            else:
+                node_spec["trace_events"] = []
 
             nodes.append(node_spec)
 
@@ -369,18 +433,9 @@ class Pipeline(TopologicalSorter):
         for node, prereqs in self.graph.items():
             target_id = id_by_node[node]
             for pre in prereqs:
-                edges.append(
-                    {
-                        "from": id_by_node[pre],
-                        "to": target_id,
-                    }
-                )
+                edges.append({"from": id_by_node[pre], "to": target_id})
 
-        return {
-            "name": self.name,
-            "nodes": nodes,
-            "edges": edges,
-        }
+        return {"name": self.name, "nodes": nodes, "edges": edges}
 
     def to_dot(self) -> str:
         """

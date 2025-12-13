@@ -71,7 +71,7 @@ class XSGeometry(ProcessStep):
             "wavelength_units_source",
             "wavelength_uncertainties_sources",
         ],  # list of argument key-val combos required by the process
-        calling_arguments={
+        default_configuration={
             "detector_distance_source": None,
             "detector_distance_units_source": None,
             "detector_distance_uncertainties_sources": {},

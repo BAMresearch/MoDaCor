@@ -37,7 +37,7 @@ class Divide(ProcessStep):
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
         required_arguments={},
-        calling_arguments={
+        default_configuration={
             "divisor_source": None,  # IoSources key for signal
             "divisor_units_source": None,  # IoSources key for units
             "divisor_uncertainties_sources": {},  # dict of uncertainty name: source, or 'propagate_to_all': source
