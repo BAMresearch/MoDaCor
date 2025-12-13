@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from logging import WARNING
+
 import attrs
 
 __coding__ = "utf-8"
@@ -67,6 +69,9 @@ class IoSource:
     configuration: dict[str, Any] = field(factory=default_config)
     source_reference: str = field(default="", converter=str, validator=attrs.validators.instance_of(str))
     type_reference: str = "IoSource"
+    # for passing extra kwargs to the data loading method if needed (e.g. csv_source)
+    iosource_method_kwargs: dict[str, Any] = field(factory=dict, validator=attrs.validators.instance_of(dict))
+    logging_level: int = field(default=WARNING, validator=attrs.validators.instance_of(int))
 
     def get_data(self, data_key: str, load_slice: Optional[ArraySlice] = None) -> np.ndarray:
         """

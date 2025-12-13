@@ -21,7 +21,7 @@ from modacor.io.io_sources import IoSource, IoSources
 from modacor.modules.base_modules.append_source import AppendSource
 
 
-def _install_dummy_loader_module(monkeypatch) -> Tuple[str, List[tuple]]:
+def _install_dummy_iosource_module(monkeypatch) -> Tuple[str, List[tuple]]:
     """
     Install a dummy loader module into sys.modules and return:
 
@@ -30,7 +30,7 @@ def _install_dummy_loader_module(monkeypatch) -> Tuple[str, List[tuple]]:
     """
     calls: List[tuple] = []
 
-    module_name = "modacor.tests.dummy_loader_module"
+    module_name = "modacor.tests.dummy_iosource_module"
     mod = types.ModuleType(module_name)
 
     class DummySource(IoSource):
@@ -47,7 +47,7 @@ def _install_dummy_loader_module(monkeypatch) -> Tuple[str, List[tuple]]:
             self.source_reference = ref
             self.resource_location = loc
 
-    def dummy_loader(*, source_reference: str, resource_location: str):
+    def dummy_loader(*, source_reference: str, resource_location: str, **kwargs) -> IoSource:
         """
         Minimal loader that mimics the real loader signature used by AppendSource.
         Returns a DummySource instance and records calls for assertions.
@@ -55,7 +55,7 @@ def _install_dummy_loader_module(monkeypatch) -> Tuple[str, List[tuple]]:
         calls.append((source_reference, resource_location))
         return DummySource(source_reference, resource_location)
 
-    # The attribute name here is what AppendSource._resolve_loader_callable
+    # The attribute name here is what AppendSource._resolve_iosource_callable
     # will try to retrieve from the module.
     mod.DummyLoader = dummy_loader  # type: ignore[attr-defined]
 
@@ -78,13 +78,13 @@ def _make_append_source_instance() -> AppendSource:
 
 
 def test_append_single_source(monkeypatch):
-    loader_path, calls = _install_dummy_loader_module(monkeypatch)
+    loader_path, calls = _install_dummy_iosource_module(monkeypatch)
 
     step = _make_append_source_instance()
     step.configuration = {
         "source_identifier": "sample_source",
         "source_location": "/tmp/sample.dat",
-        "loader_module": loader_path,
+        "iosource_module": loader_path,
     }
     step.io_sources = IoSources()
 
@@ -101,13 +101,13 @@ def test_append_single_source(monkeypatch):
 
 
 def test_append_multiple_sources(monkeypatch):
-    loader_path, calls = _install_dummy_loader_module(monkeypatch)
+    loader_path, calls = _install_dummy_iosource_module(monkeypatch)
 
     step = _make_append_source_instance()
     step.configuration = {
         "source_identifier": ["src1", "src2"],
         "source_location": ["/tmp/file1.dat", "/tmp/file2.dat"],
-        "loader_module": loader_path,
+        "iosource_module": loader_path,
     }
     step.io_sources = IoSources()
 
@@ -128,13 +128,13 @@ def test_append_multiple_sources(monkeypatch):
 
 
 def test_mismatched_source_lengths_raises(monkeypatch):
-    loader_path, _ = _install_dummy_loader_module(monkeypatch)
+    loader_path, _ = _install_dummy_iosource_module(monkeypatch)
 
     step = _make_append_source_instance()
     step.configuration = {
         "source_identifier": ["src1", "src2"],
         "source_location": ["/tmp/only_one.dat"],
-        "loader_module": loader_path,
+        "iosource_module": loader_path,
     }
     step.io_sources = IoSources()
 
@@ -143,7 +143,7 @@ def test_mismatched_source_lengths_raises(monkeypatch):
 
 
 def test_existing_source_is_not_overwritten(monkeypatch):
-    loader_path, calls = _install_dummy_loader_module(monkeypatch)
+    loader_path, calls = _install_dummy_iosource_module(monkeypatch)
 
     step = _make_append_source_instance()
     step.io_sources = IoSources()
@@ -164,7 +164,7 @@ def test_existing_source_is_not_overwritten(monkeypatch):
     step.configuration = {
         "source_identifier": "existing",
         "source_location": "/tmp/new_location.dat",
-        "loader_module": loader_path,
+        "iosource_module": loader_path,
     }
 
     result = step.calculate()
