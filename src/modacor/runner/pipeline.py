@@ -563,3 +563,138 @@ class Pipeline(TopologicalSorter):
 
         # sort_keys=False keeps insertion order, which follows node order in spec
         return yaml.safe_dump(yaml_obj, sort_keys=False)
+
+    # tracer event handling helpers:
+    @staticmethod
+    def _probe_to_dict(probe: Any) -> dict[str, Any]:
+        """
+        Duck-typed conversion of a BaseDataProbe-like object to JSON-safe dict.
+        """
+        if probe is None:
+            return {}
+
+        shape = getattr(probe, "shape", None)
+        nan_unc = getattr(probe, "nan_unc", {}) or {}
+
+        return {
+            "shape": list(shape) if shape is not None else None,
+            "ndim": getattr(probe, "ndim", None),
+            "rank_of_data": getattr(probe, "rank_of_data", None),
+            "units": getattr(probe, "units_str", None),
+            "dimensionality": getattr(probe, "dimensionality_str", None),
+            "nan_signal": getattr(probe, "nan_signal", None),
+            "nan_unc": {str(k): int(v) for k, v in dict(nan_unc).items()},
+            "min_signal": getattr(probe, "min_signal", None),
+            "max_signal": getattr(probe, "max_signal", None),
+        }
+
+    @classmethod
+    def _datasets_from_tracer_event(cls, tracer_event: dict[str, Any]) -> dict[str, Any]:
+        """
+        Convert a PipelineTracer.events entry into TraceEvent.datasets payload.
+        """
+        out: dict[str, Any] = {}
+        changed = tracer_event.get("changed", {}) or {}
+
+        for bundle_key, ds_key in sorted(changed.keys(), key=lambda x: (x[0], x[1])):
+            payload = changed[(bundle_key, ds_key)] or {}
+            prev = payload.get("prev")
+            now = payload.get("now")
+            diff = payload.get("diff", set()) or set()
+
+            out[f"{bundle_key}.{ds_key}"] = {
+                "diff": sorted(diff),
+                "prev": None if prev is None else cls._probe_to_dict(prev),
+                "now": cls._probe_to_dict(now),
+            }
+
+        return out
+
+    def attach_tracer_event(
+        self,
+        node: ProcessStep,
+        tracer: Any | None,
+        *,
+        include_rendered: bool = False,
+        rendered_format: str = "text/html",
+    ) -> TraceEvent:
+        """
+        Create & attach a TraceEvent for `node`, using `tracer.events` if available.
+
+        - Always attaches a TraceEvent so the graph UI can show config/module info.
+        - Adds datasets diffs only if a matching tracer event for this step_id exists.
+        """
+        step_id = str(node.step_id)
+        doc = getattr(node, "documentation", None)
+
+        label = getattr(doc, "calling_name", "") if doc is not None else ""
+        module_path = getattr(doc, "calling_module_path", "") if doc is not None else ""
+        version = getattr(doc, "calling_version", "") if doc is not None else ""
+
+        prereqs = tuple(sorted(str(p.step_id) for p in self.graph.get(node, set())))
+        cfg = dict(getattr(node, "configuration", {}) or {})
+
+        datasets: dict[str, Any] = {}
+
+        # Try to find the most recent tracer event for this step_id
+        if tracer is not None:
+            events = getattr(tracer, "events", None)
+            if isinstance(events, list) and events:
+                for ev in reversed(events):
+                    if str(ev.get("step_id")) == step_id:
+                        datasets = self._datasets_from_tracer_event(ev)
+                        break
+
+        messages: list[dict[str, Any]] = []
+
+        if include_rendered and tracer is not None:
+            last_report = getattr(tracer, "last_report", None)
+            if callable(last_report):
+                try:
+                    # Prefer HTML/CSS-friendly output if requested.
+                    if rendered_format in {"text/html", "text/markdown"}:
+                        try:
+                            # local import keeps runner lightweight unless used
+                            from modacor.debug.pipeline_tracer import MarkdownCssRenderer  # noqa: WPS433
+
+                            renderer = MarkdownCssRenderer(wrap_in_markdown_codeblock=False)
+                            content = last_report(1, renderer=renderer)  # only this step's latest event
+                            fmt = "text/html"  # MarkdownCssRenderer emits HTML spans/<pre>
+                        except Exception:
+                            content = last_report(1)  # fallback to plain text
+                            fmt = "text/plain"
+                    else:
+                        content = last_report(1)
+                        fmt = "text/plain"
+
+                    messages.append(
+                        {
+                            "kind": "rendered_trace",
+                            "format": fmt,
+                            "content": content,
+                        }
+                    )
+                except Exception as exc:
+                    # Never break execution due to rendering
+                    messages.append(
+                        {
+                            "kind": "rendered_trace_error",
+                            "format": "text/plain",
+                            "content": f"Failed to render trace block: {exc!r}",
+                        }
+                    )
+
+        event = TraceEvent(
+            step_id=step_id,
+            module=type(node).__name__,
+            label=str(label or ""),
+            module_path=str(module_path or ""),
+            version=str(version or ""),
+            requires_steps=prereqs,
+            config=cfg,
+            datasets=datasets,
+            messages=messages,
+        )
+
+        self.add_trace_event(event)
+        return event
