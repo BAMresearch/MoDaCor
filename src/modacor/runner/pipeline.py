@@ -645,44 +645,34 @@ class Pipeline(TopologicalSorter):
                         datasets = self._datasets_from_tracer_event(ev)
                         break
 
+        matched_ev: dict[str, Any] | None = None
+
+        if tracer is not None:
+            events = getattr(tracer, "events", None)
+            if isinstance(events, list) and events:
+                for ev in reversed(events):
+                    if str(ev.get("step_id")) == step_id:
+                        matched_ev = ev
+                        datasets = self._datasets_from_tracer_event(ev)
+                        break
+
         messages: list[dict[str, Any]] = []
 
-        if include_rendered and tracer is not None:
-            last_report = getattr(tracer, "last_report", None)
-            if callable(last_report):
-                try:
-                    # Prefer HTML/CSS-friendly output if requested.
-                    if rendered_format in {"text/html", "text/markdown"}:
-                        try:
-                            # local import keeps runner lightweight unless used
-                            from modacor.debug.pipeline_tracer import MarkdownCssRenderer  # noqa: WPS433
+        if include_rendered and matched_ev is not None:
+            try:
+                from modacor.debug.pipeline_tracer import MarkdownCssRenderer, render_tracer_event  # noqa: WPS433
 
-                            renderer = MarkdownCssRenderer(wrap_in_markdown_codeblock=False)
-                            content = last_report(1, renderer=renderer)  # only this step's latest event
-                            fmt = "text/html"  # MarkdownCssRenderer emits HTML spans/<pre>
-                        except Exception:
-                            content = last_report(1)  # fallback to plain text
-                            fmt = "text/plain"
-                    else:
-                        content = last_report(1)
-                        fmt = "text/plain"
+                if rendered_format in {"text/html", "text/markdown"}:
+                    renderer = MarkdownCssRenderer(wrap_in_markdown_codeblock=False)
+                    content = render_tracer_event(matched_ev, renderer=renderer)
+                    fmt = "text/html"  # MarkdownCssRenderer emits HTML spans/<pre>
+                else:
+                    content = render_tracer_event(matched_ev, renderer=None)
+                    fmt = "text/plain"
 
-                    messages.append(
-                        {
-                            "kind": "rendered_trace",
-                            "format": fmt,
-                            "content": content,
-                        }
-                    )
-                except Exception as exc:
-                    # Never break execution due to rendering
-                    messages.append(
-                        {
-                            "kind": "rendered_trace_error",
-                            "format": "text/plain",
-                            "content": f"Failed to render trace block: {exc!r}",
-                        }
-                    )
+                messages.append({"kind": "rendered_trace", "format": fmt, "content": content})
+            except Exception as exc:
+                messages.append({"kind": "rendered_trace_error", "format": "text/plain", "content": f"{exc!r}"})
 
         event = TraceEvent(
             step_id=step_id,

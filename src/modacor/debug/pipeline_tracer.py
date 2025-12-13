@@ -416,81 +416,10 @@ class PipelineTracer:
 
     def last_report(self, n: int = 20, *, renderer: ReportRenderer | None = None) -> str:
         r = renderer or PlainUnicodeRenderer(wrap_in_markdown_codeblock=False)
-        lines: list[str] = []
-
-        def fmt_kv(label: str, prev: object | None, now: object, is_changed: bool) -> str:
-            badge = r.badge_changed() if is_changed else r.badge_ok()
-            if prev is None:
-                return f"{badge} {label:<18} {now}"  # noqa: E231
-            if is_changed:
-                return f"{badge} {label:<18} {r.changed(str(prev))} → {r.changed(str(now))}"  # noqa: E231
-            return f"{badge} {label:<18} {r.ok(str(now))}"  # noqa: E231
-
-        for ev in self.events[-n:]:
-            step_id = ev["step_id"]
-            module = ev["module"]
-            name = ev["name"]
-
-            lines.append(r.header(f"Step {step_id} — {module} — {name}"))
-
-            changed_map: dict[tuple[str, str], dict[str, Any]] = ev["changed"]
-            items = sorted(changed_map.items(), key=lambda kv: (kv[0][0], kv[0][1]))
-
-            for idx, ((b, d), payload) in enumerate(items):
-                is_last_ds = idx == (len(items) - 1)
-                joint = UNICODE["elbow"] if is_last_ds else UNICODE["tee"]
-                cont = UNICODE["space"] if is_last_ds else UNICODE["pipe"]
-
-                prev: BaseDataProbe | None = payload["prev"]
-                now: BaseDataProbe = payload["now"]
-                diff: set[str] = set(payload["diff"])
-                diff_str = ", ".join(sorted(diff))
-                diff_note = f" {r.dim('[' + diff_str + ']')}" if diff_str else ""
-
-                lines.append(f"{joint} {UNICODE['bullet']} {b}.{d}{diff_note}")
-
-                # Compute field-level change (not just diff tags) so “all fields” can be printed
-                if prev is None:
-                    lines.append(f"{cont}{UNICODE['space']}{fmt_kv('units', None, now.units_str, True)}")
-                    lines.append(
-                        f"{cont}{UNICODE['space']}{fmt_kv('dimensionality', None, now.dimensionality_str, True)}"
-                    )
-                    lines.append(f"{cont}{UNICODE['space']}{fmt_kv('shape', None, now.shape, True)}")
-                    # If you add these later, they’ll slot right in:
-                    # lines.append(f"{cont}{UNICODE['space']}{fmt_kv('ndim', None, now.ndim, True)}")
-                    # lines.append(f"{cont}{UNICODE['space']}{fmt_kv('rank_of_data', None, now.rank_of_data, True)}")
-                    lines.append(f"{cont}{UNICODE['space']}{fmt_kv('NaN(signal)', None, now.nan_signal, True)}")
-                else:
-                    lines.append(
-                        f"{cont}{UNICODE['space']}{fmt_kv('units', prev.units_str, now.units_str, now.units_str != prev.units_str)}"
-                    )
-                    lines.append(
-                        f"{cont}{UNICODE['space']}{fmt_kv('dimensionality', prev.dimensionality_str, now.dimensionality_str, now.dimensionality_str != prev.dimensionality_str)}"
-                    )
-                    lines.append(
-                        f"{cont}{UNICODE['space']}{fmt_kv('shape', prev.shape, now.shape, now.shape != prev.shape)}"
-                    )
-                    lines.append(
-                        f"{cont}{UNICODE['space']}{fmt_kv('NaN(signal)', prev.nan_signal, now.nan_signal, now.nan_signal != prev.nan_signal)}"
-                    )
-
-                # Uncertainty NaNs (sorted)
-                unc_keys = sorted(now.nan_unc.keys() if prev is None else (set(prev.nan_unc) | set(now.nan_unc)))
-                if unc_keys:
-                    lines.append(f"{cont}{UNICODE['space']}{r.dim('uncertainties:')}")
-                    for uk in unc_keys:
-                        p = 0 if prev is None else prev.nan_unc.get(uk, 0)
-                        q = now.nan_unc.get(uk, 0)
-                        lines.append(
-                            f"{cont}{UNICODE['space']}{UNICODE['space']}"
-                            + fmt_kv(
-                                f"NaN(unc['{uk}'])", None if prev is None else p, q, True if prev is None else (p != q)
-                            )
-                        )
-
-            lines.append("")  # blank line between steps
-
-        return r.codewrap("\n".join(lines).rstrip())
+        events = self.events[-n:]
+        blocks = [render_tracer_event(ev, renderer=r) for ev in events]
+        # render_tracer_event already wraps, so join plainly:
+        return "\n\n".join(blocks)
 
 
 def _probe_to_dict(p: BaseDataProbe) -> dict[str, Any]:
@@ -538,3 +467,74 @@ def tracer_event_to_datasets_payload(tracer_step_event: dict[str, Any]) -> dict[
         }
 
     return out
+
+
+def render_tracer_event(tracer_event: dict[str, Any], *, renderer: ReportRenderer | None = None) -> str:
+    """
+    Render a single tracer event (one element of PipelineTracer.events) into a
+    pretty Unicode/HTML-ish block using the provided renderer.
+
+    This is intentionally step-local: it renders exactly one event dict.
+    """
+    r = renderer or PlainUnicodeRenderer(wrap_in_markdown_codeblock=False)
+    lines: list[str] = []
+
+    def fmt_kv(label: str, prev: object | None, now: object, is_changed: bool) -> str:
+        badge = r.badge_changed() if is_changed else r.badge_ok()
+        if prev is None:
+            return f"{badge} {label:<18} {now}"  # noqa: E231
+        if is_changed:
+            return f"{badge} {label:<18} {r.changed(str(prev))} → {r.changed(str(now))}"  # noqa: E231
+        return f"{badge} {label:<18} {r.ok(str(now))}"  # noqa: E231
+
+    step_id = tracer_event.get("step_id", "<??>")
+    module = tracer_event.get("module", "")
+    name = tracer_event.get("name", "")
+
+    lines.append(r.header(f"Step {step_id} — {module} — {name}"))
+
+    changed_map: dict[tuple[str, str], dict[str, Any]] = tracer_event.get("changed", {}) or {}
+    items = sorted(changed_map.items(), key=lambda kv: (kv[0][0], kv[0][1]))
+
+    for idx, ((b, d), payload) in enumerate(items):
+        is_last_ds = idx == (len(items) - 1)
+        joint = UNICODE["elbow"] if is_last_ds else UNICODE["tee"]
+        cont = UNICODE["space"] if is_last_ds else UNICODE["pipe"]
+
+        prev: BaseDataProbe | None = payload.get("prev")
+        now: BaseDataProbe = payload.get("now")
+        diff: set[str] = set(payload.get("diff", set()) or set())
+        diff_str = ", ".join(sorted(diff))
+        diff_note = f" {r.dim('[' + diff_str + ']')}" if diff_str else ""
+
+        lines.append(f"{joint} {UNICODE['bullet']} {b}.{d}{diff_note}")
+
+        if prev is None:
+            lines.append(f"{cont}{UNICODE['space']}{fmt_kv('units', None, now.units_str, True)}")
+            lines.append(f"{cont}{UNICODE['space']}{fmt_kv('dimensionality', None, now.dimensionality_str, True)}")
+            lines.append(f"{cont}{UNICODE['space']}{fmt_kv('shape', None, now.shape, True)}")
+            lines.append(f"{cont}{UNICODE['space']}{fmt_kv('NaN(signal)', None, now.nan_signal, True)}")
+        else:
+            lines.append(
+                f"{cont}{UNICODE['space']}{fmt_kv('units', prev.units_str, now.units_str, now.units_str != prev.units_str)}"
+            )
+            lines.append(
+                f"{cont}{UNICODE['space']}{fmt_kv('dimensionality', prev.dimensionality_str, now.dimensionality_str, now.dimensionality_str != prev.dimensionality_str)}"
+            )
+            lines.append(f"{cont}{UNICODE['space']}{fmt_kv('shape', prev.shape, now.shape, now.shape != prev.shape)}")
+            lines.append(
+                f"{cont}{UNICODE['space']}{fmt_kv('NaN(signal)', prev.nan_signal, now.nan_signal, now.nan_signal != prev.nan_signal)}"
+            )
+
+        unc_keys = sorted(now.nan_unc.keys() if prev is None else (set(prev.nan_unc) | set(now.nan_unc)))
+        if unc_keys:
+            lines.append(f"{cont}{UNICODE['space']}{r.dim('uncertainties:')}")
+            for uk in unc_keys:
+                p = 0 if prev is None else prev.nan_unc.get(uk, 0)
+                q = now.nan_unc.get(uk, 0)
+                lines.append(
+                    f"{cont}{UNICODE['space']}{UNICODE['space']}"
+                    + fmt_kv(f"NaN(unc['{uk}'])", None if prev is None else p, q, True if prev is None else (p != q))
+                )
+
+    return r.codewrap("\n".join(lines).rstrip())

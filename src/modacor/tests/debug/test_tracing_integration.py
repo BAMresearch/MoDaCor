@@ -121,3 +121,22 @@ def test_pipeline_attach_tracer_event_can_embed_rendered_trace_block():
     assert ev.messages[0]["kind"] in {"rendered_trace", "rendered_trace_error"}
     assert "format" in ev.messages[0]
     assert "content" in ev.messages[0]
+
+
+def test_attach_tracer_event_renders_step_local_block():
+    step = DummyStep(io_sources=None, step_id="A")
+    pipeline = Pipeline.from_dict({step: []}, name="t")
+
+    tracer = PipelineTracer(
+        watch={"sample": ["signal"]},
+        record_only_on_change=False,  # ensure an event is recorded even if nothing changes
+    )
+
+    tracer.after_step(step, ProcessingData())
+    ev = pipeline.attach_tracer_event(step, tracer, include_rendered=True)
+
+    assert ev.messages
+    m = ev.messages[0]
+    assert m["kind"] in {"rendered_trace", "rendered_trace_error"}
+    if m["kind"] == "rendered_trace":
+        assert "Step A" in m["content"]
