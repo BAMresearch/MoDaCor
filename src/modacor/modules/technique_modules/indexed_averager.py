@@ -125,7 +125,7 @@ class IndexedAverager(ProcessStep):
             "use_signal_uncertainty_weights",
             "uncertainty_weight_key",
         ],
-        calling_arguments={
+        default_configuration={
             "with_processing_keys": None,
             "output_processing_key": None,  # currently unused
             "averaging_direction": "azimuthal",

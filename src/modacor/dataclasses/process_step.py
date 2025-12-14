@@ -25,10 +25,11 @@ from .databundle import DataBundle
 from .messagehandler import MessageHandler
 from .process_step_describer import ProcessStepDescriber
 from .processing_data import ProcessingData
-from .validators import is_list_of_ints
+
+# from .validators import is_list_of_ints
 
 
-@define
+@define(eq=False)
 class ProcessStep:
     """A base class defining a processing step"""
 
@@ -54,7 +55,7 @@ class ProcessStep:
     # class attribute for a machine-readable description of the process step
     documentation = ProcessStepDescriber(
         calling_name="Generic Process step",
-        calling_id=None,
+        calling_id="",  # to be filled in by the process
         calling_module_path=Path(__file__),
         calling_version=__version__,
     )
@@ -66,7 +67,7 @@ class ProcessStep:
     )
 
     # flags and attributes for running the pipeline
-    requires_steps: list[int] = field(factory=list, validator=is_list_of_ints)
+    requires_steps: list[str] = field(factory=list)
     step_id: int | str = field(default=-1, validator=v.instance_of((Integral, str)))
     executed: bool = field(default=False, validator=v.instance_of(bool))
 
@@ -77,7 +78,7 @@ class ProcessStep:
 
     # a message handler, supporting logging, warnings, errors, etc. emitted by the process
     # during execution
-    message_handler: MessageHandler = field(default=MessageHandler(), validator=v.instance_of(MessageHandler))
+    message_handler: MessageHandler = field(factory=MessageHandler, validator=v.instance_of(MessageHandler))
 
     # internal variables:
     __prepared: bool = field(default=False, validator=v.instance_of(bool))
@@ -88,15 +89,17 @@ class ProcessStep:
         Post-initialization method to set up the process step.
         """
         self.configuration = self.default_config()
-        self.configuration.update(self.documentation.calling_arguments)
+        self.configuration.update(self.documentation.default_configuration)
 
     def __call__(self, processing_data: ProcessingData) -> None:
         """Allow the process step to be called like a function"""
         self.execute(processing_data)
 
     # add hash function. equality can be checked
-    def __hash__(self):
-        return hash((self.documentation.__repr__(), self.configuration.__repr__(), self.step_id))
+    # def __hash__(self):
+    #     return hash((self.documentation.__repr__(), self.configuration.__repr__(), self.step_id))
+    def __hash__(self) -> int:
+        return object.__hash__(self)
 
     def prepare_execution(self):
         """

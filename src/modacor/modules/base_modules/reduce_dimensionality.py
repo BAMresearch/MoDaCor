@@ -51,7 +51,7 @@ class ReduceDimensionality(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units", "weights"]},
-        calling_arguments={
+        default_configuration={
             # Axis or axes to reduce. Can be int, list/tuple of ints, or None (reduce all).
             "axes": None,
             # Use BaseData.weights as weights (default) or do unweighted mean (False → equal weights).

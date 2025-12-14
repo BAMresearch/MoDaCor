@@ -71,7 +71,7 @@ class XSGeometry(ProcessStep):
             "wavelength_units_source",
             "wavelength_uncertainties_sources",
         ],  # list of argument key-val combos required by the process
-        calling_arguments={
+        default_configuration={
             "detector_distance_source": None,
             "detector_distance_units_source": None,
             "detector_distance_uncertainties_sources": {},
@@ -197,12 +197,15 @@ class XSGeometry(ProcessStep):
 
         Each index gets an uncertainty of ±0.5 pixel to reflect the
         pixel-center assumption.
+
+        the indices are shifted by half a pixel to represent pixel centers.
+        This means if you floor a float coordinate in pixel units, you get the correct pixel index.
         """
         if len(shape) == 0:
             signal = np.array(0.0, dtype=float)
         else:
             grids = np.meshgrid(
-                *[np.arange(n, dtype=float) for n in shape],
+                *[np.arange(n, dtype=float) + 0.5 for n in shape],
                 indexing="ij",
             )
             signal = grids[axis]
