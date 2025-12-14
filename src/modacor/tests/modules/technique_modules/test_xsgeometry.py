@@ -568,3 +568,68 @@ def test_xsgeometry_prepare_and_calculate_integration():
     center = (n0 // 2, n1 // 2)
     abs_Q = np.abs(Q_bd.signal)
     assert abs_Q[center] == pytest.approx(abs_Q.min(), rel=1e-12, abs=1e-12)
+
+
+def test_xsgeometry_Q0_and_Omega_have_uncertainty_off_center():
+    step = XSGeometry(io_sources=IoSources())
+
+    n0, n1 = 5, 5
+    spatial_shape = (n0, n1)
+    D_bd, pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_2d(n0, n1)
+    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
+
+    x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
+        RoD=2,
+        spatial_shape=spatial_shape,
+        beam_center_bd=beam_center_bd,
+        px0_bd=px0_bd,
+        px1_bd=px1_bd,
+        detector_distance_bd=D_bd,
+    )
+
+    _, theta_bd, sin_theta_bd = step._compute_angles(
+        r_perp_bd=r_perp_bd,
+        detector_distance_bd=D_bd,
+    )
+    Q_bd, Q0_bd, Q1_bd, Q2_bd = step._compute_Q_and_components(
+        sin_theta_bd=sin_theta_bd,
+        wavelength_bd=wavelength_bd,
+        x0_bd=x0_bd,
+        x1_bd=x1_bd,
+        r_perp_bd=r_perp_bd,
+    )
+    Omega_bd = step._compute_solid_angle(
+        R_bd=R_bd,
+        px0_bd=px0_bd,
+        px1_bd=px1_bd,
+        detector_distance_bd=D_bd,
+    )
+
+    row_c, col_c = n0 // 2, n1 // 2
+    col_right = col_c + 1
+
+    # Q0 should carry pixel_index uncertainty at some off-centre pixel
+    assert "pixel_index" in Q0_bd.uncertainties
+    unc_Q0_pix = Q0_bd.uncertainties["pixel_index"][row_c, col_right]
+    assert np.isfinite(unc_Q0_pix)
+    assert unc_Q0_pix > 0.0
+
+    # Omega should also carry non-zero propagated uncertainty (from distance,
+    # pixel_size, beam_center, etc.). We don't require every key to be finite
+    # (some keys may legitimately produce NaNs near singular points), but at
+    # least one uncertainty contribution at the off-centre pixel must be finite.
+    assert Omega_bd.uncertainties  # dict not empty
+
+    target_shape = (n0, n1)
+    found_finite_positive = False
+
+    for key, u in Omega_bd.uncertainties.items():
+        # Uncertainty arrays may be scalar or lower-dimensional; broadcast to the
+        # detector shape so we can safely index the off-centre pixel.
+        u_full = np.broadcast_to(u, target_shape)
+        val = u_full[row_c, col_right]
+        if np.isfinite(val) and val > 0.0:
+            found_finite_positive = True
+            break
+
+    assert found_finite_positive

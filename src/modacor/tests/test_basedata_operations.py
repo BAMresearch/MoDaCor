@@ -122,14 +122,21 @@ class TestBinaryOpsWithUncertainties(unittest.TestCase):
         np.testing.assert_allclose(result.signal, expected.signal)
         np.testing.assert_allclose(result.uncertainties["Poisson"], expected.uncertainties["Poisson"])
 
-    def test_nonmatching_uncertainties_result_in_nan(self):
-        # other has no 'Poisson' key and no propagate_to_all -> NaN
+    def test_nonmatching_uncertainties_transfer_and_propagate_independently(self):
+        # Non-matching non-global keys: result should contain the union of keys.
         a = BaseData(signal=5.0, uncertainties={"Poisson": 0.1}, units=ureg.Unit("m"))
         b = BaseData(signal=3.0, uncertainties={"apply_to_all": 0.2}, units=ureg.Unit("s"))
 
         result = a * b
+
         self.assertIn("Poisson", result.uncertainties)
-        self.assertTrue(np.isnan(result.uncertainties["Poisson"]).all())
+        self.assertIn("apply_to_all", result.uncertainties)
+
+        # Mul: σR² = (B σA)² + (A σB)², but per-key independent:
+        # - "Poisson" comes only from a: σ = |B| σA
+        # - "apply_to_all" comes only from b: σ = |A| σB
+        self.assertAlmostEqual(float(result.uncertainties["Poisson"]), 3.0 * 0.1)
+        self.assertAlmostEqual(float(result.uncertainties["apply_to_all"]), 5.0 * 0.2)
 
     def test_propagate_to_all_fallback(self):
         # other has only propagate_to_all → used for all keys of left
@@ -144,6 +151,57 @@ class TestBinaryOpsWithUncertainties(unittest.TestCase):
         σM1 = np.sqrt((σA1 / A1) ** 2 + (σB / B) ** 2) * M1
         self.assertAlmostEqual(result.signal[0], M1)
         self.assertAlmostEqual(result.uncertainties["u"][0], σM1)
+
+    def test_both_propagate_to_all_results_in_propagate_to_all_only(self):
+        a = BaseData(
+            signal=np.array([2.0, 3.0]), units=ureg.m, uncertainties={"propagate_to_all": np.array([0.2, 0.3])}
+        )
+        b = BaseData(signal=4.0, units=ureg.s, uncertainties={"propagate_to_all": 0.4})
+
+        result = a * b
+
+        self.assertEqual(set(result.uncertainties.keys()), {"propagate_to_all"})
+
+        A = a.signal
+        B = 4.0
+        sigma_A = np.array([0.2, 0.3])
+        sigma_B = 0.4
+
+        expected = np.sqrt((B * sigma_A) ** 2 + (A * sigma_B) ** 2)
+        np.testing.assert_allclose(result.uncertainties["propagate_to_all"], expected)
+
+    def test_nonmatching_keys_union_for_addition(self):
+        a = BaseData(signal=np.array([1.0, 2.0]), units=ureg.m, uncertainties={"u": np.array([0.1, 0.2])})
+        b = BaseData(signal=np.array([3.0, 4.0]), units=ureg.m, uncertainties={"v": np.array([0.3, 0.4])})
+
+        result = a + b
+
+        self.assertEqual(set(result.uncertainties.keys()), {"u", "v"})
+        # Add: each key propagates independently; "u" comes only from a, "v" only from b
+        np.testing.assert_allclose(result.uncertainties["u"], np.array([0.1, 0.2]))
+        np.testing.assert_allclose(result.uncertainties["v"], np.array([0.3, 0.4]))
+
+    def test_nonmatching_keys_union_for_division(self):
+        a = BaseData(signal=np.array([2.0, 4.0]), units=ureg.m, uncertainties={"u": np.array([0.2, 0.4])})
+        b = BaseData(signal=np.array([5.0, 10.0]), units=ureg.s, uncertainties={"v": np.array([0.5, 1.0])})
+
+        result = a / b
+
+        self.assertEqual(set(result.uncertainties.keys()), {"u", "v"})
+
+        A = np.array([2.0, 4.0])
+        B = np.array([5.0, 10.0])
+        sigma_u = np.array([0.2, 0.4])
+        sigma_v = np.array([0.5, 1.0])
+
+        # Div per-key independent:
+        # u: σ = σA / B
+        expected_u = sigma_u / B
+        # v: σ = A σB / B^2
+        expected_v = (A * sigma_v) / (B**2)
+
+        np.testing.assert_allclose(result.uncertainties["u"], expected_u)
+        np.testing.assert_allclose(result.uncertainties["v"], expected_v)
 
 
 class TestScalarAndQuantityCoercion(unittest.TestCase):
