@@ -324,23 +324,41 @@ class XSGeometry(ProcessStep):
     ) -> Tuple[BaseData, BaseData, BaseData, BaseData]:
         """
         Compute Q magnitude and components Q0, Q1, Q2.
+
+        Uncertainties are propagated from:
+        - wavelength_bd (e.g. 'propagate_to_all'),
+        - r_perp_bd / x0_bd / x1_bd (pixel_index, pixel_size, distance, ...).
+
+        Q2 is nominally zero for a flat detector but we keep the same
+        uncertainty structure as Q to avoid empty/NaN uncertainty fields.
         """
         four_pi = 4.0 * np.pi
-        Q_bd = (four_pi * sin_theta_bd) / wavelength_bd
 
+        # Q magnitude: (4π / λ) * sin θ
+        Q_bd = (four_pi * sin_theta_bd) / wavelength_bd  # BaseData op → uncertainty propagation
+
+        # Build a "safe" r_perp copy where zeros in the signal are replaced by 1.0,
+        # but keep the original uncertainties so division still propagates correctly.
         safe_signal = np.where(r_perp_bd.signal == 0.0, 1.0, r_perp_bd.signal)
-        r_perp_safe_bd = BaseData(signal=safe_signal, units=r_perp_bd.units)
 
+        r_perp_safe_bd = r_perp_bd.copy()
+        r_perp_safe_bd.signal = safe_signal
+
+        # Direction cosines (Psi components)
         dir0_bd = x0_bd / r_perp_safe_bd
         dir1_bd = x1_bd / r_perp_safe_bd
 
+        # Components of Q
         Q0_bd = Q_bd * dir0_bd
         Q1_bd = Q_bd * dir1_bd
-        Q2_bd = BaseData(signal=np.zeros_like(Q_bd.signal), units=Q_bd.units)
+
+        # Flat detector: Q2 ≡ 0 but keep same uncertainties as Q
+        Q2_bd = Q_bd.copy()
+        Q2_bd.signal = np.zeros_like(Q_bd.signal)
 
         logger.debug(
-            f"XSGeometry: computed Q components; Q.shape={Q_bd.signal.shape}, Q.units={Q_bd.units}"  # noqa: E702
-        )
+            f"XSGeometry: computed Q and components; Q.shape={Q_bd.signal.shape}, Q.units={Q_bd.units}"  # noqa: E702
+        )  # noqa: E702
         return Q_bd, Q0_bd, Q1_bd, Q2_bd
 
     def _compute_psi(
