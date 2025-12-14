@@ -17,7 +17,7 @@ import json
 from hashlib import sha256
 from typing import Any
 
-from attrs import define, field
+from attrs import define, field, validators
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -93,6 +93,9 @@ class TraceEvent:
     # reserved for later (MessageHandler, timing, etc.)
     messages: list[dict[str, Any]] = field(factory=list)
 
+    # wall-clock runtime for this step execution (seconds)
+    duration_s: float | None = field(default=None, validator=validators.optional(validators.instance_of(float)))
+
     def __attrs_post_init__(self) -> None:
         object.__setattr__(self, "config_hash", _stable_hash_dict(self.config))
 
@@ -109,6 +112,7 @@ class TraceEvent:
             "requires_steps": list(self.requires_steps),
             "config": _to_jsonable(self.config),
             "config_hash": self.config_hash,
+            "duration_s": self.duration_s,
             "datasets": _to_jsonable(self.datasets),
             "messages": _to_jsonable(self.messages),
         }

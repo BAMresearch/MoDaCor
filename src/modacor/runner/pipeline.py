@@ -642,6 +642,12 @@ class Pipeline(TopologicalSorter):
                         datasets = tracer_event_to_datasets_payload(ev)
                         break
 
+        duration_s: float | None = None
+        if matched_ev is not None:
+            d = matched_ev.get("duration_s", None)
+            if isinstance(d, (int, float)):
+                duration_s = float(d)
+
         messages: list[dict[str, Any]] = []
 
         # --- Rendered trace (STRICTLY step-local) ---
@@ -721,6 +727,7 @@ class Pipeline(TopologicalSorter):
             requires_steps=prereqs,
             config=cfg,
             datasets=datasets,
+            duration_s=duration_s,
             messages=messages,
         )
 

@@ -305,7 +305,13 @@ class PipelineTracer:
 
         return kinds
 
-    def after_step(self, step: ProcessStep, data: ProcessingData) -> None:  # noqa: C901 # too complex, resolve later
+    def after_step(  # noqa: C901 # too complex, resolve later
+        self,
+        step: ProcessStep,
+        data: ProcessingData,
+        *,
+        duration_s: float | None = None,
+    ) -> None:
         step_id = getattr(step, "step_id", "<??>")
         module = getattr(step.documentation, "calling_id", None) or step.__class__.__name__
         name = getattr(step.documentation, "calling_name", "")
@@ -411,6 +417,7 @@ class PipelineTracer:
                     "module": module,
                     "name": name,
                     "changed": changed,
+                    "duration_s": duration_s,
                 }
             )
 
@@ -488,7 +495,11 @@ def render_tracer_event(tracer_event: dict[str, Any], *, renderer: ReportRendere
     step_id = tracer_event.get("step_id", "<??>")
     module = tracer_event.get("module", "")
     name = tracer_event.get("name", "")
-    lines.append(r.header(f"Step {step_id} — {module} — {name}"))
+    dur = tracer_event.get("duration_s", None)
+    dur_txt = ""
+    if isinstance(dur, (int, float)):
+        dur_txt = f" {r.dim(f'⏱ {dur * 1e3:.2f} ms')}"  # noqa: E231
+    lines.append(r.header(f"Step {step_id} — {module} — {name}") + dur_txt)
 
     changed_map: dict[tuple[str, str], dict[str, Any]] = tracer_event.get("changed", {}) or {}
     items = sorted(changed_map.items(), key=lambda kv: (kv[0][0], kv[0][1]))

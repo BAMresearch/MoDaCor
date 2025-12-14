@@ -177,3 +177,14 @@ def test_attach_tracer_event_embeds_rendered_trace_and_config():
     trace_blocks = [m for m in ev.messages if m.get("kind") == "rendered_trace"]
     if trace_blocks:
         assert "Step A" in trace_blocks[0].get("content", "")
+
+
+def test_attach_tracer_event_copies_duration():
+    step = DummyStep(io_sources=None, step_id="A")
+    pipeline = Pipeline.from_dict({step: []}, name="t")
+
+    tracer = PipelineTracer(watch={"sample": ["signal"]}, record_only_on_change=False)
+    tracer.after_step(step, ProcessingData(), duration_s=0.0123)
+
+    ev = pipeline.attach_tracer_event(step, tracer)
+    assert ev.duration_s == 0.0123
