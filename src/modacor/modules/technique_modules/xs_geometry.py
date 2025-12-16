@@ -391,11 +391,14 @@ class XSGeometry(ProcessStep):
 
         Approximation:
             dΩ ≈ A * D / R³
+
         with A = pixel area (px0 * px1), D = detector distance, R = ray length.
         """
         area_bd = px0_bd * px1_bd
         R3_bd = R_bd**3
         Omega_bd = (area_bd * detector_distance_bd) / R3_bd  # dimensionless (sr)
+        # set units to steradian per pixel explicitly
+        Omega_bd.units = ureg.steradian / ureg.pixel
 
         logger.debug(
             f"XSGeometry: computed solid angle; Omega.shape={Omega_bd.signal.shape}, Omega.units={Omega_bd.units}"  # noqa: E702
