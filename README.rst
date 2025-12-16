@@ -45,6 +45,13 @@ data
 
 .. end-badges
 
+Summary
+=======
+
+MoDaCor is a library for traceable, stepwise data corrections, with propagation of units as well as (multiple) uncertainties. The data sources can be files or data streams. The correction follows an optionally branching and merging graph that is to be configured per application. The computational steps can reuse pre-calculated information calculated in the first run to minimize unnecessary overhead. The modular approach allows very detailed introspection into the effect of each step on the data, units and uncertainties.
+
+This is intended to take on modular data correction workflow tasks as described in this work: https://doi.org/10.1107/S1600576717015096 
+It can be used either directly, or used as a standard to check faster, more integrated data correction implementations against. 
 
 Installation
 ============
