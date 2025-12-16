@@ -25,9 +25,9 @@ from ...dataclasses.basedata import BaseData
 from ...dataclasses.databundle import DataBundle
 from ...dataclasses.process_step import ProcessStep
 from ...dataclasses.processing_data import ProcessingData
-from ...io.hdf.hdf_loader import HDFLoader
+from ...io.hdf.hdf_source import HDFSource
 from ...io.io_sources import IoSources
-from ...io.yaml.yaml_loader import YAMLLoader
+from ...io.yaml.yaml_source import YAMLSource
 from ...modules.base_modules.poisson_uncertainties import PoissonUncertainties
 from ...runner.pipeline import Pipeline
 
@@ -197,12 +197,12 @@ class TestRealisticPipeline(unittest.TestCase):
         unlink(self.temp_hdf_path_background)
 
     def test_semirealistic_pipeline(self):
-        metadata_source = YAMLLoader(source_reference="yaml", resource_location=self.temp_file_path)
+        metadata_source = YAMLSource(source_reference="yaml", resource_location=self.temp_file_path)
         sources = IoSources()
         sources.register_source(source=metadata_source)
-        sources.register_source(HDFLoader(source_reference="sample", resource_location=self.temp_hdf_path_sample))
+        sources.register_source(HDFSource(source_reference="sample", resource_location=self.temp_hdf_path_sample))
         sources.register_source(
-            HDFLoader(source_reference="sample_background", resource_location=self.temp_hdf_path_background)
+            HDFSource(source_reference="sample_background", resource_location=self.temp_hdf_path_background)
         )
 
         source = "sample"

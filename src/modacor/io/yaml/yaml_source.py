@@ -11,7 +11,7 @@ __date__ = "06/06/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-__all__ = ["YAMLLoader"]
+__all__ = ["YAMLSource"]
 
 from logging import WARNING
 from pathlib import Path
@@ -19,6 +19,7 @@ from typing import Any
 
 import numpy as np
 import yaml
+from attrs import define, field, validators
 
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.io.io_source import ArraySlice
@@ -37,7 +38,8 @@ def get_from_nested_dict_by_path(data, path):
     return data
 
 
-class YAMLLoader(IoSource):
+@define(kw_only=True)
+class YAMLSource(IoSource):
     """
     This IoSource is used to load and make experiment metadata available to
     the processing pipeline modules.
@@ -48,17 +50,18 @@ class YAMLLoader(IoSource):
     The entries are returned as BaseData elements, with units and uncertainties.
     """
 
-    _yaml_data: dict[str, Any] = dict()
-    _data_cache: dict[str, np.ndarray] = None
-    _file_path: Path | None = None
-    _static_metadata_cache: dict[str, Any] = None
+    resource_location: Path = field(converter=Path, validator=validators.instance_of((Path)))
+    _yaml_data: dict[str, Any] = field(factory=dict, validator=validators.instance_of(dict))
+    _data_cache: dict[str, np.ndarray] = field(factory=dict, validator=validators.instance_of(dict))
+    _file_path: Path | None = field(default=None, validator=validators.optional(validators.instance_of(Path)))
+    _static_metadata_cache: dict[str, Any] = field(factory=dict, validator=validators.instance_of(dict))
+    logging_level: int = field(default=WARNING, validator=validators.instance_of(int))
+    logger: MessageHandler = field(init=False)
 
-    def __init__(self, source_reference: str, logging_level=WARNING, resource_location: Path | str | None = None):
-        super().__init__(source_reference=source_reference)
-        self.logger = MessageHandler(level=logging_level, name="YAMLLoader")
-        self._file_path = Path(resource_location) if resource_location is not None else None
-        self._file_datasets = []
-        self._file_datasets_shapes = {}
+    def __attrs_post_init__(self):
+        # super().__init__(source_reference=source_reference)
+        self.logger = MessageHandler(level=self.logging_level, name="YAMLSource")
+        self._file_path = Path(self.resource_location) if self.resource_location is not None else None
         self._data_cache = {}  # for values that are float
         self._static_metadata_cache = {}  # for other elements such as strings and tags
         self._preload()  # load the yaml data immediately
