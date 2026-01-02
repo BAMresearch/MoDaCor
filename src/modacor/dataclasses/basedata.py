@@ -647,6 +647,14 @@ class BaseData(UncertaintyOpsMixin):
         """
         return self.units == ureg.dimensionless
 
+    # not funcional yet, but needs to be implemented for data ingestion. and recommended as standard procedure to always convert to base units.
+    # def to_base_units(self) -> None:
+    #     """
+    #     Convert the signal and uncertainties to base units.
+    #     """
+    #     base_units = self.units.to_base_units().units
+    #     self.to_units(base_units)
+
     def to_units(self, new_units: pint.Unit, multiplicative_conversion=True) -> None:
         """
         Convert the signal and uncertainties to new units.
@@ -853,8 +861,8 @@ def exp_basedata_element(element: BaseData) -> BaseData:
 
 def sin_basedata_element(element: BaseData) -> BaseData:
     """Sine: y = sin(x), σ_y ≈ |cos(x)| σ_x. x in radians."""
-    # ensure element is dimensionless:
-    element.to_dimensionless()
+    # ensure element is in radian:
+    element.to_units(ureg.radian)
     return _unary_basedata_op(
         element=element,
         func=np.sin,
@@ -865,8 +873,8 @@ def sin_basedata_element(element: BaseData) -> BaseData:
 
 def cos_basedata_element(element: BaseData) -> BaseData:
     """Cosine: y = cos(x), σ_y ≈ |sin(x)| σ_x. x in radians."""
-    # ensure element is dimensionless:
-    element.to_dimensionless()
+    # ensure element is in radian:
+    element.to_units(ureg.radian)
     return _unary_basedata_op(
         element=element,
         func=np.cos,
@@ -877,8 +885,8 @@ def cos_basedata_element(element: BaseData) -> BaseData:
 
 def tan_basedata_element(element: BaseData) -> BaseData:
     """Tangent: y = tan(x), σ_y ≈ |1/cos^2(x)| σ_x. x in radians."""
-    # ensure element is dimensionless:
-    element.to_dimensionless()
+    # ensure element is in radian:
+    element.to_units(ureg.radian)
     return _unary_basedata_op(
         element=element,
         func=np.tan,
