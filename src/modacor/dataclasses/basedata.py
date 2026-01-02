@@ -528,6 +528,10 @@ class BaseData(UncertaintyOpsMixin):
     to_units(new_units: pint.Unit):
         Converts internal `signal` and all `uncertainties` to `new_units` if compatible with
         the existing `units`. Raises `TypeError` or `ValueError` on invalid input.
+    to_base_units(): Converts internal signal and uncertainties to the base units implied by current units.
+    to_dimensionless(): Converts internal signal and uncertainties to dimensionless units if possible.
+    is_dimensionless() -> bool:
+        Returns True if `units` is dimensionless, False otherwise.
     """
 
     # required:
@@ -647,13 +651,28 @@ class BaseData(UncertaintyOpsMixin):
         """
         return self.units == ureg.dimensionless
 
-    # not funcional yet, but needs to be implemented for data ingestion. and recommended as standard procedure to always convert to base units.
-    # def to_base_units(self) -> None:
-    #     """
-    #     Convert the signal and uncertainties to base units.
-    #     """
-    #     base_units = self.units.to_base_units().units
-    #     self.to_units(base_units)
+    def to_base_units(self, *, multiplicative_conversion: bool = True) -> None:
+        """
+        Convert the signal and uncertainties to the pint *base units* of `self.units`.
+
+        Notes
+        -----
+        - This is an in-place operation.
+        - For offset / non-multiplicative units (e.g. degC <-> K), this will raise unless
+          explicit support is implemented (see `to_units`).
+        """
+        # Determine the canonical base unit for the current units
+        # (use a Quantity to let pint resolve to_base_units properly)
+        base_units = (1 * self.units).to_base_units().units
+
+        try:
+            self.to_units(base_units, multiplicative_conversion=multiplicative_conversion)
+        except pint.errors.OffsetUnitCalculusError as e:
+            # Offset-unit conversions are affine, not purely multiplicative.
+            raise NotImplementedError(
+                "BaseData.to_base_units() encountered an offset / non-multiplicative unit conversion.\n"
+                "This is not supported yet because uncertainties require explicit rules (e.g. delta units)."
+            ) from e
 
     def to_units(self, new_units: pint.Unit, multiplicative_conversion=True) -> None:
         """

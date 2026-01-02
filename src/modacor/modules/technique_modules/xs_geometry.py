@@ -244,7 +244,7 @@ class XSGeometry(ProcessStep):
             # 0D: no spatial axes, use the detector distance directly.
             x0_bd = BaseData(signal=np.array(0.0), units=px0_bd.units)
             x1_bd = BaseData(signal=np.array(0.0), units=px1_bd.units)
-            r_perp_bd = BaseData(signal=np.array(0.0), units=px0_bd.units)
+            r_perp_bd = BaseData(signal=np.array(0.0), units=px0_bd.units * ureg.pixel)
             R_bd = detector_distance_bd
             logger.debug("XSGeometry: RoD=0, using detector distance directly for R.")
             return x0_bd, x1_bd, r_perp_bd, R_bd
