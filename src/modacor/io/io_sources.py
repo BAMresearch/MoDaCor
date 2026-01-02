@@ -33,7 +33,7 @@ class IoSources:
 
     defined_sources: dict[str, IoSource] = field(factory=dict)
 
-    def register_source(self, source: IoSource, source_reference: str | None = None):
+    def register_source(self, source: IoSource, source_reference: str | None = None) -> None:
         """
         Register a new source class with the given name. If no source_reference is provided, the
         source's own source_reference attribute will be used.

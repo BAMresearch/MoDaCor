@@ -628,6 +628,25 @@ class BaseData(UncertaintyOpsMixin):
         """
         return self.signal.size
 
+    def to_dimensionless(self) -> None:
+        """
+        Convert the signal and uncertainties to dimensionless units if possible.
+        """
+        if not self.is_dimensionless:
+            self.to_units(ureg.dimensionless)
+
+    @property
+    def is_dimensionless(self) -> bool:
+        """
+        Check if the BaseData is dimensionless.
+
+        Returns
+        -------
+        bool :
+            True if the units are dimensionless, False otherwise.
+        """
+        return self.units == ureg.dimensionless
+
     def to_units(self, new_units: pint.Unit, multiplicative_conversion=True) -> None:
         """
         Convert the signal and uncertainties to new units.
@@ -809,6 +828,8 @@ def powered_basedata_element(element: BaseData, exponent: float) -> BaseData:
 
 def log_basedata_element(element: BaseData) -> BaseData:
     """Natural log: y = ln(x), σ_y ≈ |1/x| σ_x. x must be > 0."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.log,
@@ -820,6 +841,8 @@ def log_basedata_element(element: BaseData) -> BaseData:
 
 def exp_basedata_element(element: BaseData) -> BaseData:
     """Exponential: y = exp(x), σ_y ≈ exp(x) σ_x. Argument should be dimensionless."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.exp,
@@ -830,6 +853,8 @@ def exp_basedata_element(element: BaseData) -> BaseData:
 
 def sin_basedata_element(element: BaseData) -> BaseData:
     """Sine: y = sin(x), σ_y ≈ |cos(x)| σ_x. x in radians."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.sin,
@@ -840,6 +865,8 @@ def sin_basedata_element(element: BaseData) -> BaseData:
 
 def cos_basedata_element(element: BaseData) -> BaseData:
     """Cosine: y = cos(x), σ_y ≈ |sin(x)| σ_x. x in radians."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.cos,
@@ -850,6 +877,8 @@ def cos_basedata_element(element: BaseData) -> BaseData:
 
 def tan_basedata_element(element: BaseData) -> BaseData:
     """Tangent: y = tan(x), σ_y ≈ |1/cos^2(x)| σ_x. x in radians."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.tan,
@@ -860,6 +889,8 @@ def tan_basedata_element(element: BaseData) -> BaseData:
 
 def arcsin_basedata_element(element: BaseData) -> BaseData:
     """Arcsin: y = arcsin(x), σ_y ≈ |1/sqrt(1-x^2)| σ_x. x dimensionless, |x| <= 1."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.arcsin,
@@ -871,6 +902,8 @@ def arcsin_basedata_element(element: BaseData) -> BaseData:
 
 def arccos_basedata_element(element: BaseData) -> BaseData:
     """Arccos: y = arccos(x), σ_y ≈ |1/sqrt(1-x^2)| σ_x. x dimensionless, |x| <= 1."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.arccos,
@@ -882,6 +915,8 @@ def arccos_basedata_element(element: BaseData) -> BaseData:
 
 def arctan_basedata_element(element: BaseData) -> BaseData:
     """Arctan: y = arctan(x), σ_y ≈ |1/(1+x^2)| σ_x. x dimensionless."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.arctan,
