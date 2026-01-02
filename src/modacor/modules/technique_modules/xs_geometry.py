@@ -477,7 +477,7 @@ class XSGeometry(ProcessStep):
         )
 
         # 10. Set rank_of_data on outputs and stash in prepared_data
-        for bd in (Q_bd, Q0_bd, Q1_bd, Q2_bd, Psi_bd, theta_bd, Omega_bd):
+        for bd in (Q_bd, Q0_bd, Q1_bd, Q2_bd, Psi_bd, two_theta_bd, Omega_bd):
             bd.rank_of_data = RoD
 
         self._prepared_data = {
@@ -503,9 +503,8 @@ class XSGeometry(ProcessStep):
         with_keys = self.configuration.get("with_processing_keys", [])
         if not with_keys:
             logger.warning("XSGeometry: no with_processing_keys specified; nothing to calculate.")
-            return output
-
-        logger.info(f"XSGeometry: adding geometry outputs to keys={with_keys}")
+        else:
+            logger.info(f"XSGeometry: adding geometry outputs to keys={with_keys}")
 
         for key in with_keys:
             databundle = data.get(key)
