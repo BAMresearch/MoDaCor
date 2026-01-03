@@ -4,14 +4,14 @@
 
 from __future__ import annotations
 
-from modacor.dataclasses.databundle import DataBundle
-
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
 __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "22/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
+
+from modacor.dataclasses.databundle import DataBundle
 
 """
 Tests for the XSGeometry processing step.
@@ -31,7 +31,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
-from modacor.modules.technique_modules.xs_geometry import XSGeometry
+from modacor.modules.technique_modules.scattering.xs_geometry import XSGeometry
 
 # ---------------------------------------------------------------------------
 # Small helpers for building geometry BaseData

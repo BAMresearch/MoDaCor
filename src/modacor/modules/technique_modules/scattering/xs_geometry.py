@@ -181,6 +181,12 @@ class XSGeometry(ProcessStep):
         if RoD == 2 and len(spatial_shape) != 2:
             raise ValueError(f"RoD=2 expects 2D spatial shape, got {spatial_shape}.")
 
+        if pixel_size_bd.units.is_compatible_with(ureg.m / ureg.pixel) is False:
+            logger.warning(
+                f"Pixel size units are {pixel_size_bd.units}, xs_geometry expects pixel size units compatible with"
+                " [m/pixel]."
+            )
+
         logger.debug(
             f"XSGeometry: validated geometry for RoD={RoD}, spatial_shape={spatial_shape}, "
             f"beam_center.size={beam_center_bd.signal.size}, pixel_size.shape={pixel_size_bd.shape}"
