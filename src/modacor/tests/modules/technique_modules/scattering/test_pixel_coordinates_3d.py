@@ -19,7 +19,7 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
-from modacor.modules.technique_modules.scattering.pixel_coordinates_3d_template import (
+from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import (
     CanonicalDetectorFrame,
     PixelCoordinates3DTemplate,
 )
