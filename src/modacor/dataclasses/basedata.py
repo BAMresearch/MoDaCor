@@ -460,6 +460,9 @@ class UncertaintyOpsMixin:
     def reciprocal(self) -> BaseData:
         return reciprocal_basedata_element(self)
 
+    def squeeze(self) -> BaseData:
+        return squeeze_basedata_element(self)
+
 
 @define
 class BaseData(UncertaintyOpsMixin):
@@ -802,6 +805,16 @@ class BaseData(UncertaintyOpsMixin):
 # ---------------------------------------------------------------------------
 # Unary operations built on the generic helper
 # ---------------------------------------------------------------------------
+
+
+def squeeze_basedata_element(element: BaseData) -> BaseData:
+    """Squeeze: remove single-dimensional entries from the shape of the signal."""
+    result = BaseData(
+        signal=np.squeeze(element.signal),
+        units=element.units,
+        uncertainties={k: np.squeeze(v) for k, v in element.uncertainties.items()},
+    )
+    return _inherit_metadata(element, result)
 
 
 def negate_basedata_element(element: BaseData) -> BaseData:
