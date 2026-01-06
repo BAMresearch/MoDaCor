@@ -13,13 +13,13 @@ __date__ = "22/10/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-__all__ = ["HDFLoader"]
+__all__ = ["HDFSource"]
 
-from logging import WARNING
 from pathlib import Path
 
 import h5py
 import numpy as np
+from attrs import define, field, validators
 
 from modacor.dataclasses.messagehandler import MessageHandler
 
@@ -29,17 +29,30 @@ from modacor.io.io_source import ArraySlice
 from ..io_source import IoSource
 
 
-class HDFLoader(IoSource):
-    _data_cache: dict[str, np.ndarray] = None
-    _file_path: Path | None = None
-    _static_metadata_cache: dict[str, Any] = None
+@define(kw_only=True)
+class HDFSource(IoSource):
+    resource_location: Path | str | None = field(
+        init=True, default=None, validator=validators.optional(validators.instance_of((Path, str)))
+    )
+    _data_cache: dict[str, np.ndarray] = field(init=False, factory=dict, validator=validators.instance_of(dict))
+    _file_path: Path | None = field(
+        init=False, default=None, validator=validators.optional(validators.instance_of(Path))
+    )
+    _file_datasets_shapes: dict[str, tuple[int, ...]] = field(
+        init=False, factory=dict, validator=validators.instance_of(dict)
+    )
+    _file_datasets_dtypes: dict[str, np.dtype] = field(init=False, factory=dict, validator=validators.instance_of(dict))
+    _static_metadata_cache: dict[str, Any] = field(init=False, factory=dict, validator=validators.instance_of(dict))
+    logger: MessageHandler = field(init=False)
 
-    def __init__(self, source_reference: str, logging_level=WARNING, resource_location: Path | str | None = None):
-        super().__init__(source_reference=source_reference)
-        self.logger = MessageHandler(level=logging_level, name="HDFLoader")
-        self._file_path = Path(resource_location) if resource_location is not None else None
-        # self._file_reference = None  # let's not leave open file references lying around if we can help it.
-        self._file_datasets = []
+    # source_reference comes from IoSource
+    # iosource_method_kwargs comes from IoSource
+
+    def __attrs_post_init__(self):
+        # super().__init__(source_reference=source_reference)
+        self.logger = MessageHandler(level=self.logging_level, name="HDFSource")
+        self._file_path = Path(self.resource_location) if self.resource_location is not None else None
+        # self._file_datasets = []
         self._file_datasets_shapes = {}
         self._file_datasets_dtypes = {}
         self._data_cache = {}
@@ -61,7 +74,7 @@ class HDFLoader(IoSource):
         the datasets within
         """
         if isinstance(path_object, h5py._hl.dataset.Dataset):
-            self._file_datasets.append(path_name)
+            # self._file_datasets.append(path_name)
             self._file_datasets_shapes[path_name] = path_object.shape
             self._file_datasets_dtypes[path_name] = path_object.dtype
 
