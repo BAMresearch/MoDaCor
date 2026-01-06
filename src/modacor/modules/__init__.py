@@ -13,7 +13,9 @@ __status__ = "Development"  # "Development", "Production"
 
 # official steps are imported here for ease
 from modacor.modules.base_modules.divide import Divide
+from modacor.modules.base_modules.find_scale_factor1d import FindScaleFactor1D
 from modacor.modules.base_modules.multiply import Multiply
+from modacor.modules.base_modules.multiply_databundles import MultiplyDatabundles
 from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertainties
 from modacor.modules.base_modules.reduce_dimensionality import ReduceDimensionality
 from modacor.modules.base_modules.subtract import Subtract
@@ -27,7 +29,9 @@ __all__ = [
     "Divide",
     "IndexPixels",
     "IndexedAverager",
+    "FindScaleFactor1D",
     "Multiply",
+    "MultiplyDatabundles",
     "PoissonUncertainties",
     "ReduceDimensionality",
     "SolidAngleCorrection",
