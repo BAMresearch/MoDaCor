@@ -48,7 +48,7 @@ class AppendSource(ProcessStep):
             "source_location",  # The ioSource path or other location identifier of the object to append to the IoSources. Can be a string or list of strings for multiple sources
             "iosource_module",  # The fully qualified import path to the module to load the source_location into an ioSource object, e.g. 'modacor.io.yaml.yaml_source.YAMLSource' or 'modacor.io.hdf.hdf_source.HDFSource'. Choose only one.
         ],
-        calling_arguments={
+        default_configuration={
             "source_identifier": "",
             "source_location": "",
             "iosource_module": "",

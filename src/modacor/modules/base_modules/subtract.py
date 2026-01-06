@@ -34,7 +34,7 @@ class Subtract(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
-        calling_arguments={
+        default_configuration={
             "subtrahend_source": None,  # IoSources key for signal
             "subtrahend_units_source": None,  # IoSources key for units
             "subtrahend_uncertainties_sources": {},  # dict of uncertainty name: source, or 'propagate_to_all': source

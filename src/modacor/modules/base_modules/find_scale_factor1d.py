@@ -194,7 +194,7 @@ class FindScaleFactor1D(ProcessStep):
             "scale_factor": ["signal", "uncertainties", "units"],
             "scale_background": ["signal", "uncertainties", "units"],
         },
-        calling_arguments={
+        default_configuration={
             "signal_key": "signal",
             "independent_axis_key": "Q",
             "scale_output_key": "scale_factor",

@@ -126,7 +126,7 @@ class IndexPixels(ProcessStep):
             "with_processing_keys",
             "averaging_direction",
         ],
-        calling_arguments={
+        default_configuration={
             "with_processing_keys": None,
             "averaging_direction": "radial",
             "q_min": None,

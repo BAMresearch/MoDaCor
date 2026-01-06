@@ -14,7 +14,7 @@ __status__ = "Development"  # "Development", "Production"
 from pathlib import Path
 from typing import Any
 
-from attrs import define, field
+from attrs import define, evolve, field
 from attrs import validators as v
 
 __all__ = ["ProcessStepDescriber"]
@@ -26,17 +26,9 @@ NXCite = str
 def validate_required_keys(instance, attribute, value):
     # keys = [key.strip() for key in value.keys()]
     keys = [key.strip() for key in instance.required_arguments]
-    missing = [key for key in keys if key not in instance.calling_arguments]
+    missing = [key for key in keys if key not in instance.default_configuration]
     if missing:
-        raise ValueError(f"Missing required argument keys in calling_arguments: {missing}")
-
-
-def validate_required_data_keys(instance, attribute, value):
-    # keys = [key.strip() for key in value.keys()]
-    keys = [key.strip() for key in instance.documentation.required_data_keys]
-    missing = [key for key in keys if key not in instance.data.data]
-    if missing:
-        raise ValueError(f"Missing required data keys in instance.data: {missing}")
+        raise ValueError(f"Missing required argument keys in default_configuration: {missing}")
 
 
 @define
@@ -49,7 +41,7 @@ class ProcessStepDescriber:
     calling_version: str = field()  # module version being executed
     required_data_keys: list[str] = field(factory=list)  # list of data keys required by the process
     required_arguments: list[str] = field(factory=list)  # list of argument key-val combos required by the process
-    calling_arguments: dict[str, Any] = field(factory=dict, validator=validate_required_keys)
+    default_configuration: dict[str, Any] = field(factory=dict, validator=validate_required_keys)
     modifies: dict[str, list] = field(
         factory=dict, validator=v.instance_of(dict)
     )  # which aspects of BaseData are modified by this
@@ -68,5 +60,5 @@ class ProcessStepDescriber:
     # # on first run, and reused on subsequent runs. Maybe two chaches, one for per-file and
     # # one for per-execution.
 
-    def copy(self) -> ProcessStepDescriber:
-        raise NotImplementedError()
+    def copy(self) -> "ProcessStepDescriber":
+        return evolve(self)

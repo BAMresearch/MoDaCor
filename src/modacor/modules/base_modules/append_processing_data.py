@@ -73,7 +73,7 @@ class AppendProcessingData(ProcessStep):
             "signal_location",  # Data identifier to read from, '<io_source_id>::<dataset_path>'. Must be a string.
             "rank_of_data",  # Rank of the created BaseData array. int or str (io_source location).
         ],
-        calling_arguments={
+        default_configuration={
             "processing_key": "",  # must be set by the user
             "signal_location": "",  # must be set by the user
             "rank_of_data": 2,
