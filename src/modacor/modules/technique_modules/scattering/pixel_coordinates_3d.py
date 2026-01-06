@@ -21,6 +21,7 @@ __all__ = ["CanonicalDetectorFrame", "PixelCoordinates3D"]
 from typing import Dict, Tuple
 
 import numpy as np
+import pint
 from attrs import define
 
 from modacor import ureg
@@ -34,51 +35,46 @@ logger = MessageHandler(name=__name__)
 def prepare_detector_coordinate(
     bd: BaseData,
     uncertainty_key: str = "detector_position_jitter",
+    require_units: pint.Unit = ureg.m,
 ) -> BaseData:
-    """
-    Prepare detector coordinate BaseData by:
-      - verifying units, must be length units
-      - weighted averaging (using basedata.weights) over non-scalar inputs to produce scalar output with standard error uncertainty
+    if not bd.units.is_compatible_with(require_units):
+        raise ValueError(f"Detector coordinate must be in {require_units}, got {bd.units}")
 
-    Parameters
-    ----------
-    bd : BaseData
-        Detector coordinate in length units.
-    pixel_pitch : BaseData
-        Pixel pitch in length/pixel for this coordinate direction.
-    uncertainty_key : str, optional
-        Uncertainty key to use for standard error on mean, by default "detector_position_jitter".
-
-    Returns
-    -------
-    BaseData
-        Detector coordinate in length units (scalar).
-    """
-    if not bd.units.is_compatible_with(ureg.m):
-        raise ValueError(f"Detector coordinate must be in length units, got {bd.units}")
-
-    if np.size(bd.signal) == 1:
-        out = bd.squeeze().copy()
+    bd_sq = bd.squeeze()
+    if np.size(bd_sq.signal) == 1:
+        out = bd_sq.copy()
         out.rank_of_data = 0
         return out
 
-    x = np.asarray(bd.signal, dtype=float).ravel()
-    w = np.asarray(bd.weights, dtype=float).ravel() if bd.weights is not None else np.ones_like(x)
+    x = np.asarray(bd_sq.signal, dtype=float).ravel()
 
-    wsum = np.sum(w)
-    if wsum <= 0:
+    if bd_sq.weights is None:
+        w = np.ones_like(x)
+    else:
+        w = np.asarray(bd_sq.weights, dtype=float).ravel()
+        # IMPORTANT: scalar/(1,) weights must broadcast to all samples
+        if w.size == 1:
+            w = np.full_like(x, float(w[0]))
+        elif w.size != x.size:
+            raise ValueError(f"Detector coordinate weights must match data size: got {w.size}, expected {x.size}")
+
+    wsum = float(np.sum(w))
+    if wsum <= 0.0:
         raise ValueError("Detector coordinate weights must sum to > 0")
 
-    mean = np.sum(w * x) / wsum
-    # "effective N" for SEM
-    n_eff = (wsum**2) / np.sum(w**2)
-    # weighted variance (about the weighted mean)
-    var = np.sum(w * (x - mean) ** 2) / wsum
-    sem = np.sqrt(var) / np.sqrt(n_eff)
+    mean = float(np.sum(w * x) / wsum)
+
+    # effective sample size for SEM
+    n_eff = float((wsum**2) / np.sum(w**2))
+    if n_eff <= 0.0:
+        raise ValueError("Effective sample size must be > 0")
+
+    var = float(np.sum(w * (x - mean) ** 2) / wsum)  # weighted population variance
+    sem = float(np.sqrt(var) / np.sqrt(n_eff))
 
     return BaseData(
         signal=np.array(mean, dtype=float),
-        units=bd.units,
+        units=bd_sq.units,
         uncertainties={uncertainty_key: np.array(sem, dtype=float)},
         rank_of_data=0,
     )
@@ -104,33 +100,31 @@ class CanonicalDetectorFrame:
     Origin of the detector is at pixel with index (0,0).
     """
 
-    det_coord_z: BaseData  # typically BaseData with signal z_det. units of length. anything larger than scalar is averaged, resulting in mean and standard error on mean uncertainty
-    det_coord_x: BaseData  # typically BaseData with signal x_det. units of length. anything larger than scalar is averaged, resulting in mean and standard error on mean uncertainty
-    det_coord_y: BaseData  # typically BaseData with signal y_det. units of length. anything larger than scalar is averaged, resulting in mean and standard error on mean uncertainty
+    det_coord_z: BaseData
+    det_coord_x: BaseData
+    det_coord_y: BaseData
 
-    e_fast: np.ndarray  # shape (3,), typically np.array([1,0,0])
-    e_slow: np.ndarray  # shape (3,), typically np.array([0,1,0])
-    e_normal: np.ndarray  # shape (3,), typically np.array([0,0,1]). Can be used to flip the detector readout orientation by setting to np.array([0,0,-1])
+    e_fast: np.ndarray
+    e_slow: np.ndarray
+    e_normal: np.ndarray
 
-    pixel_pitch_slow: BaseData  # scalar, units length/pixel
-    pixel_pitch_fast: BaseData  # scalar, units length/pixel
+    pixel_pitch_slow: BaseData
+    pixel_pitch_fast: BaseData
 
     def __attrs_post_init__(self):
-        # validate and prepare coordinates
+        object.__setattr__(self, "det_coord_z", prepare_detector_coordinate(self.det_coord_z, require_units=ureg.m))
+        object.__setattr__(self, "det_coord_x", prepare_detector_coordinate(self.det_coord_x, require_units=ureg.m))
+        object.__setattr__(self, "det_coord_y", prepare_detector_coordinate(self.det_coord_y, require_units=ureg.m))
+
         object.__setattr__(
             self,
-            "det_coord_z",
-            prepare_detector_coordinate(self.det_coord_z),
+            "pixel_pitch_slow",
+            prepare_detector_coordinate(self.pixel_pitch_slow, require_units=ureg.m / ureg.pixel),
         )
         object.__setattr__(
             self,
-            "det_coord_x",
-            prepare_detector_coordinate(self.det_coord_x),
-        )
-        object.__setattr__(
-            self,
-            "det_coord_y",
-            prepare_detector_coordinate(self.det_coord_y),
+            "pixel_pitch_fast",
+            prepare_detector_coordinate(self.pixel_pitch_fast, require_units=ureg.m / ureg.pixel),
         )
 
 
@@ -220,8 +214,12 @@ class PixelCoordinates3D(ProcessStep):
         det_coord_x = prepare_detector_coordinate(self._load_from_sources("det_coord_x"))  # scalar length
         det_coord_y = prepare_detector_coordinate(self._load_from_sources("det_coord_y"))  # scalar length
 
-        pitch_slow = self._load_from_sources("pixel_pitch_slow")  # scalar length/pixel
-        pitch_fast = self._load_from_sources("pixel_pitch_fast")  # scalar length/pixel
+        pitch_slow = prepare_detector_coordinate(
+            self._load_from_sources("pixel_pitch_slow"), require_units=ureg.m / ureg.pixel
+        )  # scalar length/pixel
+        pitch_fast = prepare_detector_coordinate(
+            self._load_from_sources("pixel_pitch_fast"), require_units=ureg.m / ureg.pixel
+        )  # scalar length/pixel
 
         e_fast = self._unit(self.configuration.get("basis_fast", (1.0, 0.0, 0.0)))
         e_slow = self._unit(self.configuration.get("basis_slow", (0.0, 1.0, 0.0)))
@@ -366,7 +364,7 @@ class PixelCoordinates3D(ProcessStep):
 
         ref_signal: BaseData = self.processing_data[with_keys[0]]["signal"]
 
-        RoD = self._effective_rank_of_data(ref_signal)
+        RoD = ref_signal.rank_of_data
         if RoD not in (0, 1, 2):
             raise NotImplementedError(
                 f"PixelCoordinates3D: only RoD in (0, 1, 2) supported; got RoD={RoD}."  # noqa: E702
