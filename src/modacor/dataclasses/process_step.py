@@ -78,7 +78,7 @@ class ProcessStep:
 
     # a message handler, supporting logging, warnings, errors, etc. emitted by the process
     # during execution
-    message_handler: MessageHandler = field(factory=MessageHandler, validator=v.instance_of(MessageHandler))
+    logger: MessageHandler = field(factory=MessageHandler, validator=v.instance_of(MessageHandler))
 
     # internal variables:
     __prepared: bool = field(default=False, validator=v.instance_of(bool))

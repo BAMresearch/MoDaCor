@@ -4,6 +4,14 @@
 
 from __future__ import annotations
 
+__coding__ = "utf-8"
+__authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
+__copyright__ = "Copyright 2025, The MoDaCor team"
+__date__ = "30/11/2025"
+__status__ = "Development"  # "Development", "Production"
+# end of header and standard imports
+__version__ = "20251130.1"
+
 """
 Tests for the IndexedAverager processing step.
 
@@ -24,7 +32,7 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
-from modacor.modules.technique_modules.indexed_averager import IndexedAverager
+from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
 
 # ---------------------------------------------------------------------------
 # Small helpers to build simple test databundles

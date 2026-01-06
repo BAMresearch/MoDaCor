@@ -34,7 +34,7 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
-from modacor.modules.technique_modules.index_pixels import IndexPixels
+from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
 
 # ---------------------------------------------------------------------------
 # Small helpers

@@ -43,10 +43,10 @@ def _path_to_module_name(py_file: Path, package_root: Path) -> str:
 
     Example
     -------
-    py_file      = /.../modacor/modules/technique_modules/xs_geometry.py
+    py_file      = /.../modacor/modules/technique_modules/scattering/xs_geometry.py
     package_root = /.../modacor
 
-    -> "modacor.modules.technique_modules.xs_geometry"
+    -> "modacor.modules.technique_modules.scattering.xs_geometry"
     """
     rel = py_file.with_suffix("").relative_to(package_root)
     return ".".join((package_root.name, *rel.parts))
@@ -69,7 +69,7 @@ def find_module(modules_root: Path, module_name: str) -> str:
     -------
     str
         Fully-qualified module path, e.g.
-        "modacor.modules.technique_modules.xs_geometry".
+        "modacor.modules.technique_modules.scattering.xs_geometry".
 
     Raises
     ------

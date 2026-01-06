@@ -20,10 +20,14 @@ from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertaint
 from modacor.modules.base_modules.reduce_dimensionality import ReduceDimensionality
 from modacor.modules.base_modules.subtract import Subtract
 from modacor.modules.base_modules.subtract_databundles import SubtractDatabundles
-from modacor.modules.technique_modules.index_pixels import IndexPixels
-from modacor.modules.technique_modules.indexed_averager import IndexedAverager
-from modacor.modules.technique_modules.solid_angle_correction import SolidAngleCorrection
-from modacor.modules.technique_modules.xs_geometry import XSGeometry
+from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
+from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
+from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
+from modacor.modules.technique_modules.scattering.solid_angle_correction import SolidAngleCorrection
+from modacor.modules.technique_modules.scattering.xs_geometry import XSGeometry
+from modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordinates import (
+    XSGeometryFromPixelCoordinates,
+)
 
 __all__ = [
     "Divide",
@@ -32,10 +36,12 @@ __all__ = [
     "FindScaleFactor1D",
     "Multiply",
     "MultiplyDatabundles",
+    "PixelCoordinates3D",
     "PoissonUncertainties",
     "ReduceDimensionality",
     "SolidAngleCorrection",
     "SubtractDatabundles",
     "Subtract",
     "XSGeometry",
+    "XSGeometryFromPixelCoordinates",
 ]

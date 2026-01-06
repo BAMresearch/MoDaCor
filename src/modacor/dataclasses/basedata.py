@@ -156,81 +156,129 @@ def _binary_basedata_op(
     Apply a binary arithmetic operation to two BaseData objects, propagating
     uncertainties using standard first-order, uncorrelated error propagation.
 
-    Rules:
-    - result = op(A, B), where A = left.signal * left.units, B = right.signal * right.units
-    - For each uncertainty key present on `left`:
-        * If `right` has the same key, use that.
-        * Else, if `right` has 'propagate_to_all', use that.
-        * Else, result.uncertainties[key] = NaN.
-    - Binary formulas:
-        * Addition / subtraction:
-            σ_result^2 = σ_A^2 + σ_B^2  (σ_A, σ_B in the same units as the result)
-        * Multiplication / division:
-            σ_result / |result| = sqrt( (σ_A / A)^2 + (σ_B / B)^2 )
+    Semantics
+    ---------
+    - Uncertainty dict entries are treated as independent sources keyed by name.
+    - "propagate_to_all" is treated as a *global fallback* only when it is the sole key
+      on an operand. Otherwise it is treated like a normal key name and participates via
+      rule 4 (union, no cross-key combining).
+
+    Rules for result uncertainty keys:
+    1) If both operands have only "propagate_to_all":
+         result.uncertainties = {"propagate_to_all": σ}
+    2) If exactly one operand has only "propagate_to_all" and the other has non-global keys:
+         result.uncertainties contains only the other operand's non-global keys.
+         The global term contributes into each of those keys.
+    3) Matching non-global keys propagate and combine by key.
+    4) Non-matching non-global keys: transfer/propagate each key independently into the result
+         (union of keys), without cross-key combining.
+
+    Propagation formulas (uncorrelated, first-order)
+    -----------------------------------------------
+    Let A = left.signal * left.units, B = right.signal * right.units, R = op(A, B).
+    Using magnitudes A_val, B_val and absolute σA, σB:
+
+    - Add/Sub:   σR² = σA² + σB²  (after converting σA, σB to result units)
+    - Mul:       σR² = (B σA)² + (A σB)²
+    - Div:       σR² = (σA/B)² + (A σB/B²)²
     """
-    # Let pint handle dimensional checks and broadcasting for the nominal values
+    # Nominal result (pint handles unit logic & broadcasting)
     A_q = left.signal * left.units
     B_q = right.signal * right.units
-    base_result = op(A_q, B_q)  # pint.Quantity
-    base_signal = np.asarray(base_result.magnitude)
+    base_result = op(A_q, B_q)
+    base_signal = np.asarray(base_result.magnitude, dtype=float)
     result_units = base_result.units
+    out_shape = base_signal.shape
 
-    # Pre-allocate result uncertainties for all keys present on left
-    result = BaseData(
-        signal=base_signal,
-        units=result_units,
-        uncertainties={key: np.full(base_signal.shape, np.nan, dtype=float) for key in left.uncertainties.keys()},
-    )
+    # Broadcast nominal magnitudes to the result shape
+    A_val = np.broadcast_to(np.asarray(left.signal, dtype=float), out_shape)
+    B_val = np.broadcast_to(np.asarray(right.signal, dtype=float), out_shape)
 
-    propagate_all = right.uncertainties.get("propagate_to_all", None)
+    left_unc = left.uncertainties
+    right_unc = right.uncertainties
 
-    # Broadcast signals to the result shape (pure magnitudes)
-    A_val = np.broadcast_to(np.asarray(left.signal, dtype=float), base_signal.shape)
-    B_val = np.broadcast_to(np.asarray(right.signal, dtype=float), base_signal.shape)
+    # "global-only" if and only if propagate_to_all is the sole key
+    left_global = left_unc.get("propagate_to_all") if set(left_unc.keys()) == {"propagate_to_all"} else None
+    right_global = right_unc.get("propagate_to_all") if set(right_unc.keys()) == {"propagate_to_all"} else None
 
-    # For multiplication / division, we need |result| as magnitudes for relative errors
-    R_val = np.asarray(base_signal, dtype=float)
+    left_non_global_keys = set(left_unc.keys()) - {"propagate_to_all"}
+    right_non_global_keys = set(right_unc.keys()) - {"propagate_to_all"}
 
-    for key in result.uncertainties.keys():
-        left_err = left.uncertainties.get(key)
-        if left_err is None:
-            # no uncertainty on left for this key
-            continue
+    # Decide output keys per rules
+    if left_global is not None and right_global is not None:
+        out_keys = {"propagate_to_all"}
+        drop_global_key = False  # we *do* want it
+    elif left_global is not None and right_non_global_keys:
+        out_keys = set(right_non_global_keys)
+        drop_global_key = True
+    elif right_global is not None and left_non_global_keys:
+        out_keys = set(left_non_global_keys)
+        drop_global_key = True
+    else:
+        # General case: union of non-global keys
+        out_keys = left_non_global_keys | right_non_global_keys
+        drop_global_key = True  # we never emit propagate_to_all unless both-global-only
 
-        right_err = right.uncertainties.get(key, propagate_all)
-        if right_err is None:
-            # neither matching key nor propagate_to_all on right → leave NaN
-            continue
+    def _as_broadcast_float(err: Any) -> np.ndarray:
+        arr = np.asarray(err, dtype=float)
+        return np.broadcast_to(arr, out_shape)
 
-        # Turn uncertainties into broadcastable float arrays
-        left_err_arr = np.asarray(left_err, dtype=float)
-        right_err_arr = np.asarray(right_err, dtype=float)
+    def _get_err(unc_map: Dict[str, np.ndarray], key: str, global_err: Any | None) -> Any:
+        """Return uncertainty for `key`, falling back to global_err if provided, else 0."""
+        if key in unc_map:
+            return unc_map[key]
+        if global_err is not None:
+            return global_err
+        return 0.0
 
-        left_err_b = np.broadcast_to(left_err_arr, base_signal.shape)
-        right_err_b = np.broadcast_to(right_err_arr, base_signal.shape)
+    # Precompute unit conversion factors (magnitudes)
+    if op in (operator.add, operator.sub):
+        cf_A = result_units.m_from(left.units)
+        cf_B = result_units.m_from(right.units)
 
-        if op in (operator.add, operator.sub):
-            # Addition / subtraction: σ_result^2 = σ_A^2 + σ_B^2
-            # Make sure σ_A and σ_B are in the same units as the result
-            sigma_A_q = (left_err_b * left.units).to(result_units)
-            sigma_B_q = (right_err_b * right.units).to(result_units)
-            sigma = np.sqrt(sigma_A_q.magnitude**2 + sigma_B_q.magnitude**2)
-        elif op in (operator.mul, operator.truediv):
-            # Multiplication / division:
-            #   σ_result / |result| = sqrt((σ_A / A)^2 + (σ_B / B)^2)
-            # with A, B and their σ in consistent units → ratio is dimensionless.
-            with np.errstate(divide="ignore", invalid="ignore"):
-                rel_A = np.where(A_val == 0.0, 0.0, left_err_b / A_val)
-                rel_B = np.where(B_val == 0.0, 0.0, right_err_b / B_val)
+        result_unc: Dict[str, np.ndarray] = {}
+        for key in out_keys:
+            sigma_A = _as_broadcast_float(_get_err(left_unc, key, left_global)) * cf_A
+            sigma_B = _as_broadcast_float(_get_err(right_unc, key, right_global)) * cf_B
+            result_unc[key] = np.sqrt(sigma_A**2 + sigma_B**2)
 
-            rel_R = np.sqrt(rel_A**2 + rel_B**2)
-            sigma = rel_R * np.abs(R_val)
-        else:
-            raise NotImplementedError(f"Operation {op} not supported in _binary_basedata_op")  # noqa: E713
+    elif op is operator.mul:
+        # Convert from left.units * right.units to result_units
+        cf_AB = result_units.m_from(left.units * right.units)
 
-        result.uncertainties[key] = sigma
+        result_unc = {}
+        for key in out_keys:
+            sigma_A = _as_broadcast_float(_get_err(left_unc, key, left_global))
+            sigma_B = _as_broadcast_float(_get_err(right_unc, key, right_global))
+            termA = (B_val * sigma_A) * cf_AB
+            termB = (A_val * sigma_B) * cf_AB
+            result_unc[key] = np.sqrt(termA**2 + termB**2)
 
-    # Inherit metadata (axes, rank_of_data, weights) from the left operand
+    elif op is operator.truediv:
+        # Convert from left.units / right.units to result_units
+        cf_A_div_B = result_units.m_from(left.units / right.units)
+
+        result_unc = {}
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            for key in out_keys:
+                sigma_A = _as_broadcast_float(_get_err(left_unc, key, left_global))
+                sigma_B = _as_broadcast_float(_get_err(right_unc, key, right_global))
+
+                termA = (sigma_A / B_val) * cf_A_div_B
+                termB = (A_val * sigma_B / (B_val**2)) * cf_A_div_B
+                sigma = np.sqrt(termA**2 + termB**2)
+
+                # Division by zero -> undefined uncertainty
+                sigma = np.where(B_val == 0.0, np.nan, sigma)
+                result_unc[key] = sigma
+    else:
+        raise NotImplementedError(f"Operation {op} not supported in _binary_basedata_op")  # noqa: E713
+
+    # Only emit propagate_to_all in the both-global-only case
+    if drop_global_key:
+        result_unc.pop("propagate_to_all", None)
+
+    result = BaseData(signal=base_signal, units=result_units, uncertainties=result_unc)
     return _inherit_metadata(left, result)
 
 
@@ -412,6 +460,9 @@ class UncertaintyOpsMixin:
     def reciprocal(self) -> BaseData:
         return reciprocal_basedata_element(self)
 
+    def squeeze(self) -> BaseData:
+        return squeeze_basedata_element(self)
+
 
 @define
 class BaseData(UncertaintyOpsMixin):
@@ -428,13 +479,33 @@ class BaseData(UncertaintyOpsMixin):
     units : pint.Unit
         Physical units of `signal*scaling` and their uncertainties.
     uncertainties : Dict[str, np.ndarray]
-        Uncertainty (as one‐sigma standard deviation) arrays keyed by type (e.g., “poisson”,
-        “SEM”). Each array must broadcast to `signal.shape`. Variances are computed as
-        `uncertainties[k]**2`.
-        Uncertainty propagation in operations that combine BaseData elements will try to
-        apply the incoming uncertainties by matched key,
-        If only a single uncertainty is found (that should be named 'propagate_to_all'), it will be
-        applied to all uncertainties.
+        Uncertainty (as one‐sigma standard deviation) arrays keyed by type (e.g. "Poisson",
+        "pixel_index"). Each array must broadcast to ``signal.shape``. Variances are computed
+        as ``uncertainties[k]**2``.
+
+        Binary operations propagate uncertainties using first-order, uncorrelated propagation.
+        Keys are treated as *independent sources*.
+
+        Special key: ``"propagate_to_all"``
+        ---------------------------------
+        ``"propagate_to_all"`` is treated as a *global* uncertainty **only when it is the sole
+        key present** on an operand.
+
+        The propagation rules for an operation ``result = op(a, b)`` are:
+
+        1. If both operands only contain ``"propagate_to_all"``, the result contains only
+           ``"propagate_to_all"`` (propagated normally).
+
+        2. If one operand only contains ``"propagate_to_all"`` and the other contains one or
+           more non-``"propagate_to_all"`` keys, the result contains only those non-global keys.
+           The global uncertainty contributes as a fallback term to each of those keys.
+
+        3. If both operands contain matching non-global keys, those keys are propagated and
+           combined by key.
+
+        4. If both operands contain non-global keys but with no matches, the result contains
+           the union of keys, and each key is propagated from its originating operand only
+           (no cross-key combining).
     weights : np.ndarray, optional
         Weights for `signal` (default is a scaling 1.0) for use in averaging operations.
         Must broadcast to `signal.shape`.
@@ -460,6 +531,10 @@ class BaseData(UncertaintyOpsMixin):
     to_units(new_units: pint.Unit):
         Converts internal `signal` and all `uncertainties` to `new_units` if compatible with
         the existing `units`. Raises `TypeError` or `ValueError` on invalid input.
+    to_base_units(): Converts internal signal and uncertainties to the base units implied by current units.
+    to_dimensionless(): Converts internal signal and uncertainties to dimensionless units if possible.
+    is_dimensionless() -> bool:
+        Returns True if `units` is dimensionless, False otherwise.
     """
 
     # required:
@@ -559,6 +634,48 @@ class BaseData(UncertaintyOpsMixin):
             The size of the signal.
         """
         return self.signal.size
+
+    def to_dimensionless(self) -> None:
+        """
+        Convert the signal and uncertainties to dimensionless units if possible.
+        """
+        if not self.is_dimensionless:
+            self.to_units(ureg.dimensionless)
+
+    @property
+    def is_dimensionless(self) -> bool:
+        """
+        Check if the BaseData is dimensionless.
+
+        Returns
+        -------
+        bool :
+            True if the units are dimensionless, False otherwise.
+        """
+        return self.units == ureg.dimensionless
+
+    def to_base_units(self, *, multiplicative_conversion: bool = True) -> None:
+        """
+        Convert the signal and uncertainties to the pint *base units* of `self.units`.
+
+        Notes
+        -----
+        - This is an in-place operation.
+        - For offset / non-multiplicative units (e.g. degC <-> K), this will raise unless
+          explicit support is implemented (see `to_units`).
+        """
+        # Determine the canonical base unit for the current units
+        # (use a Quantity to let pint resolve to_base_units properly)
+        base_units = (1 * self.units).to_base_units().units
+
+        try:
+            self.to_units(base_units, multiplicative_conversion=multiplicative_conversion)
+        except pint.errors.OffsetUnitCalculusError as e:
+            # Offset-unit conversions are affine, not purely multiplicative.
+            raise NotImplementedError(
+                "BaseData.to_base_units() encountered an offset / non-multiplicative unit conversion.\n"
+                "This is not supported yet because uncertainties require explicit rules (e.g. delta units)."
+            ) from e
 
     def to_units(self, new_units: pint.Unit, multiplicative_conversion=True) -> None:
         """
@@ -690,6 +807,16 @@ class BaseData(UncertaintyOpsMixin):
 # ---------------------------------------------------------------------------
 
 
+def squeeze_basedata_element(element: BaseData) -> BaseData:
+    """Squeeze: remove single-dimensional entries from the shape of the signal."""
+    result = BaseData(
+        signal=np.squeeze(element.signal),
+        units=element.units,
+        uncertainties={k: np.squeeze(v) for k, v in element.uncertainties.items()},
+    )
+    return _inherit_metadata(element, result)
+
+
 def negate_basedata_element(element: BaseData) -> BaseData:
     """Negate a BaseData element with uncertainty and units propagation."""
     result = BaseData(
@@ -741,6 +868,8 @@ def powered_basedata_element(element: BaseData, exponent: float) -> BaseData:
 
 def log_basedata_element(element: BaseData) -> BaseData:
     """Natural log: y = ln(x), σ_y ≈ |1/x| σ_x. x must be > 0."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.log,
@@ -752,6 +881,8 @@ def log_basedata_element(element: BaseData) -> BaseData:
 
 def exp_basedata_element(element: BaseData) -> BaseData:
     """Exponential: y = exp(x), σ_y ≈ exp(x) σ_x. Argument should be dimensionless."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.exp,
@@ -762,6 +893,8 @@ def exp_basedata_element(element: BaseData) -> BaseData:
 
 def sin_basedata_element(element: BaseData) -> BaseData:
     """Sine: y = sin(x), σ_y ≈ |cos(x)| σ_x. x in radians."""
+    # ensure element is in radian:
+    element.to_units(ureg.radian)
     return _unary_basedata_op(
         element=element,
         func=np.sin,
@@ -772,6 +905,8 @@ def sin_basedata_element(element: BaseData) -> BaseData:
 
 def cos_basedata_element(element: BaseData) -> BaseData:
     """Cosine: y = cos(x), σ_y ≈ |sin(x)| σ_x. x in radians."""
+    # ensure element is in radian:
+    element.to_units(ureg.radian)
     return _unary_basedata_op(
         element=element,
         func=np.cos,
@@ -782,6 +917,8 @@ def cos_basedata_element(element: BaseData) -> BaseData:
 
 def tan_basedata_element(element: BaseData) -> BaseData:
     """Tangent: y = tan(x), σ_y ≈ |1/cos^2(x)| σ_x. x in radians."""
+    # ensure element is in radian:
+    element.to_units(ureg.radian)
     return _unary_basedata_op(
         element=element,
         func=np.tan,
@@ -792,6 +929,8 @@ def tan_basedata_element(element: BaseData) -> BaseData:
 
 def arcsin_basedata_element(element: BaseData) -> BaseData:
     """Arcsin: y = arcsin(x), σ_y ≈ |1/sqrt(1-x^2)| σ_x. x dimensionless, |x| <= 1."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.arcsin,
@@ -803,6 +942,8 @@ def arcsin_basedata_element(element: BaseData) -> BaseData:
 
 def arccos_basedata_element(element: BaseData) -> BaseData:
     """Arccos: y = arccos(x), σ_y ≈ |1/sqrt(1-x^2)| σ_x. x dimensionless, |x| <= 1."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.arccos,
@@ -814,6 +955,8 @@ def arccos_basedata_element(element: BaseData) -> BaseData:
 
 def arctan_basedata_element(element: BaseData) -> BaseData:
     """Arctan: y = arctan(x), σ_y ≈ |1/(1+x^2)| σ_x. x dimensionless."""
+    # ensure element is dimensionless:
+    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
         func=np.arctan,

@@ -43,7 +43,7 @@ def check_data(
     data: DataBundle,
     data_element_name: str = None,
     required_unit: ureg.Unit = None,
-    message_handler: MessageHandler = _dummy_handler,
+    logger: MessageHandler = _dummy_handler,
 ) -> bool:
     """
     Check that the required data element is present in the DataBundle object.
@@ -52,10 +52,10 @@ def check_data(
         return False
     if data_element_name is not None:
         if (intensity_object := data.data.get(data_element_name, None)) is None:
-            message_handler.error(f"{data_element_name} is required.")
+            logger.error(f"{data_element_name} is required.")
             return False
         if not (intensity_object.internal_units == required_unit):
-            message_handler.error(f"{data_element_name} should have units of {required_unit}.")
+            logger.error(f"{data_element_name} should have units of {required_unit}.")
             return False
     return True
 
@@ -76,9 +76,9 @@ def check_data_element_and_units(
     data: DataBundle,
     data_element_name: str,
     required_unit: ureg.Unit,
-    message_handler: MessageHandler,
+    logger: MessageHandler,
 ) -> bool:
     """
     Check that the required data element is present with the correct units in the DataBundle object.
     """
-    return check_data(data, data_element_name, required_unit, message_handler)
+    return check_data(data, data_element_name, required_unit, logger)
