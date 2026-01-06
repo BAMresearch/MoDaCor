@@ -4,6 +4,14 @@
 
 from __future__ import annotations
 
+__coding__ = "utf-8"
+__authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
+__copyright__ = "Copyright 2026, The MoDaCor team"
+__date__ = "06/01/2026"
+__status__ = "Development"  # "Development", "Production"
+# end of header and standard imports
+__version__ = "20260106.1"
+
 import numpy as np
 import pytest
 
@@ -12,18 +20,15 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
-from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import (
-    CanonicalDetectorFrame,
-    PixelCoordinates3D,
-    prepare_detector_coordinate,
-)
+from modacor.modules.technique_modules.scattering.geometry_helpers import prepare_static_scalar
+from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import CanonicalDetectorFrame, PixelCoordinates3D
 
 # ----------------------------
 # helpers
 # ----------------------------
 
 
-def _make_processing_data_2d(shape=(11, 20), *, rod=2) -> ProcessingData:
+def _make_processing_data_2d(shape: tuple[int, int] = (11, 20), *, rod: int = 2) -> ProcessingData:
     pd = ProcessingData()
     b = DataBundle()
     b["signal"] = BaseData(signal=np.zeros(shape, dtype=float), units=ureg.dimensionless, rank_of_data=rod)
@@ -42,15 +47,37 @@ def _make_frame(
     e_slow=(0.0, 1.0, 0.0),
     e_norm=(0.0, 0.0, 1.0),
 ) -> CanonicalDetectorFrame:
+    """
+    In the new structure, the PixelCoordinates3D implementation reduces "static config"
+    arrays (NeXus-style) to scalars via prepare_static_scalar(...) during loading.
+
+    Because this test double bypasses IO loading (_load_canonical_frame), we perform the same
+    reduction here so the frame matches the module’s expectations (scalar det_coord_* / pitches).
+    """
+    det_z_s = prepare_static_scalar(det_z, require_units=ureg.m, uncertainty_key="detector_position_jitter")
+    det_x_s = prepare_static_scalar(det_x, require_units=ureg.m, uncertainty_key="detector_position_jitter")
+    det_y_s = prepare_static_scalar(det_y, require_units=ureg.m, uncertainty_key="detector_position_jitter")
+
+    pitch_slow_s = prepare_static_scalar(
+        pitch_slow,
+        require_units=ureg.m / ureg.pixel,
+        uncertainty_key="pixel_pitch_jitter",
+    )
+    pitch_fast_s = prepare_static_scalar(
+        pitch_fast,
+        require_units=ureg.m / ureg.pixel,
+        uncertainty_key="pixel_pitch_jitter",
+    )
+
     return CanonicalDetectorFrame(
-        det_coord_z=det_z,
-        det_coord_x=det_x,
-        det_coord_y=det_y,
+        det_coord_z=det_z_s,
+        det_coord_x=det_x_s,
+        det_coord_y=det_y_s,
         e_fast=np.array(e_fast, dtype=float),
         e_slow=np.array(e_slow, dtype=float),
         e_normal=np.array(e_norm, dtype=float),
-        pixel_pitch_slow=pitch_slow,
-        pixel_pitch_fast=pitch_fast,
+        pixel_pitch_slow=pitch_slow_s,
+        pixel_pitch_fast=pitch_fast_s,
     )
 
 
@@ -68,32 +95,35 @@ class DummyPixelCoordinates3D(PixelCoordinates3D):
 
 
 # ----------------------------
-# tests: coordinate preparation
+# tests: static-scalar preparation (moved from pixel module to helpers)
 # ----------------------------
 
 
-def test_prepare_detector_coordinate_passes_through_scalar():
+def test_prepare_static_scalar_passes_through_scalar():
     bd = BaseData(signal=np.array(2.5), units=ureg.m, rank_of_data=0)
-    out = prepare_detector_coordinate(bd)
+    out = prepare_static_scalar(bd, require_units=ureg.m, uncertainty_key="detector_position_jitter")
     assert np.size(out.signal) == 1
     assert out.rank_of_data == 0
     assert out.units.is_compatible_with(ureg.m)
     np.testing.assert_allclose(out.signal, 2.5)
 
 
-def test_prepare_detector_coordinate_reduces_shape_5_1_1_1_to_scalar_mean_and_sem():
+def test_prepare_static_scalar_reduces_shape_5_1_1_1_to_scalar_mean_and_sem():
     # Mimics NeXus vector stored as [5,1,1,1]
     values = np.array([2.50, 2.52, 2.48, 2.51, 2.49], dtype=float).reshape(5, 1, 1, 1)
     bd = BaseData(signal=values, units=ureg.m, rank_of_data=0)
 
-    out = prepare_detector_coordinate(bd, uncertainty_key="detector_position_jitter")
+    out = prepare_static_scalar(bd, require_units=ureg.m, uncertainty_key="detector_position_jitter")
 
     assert np.size(out.signal) == 1
     assert out.rank_of_data == 0
     assert out.units.is_compatible_with(ureg.m)
 
     exp_mean = float(np.mean(values))
-    # for equal weights, SEM = std(population about mean) / sqrt(N)
+
+    # For equal weights, this helper uses:
+    #   var = mean((x-mean)^2)   (population-style)
+    #   sem = sqrt(var) / sqrt(N)
     flat = values.ravel()
     exp_var = float(np.mean((flat - exp_mean) ** 2))
     exp_sem = float(np.sqrt(exp_var) / np.sqrt(flat.size))
@@ -103,10 +133,10 @@ def test_prepare_detector_coordinate_reduces_shape_5_1_1_1_to_scalar_mean_and_se
     np.testing.assert_allclose(out.uncertainties["detector_position_jitter"], exp_sem, rtol=0, atol=1e-15)
 
 
-def test_prepare_detector_coordinate_rejects_wrong_units():
+def test_prepare_static_scalar_rejects_wrong_units():
     bd = BaseData(signal=np.array([1.0, 2.0, 3.0]), units=ureg.pixel, rank_of_data=0)
-    with pytest.raises(ValueError, match="Detector coordinate must be in"):
-        prepare_detector_coordinate(bd, require_units=ureg.m)
+    with pytest.raises(ValueError, match="Value must be in"):
+        prepare_static_scalar(bd, require_units=ureg.m)
 
 
 # ----------------------------
@@ -125,7 +155,7 @@ def test_pixel_coordinates_2d_identity_basis_constant_z_and_expected_x_y():
     """
     pd = _make_processing_data_2d((11, 20), rod=2)
 
-    # Use a det_z given as a 5x1x1x1 array (NeXus-like), expecting reduction to scalar
+    # det_z given as a NeXus-like array (5,1,1,1), reduced to scalar in _make_frame()
     det_z_vals = np.array([2.507, 2.508, 2.509, 2.507, 2.508], dtype=float).reshape(5, 1, 1, 1)
     det_z = BaseData(signal=det_z_vals, units=ureg.m, rank_of_data=0)
 
@@ -212,15 +242,15 @@ def test_pixel_coordinates_2d_offset_origin_shifts_coordinates():
 
     # Spot check a few pixels
     # pixel (slow=j, fast=i) => center at (j+0.5, i+0.5)
-    j, i = 0, 0
-    np.testing.assert_allclose(cx[j, i], 0.10 + 0.5e-3)
-    np.testing.assert_allclose(cy[j, i], -0.05 + 0.5e-3)
-    np.testing.assert_allclose(cz[j, i], 2.0)
+    j0, i0 = 0, 0
+    np.testing.assert_allclose(cx[j0, i0], 0.10 + 0.5e-3)
+    np.testing.assert_allclose(cy[j0, i0], -0.05 + 0.5e-3)
+    np.testing.assert_allclose(cz[j0, i0], 2.0)
 
-    j, i = 10, 19
-    np.testing.assert_allclose(cx[j, i], 0.10 + (19.5e-3))
-    np.testing.assert_allclose(cy[j, i], -0.05 + (10.5e-3))
-    np.testing.assert_allclose(cz[j, i], 2.0)
+    j1, i1 = 10, 19
+    np.testing.assert_allclose(cx[j1, i1], 0.10 + 19.5e-3)
+    np.testing.assert_allclose(cy[j1, i1], -0.05 + 10.5e-3)
+    np.testing.assert_allclose(cz[j1, i1], 2.0)
 
 
 def test_pixel_coordinates_rod0_returns_scalars():

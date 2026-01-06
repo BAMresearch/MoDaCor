@@ -21,63 +21,69 @@ __all__ = ["CanonicalDetectorFrame", "PixelCoordinates3D"]
 from typing import Dict, Tuple
 
 import numpy as np
-import pint
+
+# import pint
 from attrs import define
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
+from modacor.modules.technique_modules.scattering.geometry_helpers import (
+    prepare_static_scalar,
+    require_scalar,
+    unit_vec3,
+)
 
 logger = MessageHandler(name=__name__)
 
 
-def prepare_detector_coordinate(
-    bd: BaseData,
-    uncertainty_key: str = "detector_position_jitter",
-    require_units: pint.Unit = ureg.m,
-) -> BaseData:
-    if not bd.units.is_compatible_with(require_units):
-        raise ValueError(f"Detector coordinate must be in {require_units}, got {bd.units}")
+# def prepare_detector_coordinate(
+#     bd: BaseData,
+#     uncertainty_key: str = "detector_position_jitter",
+#     require_units: pint.Unit = ureg.m,
+# ) -> BaseData:
+#     if not bd.units.is_compatible_with(require_units):
+#         raise ValueError(f"Detector coordinate must be in {require_units}, got {bd.units}")
 
-    bd_sq = bd.squeeze()
-    if np.size(bd_sq.signal) == 1:
-        out = bd_sq.copy()
-        out.rank_of_data = 0
-        return out
+#     bd_sq = bd.squeeze()
+#     if np.size(bd_sq.signal) == 1:
+#         out = bd_sq.copy()
+#         out.rank_of_data = 0
+#         return out
 
-    x = np.asarray(bd_sq.signal, dtype=float).ravel()
+#     x = np.asarray(bd_sq.signal, dtype=float).ravel()
 
-    if bd_sq.weights is None:
-        w = np.ones_like(x)
-    else:
-        w = np.asarray(bd_sq.weights, dtype=float).ravel()
-        # IMPORTANT: scalar/(1,) weights must broadcast to all samples
-        if w.size == 1:
-            w = np.full_like(x, float(w[0]))
-        elif w.size != x.size:
-            raise ValueError(f"Detector coordinate weights must match data size: got {w.size}, expected {x.size}")
+#     if bd_sq.weights is None:
+#         w = np.ones_like(x)
+#     else:
+#         w = np.asarray(bd_sq.weights, dtype=float).ravel()
+#         # IMPORTANT: scalar/(1,) weights must broadcast to all samples
+#         if w.size == 1:
+#             w = np.full_like(x, float(w[0]))
+#         elif w.size != x.size:
+#             raise ValueError(f"Detector coordinate weights must match data size: got {w.size}, expected {x.size}")
 
-    wsum = float(np.sum(w))
-    if wsum <= 0.0:
-        raise ValueError("Detector coordinate weights must sum to > 0")
+#     wsum = float(np.sum(w))
+#     if wsum <= 0.0:
+#         raise ValueError("Detector coordinate weights must sum to > 0")
 
-    mean = float(np.sum(w * x) / wsum)
+#     mean = float(np.sum(w * x) / wsum)
 
-    # effective sample size for SEM
-    n_eff = float((wsum**2) / np.sum(w**2))
-    if n_eff <= 0.0:
-        raise ValueError("Effective sample size must be > 0")
+#     # effective sample size for SEM
+#     n_eff = float((wsum**2) / np.sum(w**2))
+#     if n_eff <= 0.0:
+#         raise ValueError("Effective sample size must be > 0")
 
-    var = float(np.sum(w * (x - mean) ** 2) / wsum)  # weighted population variance
-    sem = float(np.sqrt(var) / np.sqrt(n_eff))
+#     var = float(np.sum(w * (x - mean) ** 2) / wsum)  # weighted population variance
+#     sem = float(np.sqrt(var) / np.sqrt(n_eff))
 
-    return BaseData(
-        signal=np.array(mean, dtype=float),
-        units=bd_sq.units,
-        uncertainties={uncertainty_key: np.array(sem, dtype=float)},
-        rank_of_data=0,
-    )
+#     return BaseData(
+#         signal=np.array(mean, dtype=float),
+#         units=bd_sq.units,
+#         uncertainties={uncertainty_key: np.array(sem, dtype=float)},
+#         rank_of_data=0,
+#     )
 
 
 @define(frozen=True, slots=True)
@@ -112,19 +118,19 @@ class CanonicalDetectorFrame:
     pixel_pitch_fast: BaseData
 
     def __attrs_post_init__(self):
-        object.__setattr__(self, "det_coord_z", prepare_detector_coordinate(self.det_coord_z, require_units=ureg.m))
-        object.__setattr__(self, "det_coord_x", prepare_detector_coordinate(self.det_coord_x, require_units=ureg.m))
-        object.__setattr__(self, "det_coord_y", prepare_detector_coordinate(self.det_coord_y, require_units=ureg.m))
+        object.__setattr__(self, "det_coord_z", prepare_static_scalar(self.det_coord_z, require_units=ureg.m))
+        object.__setattr__(self, "det_coord_x", prepare_static_scalar(self.det_coord_x, require_units=ureg.m))
+        object.__setattr__(self, "det_coord_y", prepare_static_scalar(self.det_coord_y, require_units=ureg.m))
 
         object.__setattr__(
             self,
             "pixel_pitch_slow",
-            prepare_detector_coordinate(self.pixel_pitch_slow, require_units=ureg.m / ureg.pixel),
+            prepare_static_scalar(self.pixel_pitch_slow, require_units=ureg.m / ureg.pixel),
         )
         object.__setattr__(
             self,
             "pixel_pitch_fast",
-            prepare_detector_coordinate(self.pixel_pitch_fast, require_units=ureg.m / ureg.pixel),
+            prepare_static_scalar(self.pixel_pitch_fast, require_units=ureg.m / ureg.pixel),
         )
 
 
@@ -210,20 +216,30 @@ class PixelCoordinates3D(ProcessStep):
         detector_shape: Tuple[int, ...],
         reference_signal: BaseData,
     ) -> CanonicalDetectorFrame:
-        det_coord_z = prepare_detector_coordinate(self._load_from_sources("det_coord_z"))  # scalar length
-        det_coord_x = prepare_detector_coordinate(self._load_from_sources("det_coord_x"))  # scalar length
-        det_coord_y = prepare_detector_coordinate(self._load_from_sources("det_coord_y"))  # scalar length
+        det_coord_z = prepare_static_scalar(
+            self._load_from_sources("det_coord_z"), require_units=ureg.m, uncertainty_key="detector_position_jitter"
+        )  # scalar length
+        det_coord_x = prepare_static_scalar(
+            self._load_from_sources("det_coord_x"), require_units=ureg.m, uncertainty_key="detector_position_jitter"
+        )  # scalar length
+        det_coord_y = prepare_static_scalar(
+            self._load_from_sources("det_coord_y"), require_units=ureg.m, uncertainty_key="detector_position_jitter"
+        )  # scalar length
 
-        pitch_slow = prepare_detector_coordinate(
-            self._load_from_sources("pixel_pitch_slow"), require_units=ureg.m / ureg.pixel
+        pitch_slow = prepare_static_scalar(
+            self._load_from_sources("pixel_pitch_slow"),
+            require_units=ureg.m / ureg.pixel,
+            uncertainty_key="pixel_pitch_jitter",
         )  # scalar length/pixel
-        pitch_fast = prepare_detector_coordinate(
-            self._load_from_sources("pixel_pitch_fast"), require_units=ureg.m / ureg.pixel
+        pitch_fast = prepare_static_scalar(
+            self._load_from_sources("pixel_pitch_fast"),
+            require_units=ureg.m / ureg.pixel,
+            uncertainty_key="pixel_pitch_jitter",
         )  # scalar length/pixel
 
-        e_fast = self._unit(self.configuration.get("basis_fast", (1.0, 0.0, 0.0)))
-        e_slow = self._unit(self.configuration.get("basis_slow", (0.0, 1.0, 0.0)))
-        e_norm = self._unit(self.configuration.get("basis_normal", (0.0, 0.0, 1.0)))
+        e_fast = unit_vec3(self.configuration.get("basis_fast", (1.0, 0.0, 0.0)), name="basis_fast")
+        e_slow = unit_vec3(self.configuration.get("basis_slow", (0.0, 1.0, 0.0)), name="basis_slow")
+        e_norm = unit_vec3(self.configuration.get("basis_normal", (0.0, 0.0, 1.0)), name="basis_normal")
 
         return CanonicalDetectorFrame(
             det_coord_z=det_coord_z,
@@ -294,25 +310,14 @@ class PixelCoordinates3D(ProcessStep):
         """
 
         # Scalars in length units (already averaged + SEM in CanonicalDetectorFrame.__attrs_post_init__)
-        ox = frame.det_coord_x.squeeze()
-        oy = frame.det_coord_y.squeeze()
-        oz = frame.det_coord_z.squeeze()
+        ox = require_scalar("det_coord_x", frame.det_coord_x)
+        oy = require_scalar("det_coord_y", frame.det_coord_y)
+        oz = require_scalar("det_coord_z", frame.det_coord_z)
+        pitch_fast = require_scalar("pixel_pitch_fast", frame.pixel_pitch_fast)
+        pitch_slow = require_scalar("pixel_pitch_slow", frame.pixel_pitch_slow)
 
-        pitch_fast = frame.pixel_pitch_fast.squeeze()
-        pitch_slow = frame.pixel_pitch_slow.squeeze()
-
-        for name, bd in (
-            ("det_coord_x", ox),
-            ("det_coord_y", oy),
-            ("det_coord_z", oz),
-            ("pixel_pitch_fast", pitch_fast),
-            ("pixel_pitch_slow", pitch_slow),
-        ):
-            self._require_scalar(name, bd)
-
-        # Unit vectors (unit length)
-        e_fast = self._unit(frame.e_fast)
-        e_slow = self._unit(frame.e_slow)
+        e_fast = unit_vec3(frame.e_fast, name="e_fast")
+        e_slow = unit_vec3(frame.e_slow, name="e_slow")
         # e_normal kept for future tilt support
 
         # RoD==0: no detector axes, just return the detector origin position as scalars

@@ -25,6 +25,9 @@ from modacor.modules.technique_modules.scattering.indexed_averager import Indexe
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
 from modacor.modules.technique_modules.scattering.solid_angle_correction import SolidAngleCorrection
 from modacor.modules.technique_modules.scattering.xs_geometry import XSGeometry
+from modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordinates import (
+    XSGeometryFromPixelCoordinates,
+)
 
 __all__ = [
     "Divide",
@@ -40,4 +43,5 @@ __all__ = [
     "SubtractDatabundles",
     "Subtract",
     "XSGeometry",
+    "XSGeometryFromPixelCoordinates",
 ]

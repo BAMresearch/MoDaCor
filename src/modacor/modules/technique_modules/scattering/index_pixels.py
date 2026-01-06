@@ -4,8 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
-
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw"]
 __copyright__ = "Copyright 2025, The MoDaCor team"
@@ -16,6 +14,7 @@ __version__ = "20251130.1"
 __all__ = ["IndexPixels"]
 
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 import numpy as np
 
