@@ -4,19 +4,17 @@
 
 from __future__ import annotations
 
-from logging import WARNING
-
-import attrs
-
 __coding__ = "utf-8"
-__authors__ = ["Malte Storm", "Brian R. Pauw"]  # add names to the list as appropriate
+__authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
 __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "14/06/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
+from logging import WARNING
 from typing import Any, Optional, Tuple, Union
 
+import attrs
 import numpy as np
 from attrs import define, field
 
