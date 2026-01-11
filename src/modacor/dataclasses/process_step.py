@@ -20,6 +20,7 @@ from typing import Any, Iterable, Type
 from attrs import define, field
 from attrs import validators as v
 
+from ..io.io_sinks import IoSinks
 from ..io.io_sources import IoSources
 from .databundle import DataBundle
 from .messagehandler import MessageHandler
@@ -49,8 +50,13 @@ class ProcessStep:
         },
     }
 
+    # three input items for the process step. For backward compatibility, the first is io_sources
     # The configuration keys for the process step instantiation
-    io_sources: IoSources = field()
+    io_sources: IoSources | None = field(default=None, validator=v.optional(v.instance_of(IoSources)))
+    # the processing data to work on
+    processing_data: ProcessingData = field(default=None, validator=v.optional(v.instance_of(ProcessingData)))
+    # optional IO sinks if needed
+    io_sinks: IoSinks | None = field(default=None, validator=v.optional(v.instance_of(IoSinks)))
 
     # class attribute for a machine-readable description of the process step
     documentation = ProcessStepDescriber(
@@ -63,7 +69,8 @@ class ProcessStep:
     # dynamic instance configuration
     configuration: dict = field(
         factory=dict,
-        validator=lambda inst, attrs, val: inst.is_process_step_dict,
+        # validator=lambda inst, attrs, val: inst.is_process_step_dict,
+        validator=lambda inst, attrs, val: ProcessStep.is_process_step_dict(inst, attrs.name if attrs else None, val),
     )
 
     # flags and attributes for running the pipeline
@@ -82,7 +89,6 @@ class ProcessStep:
 
     # internal variables:
     __prepared: bool = field(default=False, validator=v.instance_of(bool))
-    processing_data: ProcessingData = field(default=None, validator=v.optional(v.instance_of(ProcessingData)))
 
     def __attrs_post_init__(self):
         """
