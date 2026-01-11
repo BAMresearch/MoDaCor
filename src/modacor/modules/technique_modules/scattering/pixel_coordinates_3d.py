@@ -38,54 +38,6 @@ from modacor.modules.technique_modules.scattering.geometry_helpers import (
 logger = MessageHandler(name=__name__)
 
 
-# def prepare_detector_coordinate(
-#     bd: BaseData,
-#     uncertainty_key: str = "detector_position_jitter",
-#     require_units: pint.Unit = ureg.m,
-# ) -> BaseData:
-#     if not bd.units.is_compatible_with(require_units):
-#         raise ValueError(f"Detector coordinate must be in {require_units}, got {bd.units}")
-
-#     bd_sq = bd.squeeze()
-#     if np.size(bd_sq.signal) == 1:
-#         out = bd_sq.copy()
-#         out.rank_of_data = 0
-#         return out
-
-#     x = np.asarray(bd_sq.signal, dtype=float).ravel()
-
-#     if bd_sq.weights is None:
-#         w = np.ones_like(x)
-#     else:
-#         w = np.asarray(bd_sq.weights, dtype=float).ravel()
-#         # IMPORTANT: scalar/(1,) weights must broadcast to all samples
-#         if w.size == 1:
-#             w = np.full_like(x, float(w[0]))
-#         elif w.size != x.size:
-#             raise ValueError(f"Detector coordinate weights must match data size: got {w.size}, expected {x.size}")
-
-#     wsum = float(np.sum(w))
-#     if wsum <= 0.0:
-#         raise ValueError("Detector coordinate weights must sum to > 0")
-
-#     mean = float(np.sum(w * x) / wsum)
-
-#     # effective sample size for SEM
-#     n_eff = float((wsum**2) / np.sum(w**2))
-#     if n_eff <= 0.0:
-#         raise ValueError("Effective sample size must be > 0")
-
-#     var = float(np.sum(w * (x - mean) ** 2) / wsum)  # weighted population variance
-#     sem = float(np.sqrt(var) / np.sqrt(n_eff))
-
-#     return BaseData(
-#         signal=np.array(mean, dtype=float),
-#         units=bd_sq.units,
-#         uncertainties={uncertainty_key: np.array(sem, dtype=float)},
-#         rank_of_data=0,
-#     )
-
-
 @define(frozen=True, slots=True)
 class CanonicalDetectorFrame:
     """
