@@ -53,7 +53,7 @@ class DummyProcessStep(ProcessStep):
 
 def test_processstep_pipeline(flat_data):
     "tests execution of a linear processstep pipeline (not actually doing anything)"
-    steps = [DummyProcessStep(TEST_IO_SOURCES, step_id=i) for i in range(3)]
+    steps = [DummyProcessStep(io_sources=TEST_IO_SOURCES, step_id=i) for i in range(3)]
     graph = {steps[i]: {steps[i + 1]} for i in range(len(steps) - 1)}
 
     pipeline = Pipeline(graph=graph)
@@ -70,7 +70,7 @@ def test_processstep_pipeline(flat_data):
 
 def test_actual_processstep(flat_data):
     "test running the PoissonUncertainties Process step"
-    step = PoissonUncertainties(TEST_IO_SOURCES)
+    step = PoissonUncertainties(io_sources=TEST_IO_SOURCES)
     # we need to supply a list of values here
     step.modify_config_by_kwargs(with_processing_keys=["bundle2"])
     graph = {step: {}}
