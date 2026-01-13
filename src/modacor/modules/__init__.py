@@ -12,6 +12,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 # official steps are imported here for ease
+from modacor.modules.base_modules.bitwise_or_masks import BitwiseOrMasks
 from modacor.modules.base_modules.divide import Divide
 from modacor.modules.base_modules.find_scale_factor1d import FindScaleFactor1D
 from modacor.modules.base_modules.multiply import Multiply
@@ -30,6 +31,7 @@ from modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordin
 )
 
 __all__ = [
+    "BitwiseOrMasks",
     "Divide",
     "IndexPixels",
     "IndexedAverager",
