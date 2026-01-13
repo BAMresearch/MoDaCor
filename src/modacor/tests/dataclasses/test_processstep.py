@@ -154,18 +154,18 @@ def test_is_process_step_dict__w_wrong_key():
 
 
 def test_minimal_instantiation():
-    ps = ProcessStep(TEST_IO_SOURCES)
+    ps = ProcessStep(io_sources=TEST_IO_SOURCES)
     assert isinstance(ps, ProcessStep)
 
 
 def test_instantiation_of_subclass():
-    instance = TESTProcessingStep(TEST_IO_SOURCES)
+    instance = TESTProcessingStep(io_sources=TEST_IO_SOURCES)
     assert all(k in instance.configuration for k in TESTProcessingStep.CONFIG_KEYS)
     assert isinstance(instance, TESTProcessingStep)
 
 
 def test_process_step__reset():
-    ps = ProcessStep(TEST_IO_SOURCES)
+    ps = ProcessStep(io_sources=TEST_IO_SOURCES)
     ps.produced_outputs = {"a": 1}
     ps._ProcessStep__prepared = True
     ps.executed = True
@@ -177,7 +177,7 @@ def test_process_step__reset():
 
 @pytest.mark.parametrize("class_with_config_keys", [["test_str"]], indirect=True)
 def test_modify_config__valid_key(class_with_config_keys):
-    instance = class_with_config_keys[1](TEST_IO_SOURCES)
+    instance = class_with_config_keys[1](io_sources=TEST_IO_SOURCES)
     instance.modify_config_by_kwargs(test_str="new_value")
     assert instance.configuration["test_str"] == "new_value"
     assert not instance._ProcessStep__prepared
@@ -185,7 +185,7 @@ def test_modify_config__valid_key(class_with_config_keys):
 
 @pytest.mark.parametrize("class_with_config_keys", [["test_str"]], indirect=True)
 def test_modify_config__by_dict(class_with_config_keys):
-    instance = class_with_config_keys[1](TEST_IO_SOURCES)
+    instance = class_with_config_keys[1](io_sources=TEST_IO_SOURCES)
     instance.modify_config_by_dict({"test_str": "new_value"})
     assert instance.configuration["test_str"] == "new_value"
     assert not instance._ProcessStep__prepared
@@ -193,26 +193,26 @@ def test_modify_config__by_dict(class_with_config_keys):
 
 @pytest.mark.parametrize("class_with_config_keys", [["test_str"]], indirect=True)
 def test_modify_config__invalid_key(class_with_config_keys):
-    instance = class_with_config_keys[1](TEST_IO_SOURCES)
+    instance = class_with_config_keys[1](io_sources=TEST_IO_SOURCES)
     with pytest.raises(KeyError):
         instance.modify_config_by_kwargs(silly_key="new_value")
 
 
 def test_calculate():
-    ps = TESTProcessingStep(TEST_IO_SOURCES)
+    ps = TESTProcessingStep(io_sources=TEST_IO_SOURCES)
     ps.processing_data = ProcessingData()
     _return = ps.calculate()
     assert isinstance(_return, dict)
 
 
 def test_calculate__abstract():
-    ps = ProcessStep(TEST_IO_SOURCES)
+    ps = ProcessStep(io_sources=TEST_IO_SOURCES)
     with pytest.raises(NotImplementedError):
         ps.calculate()
 
 
 def test_execute(processing_data):
-    ps = TESTProcessingStep(TEST_IO_SOURCES)
+    ps = TESTProcessingStep(io_sources=TEST_IO_SOURCES)
     ps.execute(processing_data)
     assert ps.executed is True
     assert ps._ProcessStep__prepared is True
@@ -225,7 +225,7 @@ def test_execute(processing_data):
 
 
 def test_call(processing_data):
-    ps = TESTProcessingStep(TEST_IO_SOURCES)
+    ps = TESTProcessingStep(io_sources=TEST_IO_SOURCES)
     ps(processing_data)
     assert ps.executed is True
     assert ps._ProcessStep__prepared is True

@@ -159,7 +159,7 @@ class Pipeline(TopologicalSorter):
             step_cls = registry.get(module_ref)
 
             # Pass the normalized string step_id into the ProcessStep
-            step_instance: ProcessStep = step_cls(io_sources=None, step_id=step_id)
+            step_instance: ProcessStep = step_cls(io_sources=None, io_sinks=None, step_id=step_id)
             step_instance.modify_config_by_dict(configuration)
 
             process_step_instances[step_id] = step_instance
@@ -239,7 +239,7 @@ class Pipeline(TopologicalSorter):
             config = node.get("config", {}) or {}
 
             step_cls = registry.get(module_name)
-            step = step_cls(io_sources=None, step_id=step_id)
+            step = step_cls(io_sources=None, io_sinks=None, step_id=step_id)
             step.modify_config_by_dict(config)
 
             process_step_instances[step_id] = step
