@@ -36,11 +36,28 @@ class Divide(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
-        required_arguments={},
+        required_arguments=[],
         default_configuration={
             "divisor_source": None,  # IoSources key for signal
             "divisor_units_source": None,  # IoSources key for units
             "divisor_uncertainties_sources": {},  # dict of uncertainty name: source, or 'propagate_to_all': source
+        },
+        argument_specs={
+            "divisor_source": {
+                "type": str,
+                "required": False,
+                "doc": "IoSources key for the divisor signal.",
+            },
+            "divisor_units_source": {
+                "type": str,
+                "required": False,
+                "doc": "IoSources key for divisor units metadata.",
+            },
+            "divisor_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Mapping of uncertainty name to IoSources key.",
+            },
         },
         step_keywords=["divide", "scalar", "array"],
         step_doc="Divide a DataBundle element by a divisor loaded from a data source",

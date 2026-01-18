@@ -90,6 +90,43 @@ class AppendProcessingData(ProcessStep):
             # {'<uncertainty_name>': '<io_source_id>::<dataset_path>'}
             "uncertainties_sources": {},
         },
+        argument_specs={
+            "processing_key": {
+                "type": str,
+                "required": True,
+                "doc": "ProcessingData key to create or update.",
+            },
+            "signal_location": {
+                "type": str,
+                "required": True,
+                "doc": "IoSources reference '<io_source_id>::<dataset_path>'.",
+            },
+            "rank_of_data": {
+                "type": (int, str),
+                "required": True,
+                "doc": "BaseData rank as int or IoSources metadata reference.",
+            },
+            "databundle_output_key": {
+                "type": str,
+                "required": False,
+                "doc": "BaseData key inside the DataBundle.",
+            },
+            "units_location": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "Optional IoSources reference for units metadata.",
+            },
+            "units_override": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "Optional unit string that overrides loaded units.",
+            },
+            "uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Mapping of uncertainty name to IoSources reference.",
+            },
+        },
         step_keywords=["append", "processing", "data", "signal"],
         step_doc="Append signal data from IoSources into a processing DataBundle.",
         step_reference="",

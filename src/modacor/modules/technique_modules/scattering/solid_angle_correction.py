@@ -35,7 +35,7 @@ class SolidAngleCorrection(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal", "Omega"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
-        required_arguments={},  # none required, defaults all around
+        required_arguments=[],  # none required, defaults all around
         default_configuration={},
         step_keywords=["divide", "normalize", "solid angle"],
         step_doc="Divide the pixels in a signal by their solid angle coverage",

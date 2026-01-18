@@ -95,7 +95,7 @@ class ProcessStep:
         Post-initialization method to set up the process step.
         """
         self.configuration = self.default_config()
-        self.configuration.update(self.documentation.default_configuration)
+        self.configuration.update(self.documentation.default_configuration_copy())
 
     def __call__(self, processing_data: ProcessingData) -> None:
         """Allow the process step to be called like a function"""
