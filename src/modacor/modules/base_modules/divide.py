@@ -79,7 +79,7 @@ class Divide(ProcessStep):
         output: dict[str, DataBundle] = {}
 
         # actual work happens here:
-        for key in self.configuration["with_processing_keys"]:
+        for key in self._normalised_processing_keys():
             databundle = self.processing_data.get(key)
             # divide the data
             # Rely on BaseData.__truediv__ for units + uncertainty propagation

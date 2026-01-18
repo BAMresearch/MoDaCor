@@ -220,45 +220,7 @@ class IndexPixels(ProcessStep):
         primary_key: the key used to compute the pixel index map.
         keys_to_update: all keys that should receive the map.
         """
-        if self.processing_data is None:
-            raise RuntimeError("IndexPixels: processing_data is None in _normalised_keys.")
-
-        cfg_value = self.configuration.get("with_processing_keys", None)
-
-        # None → use only key if exactly one available
-        if cfg_value is None:
-            if len(self.processing_data) == 0:
-                raise ValueError("IndexPixels: with_processing_keys is None and processing_data is empty.")
-            if len(self.processing_data) == 1:
-                only_key = next(iter(self.processing_data.keys()))
-                logger.info(
-                    f"IndexPixels: with_processing_keys not set; using the only key {only_key}.",  # noqa: E702
-                )
-                return only_key, [only_key]
-            raise ValueError(
-                "IndexPixels: with_processing_keys is None but multiple "
-                "databundles are present. Please specify a key or list of keys."
-            )
-
-        # Single string
-        if isinstance(cfg_value, str):
-            return cfg_value, [cfg_value]
-
-        # Iterable of strings
-        try:
-            keys = list(cfg_value)
-        except TypeError as exc:  # not iterable
-            raise ValueError(
-                "IndexPixels: with_processing_keys must be a string, an iterable of strings, or None."
-            ) from exc
-
-        if not keys:
-            raise ValueError("IndexPixels: with_processing_keys is an empty iterable.")
-
-        for k in keys:
-            if not isinstance(k, str):
-                raise ValueError("IndexPixels: all entries in with_processing_keys must be strings, got %r." % (k,))
-
+        keys = self._normalised_processing_keys()
         primary_key = keys[0]
         if len(keys) > 1:
             logger.warning(

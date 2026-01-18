@@ -242,7 +242,7 @@ class ReduceDimensionality(ProcessStep):
 
         output: dict[str, DataBundle] = {}
 
-        for key in self.configuration["with_processing_keys"]:
+        for key in self._normalised_processing_keys():
             databundle: DataBundle = self.processing_data.get(key)
             bd: BaseData = databundle["signal"]
 

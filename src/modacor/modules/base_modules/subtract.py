@@ -76,7 +76,7 @@ class Subtract(ProcessStep):
 
         output: dict[str, DataBundle] = {}
         # actual work happens here:
-        for key in self.configuration["with_processing_keys"]:
+        for key in self._normalised_processing_keys():
             databundle = data.get(key)
             # subtract the data
             # databundle['signal'] is a BaseData object

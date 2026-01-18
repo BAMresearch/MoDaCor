@@ -61,13 +61,14 @@ class MultiplyDatabundles(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         # actual work happens here:
-        assert len(self.configuration["with_processing_keys"]) == 2, (
+        keys = self._normalised_processing_keys()
+        assert len(keys) == 2, (
             "MultiplyDatabundles requires exactly two processing keys in 'with_processing_keys': "
             "the first is the multiplicand, the second is the multiplier."
         )
-        multiplicand_key = self.configuration["with_processing_keys"][0]
+        multiplicand_key = keys[0]
         multiplicand = self.processing_data.get(multiplicand_key)
-        multiplier = self.processing_data.get(self.configuration["with_processing_keys"][1])
+        multiplier = self.processing_data.get(keys[1])
         # multiply the data
         multiplicand[self.configuration["multiplicand_data_key"]] *= multiplier[
             self.configuration["multiplier_data_key"]

@@ -60,7 +60,7 @@ class UnitsLabelUpdate(ProcessStep):
         }
 
         output: dict[str, DataBundle] = {}
-        for key in self.configuration["with_processing_keys"]:
+        for key in self._normalised_processing_keys():
             databundle = self.processing_data.get(key)
             for bd_key, unit in parsed.items():
                 databundle[bd_key].units = unit

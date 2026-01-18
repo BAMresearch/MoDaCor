@@ -58,7 +58,7 @@ class PoissonUncertainties(ProcessStep):
         # Get the data
         data = self.processing_data
         output = {}
-        for key in self.configuration["with_processing_keys"]:
+        for key in self._normalised_processing_keys():
             databundle = data.get(key)
             signal = databundle["signal"].signal
 

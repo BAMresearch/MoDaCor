@@ -200,46 +200,7 @@ class IndexedAverager(ProcessStep):
         If configuration value is None and exactly one databundle is present
         in processing_data, that key is returned as the single entry.
         """
-        if self.processing_data is None:
-            raise RuntimeError("IndexedAverager: processing_data is None in _normalised_keys.")
-
-        cfg_value = self.configuration.get("with_processing_keys", None)
-
-        # None → use only key if exactly one available
-        if cfg_value is None:
-            if len(self.processing_data) == 0:
-                raise ValueError("IndexedAverager: with_processing_keys is None and processing_data is empty.")
-            if len(self.processing_data) == 1:
-                only_key = next(iter(self.processing_data.keys()))
-                logger.info(
-                    "IndexedAverager: with_processing_keys not set; using the only key %r.",
-                    only_key,
-                )
-                return [only_key]
-            raise ValueError(
-                "IndexedAverager: with_processing_keys is None but multiple "
-                "databundles are present. Please specify a key or list of keys."
-            )
-
-        # Single string
-        if isinstance(cfg_value, str):
-            return [cfg_value]
-
-        # Iterable of strings
-        try:
-            keys = list(cfg_value)
-        except TypeError as exc:  # not iterable
-            raise ValueError(
-                "IndexedAverager: with_processing_keys must be a string, an iterable of strings, or None."
-            ) from exc
-
-        if not keys:
-            raise ValueError("IndexedAverager: with_processing_keys is an empty iterable.")
-
-        for k in keys:
-            if not isinstance(k, str):
-                raise ValueError(f"IndexedAverager: all entries in with_processing_keys must be strings, got {k!r}.")
-        return keys
+        return self._normalised_processing_keys()
 
     # ------------------------------------------------------------------
     # Helper: validate geometry, signal and pixel_index for a databundle

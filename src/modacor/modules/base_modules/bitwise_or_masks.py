@@ -83,9 +83,9 @@ class BitwiseOrMasks(ProcessStep):
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration
 
-        with_processing_keys = cfg["with_processing_keys"]
-        assert len(with_processing_keys) == 1, "BitwiseOrMasks requires a single databundle processing key."
-        processing_key = with_processing_keys[0]
+        keys = self._normalised_processing_keys()
+        assert len(keys) == 1, "BitwiseOrMasks requires a single databundle processing key."
+        processing_key = keys[0]
         target_key = cfg.get("target_mask_key", "mask")
         source_keys = cfg["source_mask_keys"]
 

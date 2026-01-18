@@ -282,7 +282,10 @@ class FindScaleFactor1D(ProcessStep):
 
     def calculate(self) -> Dict[str, DataBundle]:
         cfg = self.configuration
-        work_key, ref_key = cfg["with_processing_keys"]
+        keys = self._normalised_processing_keys()
+        if len(keys) != 2:
+            raise ValueError("FindScaleFactor1D requires exactly two processing keys in 'with_processing_keys'.")
+        work_key, ref_key = keys
 
         sig_key = cfg.get("signal_key", "signal")
         axis_key = cfg.get("independent_axis_key", "Q")

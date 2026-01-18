@@ -53,13 +53,14 @@ class SubtractDatabundles(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         # actual work happens here:
-        assert len(self.configuration["with_processing_keys"]) == 2, (
+        keys = self._normalised_processing_keys()
+        assert len(keys) == 2, (
             "SubtractDatabundles requires exactly two processing keys in 'with_processing_keys': "
             "the first is the minuend, the second is the subtrahend."
         )
-        minuend_key = self.configuration["with_processing_keys"][0]
+        minuend_key = keys[0]
         minuend = self.processing_data.get(minuend_key)
-        subtrahend = self.processing_data.get(self.configuration["with_processing_keys"][1])
+        subtrahend = self.processing_data.get(keys[1])
         # subtract the data
         minuend["signal"] -= subtrahend["signal"]
         output: dict[str, DataBundle] = {minuend_key: minuend}
