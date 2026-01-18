@@ -79,6 +79,73 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
             # optional detector normal (lab frame)
             "detector_normal": (0.0, 0.0, 1.0),
         },
+        argument_specs={
+            "sample_z_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for sample z-position signal.",
+            },
+            "sample_z_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for sample z-position units.",
+            },
+            "sample_z_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for sample z-position.",
+            },
+            "wavelength_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for wavelength signal.",
+            },
+            "wavelength_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for wavelength units.",
+            },
+            "wavelength_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for wavelength.",
+            },
+            "pixel_pitch_slow_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for slow-axis pixel pitch signal.",
+            },
+            "pixel_pitch_slow_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for slow-axis pixel pitch units.",
+            },
+            "pixel_pitch_slow_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for slow-axis pixel pitch.",
+            },
+            "pixel_pitch_fast_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for fast-axis pixel pitch signal.",
+            },
+            "pixel_pitch_fast_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for fast-axis pixel pitch units.",
+            },
+            "pixel_pitch_fast_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for fast-axis pixel pitch.",
+            },
+            "detector_normal": {
+                "type": tuple,
+                "required": False,
+                "doc": "Detector normal unit vector in lab frame.",
+            },
+        },
         modifies={
             "Q0": ["signal", "uncertainties"],
             "Q1": ["signal", "uncertainties"],

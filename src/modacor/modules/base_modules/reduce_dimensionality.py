@@ -61,6 +61,28 @@ class ReduceDimensionality(ProcessStep):
             # Reduction method: 'mean' (default, weighted or unweighted), or 'sum' (weighted or unweighted).
             "reduction": "mean",
         },
+        argument_specs={
+            "axes": {
+                "type": (int, list, tuple, type(None)),
+                "required": False,
+                "doc": "Axis or axes to reduce (int, list/tuple, or None for all).",
+            },
+            "use_weights": {
+                "type": bool,
+                "required": False,
+                "doc": "Use BaseData weights for weighted reduction.",
+            },
+            "nan_policy": {
+                "type": str,
+                "required": False,
+                "doc": "NaN handling policy: 'omit' or 'propagate'.",
+            },
+            "reduction": {
+                "type": str,
+                "required": False,
+                "doc": "Reduction method: 'mean' or 'sum'.",
+            },
+        },
         step_keywords=["average", "mean", "weighted", "nanmean", "reduce", "axis", "sum"],
         step_doc=(
             "Compute (default weighted) mean of the BaseData signal over the given axes, "

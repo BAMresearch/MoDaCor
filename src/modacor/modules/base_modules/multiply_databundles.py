@@ -37,6 +37,18 @@ class MultiplyDatabundles(ProcessStep):
             "multiplicand_data_key": "signal",  # key of the DataBundle to multiply
             "multiplier_data_key": "signal",  # key of the DataBundle to multiply with if not signal
         },  # no arguments needed
+        argument_specs={
+            "multiplicand_data_key": {
+                "type": str,
+                "required": False,
+                "doc": "BaseData key to modify in the multiplicand DataBundle.",
+            },
+            "multiplier_data_key": {
+                "type": str,
+                "required": False,
+                "doc": "BaseData key to read from the multiplier DataBundle.",
+            },
+        },
         step_keywords=["multiply", "scaling", "databundle"],
         step_doc="Multiply a DataBundle element using another DataBundle",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",

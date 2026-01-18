@@ -41,6 +41,13 @@ class UnitsLabelUpdate(ProcessStep):
             #   <basedata_key>: "<pint unit str>"
             "update_pairs": {},
         },
+        argument_specs={
+            "update_pairs": {
+                "type": dict,
+                "required": True,
+                "doc": "Mapping of BaseData key to unit string or {'units': str}.",
+            },
+        },
         step_keywords=["units", "update", "standardize"],
         step_doc="Update unit labels of one or more BaseData elements (no conversion).",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",

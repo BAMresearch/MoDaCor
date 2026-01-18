@@ -137,6 +137,58 @@ class IndexPixels(ProcessStep):
             "psi_max": None,
             "psi_limits_unit": None,
         },
+        argument_specs={
+            "with_processing_keys": {
+                "type": (str, list, type(None)),
+                "required": False,
+                "doc": "ProcessingData key or list of keys to index.",
+            },
+            "averaging_direction": {
+                "type": str,
+                "required": True,
+                "doc": "Averaging direction: 'radial' or 'azimuthal'.",
+            },
+            "q_min": {
+                "type": (float, int, type(None)),
+                "required": False,
+                "doc": "Minimum Q value for binning.",
+            },
+            "q_max": {
+                "type": (float, int, type(None)),
+                "required": False,
+                "doc": "Maximum Q value for binning.",
+            },
+            "q_limits_unit": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "Units for q_min/q_max if provided.",
+            },
+            "n_bins": {
+                "type": int,
+                "required": False,
+                "doc": "Number of bins.",
+            },
+            "bin_type": {
+                "type": str,
+                "required": False,
+                "doc": "Binning type: 'linear' or 'log'.",
+            },
+            "psi_min": {
+                "type": (float, int, type(None)),
+                "required": False,
+                "doc": "Minimum Psi value for binning.",
+            },
+            "psi_max": {
+                "type": (float, int, type(None)),
+                "required": False,
+                "doc": "Maximum Psi value for binning.",
+            },
+            "psi_limits_unit": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "Units for psi_min/psi_max if provided.",
+            },
+        },
         modifies={},  # nothing, we only add.
         step_keywords=[
             "radial",

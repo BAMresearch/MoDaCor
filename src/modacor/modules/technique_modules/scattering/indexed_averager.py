@@ -133,6 +133,38 @@ class IndexedAverager(ProcessStep):
             "use_signal_uncertainty_weights": False,
             "uncertainty_weight_key": None,
         },
+        argument_specs={
+            "with_processing_keys": {
+                "type": (str, list, type(None)),
+                "required": False,
+                "doc": "ProcessingData key or list of keys to average.",
+            },
+            "output_processing_key": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "Optional output key override (currently unused).",
+            },
+            "averaging_direction": {
+                "type": str,
+                "required": True,
+                "doc": "Averaging direction: 'radial' or 'azimuthal'.",
+            },
+            "use_signal_weights": {
+                "type": bool,
+                "required": False,
+                "doc": "Use BaseData weights when averaging signal.",
+            },
+            "use_signal_uncertainty_weights": {
+                "type": bool,
+                "required": False,
+                "doc": "Use signal uncertainty as weights.",
+            },
+            "uncertainty_weight_key": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "Uncertainty key to use as weights if enabled.",
+            },
+        },
         modifies={
             # We overwrite 'signal', 'Q', 'Psi' with their 1D binned versions.
             "signal": ["signal", "uncertainties"],

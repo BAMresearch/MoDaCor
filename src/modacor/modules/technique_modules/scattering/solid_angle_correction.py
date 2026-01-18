@@ -37,6 +37,13 @@ class SolidAngleCorrection(ProcessStep):
         modifies={"signal": ["signal", "uncertainties", "units"]},
         required_arguments=[],  # none required, defaults all around
         default_configuration={},
+        argument_specs={
+            "with_processing_keys": {
+                "type": list,
+                "required": True,
+                "doc": "ProcessingData keys whose signal should be divided by Omega.",
+            },
+        },
         step_keywords=["divide", "normalize", "solid angle"],
         step_doc="Divide the pixels in a signal by their solid angle coverage",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",

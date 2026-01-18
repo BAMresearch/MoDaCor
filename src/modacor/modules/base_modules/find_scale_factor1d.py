@@ -209,6 +209,73 @@ class FindScaleFactor1D(ProcessStep):
             "robust_fscale": 1.0,
             "use_basedata_weights": True,
         },
+        argument_specs={
+            "signal_key": {
+                "type": str,
+                "required": False,
+                "doc": "BaseData key for the dependent variable signal.",
+            },
+            "independent_axis_key": {
+                "type": str,
+                "required": False,
+                "doc": "BaseData key for the independent axis.",
+            },
+            "scale_output_key": {
+                "type": str,
+                "required": False,
+                "doc": "BaseData key to store the scale factor output.",
+            },
+            "background_output_key": {
+                "type": str,
+                "required": False,
+                "doc": "BaseData key to store the fitted background output.",
+            },
+            "fit_background": {
+                "type": bool,
+                "required": False,
+                "doc": "Whether to fit a constant background offset.",
+            },
+            "fit_min_val": {
+                "type": (float, int, type(None)),
+                "required": False,
+                "doc": "Minimum x-value for the fit (in fit_val_units).",
+            },
+            "fit_max_val": {
+                "type": (float, int, type(None)),
+                "required": False,
+                "doc": "Maximum x-value for the fit (in fit_val_units).",
+            },
+            "fit_val_units": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "Units for fit_min_val/fit_max_val if provided.",
+            },
+            "require_overlap": {
+                "type": bool,
+                "required": False,
+                "doc": "Require overlapping x-range between reference and work data.",
+            },
+            "interpolation_kind": {
+                "type": str,
+                "required": False,
+                "doc": "Interpolation kind passed to scipy/numpy interpolation.",
+            },
+            "robust_loss": {
+                "type": str,
+                "required": False,
+                "doc": "Robust loss function name for the fit.",
+            },
+            "robust_fscale": {
+                "type": (float, int),
+                "required": False,
+                "doc": "Robust loss scale parameter.",
+            },
+            "use_basedata_weights": {
+                "type": bool,
+                "required": False,
+                "doc": "Use BaseData weights when fitting.",
+            },
+        },
         step_keywords=["scale", "calibration", "1D"],
         step_doc="Compute scale factor between two 1D curves using robust least squares.",
     )

@@ -34,6 +34,13 @@ class SubtractDatabundles(ProcessStep):
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
         default_configuration={},  # no arguments needed
+        argument_specs={
+            "with_processing_keys": {
+                "type": list,
+                "required": True,
+                "doc": "Two processing keys: minuend then subtrahend.",
+            },
+        },
         step_keywords=["subtract", "background", "databundle"],
         step_doc="Subtract a DataBundle element using another DataBundle",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",

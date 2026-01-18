@@ -45,6 +45,23 @@ class BitwiseOrMasks(ProcessStep):
             "target_mask_key": "mask",  # target mask BaseData key within the DataBundle
             "source_mask_keys": [],  # list of source mask BaseData keys within the DataBundle
         },
+        argument_specs={
+            "with_processing_keys": {
+                "type": list,
+                "required": True,
+                "doc": "Single processing key identifying the DataBundle to update.",
+            },
+            "target_mask_key": {
+                "type": str,
+                "required": False,
+                "doc": "BaseData key for the target mask inside the DataBundle.",
+            },
+            "source_mask_keys": {
+                "type": list,
+                "required": True,
+                "doc": "List of BaseData keys to OR into the target mask.",
+            },
+        },
         step_keywords=["mask", "bitmask", "bitwise", "or", "databundle"],
         step_doc="Combine multiple mask arrays stored as different BaseData keys in the same DataBundle.",
         step_reference="NeXus mask bit-field convention (NXdata/NXdetector masks)",

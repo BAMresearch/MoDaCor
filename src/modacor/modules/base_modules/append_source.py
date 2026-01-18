@@ -54,6 +54,28 @@ class AppendSource(ProcessStep):
             "iosource_module": "",
             "iosource_method_kwargs": {},
         },
+        argument_specs={
+            "source_identifier": {
+                "type": (str, list),
+                "required": True,
+                "doc": "Identifier(s) to register the ioSource(s) under.",
+            },
+            "source_location": {
+                "type": (str, list),
+                "required": True,
+                "doc": "Resource location(s) to load for the ioSource(s).",
+            },
+            "iosource_module": {
+                "type": str,
+                "required": True,
+                "doc": "Fully qualified module path to the ioSource class.",
+            },
+            "iosource_method_kwargs": {
+                "type": dict,
+                "required": False,
+                "doc": "Keyword arguments forwarded to the ioSource constructor.",
+            },
+        },
         step_keywords=["append", "source"],
         step_doc="Append an ioSource to the available data sources",
         step_reference="",
