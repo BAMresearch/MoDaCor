@@ -54,6 +54,28 @@ class AppendSink(ProcessStep):
             "iosink_module": "",
             "iosink_method_kwargs": {},
         },
+        argument_specs={
+            "sink_identifier": {
+                "type": (str, list),
+                "required": True,
+                "doc": "Identifier(s) to register the ioSink(s) under.",
+            },
+            "sink_location": {
+                "type": (str, list),
+                "required": True,
+                "doc": "Resource location(s) understood by the sink.",
+            },
+            "iosink_module": {
+                "type": str,
+                "required": True,
+                "doc": "Fully qualified module path to the ioSink class.",
+            },
+            "iosink_method_kwargs": {
+                "type": dict,
+                "required": False,
+                "doc": "Keyword arguments forwarded to the ioSink constructor.",
+            },
+        },
         step_keywords=["append", "sink"],
         step_doc="Append an IoSink to the available data sinks",
         step_reference="",

@@ -48,6 +48,18 @@ class SinkProcessingData(ProcessStep):
             "target": "",
             "data_paths": [],
         },
+        argument_specs={
+            "target": {
+                "type": str,
+                "required": True,
+                "doc": "Sink target in the form 'sink_id::subpath'.",
+            },
+            "data_paths": {
+                "type": (str, list),
+                "required": True,
+                "doc": "ProcessingData paths to write (string or list of strings).",
+            },
+        },
         step_keywords=["sink", "export", "write"],
         step_doc="Write selected ProcessingData leaves to an IoSink.",
         step_reference="",

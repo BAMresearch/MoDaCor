@@ -41,6 +41,13 @@ class UnitsLabelUpdate(ProcessStep):
             #   <basedata_key>: "<pint unit str>"
             "update_pairs": {},
         },
+        argument_specs={
+            "update_pairs": {
+                "type": dict,
+                "required": True,
+                "doc": "Mapping of BaseData key to unit string or {'units': str}.",
+            },
+        },
         step_keywords=["units", "update", "standardize"],
         step_doc="Update unit labels of one or more BaseData elements (no conversion).",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
@@ -53,7 +60,7 @@ class UnitsLabelUpdate(ProcessStep):
         }
 
         output: dict[str, DataBundle] = {}
-        for key in self.configuration["with_processing_keys"]:
+        for key in self._normalised_processing_keys():
             databundle = self.processing_data.get(key)
             for bd_key, unit in parsed.items():
                 databundle[bd_key].units = unit
