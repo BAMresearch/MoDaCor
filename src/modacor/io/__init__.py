@@ -25,8 +25,9 @@
 __license__ = "BSD-3-Clause"
 __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
-__all__ = ["IoSource", "IoSources"]
+__all__ = ["IoSource", "IoSources", "TiledSource"]
 
 
 from .io_source import IoSource
 from .io_sources import IoSources
+from .tiled.tiled_source import TiledSource
