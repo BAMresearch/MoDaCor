@@ -144,6 +144,98 @@ class PixelCoordinates3D(ProcessStep):
             "basis_slow": (0.0, 1.0, 0.0),
             "basis_normal": (0.0, 0.0, 1.0),
         },
+        argument_specs={
+            "det_coord_z_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for detector z-coordinate signal.",
+            },
+            "det_coord_z_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for detector z-coordinate units.",
+            },
+            "det_coord_z_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for detector z-coordinate.",
+            },
+            "det_coord_x_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for detector x-coordinate signal.",
+            },
+            "det_coord_x_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for detector x-coordinate units.",
+            },
+            "det_coord_x_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for detector x-coordinate.",
+            },
+            "det_coord_y_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for detector y-coordinate signal.",
+            },
+            "det_coord_y_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for detector y-coordinate units.",
+            },
+            "det_coord_y_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for detector y-coordinate.",
+            },
+            "pixel_pitch_slow_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for slow-axis pixel pitch signal.",
+            },
+            "pixel_pitch_slow_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for slow-axis pixel pitch units.",
+            },
+            "pixel_pitch_slow_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for slow-axis pixel pitch.",
+            },
+            "pixel_pitch_fast_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for fast-axis pixel pitch signal.",
+            },
+            "pixel_pitch_fast_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for fast-axis pixel pitch units.",
+            },
+            "pixel_pitch_fast_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for fast-axis pixel pitch.",
+            },
+            "basis_fast": {
+                "type": tuple,
+                "required": False,
+                "doc": "Basis vector for the fast detector axis.",
+            },
+            "basis_slow": {
+                "type": tuple,
+                "required": False,
+                "doc": "Basis vector for the slow detector axis.",
+            },
+            "basis_normal": {
+                "type": tuple,
+                "required": False,
+                "doc": "Basis vector for the detector normal.",
+            },
+        },
         modifies={
             "coord_x": ["signal", "uncertainties"],
             "coord_y": ["signal", "uncertainties"],

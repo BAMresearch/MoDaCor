@@ -23,10 +23,16 @@ extensions = [
     "sphinx.ext.graphviz",
     "myst_parser",
 ]
+myst_enable_extensions = [
+    "colon_fence",
+]
 inheritance_edge_attrs = dict(color="gray")  # readable in darkmode too
 autosummary_generate = True  # Turn on sphinx.ext.autosummary
 templates_path = ["_templates"]
-source_suffix = ".rst"
+source_suffix = {
+    ".md": "markdown",
+    ".rst": "restructuredtext",
+}
 master_doc = "index"
 project = "MoDaCor"
 year = "2025"

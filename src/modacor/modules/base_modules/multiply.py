@@ -39,6 +39,23 @@ class Multiply(ProcessStep):
             "multiplier_units_source": None,  # IoSources key for units
             "multiplier_uncertainties_sources": {},  # dict of uncertainty name: source, or 'propagate_to_all': source
         },
+        argument_specs={
+            "multiplier_source": {
+                "type": str,
+                "required": False,
+                "doc": "IoSources key for the multiplier signal.",
+            },
+            "multiplier_units_source": {
+                "type": str,
+                "required": False,
+                "doc": "IoSources key for multiplier units metadata.",
+            },
+            "multiplier_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Mapping of uncertainty name to IoSources key.",
+            },
+        },
         step_keywords=["multiply", "scalar", "array"],
         step_doc="Multiply a DataBundle element by a multiplier loaded from a data source",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
@@ -57,7 +74,7 @@ class Multiply(ProcessStep):
 
         output: dict[str, DataBundle] = {}
         # actual work happens here:
-        for key in self.configuration["with_processing_keys"]:
+        for key in self._normalised_processing_keys():
             databundle = self.processing_data.get(key)
             # multiply the data
             databundle["signal"] *= multiplier

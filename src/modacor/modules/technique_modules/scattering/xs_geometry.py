@@ -85,6 +85,68 @@ class XSGeometry(ProcessStep):
             "wavelength_units_source": None,
             "wavelength_uncertainties_sources": {},
         },
+        argument_specs={
+            "detector_distance_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for detector distance signal.",
+            },
+            "detector_distance_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for detector distance units.",
+            },
+            "detector_distance_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for detector distance.",
+            },
+            "pixel_size_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for pixel size signal.",
+            },
+            "pixel_size_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for pixel size units.",
+            },
+            "pixel_size_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for pixel size.",
+            },
+            "beam_center_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for beam center signal.",
+            },
+            "beam_center_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for beam center units.",
+            },
+            "beam_center_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for beam center.",
+            },
+            "wavelength_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "doc": "IoSources key for wavelength signal.",
+            },
+            "wavelength_units_source": {
+                "type": (str, type(None)),
+                "required": False,
+                "doc": "IoSources key for wavelength units.",
+            },
+            "wavelength_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Uncertainty sources for wavelength.",
+            },
+        },
         modifies={
             "Q": ["signal", "uncertainties"],
             "Q0": ["signal", "uncertainties"],

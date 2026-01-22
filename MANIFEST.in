@@ -18,10 +18,10 @@ include .pre-commit-config.yaml
 include .cookiecutterrc
 include tox.ini
 
-include AUTHORS.rst
+include AUTHORS.md
 include CHANGELOG.md
-include CONTRIBUTING.rst
+include CONTRIBUTING.md
 include LICENSE.txt
-include README.rst
+include README.md
 
 recursive-include templates *.j2
