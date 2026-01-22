@@ -31,6 +31,14 @@ or as a reference to validate faster, more integrated data-correction implementa
 pip install modacor
 ```
 
+### Optional extras
+
+Support for the Tiled-backed IoSource is provided via an optional dependency set. Install it with:
+
+```bash
+pip install modacor[tiled]
+```
+
 To install the in-development version:
 
 ```bash

@@ -1,13 +1,11 @@
+---
+myst:
+  toctree:
+    maxdepth: 1
+    entries:
+      - quickstart
+---
 
 # Getting started
 
-```{note}
-This section is a placeholder for the future getting-started guides. Content will be filled in as the documentation
-refresh progresses.
-```
-
-```{toctree}
-:maxdepth: 1
-
-quickstart
-```
+> **Note:** This section is a placeholder for the future getting-started guides. Content will be filled in as the documentation refresh progresses.
