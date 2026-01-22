@@ -39,6 +39,23 @@ class Subtract(ProcessStep):
             "subtrahend_units_source": None,  # IoSources key for units
             "subtrahend_uncertainties_sources": {},  # dict of uncertainty name: source, or 'propagate_to_all': source
         },
+        argument_specs={
+            "subtrahend_source": {
+                "type": str,
+                "required": False,
+                "doc": "IoSources key for the subtrahend signal.",
+            },
+            "subtrahend_units_source": {
+                "type": str,
+                "required": False,
+                "doc": "IoSources key for subtrahend units metadata.",
+            },
+            "subtrahend_uncertainties_sources": {
+                "type": dict,
+                "required": False,
+                "doc": "Mapping of uncertainty name to IoSources key.",
+            },
+        },
         step_keywords=["subtract", "scalar", "array"],
         step_doc="Subtract a DataBundle element by a subtrahend loaded from a data source",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
@@ -59,7 +76,7 @@ class Subtract(ProcessStep):
 
         output: dict[str, DataBundle] = {}
         # actual work happens here:
-        for key in self.configuration["with_processing_keys"]:
+        for key in self._normalised_processing_keys():
             databundle = data.get(key)
             # subtract the data
             # databundle['signal'] is a BaseData object

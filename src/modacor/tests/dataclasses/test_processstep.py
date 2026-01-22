@@ -175,6 +175,51 @@ def test_process_step__reset():
     assert ps.executed is False
 
 
+def test_normalised_processing_keys_with_single_entry():
+    data = ProcessingData()
+    data["only"] = DataBundle()
+    ps = ProcessStep(io_sources=TEST_IO_SOURCES, processing_data=data)
+    ps.configuration["with_processing_keys"] = None
+    assert ps._normalised_processing_keys() == ["only"]
+
+
+def test_normalised_processing_keys_with_multiple_entries_requires_explicit_keys():
+    data = ProcessingData()
+    data["a"] = DataBundle()
+    data["b"] = DataBundle()
+    ps = ProcessStep(io_sources=TEST_IO_SOURCES, processing_data=data)
+    ps.configuration["with_processing_keys"] = None
+    with pytest.raises(ValueError):
+        ps._normalised_processing_keys()
+
+
+def test_normalised_processing_keys_accepts_string_or_list():
+    data = ProcessingData()
+    data["a"] = DataBundle()
+    ps = ProcessStep(io_sources=TEST_IO_SOURCES, processing_data=data)
+    ps.configuration["with_processing_keys"] = "a"
+    assert ps._normalised_processing_keys() == ["a"]
+
+    ps.configuration["with_processing_keys"] = ["a", "b"]
+    assert ps._normalised_processing_keys() == ["a", "b"]
+
+
+def test_normalised_processing_keys_rejects_empty_list():
+    data = ProcessingData()
+    data["a"] = DataBundle()
+    ps = ProcessStep(io_sources=TEST_IO_SOURCES, processing_data=data)
+    ps.configuration["with_processing_keys"] = []
+    with pytest.raises(ValueError):
+        ps._normalised_processing_keys()
+
+
+def test_normalised_processing_keys_requires_processing_data():
+    ps = ProcessStep(io_sources=TEST_IO_SOURCES, processing_data=None)
+    ps.configuration["with_processing_keys"] = ["a"]
+    with pytest.raises(RuntimeError):
+        ps._normalised_processing_keys()
+
+
 @pytest.mark.parametrize("class_with_config_keys", [["test_str"]], indirect=True)
 def test_modify_config__valid_key(class_with_config_keys):
     instance = class_with_config_keys[1](io_sources=TEST_IO_SOURCES)

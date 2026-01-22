@@ -37,6 +37,18 @@ class MultiplyDatabundles(ProcessStep):
             "multiplicand_data_key": "signal",  # key of the DataBundle to multiply
             "multiplier_data_key": "signal",  # key of the DataBundle to multiply with if not signal
         },  # no arguments needed
+        argument_specs={
+            "multiplicand_data_key": {
+                "type": str,
+                "required": False,
+                "doc": "BaseData key to modify in the multiplicand DataBundle.",
+            },
+            "multiplier_data_key": {
+                "type": str,
+                "required": False,
+                "doc": "BaseData key to read from the multiplier DataBundle.",
+            },
+        },
         step_keywords=["multiply", "scaling", "databundle"],
         step_doc="Multiply a DataBundle element using another DataBundle",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
@@ -49,13 +61,14 @@ class MultiplyDatabundles(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         # actual work happens here:
-        assert len(self.configuration["with_processing_keys"]) == 2, (
+        keys = self._normalised_processing_keys()
+        assert len(keys) == 2, (
             "MultiplyDatabundles requires exactly two processing keys in 'with_processing_keys': "
             "the first is the multiplicand, the second is the multiplier."
         )
-        multiplicand_key = self.configuration["with_processing_keys"][0]
+        multiplicand_key = keys[0]
         multiplicand = self.processing_data.get(multiplicand_key)
-        multiplier = self.processing_data.get(self.configuration["with_processing_keys"][1])
+        multiplier = self.processing_data.get(keys[1])
         # multiply the data
         multiplicand[self.configuration["multiplicand_data_key"]] *= multiplier[
             self.configuration["multiplier_data_key"]

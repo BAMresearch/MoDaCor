@@ -75,7 +75,7 @@ include = ["modacor*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "modacor.__version__"}
-readme = {file = ["README.rst", "CHANGELOG.md"]}
+readme = {file = ["README.md", "CHANGELOG.md"]}
 dependencies = {file = ["requirements.txt"]}
 
 [tool.coverage.report]
