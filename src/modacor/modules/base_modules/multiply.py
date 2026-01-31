@@ -34,25 +34,20 @@ class Multiply(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
-        default_configuration={
-            "multiplier_source": None,  # IoSources key for signal
-            "multiplier_units_source": None,  # IoSources key for units
-            "multiplier_uncertainties_sources": {},  # dict of uncertainty name: source, or 'propagate_to_all': source
-        },
-        argument_specs={
+        arguments={
             "multiplier_source": {
                 "type": str,
-                "required": False,
+                "default": None,
                 "doc": "IoSources key for the multiplier signal.",
             },
             "multiplier_units_source": {
                 "type": str,
-                "required": False,
+                "default": None,
                 "doc": "IoSources key for multiplier units metadata.",
             },
             "multiplier_uncertainties_sources": {
                 "type": dict,
-                "required": False,
+                "default": {},
                 "doc": "Mapping of uncertainty name to IoSources key.",
             },
         },

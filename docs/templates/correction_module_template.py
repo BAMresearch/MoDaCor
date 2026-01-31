@@ -35,8 +35,7 @@ class YourCorrectionStep(ProcessStep):
 
     Fill in:
     - required_data_keys: BaseData keys required in each DataBundle
-    - default_configuration: runtime configuration defaults
-    - argument_specs: docs for configuration keys
+    - arguments: runtime configuration defaults and documentation
     - calculate(): core logic, returning updated DataBundles
     """
 
@@ -47,30 +46,20 @@ class YourCorrectionStep(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
-        required_arguments=[],
-        default_configuration={
-            # Use with_processing_keys to select which ProcessingData entries to update.
-            # None -> auto-apply when only one DataBundle exists.
-            "with_processing_keys": None,
-            # Example parameter for a scalar correction factor.
-            "correction_factor": 1.0,
-            # Optional: name of BaseData key to read/write.
-            "signal_key": "signal",
-        },
-        argument_specs={
+        arguments={
             "with_processing_keys": {
                 "type": (str, list, type(None)),
-                "required": False,
+                "default": None,
                 "doc": "ProcessingData key(s) to correct (string, list, or None).",
             },
             "correction_factor": {
                 "type": (float, int),
-                "required": False,
+                "default": 1.0,
                 "doc": "Scalar factor applied to the signal.",
             },
             "signal_key": {
                 "type": str,
-                "required": False,
+                "default": "signal",
                 "doc": "BaseData key to read/write within each DataBundle.",
             },
         },

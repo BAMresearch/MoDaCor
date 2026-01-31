@@ -33,11 +33,11 @@ class SubtractDatabundles(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
-        default_configuration={},  # no arguments needed
-        argument_specs={
+        arguments={
             "with_processing_keys": {
                 "type": list,
                 "required": True,
+                "default": None,
                 "doc": "Two processing keys: minuend then subtrahend.",
             },
         },

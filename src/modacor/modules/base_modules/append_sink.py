@@ -43,36 +43,28 @@ class AppendSink(ProcessStep):
         calling_version=__version__,
         required_data_keys=[],
         modifies={},  # sinks only; no data modified
-        required_arguments=[
-            "sink_identifier",  # identifier(s) to register the sink(s) under
-            "sink_location",  # resource location(s) (file/socket/...) understood by the sink
-            "iosink_module",  # fully qualified import path to sink class
-        ],
-        default_configuration={
-            "sink_identifier": "",
-            "sink_location": "",
-            "iosink_module": "",
-            "iosink_method_kwargs": {},
-        },
-        argument_specs={
+        arguments={
             "sink_identifier": {
                 "type": (str, list),
                 "required": True,
+                "default": "",
                 "doc": "Identifier(s) to register the ioSink(s) under.",
             },
             "sink_location": {
                 "type": (str, list),
                 "required": True,
+                "default": "",
                 "doc": "Resource location(s) understood by the sink.",
             },
             "iosink_module": {
                 "type": str,
                 "required": True,
+                "default": "",
                 "doc": "Fully qualified module path to the ioSink class.",
             },
             "iosink_method_kwargs": {
                 "type": dict,
-                "required": False,
+                "default": {},
                 "doc": "Keyword arguments forwarded to the ioSink constructor.",
             },
         },

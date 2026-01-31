@@ -35,12 +35,11 @@ class SolidAngleCorrection(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal", "Omega"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
-        required_arguments=[],  # none required, defaults all around
-        default_configuration={},
-        argument_specs={
+        arguments={
             "with_processing_keys": {
                 "type": list,
                 "required": True,
+                "default": None,
                 "doc": "ProcessingData keys whose signal should be divided by Omega.",
             },
         },

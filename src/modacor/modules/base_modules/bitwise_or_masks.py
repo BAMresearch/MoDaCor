@@ -40,25 +40,22 @@ class BitwiseOrMasks(ProcessStep):
         calling_version=__version__,
         required_data_keys=["mask"],
         modifies={"mask": ["signal"]},
-        default_configuration={
-            "with_processing_keys": ["sample"],  # single databundle key
-            "target_mask_key": "mask",  # target mask BaseData key within the DataBundle
-            "source_mask_keys": [],  # list of source mask BaseData keys within the DataBundle
-        },
-        argument_specs={
+        arguments={
             "with_processing_keys": {
                 "type": list,
                 "required": True,
+                "default": ["sample"],
                 "doc": "Single processing key identifying the DataBundle to update.",
             },
             "target_mask_key": {
                 "type": str,
-                "required": False,
+                "default": "mask",
                 "doc": "BaseData key for the target mask inside the DataBundle.",
             },
             "source_mask_keys": {
                 "type": list,
                 "required": True,
+                "default": [],
                 "doc": "List of BaseData keys to OR into the target mask.",
             },
         },
