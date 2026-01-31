@@ -49,31 +49,26 @@ class CombineUncertainties(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["uncertainties"]},
-        default_configuration={
-            "target_basedata_key": "signal",
-            "combinations": {},
-            "drop_source_keys": False,
-            "ignore_missing": False,
-        },
-        argument_specs={
+        arguments={
             "target_basedata_key": {
                 "type": str,
-                "required": False,
+                "default": "signal",
                 "doc": "Name of the BaseData entry within each DataBundle to modify (default: 'signal').",
             },
             "combinations": {
                 "type": dict,
                 "required": True,
+                "default": {},
                 "doc": "Mapping of output uncertainty key to an iterable of source keys to combine.",
             },
             "drop_source_keys": {
                 "type": bool,
-                "required": False,
+                "default": False,
                 "doc": "Remove source uncertainty keys after combination (default: False).",
             },
             "ignore_missing": {
                 "type": bool,
-                "required": False,
+                "default": False,
                 "doc": (
                     "If True, missing source keys are ignored (combinations use the available ones). "
                     "If all listed keys are missing, the combination is skipped."
