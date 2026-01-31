@@ -25,6 +25,7 @@ from modacor.modules.base_modules.subtract import Subtract
 from modacor.modules.base_modules.subtract_databundles import SubtractDatabundles
 from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
 from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
+from modacor.modules.technique_modules.scattering.lake_desmearing import LakeDesmearing
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
 from modacor.modules.technique_modules.scattering.solid_angle_correction import SolidAngleCorrection
 from modacor.modules.technique_modules.scattering.xs_geometry import XSGeometry
@@ -43,6 +44,7 @@ __all__ = [
     "Multiply",
     "MultiplyDatabundles",
     "PixelCoordinates3D",
+    "LakeDesmearing",
     "PoissonUncertainties",
     "ReduceDimensionality",
     "SolidAngleCorrection",
