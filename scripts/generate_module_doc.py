@@ -78,13 +78,18 @@ def _format_modifies(modifies: dict[str, list[str]]) -> str:
     return "\n".join(lines)
 
 
-def _format_argument_specs(argument_specs: dict[str, dict[str, Any]]) -> str:
-    if not argument_specs:
+def _format_arguments(documentation: ProcessStepDescriber) -> str:
+    arguments = getattr(documentation, "arguments", {}) or {}
+    if not arguments:
         return "_No configuration arguments documented._"
 
-    header = "| Argument | Type | Required | Description |\n|---|---|---|---|"
+    defaults = {}
+    if hasattr(documentation, "initial_configuration"):
+        defaults = documentation.initial_configuration() or {}
+
+    header = "| Argument | Type | Required | Default | Description |\n|---|---|---|---|---|"
     rows = []
-    for name, spec in sorted(argument_specs.items()):
+    for name, spec in sorted(arguments.items()):
         raw_types = spec.get("type", [])
         if raw_types in (None, []):
             type_items = []
@@ -94,21 +99,37 @@ def _format_argument_specs(argument_specs: dict[str, dict[str, Any]]) -> str:
             type_items = [raw_types]
         type_repr = " or ".join(t.__name__ if hasattr(t, "__name__") else str(t) for t in type_items)
         required = "Yes" if spec.get("required", False) else "No"
+        default_value = defaults.get(name, spec.get("default", None))
+        if isinstance(default_value, (dict, list, tuple)):
+            default_repr = json.dumps(default_value, ensure_ascii=False)
+        elif isinstance(default_value, str):
+            default_repr = default_value
+        elif default_value is None:
+            default_repr = "-"
+        else:
+            default_repr = str(default_value)
         description = spec.get("doc", "") or ""
-        rows.append(f"| `{name}` | {type_repr or '-'} | {required} | {description} |")
+        rows.append(f"| `{name}` | {type_repr or '-'} | {required} | {default_repr} | {description} |")
 
     return "\n".join([header, *rows])
 
 
 def _format_default_config(documentation: ProcessStepDescriber) -> str:
-    defaults = documentation.default_configuration_copy() or {}
+    defaults = {}
+    if hasattr(documentation, "initial_configuration"):
+        defaults = documentation.initial_configuration() or {}
+    else:
+        defaults = documentation.default_configuration_copy() or {}
     if not defaults:
         return "_No default configuration defined._"
     return "```json\n" + json.dumps(defaults, indent=2, sort_keys=True) + "\n```"
 
 
 def _format_required_arguments(documentation: ProcessStepDescriber) -> str:
-    required_args = documentation.required_arguments or []
+    if hasattr(documentation, "required_argument_names"):
+        required_args = list(documentation.required_argument_names())
+    else:
+        required_args = getattr(documentation, "required_arguments", []) or []
     return _format_list(required_args)
 
 
@@ -159,7 +180,7 @@ def build_markdown(step_cls, documentation: ProcessStepDescriber) -> str:
         _format_default_config(documentation),
         "",
         "## Argument specification",
-        _format_argument_specs(documentation.argument_specs or {}),
+        _format_arguments(documentation),
     ]
 
     if reference:
