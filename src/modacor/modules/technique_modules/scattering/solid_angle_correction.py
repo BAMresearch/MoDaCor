@@ -35,8 +35,14 @@ class SolidAngleCorrection(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal", "Omega"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
-        required_arguments={},  # none required, defaults all around
-        default_configuration={},
+        arguments={
+            "with_processing_keys": {
+                "type": list,
+                "required": True,
+                "default": None,
+                "doc": "ProcessingData keys whose signal should be divided by Omega.",
+            },
+        },
         step_keywords=["divide", "normalize", "solid angle"],
         step_doc="Divide the pixels in a signal by their solid angle coverage",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
@@ -48,7 +54,7 @@ class SolidAngleCorrection(ProcessStep):
         output: dict[str, DataBundle] = {}
 
         # actual work happens here:
-        for key in self.configuration["with_processing_keys"]:
+        for key in self._normalised_processing_keys():
             databundle = self.processing_data.get(key)
             # divide the data
             # Rely on BaseData.__truediv__ for units + uncertainty propagation

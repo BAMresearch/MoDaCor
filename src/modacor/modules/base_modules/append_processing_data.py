@@ -68,27 +68,45 @@ class AppendProcessingData(ProcessStep):
         calling_version=__version__,
         required_data_keys=[],  # this step creates/updates a DataBundle
         modifies={},  # processing_key: databundle: databundle_output_key
-        required_arguments=[
-            "processing_key",  # Processing data key to create/update. Must be a string.
-            "signal_location",  # Data identifier to read from, '<io_source_id>::<dataset_path>'. Must be a string.
-            "rank_of_data",  # Rank of the created BaseData array. int or str (io_source location).
-        ],
-        default_configuration={
-            "processing_key": "",  # must be set by the user
-            "signal_location": "",  # must be set by the user
-            "rank_of_data": 2,
-            # key under which the BaseData will be stored in the DataBundle
-            "databundle_output_key": "signal",
-            # optional location for units definition, in the form
-            # '<io_source_id>::<dataset_path>' or with attribute suffix
-            # '<io_source_id>::<dataset_path>@units'. If None, units will be
-            # set to ureg.dimensionless unless units_override is given.
-            "units_location": None,
-            # optional direct units string to override any loaded units
-            "units_override": None,
-            # optional sources for uncertainties data, in the form:
-            # {'<uncertainty_name>': '<io_source_id>::<dataset_path>'}
-            "uncertainties_sources": {},
+        arguments={
+            "processing_key": {
+                "type": str,
+                "required": True,
+                "default": "",
+                "doc": "ProcessingData key to create or update.",
+            },
+            "signal_location": {
+                "type": str,
+                "required": True,
+                "default": "",
+                "doc": "IoSources reference '<io_source_id>::<dataset_path>'.",
+            },
+            "rank_of_data": {
+                "type": (int, str),
+                "required": True,
+                "default": 2,
+                "doc": "BaseData rank as int or IoSources metadata reference.",
+            },
+            "databundle_output_key": {
+                "type": str,
+                "default": "signal",
+                "doc": "BaseData key inside the DataBundle.",
+            },
+            "units_location": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Optional IoSources reference for units metadata.",
+            },
+            "units_override": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Optional unit string that overrides loaded units.",
+            },
+            "uncertainties_sources": {
+                "type": dict,
+                "default": {},
+                "doc": "Mapping of uncertainty name to IoSources reference.",
+            },
         },
         step_keywords=["append", "processing", "data", "signal"],
         step_doc="Append signal data from IoSources into a processing DataBundle.",

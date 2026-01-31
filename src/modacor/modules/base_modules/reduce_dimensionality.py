@@ -51,15 +51,27 @@ class ReduceDimensionality(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units", "weights"]},
-        default_configuration={
-            # Axis or axes to reduce. Can be int, list/tuple of ints, or None (reduce all).
-            "axes": None,
-            # Use BaseData.weights as weights (default) or do unweighted mean (False → equal weights).
-            "use_weights": True,
-            # 'omit' → ignore NaNs (nanmean-style); 'propagate' → NaNs propagate (mean-style).
-            "nan_policy": "omit",
-            # Reduction method: 'mean' (default, weighted or unweighted), or 'sum' (weighted or unweighted).
-            "reduction": "mean",
+        arguments={
+            "axes": {
+                "type": (int, list, tuple, type(None)),
+                "default": None,
+                "doc": "Axis or axes to reduce (int, list/tuple, or None for all).",
+            },
+            "use_weights": {
+                "type": bool,
+                "default": True,
+                "doc": "Use BaseData weights for weighted reduction.",
+            },
+            "nan_policy": {
+                "type": str,
+                "default": "omit",
+                "doc": "NaN handling policy: 'omit' or 'propagate'.",
+            },
+            "reduction": {
+                "type": str,
+                "default": "mean",
+                "doc": "Reduction method: 'mean' or 'sum'.",
+            },
         },
         step_keywords=["average", "mean", "weighted", "nanmean", "reduce", "axis", "sum"],
         step_doc=(
@@ -220,7 +232,7 @@ class ReduceDimensionality(ProcessStep):
 
         output: dict[str, DataBundle] = {}
 
-        for key in self.configuration["with_processing_keys"]:
+        for key in self._normalised_processing_keys():
             databundle: DataBundle = self.processing_data.get(key)
             bd: BaseData = databundle["signal"]
 

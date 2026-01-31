@@ -95,7 +95,7 @@ class ProcessStep:
         Post-initialization method to set up the process step.
         """
         self.configuration = self.default_config()
-        self.configuration.update(self.documentation.default_configuration)
+        self.configuration.update(self.documentation.initial_configuration())
 
     def __call__(self, processing_data: ProcessingData) -> None:
         """Allow the process step to be called like a function"""
@@ -115,6 +115,45 @@ class ProcessStep:
         once before the process step can be executed.
         """
         pass
+
+    def _normalised_processing_keys(self, cfg_key: str = "with_processing_keys") -> list[str]:
+        """
+        Normalize a ProcessingData key selection into a non-empty list of strings.
+
+        Behavior:
+        - None: if processing_data has exactly one key, use it; otherwise error.
+        - str: wrap into a one-item list.
+        - iterable: materialize into a list (must be non-empty).
+        """
+        if self.processing_data is None:
+            raise RuntimeError(f"{self.__class__.__name__}: processing_data is None in _normalised_processing_keys.")
+
+        cfg_value = self.configuration.get(cfg_key, None)
+
+        if cfg_value is None:
+            if len(self.processing_data) == 0:
+                raise ValueError(f"{self.__class__.__name__}: {cfg_key} is None and processing_data is empty.")
+            if len(self.processing_data) == 1:
+                only_key = next(iter(self.processing_data.keys()))
+                self.logger.info(
+                    f"{self.__class__.__name__}: {cfg_key} not set; using the only key {only_key!r}."  # noqa: E702
+                )
+                return [only_key]
+            raise ValueError(f"{self.__class__.__name__}: {cfg_key} is None but multiple databundles are present.")
+
+        if isinstance(cfg_value, str):
+            return [cfg_value]
+
+        try:
+            keys = list(cfg_value)
+        except TypeError as exc:  # not iterable
+            raise ValueError(
+                f"{self.__class__.__name__}: {cfg_key} must be a string, an iterable of strings, or None."
+            ) from exc
+
+        if not keys:
+            raise ValueError(f"{self.__class__.__name__}: {cfg_key} must not be an empty list.")
+        return keys
 
     @abstractmethod
     def calculate(self) -> dict[str, DataBundle]:
@@ -147,8 +186,13 @@ class ProcessStep:
         for key, value in by_dict.items():
             if key in self.configuration:
                 self.configuration[key] = value
+            elif key in self.documentation.arguments:
+                # Allow setting documented arguments even if they were not part of the
+                # current configuration snapshot yet.
+                self.configuration[key] = value
             else:
-                raise KeyError(f"Key {key} not found in configuration")  # noqa
+                known_keys = ", ".join(sorted(self.configuration.keys()))
+                raise KeyError(f"Key {key} not found in configuration. Known keys: {known_keys}")  # noqa
         # restart preparation after configuration change:
         self.__prepared = False
 

@@ -40,10 +40,24 @@ class BitwiseOrMasks(ProcessStep):
         calling_version=__version__,
         required_data_keys=["mask"],
         modifies={"mask": ["signal"]},
-        default_configuration={
-            "with_processing_keys": ["sample"],  # single databundle key
-            "target_mask_key": "mask",  # target mask BaseData key within the DataBundle
-            "source_mask_keys": [],  # list of source mask BaseData keys within the DataBundle
+        arguments={
+            "with_processing_keys": {
+                "type": list,
+                "required": True,
+                "default": ["sample"],
+                "doc": "Single processing key identifying the DataBundle to update.",
+            },
+            "target_mask_key": {
+                "type": str,
+                "default": "mask",
+                "doc": "BaseData key for the target mask inside the DataBundle.",
+            },
+            "source_mask_keys": {
+                "type": list,
+                "required": True,
+                "default": [],
+                "doc": "List of BaseData keys to OR into the target mask.",
+            },
         },
         step_keywords=["mask", "bitmask", "bitwise", "or", "databundle"],
         step_doc="Combine multiple mask arrays stored as different BaseData keys in the same DataBundle.",
@@ -66,9 +80,9 @@ class BitwiseOrMasks(ProcessStep):
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration
 
-        with_processing_keys = cfg["with_processing_keys"]
-        assert len(with_processing_keys) == 1, "BitwiseOrMasks requires a single databundle processing key."
-        processing_key = with_processing_keys[0]
+        keys = self._normalised_processing_keys()
+        assert len(keys) == 1, "BitwiseOrMasks requires a single databundle processing key."
+        processing_key = keys[0]
         target_key = cfg.get("target_mask_key", "mask")
         source_keys = cfg["source_mask_keys"]
 

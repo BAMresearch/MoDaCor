@@ -11,6 +11,7 @@ __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -21,14 +22,51 @@ __all__ = ["ProcessStepDescriber"]
 
 
 NXCite = str
+ArgumentSpec = dict[str, Any]
 
 
-def validate_required_keys(instance, attribute, value):
-    # keys = [key.strip() for key in value.keys()]
-    keys = [key.strip() for key in instance.required_arguments]
-    missing = [key for key in keys if key not in instance.default_configuration]
-    if missing:
-        raise ValueError(f"Missing required argument keys in default_configuration: {missing}")
+_MISSING = object()
+
+
+def _normalize_str_list(value: Any, field_name: str) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, (str, dict)):
+        raise TypeError(f"{field_name} must be a list of strings, got {type(value).__name__}.")
+    if isinstance(value, (list, tuple, set)):
+        return [item.strip() if isinstance(item, str) else item for item in value]
+    raise TypeError(f"{field_name} must be a list of strings, got {type(value).__name__}.")
+
+
+def _normalize_arguments(value: Any, field_name: str) -> dict[str, ArgumentSpec]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise TypeError(f"{field_name} must be a mapping, got {type(value).__name__}.")
+
+    normalized: dict[str, ArgumentSpec] = {}
+    for key, spec in value.items():
+        if not isinstance(spec, dict):
+            raise TypeError(f"{field_name} entries must be mappings, got {type(spec).__name__} for key {key!r}.")
+        normalized_key = str(key).strip()
+        if not normalized_key:
+            raise ValueError(f"{field_name} keys must be non-empty strings.")
+
+        normalized_spec = dict(spec)
+        default = normalized_spec.get("default", _MISSING)
+        normalized_spec["default"] = default
+
+        required = normalized_spec.get("required", False)
+        if not isinstance(required, bool):
+            raise TypeError(f"{field_name}[{normalized_key!r}]['required'] must be a boolean.")
+        normalized_spec["required"] = required
+
+        normalized[normalized_key] = normalized_spec
+    return normalized
+
+
+def _deepcopy_default(value: Any) -> Any:
+    return deepcopy(value)
 
 
 @define
@@ -39,14 +77,23 @@ class ProcessStepDescriber:
         validator=v.instance_of(Path)
     )  # partial path to the module from src/modacor/modules onwards
     calling_version: str = field()  # module version being executed
-    required_data_keys: list[str] = field(factory=list)  # list of data keys required by the process
-    required_arguments: list[str] = field(factory=list)  # list of argument key-val combos required by the process
-    default_configuration: dict[str, Any] = field(factory=dict, validator=validate_required_keys)
+    required_data_keys: list[str] = field(
+        factory=list,
+        converter=lambda value: _normalize_str_list(value, "required_data_keys"),
+        validator=v.deep_iterable(member_validator=v.instance_of(str), iterable_validator=v.instance_of(list)),
+    )  # list of data keys required by the process
+    arguments: dict[str, ArgumentSpec] = field(
+        factory=dict,
+        converter=lambda value: _normalize_arguments(value, "arguments"),
+        validator=v.deep_mapping(key_validator=v.instance_of(str), value_validator=v.instance_of(dict)),
+    )  # schema describing configurable arguments
     modifies: dict[str, list] = field(
         factory=dict, validator=v.instance_of(dict)
     )  # which aspects of BaseData are modified by this
     step_keywords: list[str] = field(
-        factory=list
+        factory=list,
+        converter=lambda value: _normalize_str_list(value, "step_keywords"),
+        validator=v.deep_iterable(member_validator=v.instance_of(str), iterable_validator=v.instance_of(list)),
     )  # list of keywords that can be used to identify the process (allowing for searches)
     step_doc: str = field(default="")  # documentation for the process
     step_reference: NXCite = field(default="")  # NXCite to the paper describing the process
@@ -62,3 +109,38 @@ class ProcessStepDescriber:
 
     def copy(self) -> "ProcessStepDescriber":
         return evolve(self)
+
+    def argument_names(self) -> tuple[str, ...]:
+        return tuple(self.arguments.keys())
+
+    def required_argument_names(self) -> tuple[str, ...]:
+        return tuple(name for name, spec in self.arguments.items() if spec.get("required", False))
+
+    def initial_configuration(self) -> dict[str, Any]:
+        configuration: dict[str, Any] = {}
+        for name, spec in self.arguments.items():
+            default = spec.get("default", _MISSING)
+            if default is _MISSING:
+                configuration[name] = None
+            else:
+                configuration[name] = _deepcopy_default(default)
+        return configuration
+
+    @classmethod
+    def from_module(
+        cls,
+        *,
+        calling_name: str,
+        calling_id: str,
+        module_file: str | Path,
+        version: str,
+        **kwargs: Any,
+    ) -> "ProcessStepDescriber":
+        """Convenience constructor that normalises ``module_file`` to :class:`Path`."""
+        return cls(
+            calling_name=calling_name,
+            calling_id=calling_id,
+            calling_module_path=Path(module_file),
+            calling_version=version,
+            **kwargs,
+        )

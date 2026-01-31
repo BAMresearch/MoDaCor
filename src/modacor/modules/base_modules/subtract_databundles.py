@@ -33,7 +33,14 @@ class SubtractDatabundles(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
-        default_configuration={},  # no arguments needed
+        arguments={
+            "with_processing_keys": {
+                "type": list,
+                "required": True,
+                "default": None,
+                "doc": "Two processing keys: minuend then subtrahend.",
+            },
+        },
         step_keywords=["subtract", "background", "databundle"],
         step_doc="Subtract a DataBundle element using another DataBundle",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
@@ -46,13 +53,14 @@ class SubtractDatabundles(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         # actual work happens here:
-        assert len(self.configuration["with_processing_keys"]) == 2, (
+        keys = self._normalised_processing_keys()
+        assert len(keys) == 2, (
             "SubtractDatabundles requires exactly two processing keys in 'with_processing_keys': "
             "the first is the minuend, the second is the subtrahend."
         )
-        minuend_key = self.configuration["with_processing_keys"][0]
+        minuend_key = keys[0]
         minuend = self.processing_data.get(minuend_key)
-        subtrahend = self.processing_data.get(self.configuration["with_processing_keys"][1])
+        subtrahend = self.processing_data.get(keys[1])
         # subtract the data
         minuend["signal"] -= subtrahend["signal"]
         output: dict[str, DataBundle] = {minuend_key: minuend}

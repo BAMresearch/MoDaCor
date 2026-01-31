@@ -194,20 +194,72 @@ class FindScaleFactor1D(ProcessStep):
             "scale_factor": ["signal", "uncertainties", "units"],
             "scale_background": ["signal", "uncertainties", "units"],
         },
-        default_configuration={
-            "signal_key": "signal",
-            "independent_axis_key": "Q",
-            "scale_output_key": "scale_factor",
-            "background_output_key": "scale_background",
-            "fit_background": False,
-            "fit_min_val": None,
-            "fit_max_val": None,
-            "fit_val_units": None,
-            "require_overlap": True,
-            "interpolation_kind": "linear",
-            "robust_loss": "huber",
-            "robust_fscale": 1.0,
-            "use_basedata_weights": True,
+        arguments={
+            "signal_key": {
+                "type": str,
+                "default": "signal",
+                "doc": "BaseData key for the dependent variable signal.",
+            },
+            "independent_axis_key": {
+                "type": str,
+                "default": "Q",
+                "doc": "BaseData key for the independent axis.",
+            },
+            "scale_output_key": {
+                "type": str,
+                "default": "scale_factor",
+                "doc": "BaseData key to store the scale factor output.",
+            },
+            "background_output_key": {
+                "type": str,
+                "default": "scale_background",
+                "doc": "BaseData key to store the fitted background output.",
+            },
+            "fit_background": {
+                "type": bool,
+                "default": False,
+                "doc": "Whether to fit a constant background offset.",
+            },
+            "fit_min_val": {
+                "type": (float, int, type(None)),
+                "default": None,
+                "doc": "Minimum x-value for the fit (in fit_val_units).",
+            },
+            "fit_max_val": {
+                "type": (float, int, type(None)),
+                "default": None,
+                "doc": "Maximum x-value for the fit (in fit_val_units).",
+            },
+            "fit_val_units": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Units for fit_min_val/fit_max_val if provided.",
+            },
+            "require_overlap": {
+                "type": bool,
+                "default": True,
+                "doc": "Require overlapping x-range between reference and work data.",
+            },
+            "interpolation_kind": {
+                "type": str,
+                "default": "linear",
+                "doc": "Interpolation kind passed to scipy/numpy interpolation.",
+            },
+            "robust_loss": {
+                "type": str,
+                "default": "huber",
+                "doc": "Robust loss function name for the fit.",
+            },
+            "robust_fscale": {
+                "type": (float, int),
+                "default": 1.0,
+                "doc": "Robust loss scale parameter.",
+            },
+            "use_basedata_weights": {
+                "type": bool,
+                "default": True,
+                "doc": "Use BaseData weights when fitting.",
+            },
         },
         step_keywords=["scale", "calibration", "1D"],
         step_doc="Compute scale factor between two 1D curves using robust least squares.",
@@ -215,7 +267,10 @@ class FindScaleFactor1D(ProcessStep):
 
     def calculate(self) -> Dict[str, DataBundle]:
         cfg = self.configuration
-        work_key, ref_key = cfg["with_processing_keys"]
+        keys = self._normalised_processing_keys()
+        if len(keys) != 2:
+            raise ValueError("FindScaleFactor1D requires exactly two processing keys in 'with_processing_keys'.")
+        work_key, ref_key = keys
 
         sig_key = cfg.get("signal_key", "signal")
         axis_key = cfg.get("independent_axis_key", "Q")

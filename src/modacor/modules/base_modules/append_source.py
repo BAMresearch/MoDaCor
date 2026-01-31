@@ -43,16 +43,30 @@ class AppendSource(ProcessStep):
         calling_version=__version__,
         required_data_keys=[],
         modifies={},  # sources only; no data modified
-        required_arguments=[
-            "source_identifier",  # The identifier to use for the appended ioSource in the data sources. Can be a string or list of strings for multiple sources
-            "source_location",  # The ioSource path or other location identifier of the object to append to the IoSources. Can be a string or list of strings for multiple sources
-            "iosource_module",  # The fully qualified import path to the module to load the source_location into an ioSource object, e.g. 'modacor.io.yaml.yaml_source.YAMLSource' or 'modacor.io.hdf.hdf_source.HDFSource'. Choose only one.
-        ],
-        default_configuration={
-            "source_identifier": "",
-            "source_location": "",
-            "iosource_module": "",
-            "iosource_method_kwargs": {},
+        arguments={
+            "source_identifier": {
+                "type": (str, list),
+                "required": True,
+                "default": "",
+                "doc": "Identifier(s) to register the ioSource(s) under.",
+            },
+            "source_location": {
+                "type": (str, list),
+                "required": True,
+                "default": "",
+                "doc": "Resource location(s) to load for the ioSource(s).",
+            },
+            "iosource_module": {
+                "type": str,
+                "required": True,
+                "default": "",
+                "doc": "Fully qualified module path to the ioSource class.",
+            },
+            "iosource_method_kwargs": {
+                "type": dict,
+                "default": {},
+                "doc": "Keyword arguments forwarded to the ioSource constructor.",
+            },
         },
         step_keywords=["append", "source"],
         step_doc="Append an ioSource to the available data sources",

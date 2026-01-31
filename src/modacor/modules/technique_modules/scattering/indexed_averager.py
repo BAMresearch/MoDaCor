@@ -117,21 +117,39 @@ class IndexedAverager(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal", "Q", "Psi", "pixel_index"],
-        required_arguments=[
-            "with_processing_keys",
-            "output_processing_key",
-            "averaging_direction",
-            "use_signal_weights",
-            "use_signal_uncertainty_weights",
-            "uncertainty_weight_key",
-        ],
-        default_configuration={
-            "with_processing_keys": None,
-            "output_processing_key": None,  # currently unused
-            "averaging_direction": "azimuthal",
-            "use_signal_weights": True,
-            "use_signal_uncertainty_weights": False,
-            "uncertainty_weight_key": None,
+        arguments={
+            "with_processing_keys": {
+                "type": (str, list, type(None)),
+                "required": True,
+                "default": None,
+                "doc": "ProcessingData key or list of keys to average.",
+            },
+            "output_processing_key": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Optional output key override (currently unused).",
+            },
+            "averaging_direction": {
+                "type": str,
+                "required": True,
+                "default": "azimuthal",
+                "doc": "Averaging direction: 'radial' or 'azimuthal'.",
+            },
+            "use_signal_weights": {
+                "type": bool,
+                "default": True,
+                "doc": "Use BaseData weights when averaging signal.",
+            },
+            "use_signal_uncertainty_weights": {
+                "type": bool,
+                "default": False,
+                "doc": "Use signal uncertainty as weights.",
+            },
+            "uncertainty_weight_key": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Uncertainty key to use as weights if enabled.",
+            },
         },
         modifies={
             # We overwrite 'signal', 'Q', 'Psi' with their 1D binned versions.
@@ -168,46 +186,7 @@ class IndexedAverager(ProcessStep):
         If configuration value is None and exactly one databundle is present
         in processing_data, that key is returned as the single entry.
         """
-        if self.processing_data is None:
-            raise RuntimeError("IndexedAverager: processing_data is None in _normalised_keys.")
-
-        cfg_value = self.configuration.get("with_processing_keys", None)
-
-        # None → use only key if exactly one available
-        if cfg_value is None:
-            if len(self.processing_data) == 0:
-                raise ValueError("IndexedAverager: with_processing_keys is None and processing_data is empty.")
-            if len(self.processing_data) == 1:
-                only_key = next(iter(self.processing_data.keys()))
-                logger.info(
-                    "IndexedAverager: with_processing_keys not set; using the only key %r.",
-                    only_key,
-                )
-                return [only_key]
-            raise ValueError(
-                "IndexedAverager: with_processing_keys is None but multiple "
-                "databundles are present. Please specify a key or list of keys."
-            )
-
-        # Single string
-        if isinstance(cfg_value, str):
-            return [cfg_value]
-
-        # Iterable of strings
-        try:
-            keys = list(cfg_value)
-        except TypeError as exc:  # not iterable
-            raise ValueError(
-                "IndexedAverager: with_processing_keys must be a string, an iterable of strings, or None."
-            ) from exc
-
-        if not keys:
-            raise ValueError("IndexedAverager: with_processing_keys is an empty iterable.")
-
-        for k in keys:
-            if not isinstance(k, str):
-                raise ValueError(f"IndexedAverager: all entries in with_processing_keys must be strings, got {k!r}.")
-        return keys
+        return self._normalised_processing_keys()
 
     # ------------------------------------------------------------------
     # Helper: validate geometry, signal and pixel_index for a databundle

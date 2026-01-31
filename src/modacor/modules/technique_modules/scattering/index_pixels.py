@@ -121,21 +121,59 @@ class IndexPixels(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal", "Q", "Psi"],
-        required_arguments=[
-            "with_processing_keys",
-            "averaging_direction",
-        ],
-        default_configuration={
-            "with_processing_keys": None,
-            "averaging_direction": "radial",
-            "q_min": None,
-            "q_max": None,
-            "q_limits_unit": None,
-            "n_bins": 100,
-            "bin_type": "log",
-            "psi_min": None,
-            "psi_max": None,
-            "psi_limits_unit": None,
+        arguments={
+            "with_processing_keys": {
+                "type": (str, list, type(None)),
+                "required": True,
+                "default": None,
+                "doc": "ProcessingData key or list of keys to index.",
+            },
+            "averaging_direction": {
+                "type": str,
+                "required": True,
+                "default": "radial",
+                "doc": "Averaging direction: 'radial' or 'azimuthal'.",
+            },
+            "q_min": {
+                "type": (float, int, type(None)),
+                "default": None,
+                "doc": "Minimum Q value for binning.",
+            },
+            "q_max": {
+                "type": (float, int, type(None)),
+                "default": None,
+                "doc": "Maximum Q value for binning.",
+            },
+            "q_limits_unit": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Units for q_min/q_max if provided.",
+            },
+            "n_bins": {
+                "type": int,
+                "default": 100,
+                "doc": "Number of bins.",
+            },
+            "bin_type": {
+                "type": str,
+                "default": "log",
+                "doc": "Binning type: 'linear' or 'log'.",
+            },
+            "psi_min": {
+                "type": (float, int, type(None)),
+                "default": None,
+                "doc": "Minimum Psi value for binning.",
+            },
+            "psi_max": {
+                "type": (float, int, type(None)),
+                "default": None,
+                "doc": "Maximum Psi value for binning.",
+            },
+            "psi_limits_unit": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Units for psi_min/psi_max if provided.",
+            },
         },
         modifies={},  # nothing, we only add.
         step_keywords=[
@@ -168,45 +206,7 @@ class IndexPixels(ProcessStep):
         primary_key: the key used to compute the pixel index map.
         keys_to_update: all keys that should receive the map.
         """
-        if self.processing_data is None:
-            raise RuntimeError("IndexPixels: processing_data is None in _normalised_keys.")
-
-        cfg_value = self.configuration.get("with_processing_keys", None)
-
-        # None → use only key if exactly one available
-        if cfg_value is None:
-            if len(self.processing_data) == 0:
-                raise ValueError("IndexPixels: with_processing_keys is None and processing_data is empty.")
-            if len(self.processing_data) == 1:
-                only_key = next(iter(self.processing_data.keys()))
-                logger.info(
-                    f"IndexPixels: with_processing_keys not set; using the only key {only_key}.",  # noqa: E702
-                )
-                return only_key, [only_key]
-            raise ValueError(
-                "IndexPixels: with_processing_keys is None but multiple "
-                "databundles are present. Please specify a key or list of keys."
-            )
-
-        # Single string
-        if isinstance(cfg_value, str):
-            return cfg_value, [cfg_value]
-
-        # Iterable of strings
-        try:
-            keys = list(cfg_value)
-        except TypeError as exc:  # not iterable
-            raise ValueError(
-                "IndexPixels: with_processing_keys must be a string, an iterable of strings, or None."
-            ) from exc
-
-        if not keys:
-            raise ValueError("IndexPixels: with_processing_keys is an empty iterable.")
-
-        for k in keys:
-            if not isinstance(k, str):
-                raise ValueError("IndexPixels: all entries in with_processing_keys must be strings, got %r." % (k,))
-
+        keys = self._normalised_processing_keys()
         primary_key = keys[0]
         if len(keys) > 1:
             logger.warning(
