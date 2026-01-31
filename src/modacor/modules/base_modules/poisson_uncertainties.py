@@ -37,10 +37,11 @@ class PoissonUncertainties(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"variances": ["Poisson"]},
-        argument_specs={
+        arguments={
             "with_processing_keys": {
                 "type": list,
                 "required": True,
+                "default": None,
                 "doc": "ProcessingData keys to update with Poisson variances.",
             },
         },

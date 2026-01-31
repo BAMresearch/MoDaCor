@@ -34,17 +34,11 @@ class UnitsLabelUpdate(ProcessStep):
         calling_version=__version__,
         required_data_keys=[""],  # provided via update_pairs
         modifies={"": ["units"]},
-        default_configuration={
-            # update_pairs:
-            #   <basedata_key>: { units: "<pint unit str>" }
-            # or shorthand:
-            #   <basedata_key>: "<pint unit str>"
-            "update_pairs": {},
-        },
-        argument_specs={
+        arguments={
             "update_pairs": {
                 "type": dict,
                 "required": True,
+                "default": {},
                 "doc": "Mapping of BaseData key to unit string or {'units': str}.",
             },
         },

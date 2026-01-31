@@ -117,51 +117,37 @@ class IndexedAverager(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal", "Q", "Psi", "pixel_index"],
-        required_arguments=[
-            "with_processing_keys",
-            "output_processing_key",
-            "averaging_direction",
-            "use_signal_weights",
-            "use_signal_uncertainty_weights",
-            "uncertainty_weight_key",
-        ],
-        default_configuration={
-            "with_processing_keys": None,
-            "output_processing_key": None,  # currently unused
-            "averaging_direction": "azimuthal",
-            "use_signal_weights": True,
-            "use_signal_uncertainty_weights": False,
-            "uncertainty_weight_key": None,
-        },
-        argument_specs={
+        arguments={
             "with_processing_keys": {
                 "type": (str, list, type(None)),
-                "required": False,
+                "required": True,
+                "default": None,
                 "doc": "ProcessingData key or list of keys to average.",
             },
             "output_processing_key": {
                 "type": (str, type(None)),
-                "required": False,
+                "default": None,
                 "doc": "Optional output key override (currently unused).",
             },
             "averaging_direction": {
                 "type": str,
                 "required": True,
+                "default": "azimuthal",
                 "doc": "Averaging direction: 'radial' or 'azimuthal'.",
             },
             "use_signal_weights": {
                 "type": bool,
-                "required": False,
+                "default": True,
                 "doc": "Use BaseData weights when averaging signal.",
             },
             "use_signal_uncertainty_weights": {
                 "type": bool,
-                "required": False,
+                "default": False,
                 "doc": "Use signal uncertainty as weights.",
             },
             "uncertainty_weight_key": {
                 "type": (str, type(None)),
-                "required": False,
+                "default": None,
                 "doc": "Uncertainty key to use as weights if enabled.",
             },
         },

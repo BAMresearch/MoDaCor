@@ -95,7 +95,7 @@ class ProcessStep:
         Post-initialization method to set up the process step.
         """
         self.configuration = self.default_config()
-        self.configuration.update(self.documentation.default_configuration_copy())
+        self.configuration.update(self.documentation.initial_configuration())
 
     def __call__(self, processing_data: ProcessingData) -> None:
         """Allow the process step to be called like a function"""
@@ -186,8 +186,13 @@ class ProcessStep:
         for key, value in by_dict.items():
             if key in self.configuration:
                 self.configuration[key] = value
+            elif key in self.documentation.arguments:
+                # Allow setting documented arguments even if they were not part of the
+                # current configuration snapshot yet.
+                self.configuration[key] = value
             else:
-                raise KeyError(f"Key {key} not found in configuration")  # noqa
+                known_keys = ", ".join(sorted(self.configuration.keys()))
+                raise KeyError(f"Key {key} not found in configuration. Known keys: {known_keys}")  # noqa
         # restart preparation after configuration change:
         self.__prepared = False
 

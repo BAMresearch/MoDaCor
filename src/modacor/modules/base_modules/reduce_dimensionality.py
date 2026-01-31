@@ -51,35 +51,25 @@ class ReduceDimensionality(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units", "weights"]},
-        default_configuration={
-            # Axis or axes to reduce. Can be int, list/tuple of ints, or None (reduce all).
-            "axes": None,
-            # Use BaseData.weights as weights (default) or do unweighted mean (False → equal weights).
-            "use_weights": True,
-            # 'omit' → ignore NaNs (nanmean-style); 'propagate' → NaNs propagate (mean-style).
-            "nan_policy": "omit",
-            # Reduction method: 'mean' (default, weighted or unweighted), or 'sum' (weighted or unweighted).
-            "reduction": "mean",
-        },
-        argument_specs={
+        arguments={
             "axes": {
                 "type": (int, list, tuple, type(None)),
-                "required": False,
+                "default": None,
                 "doc": "Axis or axes to reduce (int, list/tuple, or None for all).",
             },
             "use_weights": {
                 "type": bool,
-                "required": False,
+                "default": True,
                 "doc": "Use BaseData weights for weighted reduction.",
             },
             "nan_policy": {
                 "type": str,
-                "required": False,
+                "default": "omit",
                 "doc": "NaN handling policy: 'omit' or 'propagate'.",
             },
             "reduction": {
                 "type": str,
-                "required": False,
+                "default": "mean",
                 "doc": "Reduction method: 'mean' or 'sum'.",
             },
         },

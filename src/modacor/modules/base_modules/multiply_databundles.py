@@ -33,19 +33,15 @@ class MultiplyDatabundles(ProcessStep):
         calling_version=__version__,
         required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
-        default_configuration={
-            "multiplicand_data_key": "signal",  # key of the DataBundle to multiply
-            "multiplier_data_key": "signal",  # key of the DataBundle to multiply with if not signal
-        },  # no arguments needed
-        argument_specs={
+        arguments={
             "multiplicand_data_key": {
                 "type": str,
-                "required": False,
+                "default": "signal",
                 "doc": "BaseData key to modify in the multiplicand DataBundle.",
             },
             "multiplier_data_key": {
                 "type": str,
-                "required": False,
+                "default": "signal",
                 "doc": "BaseData key to read from the multiplier DataBundle.",
             },
         },

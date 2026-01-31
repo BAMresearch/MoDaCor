@@ -40,23 +40,17 @@ class SinkProcessingData(ProcessStep):
         calling_version=__version__,
         required_data_keys=[],  # no new databundle produced
         modifies={},  # side-effect only (writing)
-        required_arguments=[
-            "target",  # 'sink_id::subpath'
-            "data_paths",  # list[str] ProcessingData paths
-        ],
-        default_configuration={
-            "target": "",
-            "data_paths": [],
-        },
-        argument_specs={
+        arguments={
             "target": {
                 "type": str,
                 "required": True,
+                "default": "",
                 "doc": "Sink target in the form 'sink_id::subpath'.",
             },
             "data_paths": {
                 "type": (str, list),
                 "required": True,
+                "default": [],
                 "doc": "ProcessingData paths to write (string or list of strings).",
             },
         },

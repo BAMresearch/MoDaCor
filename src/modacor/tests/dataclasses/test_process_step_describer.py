@@ -28,20 +28,17 @@ def _build_describer(**kwargs) -> ProcessStepDescriber:
     )
 
 
-def test_required_arguments_must_be_list_of_strings():
+def test_arguments_must_be_mapping_of_dicts():
     with pytest.raises(TypeError):
-        _build_describer(required_arguments={})
+        _build_describer(arguments=["not a mapping"])
 
     with pytest.raises(TypeError):
-        _build_describer(required_arguments=[1])
+        _build_describer(arguments={"key": "not a dict"})
 
 
-def test_required_arguments_must_exist_in_default_configuration():
-    with pytest.raises(ValueError):
-        _build_describer(required_arguments=["needed"], default_configuration={})
-
-    describer = _build_describer(required_arguments=["needed"], default_configuration={"needed": 1})
-    assert describer.required_arguments == ["needed"]
+def test_arguments_required_flag_must_be_boolean():
+    with pytest.raises(TypeError):
+        _build_describer(arguments={"key": {"required": "yes"}})
 
 
 def test_list_fields_allow_tuples_and_strip_whitespace():
@@ -54,23 +51,23 @@ def test_list_fields_allow_tuples_and_strip_whitespace():
     assert describer.step_keywords == ["foo", "bar"]
 
 
-def test_default_configuration_copy_is_isolated():
+def test_initial_configuration_is_isolated_from_defaults():
     describer = _build_describer(
-        default_configuration={"nested": {"values": [1, 2]}},
+        arguments={"nested": {"default": {"values": [1, 2]}}},
     )
 
-    copied = describer.default_configuration_copy()
+    copied = describer.initial_configuration()
     copied["nested"]["values"].append(3)
 
-    assert describer.default_configuration["nested"]["values"] == [1, 2]
+    assert describer.arguments["nested"]["default"]["values"] == [1, 2]
 
 
-def test_argument_specs_requires_mapping_of_dicts():
-    with pytest.raises(TypeError):
-        _build_describer(argument_specs=["not a mapping"])
+def test_required_argument_names():
+    describer = _build_describer(
+        arguments={
+            "needed": {"default": "", "required": True},
+            "optional": {"default": 0},
+        }
+    )
 
-    with pytest.raises(TypeError):
-        _build_describer(argument_specs={"key": "not a dict"})
-
-    describer = _build_describer(argument_specs={"key": {"type": str, "required": True}})
-    assert describer.argument_specs["key"]["required"] is True
+    assert describer.required_argument_names() == ("needed",)

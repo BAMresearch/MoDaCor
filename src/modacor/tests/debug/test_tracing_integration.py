@@ -27,8 +27,6 @@ class DummyStep(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version="0",
         required_data_keys=[],
-        required_arguments=[],
-        default_configuration={},
     )
 
     def calculate(self):
