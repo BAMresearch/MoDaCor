@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import pydata_sphinx_theme
 
 import subprocess
 from os.path import abspath, dirname, join
@@ -82,6 +82,7 @@ html_theme_options = {
             "icon": "fa-brands fa-github",
         },
     ],
+    "githuburl": "https://github.com/BAMresearch/MoDaCor/",
 }
 
 html_use_smartypants = True
@@ -89,7 +90,13 @@ html_last_updated_fmt = "%b %d, %Y"
 if commit_id:
     html_last_updated_fmt += f" (git {commit_id})"
 html_split_index = False
-
+html_sidebars = {
+    "**": [
+        "searchbox.html",
+        "globaltoc.html",
+        "sourcelink.html",
+    ],
+}
 html_short_title = "%s-%s" % (project, version)
 
 napoleon_use_ivar = True
@@ -107,5 +114,5 @@ linkcheck_ignore = [
     join(project_meta["project"]["urls"]["repository"], "commit", r"[0-9a-fA-F]+")
 ]
 linkcheck_anchors_ignore_for_url = [
-    r"https://test\.pypi\.org/project/[^/]+",
+    r"https://pypi\.org/project/[^/]+",
 ]

@@ -11,7 +11,7 @@ license: BSD-3-Clause
 project_description: A new modular data correction software for any neutron or X-ray
     technique that produces 1D or 2D scattering, diffraction, or imaging data.
 project_name: MoDaCor
-pypi_host: test.pypi.org
+pypi_host: pypi.org
 python_versions:
 - '3.12'
 - '3.13'
@@ -20,5 +20,5 @@ repo_hosting_domain: github.com
 repo_main_branch: main
 repo_name: MoDaCor
 repo_userorg: BAMresearch
-sphinx_theme: furo
+sphinx_theme: pydata-sphinx-theme
 version: 1.0.0
