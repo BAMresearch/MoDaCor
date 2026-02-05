@@ -1,10 +1,11 @@
 [project]
 name = "modacor"
-description = "new modular data corrections for any neutron or xray technique that produces 1D or 2D scattering/diffraction/imaging data"
-dynamic = ["version", "readme", "dependencies"]
+description = "A new modular data correction software for any neutron or X-ray technique that produces 1D or 2D scattering, diffraction, or imaging data."
+dynamic = ["version", "readme"]
+license = "BSD-3-Clause"
 classifiers = [
   # complete classifier list: http://pypi.python.org/pypi?%3Aaction=list_classifiers
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Operating System :: Unix",
   "Operating System :: POSIX",
   "Operating System :: MacOS",
@@ -12,7 +13,6 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: Implementation :: CPython",
@@ -21,6 +21,45 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
+]
+
+dependencies = [
+    "attrs",
+    #entrypoints,
+    "numpy",
+    #hdf5plugin,
+    "h5py",
+    "pint",
+    "matplotlib",
+    #stamina,
+    "scipy",
+    #pyyaml,
+]
+
+[project.optional-dependencies]
+tests = [
+  "tox",
+  "pytest",
+  "pytest-cov",
+  "pre-commit",
+  #"ipykernel"
+]
+docs = [
+    "sphinx>=6.2",
+    "myst-parser>=2.0",
+    "pydata-sphinx-theme>=0.14",
+    "linkify-it-py",
+    "toml",
+    "sphinxcontrib-mermaid"
+]
+ci = [
+    "tox",
+    "build",
+    "toml",
+    "python-semantic-release",
+    # provides the *coverage* command to combine and publish coverage data
+    # generated within tox environments
+    "pytest-cov"
 ]
 
 [[project.authors]]
@@ -56,10 +95,10 @@ name = "Malte Storm"
 email = "malte.storm@hereon.de"
 
 [project.urls]
-homepage = "https://BAMresearch.github.io/modacor"
-documentation = "https://BAMresearch.github.io/modacor"
-repository = "https://github.com/BAMresearch/modacor"
-changelog = "https://BAMresearch.github.io/modacor/changelog.html"
+homepage = "https://BAMresearch.github.io/MoDaCor"
+documentation = "https://BAMresearch.github.io/MoDaCor"
+repository = "https://github.com/BAMresearch/MoDaCor"
+changelog = "https://BAMresearch.github.io/MoDaCor/changelog.html"
 
 [build-system]
 requires = [
@@ -75,16 +114,15 @@ include = ["modacor*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "modacor.__version__"}
-readme = {file = ["README.md", "CHANGELOG.md"]}
-dependencies = {file = ["requirements.txt"]}
+readme = {file = ["README.md", "CHANGELOG.md"], content-type = "text/markdown"}
 
 [tool.coverage.report]
-path = "coverage-report"
+path = "coverage-report"  # see coverage.yml github action
 
 # on version numbers: https://peps.python.org/pep-0440/
 # and bottom of https://softwareengineering.stackexchange.com/a/151558
 [tool.semantic_release]
-#major_on_zero = false # no major release when current major version is zero
+allow_zero_version = true
 version_variables = [                        # version location
     "src/modacor/__init__.py:__version__",
     "docs/conf.py:version",
@@ -109,3 +147,8 @@ group_by_package = true
 known_first_party = "modacor"
 ensure_newline_before_comments = true
 extend_skip = ["ci/templates", ".ipynb_checkpoints"]
+
+[tool.docformatter]
+recursive = true
+wrap-summaries = 100
+wrap-descriptions = 100

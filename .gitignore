@@ -64,6 +64,7 @@ docs/reference/modules
 .DS_Store
 *~
 .*.sw[po]
+.*.kate-swp
 .build
 .ve
 .env
