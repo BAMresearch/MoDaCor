@@ -5,12 +5,12 @@
 New modular data corrections for any neutron or X-ray technique that produces 1D or 2D scattering/diffraction/imaging
 data.
 
-[![PyPI Package latest release](https://img.shields.io/pypi/v/modacor.svg)](https://test.pypi.org/project/modacor)
+[![PyPI Package latest release](https://img.shields.io/pypi/v/modacor.svg)](https://pypi.org/project/modacor)
 [![Commits since latest release](https://img.shields.io/github/commits-since/BAMresearch/MoDaCor/v1.0.0.svg)](https://github.com/BAMresearch/MoDaCor/compare/v1.0.0...main)
 [![License](https://img.shields.io/pypi/l/modacor.svg)](https://en.wikipedia.org/wiki/BSD-3-Clause)
-[![Supported versions](https://img.shields.io/pypi/pyversions/modacor.svg)](https://test.pypi.org/project/modacor)
-[![PyPI Wheel](https://img.shields.io/pypi/wheel/modacor.svg)](https://test.pypi.org/project/modacor#files)
-[![Weekly PyPI downloads](https://img.shields.io/pypi/dw/modacor.svg)](https://test.pypi.org/project/modacor/)
+[![Supported versions](https://img.shields.io/pypi/pyversions/modacor.svg)](https://pypi.org/project/modacor)
+[![PyPI Wheel](https://img.shields.io/pypi/wheel/modacor.svg)](https://pypi.org/project/modacor#files)
+[![Weekly PyPI downloads](https://img.shields.io/pypi/dw/modacor.svg)](https://pypi.org/project/modacor/)
 [![Continuous Integration and Deployment Status](https://github.com/BAMresearch/MoDaCor/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/BAMresearch/MoDaCor/actions/workflows/ci-cd.yml)
 [![Coverage report](https://img.shields.io/endpoint?url=https://BAMresearch.github.io/MoDaCor/coverage-report/cov.json)](https://BAMresearch.github.io/MoDaCor/coverage-report/)
 
