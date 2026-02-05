@@ -47,7 +47,7 @@ jobs:
         run: |
           [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
           python -m pip install --upgrade pip
-          python -m pip install --progress-bar=off -r ci/requirements.txt
+          python -m pip install --progress-bar=off .[ci]
 
       - name: Download package artifacts
         uses: actions/download-artifact@v6

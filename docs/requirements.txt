@@ -1,8 +1,0 @@
--r ../requirements.txt
-
-sphinx>=6.2
-myst-parser>=2.0
-pydata-sphinx-theme>=0.14
-linkify-it-py
-toml
-sphinxcontrib-mermaid

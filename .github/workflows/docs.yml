@@ -22,9 +22,6 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: |
-            ci/requirements.txt
-            docs/requirements.txt
-            requirements.txt
             pyproject.toml
 
       - name: Install required system packages
@@ -46,7 +43,7 @@ jobs:
         run: |
           [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
           python -m pip install --upgrade pip
-          python -m pip install --progress-bar=off -r ci/requirements.txt
+          python -m pip install --progress-bar=off .[ci]
 
       - name: Generate documentation
         shell: sh

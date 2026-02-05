@@ -39,8 +39,7 @@ jobs:
           architecture: '${{ matrix.python_arch }}'
           cache: pip
           cache-dependency-path: |
-            ci/requirements.txt
-            tests/requirements.txt
+            pyproject.toml
 
       - name: Install required system packages
         shell: sh
@@ -61,7 +60,7 @@ jobs:
         run: |
           [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
           python -m pip install --upgrade pip
-          python -m pip install --progress-bar=off -r ci/requirements.txt
+          python -m pip install --progress-bar=off .[ci]
 
       - name: Show installed package details
         shell: sh
