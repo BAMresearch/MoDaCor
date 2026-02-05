@@ -1,0 +1,43 @@
+# Combine uncertainties in quadrature
+
+## Summary
+Combine selected uncertainties in quadrature and expose the result under new keys.
+
+## Metadata
+- **Module ID:** CombineUncertainties
+- **Module path:** /home/runner/work/MoDaCor/MoDaCor/src/modacor/modules/base_modules/combine_uncertainties.py
+- **Module version:** 20260120.1
+- **Keywords:** uncertainties, combine, quadrature, propagation
+
+## Required data keys
+- signal
+
+## Modifies
+- **signal**: uncertainties
+
+## Required arguments
+- combinations
+
+## Default configuration
+```json
+{
+  "combinations": {},
+  "drop_source_keys": false,
+  "ignore_missing": false,
+  "target_basedata_key": "signal"
+}
+```
+
+## Argument specification
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `combinations` | dict | Yes | {} | Mapping of output uncertainty key to an iterable of source keys to combine. |
+| `drop_source_keys` | bool | No | False | Remove source uncertainty keys after combination (default: False). |
+| `ignore_missing` | bool | No | False | If True, missing source keys are ignored (combinations use the available ones). If all listed keys are missing, the combination is skipped. |
+| `target_basedata_key` | str | No | signal | Name of the BaseData entry within each DataBundle to modify (default: 'signal'). |
+
+## References
+DOI 10.1088/0953-8984/25/38/383201
+
+## Notes
+Designed for SAXS/SANS pipelines where uncertainties such as Poisson, readout noise, and flat-field corrections are stored separately (see the MOUSE notebook examples).

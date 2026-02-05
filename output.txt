@@ -1,0 +1,1 @@
+changelog.md:21: [broken] http://license.py: HTTPConnectionPool(host='license.py', port=80): Max retries exceeded with url: / (Caused by NameResolutionError("HTTPConnection(host='license.py', port=80): Failed to resolve 'license.py' ([Errno -2] Name or service not known)"))

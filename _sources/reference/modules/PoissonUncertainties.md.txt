@@ -1,0 +1,37 @@
+# Add Poisson Uncertainties
+
+## Summary
+Add Poisson uncertainties to the data
+
+## Metadata
+- **Module ID:** PoissonUncertainties
+- **Module path:** /home/runner/work/MoDaCor/MoDaCor/src/modacor/modules/base_modules/poisson_uncertainties.py
+- **Module version:** 20250522.1
+- **Keywords:** uncertainties, Poisson
+
+## Required data keys
+- signal
+
+## Modifies
+- **variances**: Poisson
+
+## Required arguments
+- with_processing_keys
+
+## Default configuration
+```json
+{
+  "with_processing_keys": null
+}
+```
+
+## Argument specification
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `with_processing_keys` | list | Yes | - | ProcessingData keys to update with Poisson variances. |
+
+## References
+DOI 10.1088/0953-8984/25/38/383201
+
+## Notes
+This is a simple Poisson uncertainty calculation based on the signal intensity

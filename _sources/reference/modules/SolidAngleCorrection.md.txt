@@ -1,0 +1,39 @@
+# Solid Angle Correction
+
+## Summary
+Divide the pixels in a signal by their solid angle coverage
+
+## Metadata
+- **Module ID:** SolidAngleCorrection
+- **Module path:** /home/runner/work/MoDaCor/MoDaCor/src/modacor/modules/technique_modules/scattering/solid_angle_correction.py
+- **Module version:** 20251029.1
+- **Keywords:** divide, normalize, solid angle
+
+## Required data keys
+- signal
+- Omega
+
+## Modifies
+- **signal**: signal, uncertainties, units
+
+## Required arguments
+- with_processing_keys
+
+## Default configuration
+```json
+{
+  "with_processing_keys": null
+}
+```
+
+## Argument specification
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `with_processing_keys` | list | Yes | - | ProcessingData keys whose signal should be divided by Omega. |
+
+## References
+DOI 10.1088/0953-8984/25/38/383201
+
+## Notes
+This divides the signal by the value previously calculated
+            using the XSGeometry module

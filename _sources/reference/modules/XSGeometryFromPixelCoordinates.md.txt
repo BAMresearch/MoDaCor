@@ -1,0 +1,70 @@
+# Add Q, Psi, TwoTheta, Omega from pixel coordinates
+
+## Summary
+Compute Q-vector components and angles from lab-frame pixel coordinates.
+
+## Metadata
+- **Module ID:** XSGeometryFromPixelCoordinates
+- **Module path:** /home/runner/work/MoDaCor/MoDaCor/src/modacor/modules/technique_modules/scattering/xs_geometry_from_pixel_coordinates.py
+- **Module version:** 20260106.1
+- **Keywords:** geometry, Q, Psi, TwoTheta, Solid Angle, Omega, scattering
+
+## Required data keys
+- coord_x
+- coord_y
+- coord_z
+
+## Modifies
+- **Q0**: signal, uncertainties
+- **Q1**: signal, uncertainties
+- **Q2**: signal, uncertainties
+- **Q**: signal, uncertainties
+- **Psi**: signal
+- **TwoTheta**: signal, uncertainties
+- **Omega**: signal, uncertainties
+
+## Required arguments
+- sample_z_source
+- wavelength_source
+- pixel_pitch_slow_source
+- pixel_pitch_fast_source
+
+## Default configuration
+```json
+{
+  "detector_normal": [
+    0.0,
+    0.0,
+    1.0
+  ],
+  "pixel_pitch_fast_source": null,
+  "pixel_pitch_fast_uncertainties_sources": {},
+  "pixel_pitch_fast_units_source": null,
+  "pixel_pitch_slow_source": null,
+  "pixel_pitch_slow_uncertainties_sources": {},
+  "pixel_pitch_slow_units_source": null,
+  "sample_z_source": null,
+  "sample_z_uncertainties_sources": {},
+  "sample_z_units_source": null,
+  "wavelength_source": null,
+  "wavelength_uncertainties_sources": {},
+  "wavelength_units_source": null
+}
+```
+
+## Argument specification
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `detector_normal` | tuple | No | [0.0, 0.0, 1.0] | Detector normal unit vector in lab frame. |
+| `pixel_pitch_fast_source` | str or NoneType | Yes | - | IoSources key for fast-axis pixel pitch signal. |
+| `pixel_pitch_fast_uncertainties_sources` | dict | No | {} | Uncertainty sources for fast-axis pixel pitch. |
+| `pixel_pitch_fast_units_source` | str or NoneType | No | - | IoSources key for fast-axis pixel pitch units. |
+| `pixel_pitch_slow_source` | str or NoneType | Yes | - | IoSources key for slow-axis pixel pitch signal. |
+| `pixel_pitch_slow_uncertainties_sources` | dict | No | {} | Uncertainty sources for slow-axis pixel pitch. |
+| `pixel_pitch_slow_units_source` | str or NoneType | No | - | IoSources key for slow-axis pixel pitch units. |
+| `sample_z_source` | str or NoneType | Yes | - | IoSources key for sample z-position signal. |
+| `sample_z_uncertainties_sources` | dict | No | {} | Uncertainty sources for sample z-position. |
+| `sample_z_units_source` | str or NoneType | No | - | IoSources key for sample z-position units. |
+| `wavelength_source` | str or NoneType | Yes | - | IoSources key for wavelength signal. |
+| `wavelength_uncertainties_sources` | dict | No | {} | Uncertainty sources for wavelength. |
+| `wavelength_units_source` | str or NoneType | No | - | IoSources key for wavelength units. |

@@ -1,0 +1,764 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Changelog &#8212; MoDaCor 1.0.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=34bb78ad" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="_static/documentation_options.js?v=e7fff540"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'changelog';</script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Authors" href="authors.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="1.0.1" />
+    <meta name="docbuild:last-update" content="Feb 05, 2026 (git a2c8326)"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">MoDaCor 1.0.1 documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="readme.html">
+    Documentation contributor guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="getting_started/index.html">
+    Getting started
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="pipeline_operations/index.html">
+    Pipeline operations
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="extending/index.html">
+    Extending MoDaCor
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="examples/index.html">
+    Application examples
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="reference/index.html">
+    Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="usage.html">
+    Usage
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="authors.html">
+    Authors
+  </a>
+</li>
+
+
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="#">
+    Changelog
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/BAMresearch/MoDaCor" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="readme.html">
+    Documentation contributor guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="getting_started/index.html">
+    Getting started
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="pipeline_operations/index.html">
+    Pipeline operations
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="extending/index.html">
+    Extending MoDaCor
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="examples/index.html">
+    Application examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="reference/index.html">
+    Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="usage.html">
+    Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="authors.html">
+    Authors
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Changelog
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/BAMresearch/MoDaCor" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"></div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Changelog</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="changelog">
+<h1>Changelog<a class="headerlink" href="#changelog" title="Link to this heading">#</a></h1>
+<section id="v1-0-0-2025-06-16">
+<h2>v1.0.0 (2025-06-16)<a class="headerlink" href="#v1-0-0-2025-06-16" title="Link to this heading">#</a></h2>
+<section id="unknown">
+<h3>Unknown<a class="headerlink" href="#unknown" title="Link to this heading">#</a></h3>
+<ul class="simple">
+<li><p>fix pytest warning: rename TestProcessingStep -&gt; TESTProcessingStep (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/b19e701f983322c1cc2aee68b152ad633fbb923a"><code class="docutils literal notranslate"><span class="pre">b19e701</span></code></a>)</p></li>
+<li><p>adapt PoissonUncertainties unit test to use processing data (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/86c719bd90a68c842e2e72118893ce099e4a1400"><code class="docutils literal notranslate"><span class="pre">86c719b</span></code></a>)</p></li>
+<li><p>modification of the poisson uncertainties module for pipeline use (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/ce86eae06eee81d6353aca2f499447c3039dcaf0"><code class="docutils literal notranslate"><span class="pre">ce86eae</span></code></a>)</p></li>
+<li><p>pipeline with PoissonUncertainties step is now running (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/594315bedfdaae91e06b5afdfda85da1f4d46c62"><code class="docutils literal notranslate"><span class="pre">594315b</span></code></a>)</p></li>
+<li><p>adjust names of bundles and BaseData keys to contain “signal” (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/e8c342f6ea95d8effcca863a42a3d3d58333444c"><code class="docutils literal notranslate"><span class="pre">e8c342f</span></code></a>)</p></li>
+<li><p>add license text to <a class="reference external" href="http://license.py">license.py</a> (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/fdd7ddf54f40de677139b9ebe61799db136ec271"><code class="docutils literal notranslate"><span class="pre">fdd7ddf</span></code></a>)</p></li>
+<li><p>add to last commit (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/648cb2529665caac5d5117b7275ee99f7f069ae2"><code class="docutils literal notranslate"><span class="pre">648cb25</span></code></a>)</p></li>
+<li><p>adding a central license to shorten headers (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/2f88d39c0790e2b2eb2d917f0b78493edf3c18db"><code class="docutils literal notranslate"><span class="pre">2f88d39</span></code></a>)</p></li>
+<li><p>begin adapting the calculate function (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/7cf56a1bdf7c96428121b37bd13ab41ded0da1bd"><code class="docutils literal notranslate"><span class="pre">7cf56a1</span></code></a>)</p></li>
+<li><p>update pipeline integration test to use new ProcessStep (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/61724fd311c1d94c86fb26a72d79f7988bc4e7e6"><code class="docutils literal notranslate"><span class="pre">61724fd</span></code></a>)</p></li>
+<li><p>update to new BaseData unit handling (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/06f8763c7832e8689ad9cc91977287a93b986f51"><code class="docutils literal notranslate"><span class="pre">06f8763</span></code></a>)</p></li>
+<li><p>use modacor’s unit registry (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/540ce4ad6ddf4ec406e515649715e8a541d856ed"><code class="docutils literal notranslate"><span class="pre">540ce4a</span></code></a>)</p></li>
+<li><p>adapt PoissonUncertainties unit test to use processing data (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/bf2096899ccc0a95f58d115b3beacb37f1f00fe3"><code class="docutils literal notranslate"><span class="pre">bf20968</span></code></a>)</p></li>
+<li><p>modification of the poisson uncertainties module for pipeline use (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/ee3e9400062c4d70befdb729ede685e04583cf56"><code class="docutils literal notranslate"><span class="pre">ee3e940</span></code></a>)</p></li>
+<li><p>pipeline with PoissonUncertainties step is now running (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/663fee6313382b33ac1d00d31a08e32da0660654"><code class="docutils literal notranslate"><span class="pre">663fee6</span></code></a>)</p></li>
+<li><p>adjust names of bundles and BaseData keys to contain “signal” (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/ff9a21a4486911029284f887b320e44c14f0f270"><code class="docutils literal notranslate"><span class="pre">ff9a21a</span></code></a>)</p></li>
+<li><p>begin adapting the calculate function (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/cc5f12217823ce3c378e15c27efcc50ec3d96c6c"><code class="docutils literal notranslate"><span class="pre">cc5f122</span></code></a>)</p></li>
+<li><p>update pipeline integration test to use new ProcessStep (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/aec63ce8c358448f9f3ef0f8214f3b91dd72e645"><code class="docutils literal notranslate"><span class="pre">aec63ce</span></code></a>)</p></li>
+<li><p>update to new BaseData unit handling (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/ebdceebb01d251fcac65d9975a31eb968dabab71"><code class="docutils literal notranslate"><span class="pre">ebdceeb</span></code></a>)</p></li>
+<li><p>use modacor’s unit registry (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/5fe0eda2dd0e5cf33d3b8f92155b66dbadaca61d"><code class="docutils literal notranslate"><span class="pre">5fe0eda</span></code></a>)</p></li>
+<li><p>arithmetic: data is <em>divided</em> by normalization (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/98f938966269416c5e0280389982ed3a7297af36"><code class="docutils literal notranslate"><span class="pre">98f9389</span></code></a>)</p></li>
+<li><p>BaseData no longer has a .data property (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/5a53260f6cc44415b8d9b671dac8c6c6e3602a12"><code class="docutils literal notranslate"><span class="pre">5a53260</span></code></a>)</p></li>
+<li><p>remove test of display_data property: display_units not defined (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/19d0a664c0074273339eb435691ae91fc1d8ddb1"><code class="docutils literal notranslate"><span class="pre">19d0a66</span></code></a>)</p></li>
+<li><p>basedata: use simplified call signature (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/619368ab05757fe6bcfd81b3c18588e551349568"><code class="docutils literal notranslate"><span class="pre">619368a</span></code></a>)</p></li>
+<li><p>import uncertainties.unumpy for variance calculation tests (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/7a55d68e7635f5c4b991778b7021d93a207647c3"><code class="docutils literal notranslate"><span class="pre">7a55d68</span></code></a>)</p></li>
+<li><p>add license text to <a class="reference external" href="http://license.py">license.py</a> (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/0f5cfb9ceb66d7156ac01229eb46eecdaf6f3de1"><code class="docutils literal notranslate"><span class="pre">0f5cfb9</span></code></a>)</p></li>
+<li><p>add to last commit (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/441068d79470cc19d13a78416dbb2a030851f2a6"><code class="docutils literal notranslate"><span class="pre">441068d</span></code></a>)</p></li>
+<li><p>adding a central license to shorten headers (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/939516c078bbd0d6d272399ee3c5e4094cd0718a"><code class="docutils literal notranslate"><span class="pre">939516c</span></code></a>)</p></li>
+<li><p>add note to self: need ProcessStep registry to populate pipeline (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/b8ba70b55a1bd0eafb4c0bf39496ecc28b25ec88"><code class="docutils literal notranslate"><span class="pre">b8ba70b</span></code></a>)</p></li>
+<li><p>test and draft config format for pipeline import from yaml (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/4a40871f2b6b17835069b376941162fa357e2481"><code class="docutils literal notranslate"><span class="pre">4a40871</span></code></a>)</p></li>
+<li><p>initial yaml loader for pipelines (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/a12d58e8cd5806f742c01619d8325c4ef70d3bd7"><code class="docutils literal notranslate"><span class="pre">a12d58e</span></code></a>)</p></li>
+<li><p>add hash function to make test run (already in draft PR #33) (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/4e03a00765ca19b5f3ff94f3ee1a526338c2380e"><code class="docutils literal notranslate"><span class="pre">4e03a00</span></code></a>)</p></li>
+<li><p>add pyyaml to requirements for yaml definition of pipelines (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/0f76ecec1909671391aea861d20e0528fff688d5"><code class="docutils literal notranslate"><span class="pre">0f76ece</span></code></a>)</p></li>
+<li><p>Delete src/modacor/modules/base_modules/poisson_uncertainty.py (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/09def97ecf615beb85d130695dff425e86853d25"><code class="docutils literal notranslate"><span class="pre">09def97</span></code></a>)</p></li>
+<li><p>Updating the ProcessStep definition (#34) (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/605c3f6151152b3dddf406b64d799bc16abc2eba"><code class="docutils literal notranslate"><span class="pre">605c3f6</span></code></a>)</p></li>
+<li><p>changing unit handling to central pint unit registry (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/ee3f2f5738eecfd0068ccd2a8b729599a725fa2e"><code class="docutils literal notranslate"><span class="pre">ee3f2f5</span></code></a>)</p></li>
+<li><p>adding a multiply by variable processing step (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/fa04cd7f06750def211fc216cf04ea75764f29f1"><code class="docutils literal notranslate"><span class="pre">fa04cd7</span></code></a>)</p></li>
+<li><p>import central unit registry (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/cfdd86756383f37d23bb45f5db08a7f1d1d60347"><code class="docutils literal notranslate"><span class="pre">cfdd867</span></code></a>)</p></li>
+<li><p>change internal_units to signal_units and removing ingest and display units (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/adfa55185ca37b59b975ee3d978c5014bf17258b"><code class="docutils literal notranslate"><span class="pre">adfa551</span></code></a>)</p></li>
+<li><p>minor polishing (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/e9f9083ad87869862cabe19970b79f111db76ca3"><code class="docutils literal notranslate"><span class="pre">e9f9083</span></code></a>)</p></li>
+<li><p>provide azimuthal variance (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/93d0dae3de397e28f86e49151ef14d356e5f8c6f"><code class="docutils literal notranslate"><span class="pre">93d0dae</span></code></a>)</p></li>
+<li><p>First uncertainties commit, test is broken (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/29bec04a256f356c89f099c5cd9c86d642e4de25"><code class="docutils literal notranslate"><span class="pre">29bec04</span></code></a>)</p></li>
+<li><p>fixing error (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/986f10bcb6241ff3e48537c18d11fdbb389f2359"><code class="docutils literal notranslate"><span class="pre">986f10b</span></code></a>)</p></li>
+<li><p>Starting on Poisson Testing (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/04eaa249dc3054bbca4990ec098d01550edb4fc2"><code class="docutils literal notranslate"><span class="pre">04eaa24</span></code></a>)</p></li>
+<li><p>implement the test, still broken (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/2b787b78f13461eeffe4dab28f109ca9e0a54647"><code class="docutils literal notranslate"><span class="pre">2b787b7</span></code></a>)</p></li>
+<li><p>polish import_tester (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/683a0f88d51f406004f7dea7ab5c5b017cbd18b9"><code class="docutils literal notranslate"><span class="pre">683a0f8</span></code></a>)</p></li>
+<li><p>make an integrated dataset behave like a normal one (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/49e8412e220516ab8587aaad8f9e7bb19790b45b"><code class="docutils literal notranslate"><span class="pre">49e8412</span></code></a>)</p></li>
+<li><p>feed-back of flake8 (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/07cdc34109397de6d9369d840b2e0e0326b4c636"><code class="docutils literal notranslate"><span class="pre">07cdc34</span></code></a>)</p></li>
+<li><p>Allow longer lines (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/5b74de3f0785a430b2b01adf1a5d8d17bce69482"><code class="docutils literal notranslate"><span class="pre">5b74de3</span></code></a>)</p></li>
+<li><p>configuration for flake8 (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/dc45d13a44d06dc0bb3f6bf94b7a1c0cd2e7e27a"><code class="docutils literal notranslate"><span class="pre">dc45d13</span></code></a>)</p></li>
+<li><p>increase line length (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/d56fc36fccb1a629fb6092c1d6220b34699f7e9a"><code class="docutils literal notranslate"><span class="pre">d56fc36</span></code></a>)</p></li>
+<li><p>fix PoissonUncertainties module: needs to return outputs (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/4e4eeeab00da48c34ec0bbedd78b670fcb40f07a"><code class="docutils literal notranslate"><span class="pre">4e4eeea</span></code></a>)</p></li>
+<li><p>use smaller array for testing (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/2b5700015584e2267e6feaef108488241acccbc6"><code class="docutils literal notranslate"><span class="pre">2b57000</span></code></a>)</p></li>
+<li><p>test runs until PoissonUncertainties are actually calculated (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/7c91102831fdcf15c77b42a9d291d15f1e1a6d9b"><code class="docutils literal notranslate"><span class="pre">7c91102</span></code></a>)</p></li>
+<li><p>prepare test running PoissonUncertainties module in a pipeline (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/537ccdf171d6b7c4b6549c5ba4cb8a721a69bbdf"><code class="docutils literal notranslate"><span class="pre">537ccdf</span></code></a>)</p></li>
+<li><p>adapt: DataBundle no longer has a data attribute (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/7a33677b5ba7261a49ff1d3637d4fad45d9c0e46"><code class="docutils literal notranslate"><span class="pre">7a33677</span></code></a>)</p></li>
+<li><p>first integration test: run pipeline with dummy processsteps (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/58e1c5d2dc3fda70a02b7617f360d47c18d78ed0"><code class="docutils literal notranslate"><span class="pre">58e1c5d</span></code></a>)</p></li>
+<li><p>add hash function to ProcessStep (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/15125a96738be47231658e7dbf340cce298f0f23"><code class="docutils literal notranslate"><span class="pre">15125a9</span></code></a>)</p></li>
+<li><p>remove DataBundle from the arguments for running the pipeline (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/def0dbafb4ac7d6926b9d6c374033340217f0d66"><code class="docutils literal notranslate"><span class="pre">def0dba</span></code></a>)</p></li>
+<li><p>fixing file reference in documentation (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/5d337fd1c572b7c933d87a2688fd1524c11c0284"><code class="docutils literal notranslate"><span class="pre">5d337fd</span></code></a>)</p></li>
+<li><p>removing unused fields (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/4b12b8f38b0ac2b8b30bbfeaec9ed12f6535fa5f"><code class="docutils literal notranslate"><span class="pre">4b12b8f</span></code></a>)</p></li>
+<li><p>Tidy up (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/312cb829a2c2b79e7ccf940e4e27284b98c94c86"><code class="docutils literal notranslate"><span class="pre">312cb82</span></code></a>)</p></li>
+<li><p>HDF Loader Tests Now Passing (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/d17e05dfa09697d09a0d20052c6ecd5fce0bb24e"><code class="docutils literal notranslate"><span class="pre">d17e05d</span></code></a>)</p></li>
+<li><p>adding a new poisson uncertainties estimator (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/22c2233163903b5c613829671c261904cc7ba2dc"><code class="docutils literal notranslate"><span class="pre">22c2233</span></code></a>)</p></li>
+<li><p>Delete src/modacor/dataclasses/pipelinedata.py (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/5045ae991370e583ea5790e992ffaf5003e21d9d"><code class="docutils literal notranslate"><span class="pre">5045ae9</span></code></a>)</p></li>
+<li><p>renaming pipelinedata to processingdata (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/be76a326c52578ce508b5740773137b1f0282e8c"><code class="docutils literal notranslate"><span class="pre">be76a32</span></code></a>)</p></li>
+<li><p>Removing an outdated module (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/cbd7f8791c98228837c8b914dab4df20e16f0b95"><code class="docutils literal notranslate"><span class="pre">cbd7f87</span></code></a>)</p></li>
+<li><p>Updated formatting with black, flake8 and isort (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/c89718b70fd5d84d4deb6e29dc39eeb571fa37a7"><code class="docutils literal notranslate"><span class="pre">c89718b</span></code></a>)</p></li>
+<li><p>add <strong>init</strong>.py in runner submodule (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/d995affc5210693e5e8500d64c5f2ab87c030aed"><code class="docutils literal notranslate"><span class="pre">d995aff</span></code></a>)</p></li>
+<li><p>modify branch addition methods to operate on another Pipeline (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/3dcdce7871372af6f01f84ad2466f9bf31c35f58"><code class="docutils literal notranslate"><span class="pre">3dcdce7</span></code></a>)</p></li>
+<li><p>use the same syntax for incoming and outgoing branch addition (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/ee8ada700b2b6850a97b0822d1c4ef8ca8f77b15"><code class="docutils literal notranslate"><span class="pre">ee8ada7</span></code></a>)</p></li>
+<li><p>add separate methods for adding in- and outgoing branches (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/a635247014b40ef5663500adcb1f3521eadc7e2e"><code class="docutils literal notranslate"><span class="pre">a635247</span></code></a>)</p></li>
+<li><p>fix reference to self (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/06c217386d3fc15bfe64bd0f15ee08bb626ec676"><code class="docutils literal notranslate"><span class="pre">06c2173</span></code></a>)</p></li>
+<li><p>prepare running the pipeline - not yet tested (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/f544fea40838c280f866e8435355d0d66e189b8f"><code class="docutils literal notranslate"><span class="pre">f544fea</span></code></a>)</p></li>
+<li><p>add functionality for branching the pipeline, with simple tests (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/e8093f802532f4a22d0222e1eb7b3618bec6ecf2"><code class="docutils literal notranslate"><span class="pre">e8093f8</span></code></a>)</p></li>
+<li><p>test addition of a simple hashable object (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/e9bdcbf38fabcdf75f422d857ef74ff4f55fb7f4"><code class="docutils literal notranslate"><span class="pre">e9bdcbf</span></code></a>)</p></li>
+<li><p>initial pipeline draft based on graphlibs TopologicalSorter (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/7c5cfc593f2dc7a38e597ba35da99b02913e55f4"><code class="docutils literal notranslate"><span class="pre">7c5cfc5</span></code></a>)</p></li>
+<li><p>fix a bunch of tests (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/503d1e09c367bdf5a8aa8b3b18e03a25f618a242"><code class="docutils literal notranslate"><span class="pre">503d1e0</span></code></a>)</p></li>
+<li><p>flake8 config file (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/2d34c5d63743048cc49a2be485856030a5ce4ca7"><code class="docutils literal notranslate"><span class="pre">2d34c5d</span></code></a>)</p></li>
+<li><p>cleanup of databundle and adding pipelinedata (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/2015907e877b4c2e98910116a815a6a3c559a4a9"><code class="docutils literal notranslate"><span class="pre">2015907</span></code></a>)</p></li>
+<li><p>adding a header and cleanung up datbundle. (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/7c4e7e3888b6a3c085948cbb353ca4e37ca9342e"><code class="docutils literal notranslate"><span class="pre">7c4e7e3</span></code></a>)</p></li>
+<li><p>renaming raw_data to signal in BaseData (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/2f6429ffd65b49de93d25a218151ff3ee2e78d9d"><code class="docutils literal notranslate"><span class="pre">2f6429f</span></code></a>)</p></li>
+<li><p>HDF Testing (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/d874571d02ffba732bbfb1ab57cf8494d8473f47"><code class="docutils literal notranslate"><span class="pre">d874571</span></code></a>)</p></li>
+<li><p>HDF IO Test Commit (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/920b02f61c9e403d3d9114180a3a6bad974a8653"><code class="docutils literal notranslate"><span class="pre">920b02f</span></code></a>)</p></li>
+<li><p>Update pyproject.toml (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/7f8d1c75cd9fa949ed40364485c4f147e524935d"><code class="docutils literal notranslate"><span class="pre">7f8d1c7</span></code></a>)</p></li>
+<li><p>Update pyproject.toml (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/acf17b9f1196a0bf1c2b282a0bf706feec3573bd"><code class="docutils literal notranslate"><span class="pre">acf17b9</span></code></a>)</p></li>
+<li><p>Update pyproject.toml (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/70eed8a6560791635368186f912dace28727dbd8"><code class="docutils literal notranslate"><span class="pre">70eed8a</span></code></a>)</p></li>
+<li><p>fix importing BaseData (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/a104dce54d9b2fd23932924d0cb846f7c057ce08"><code class="docutils literal notranslate"><span class="pre">a104dce</span></code></a>)</p></li>
+<li><p>work on integration (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/125dacdc1b3fa37e65f9c8ec6364fee380204af5"><code class="docutils literal notranslate"><span class="pre">125dacd</span></code></a>)</p></li>
+<li><p>Attempt to fix tox.ini (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/9a253766317bd4b01ea88af1e00bca944ce957af"><code class="docutils literal notranslate"><span class="pre">9a25376</span></code></a>)</p></li>
+<li><p>Removed unused imports (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/c5bf6068a18824710b29fa405988a01f2bbe9ed2"><code class="docutils literal notranslate"><span class="pre">c5bf606</span></code></a>)</p></li>
+<li><p>Updating package metadata (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/eb4b8c8683dc4b302eb269469a580eb82cb9abf0"><code class="docutils literal notranslate"><span class="pre">eb4b8c8</span></code></a>)</p></li>
+<li><p>Added tests for io sub-package (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/e0f321889e534b9cdf13e524878bd925766094f1"><code class="docutils literal notranslate"><span class="pre">e0f3218</span></code></a>)</p></li>
+<li><p>WIP on azimuthal integration (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/ca15a976fcec2ac2a31e328e552cb004b3d04a6e"><code class="docutils literal notranslate"><span class="pre">ca15a97</span></code></a>)</p></li>
+<li><p>updating the pre-commit config (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/6e247b412092e27ef4dec0eb00eaa4db8ee443a7"><code class="docutils literal notranslate"><span class="pre">6e247b4</span></code></a>)</p></li>
+<li><p>updated BaseData (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/72912e78c82924ecec9a8733ec4ca8c9123c184e"><code class="docutils literal notranslate"><span class="pre">72912e7</span></code></a>)</p></li>
+<li><p>modifications to basedata and databundle (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/a50204c3e620d5b9fa6ff9d038832fca22b0e623"><code class="docutils literal notranslate"><span class="pre">a50204c</span></code></a>)</p></li>
+<li><p>clean-up (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/5435da48adf365f60901d718c09f0dc9e0e6e6ba"><code class="docutils literal notranslate"><span class="pre">5435da4</span></code></a>)</p></li>
+<li><p>put back scalers are normalization factor (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/8ad59ff9fe3154595dd49e23fb9fbfc209d0a648"><code class="docutils literal notranslate"><span class="pre">8ad59ff</span></code></a>)</p></li>
+<li><p>updating databundle (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/f56265af01b476c17589b46aa1028d0b238a22e6"><code class="docutils literal notranslate"><span class="pre">f56265a</span></code></a>)</p></li>
+<li><p>Modified HDF Loader (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/1fa7fd0ce72ff64851cf72625adb20045e34e575"><code class="docutils literal notranslate"><span class="pre">1fa7fd0</span></code></a>)</p></li>
+<li><p>Start of HDF5 Loader (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/3397b1419343cfd35b1a9032ce8fe5e20bab4692"><code class="docutils literal notranslate"><span class="pre">3397b14</span></code></a>)</p></li>
+<li><p>Error Propagation (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/9e1710077c2f60f1eabc196cfb6e348c6e90134c"><code class="docutils literal notranslate"><span class="pre">9e17100</span></code></a>)</p></li>
+<li><p>Adding units to normalization (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/1ef17ef0d6ea4c90278d25b6337f9b3b0aebe24e"><code class="docutils literal notranslate"><span class="pre">1ef17ef</span></code></a>)</p></li>
+<li><p>Requirements Changes (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/d7041d58c667380f1f2152555d52eaef8a5599a9"><code class="docutils literal notranslate"><span class="pre">d7041d5</span></code></a>)</p></li>
+<li><p>Updated requirements (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/1c2b91c7d5d0e488849c31ac6a2be50199c09d68"><code class="docutils literal notranslate"><span class="pre">1c2b91c</span></code></a>)</p></li>
+<li><p>Updates to init files (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/663ede21782d5cc45d2b63f0a4b5bccacc84694e"><code class="docutils literal notranslate"><span class="pre">663ede2</span></code></a>)</p></li>
+<li><p>Added file headers to io and updated definitions (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/fa7996be2688476b861b5909eb082ec0fb25503a"><code class="docutils literal notranslate"><span class="pre">fa7996b</span></code></a>)</p></li>
+<li><p>Fixing linting (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/6bd4918a13ca9f9247fd80bc1cb8bc63d06670eb"><code class="docutils literal notranslate"><span class="pre">6bd4918</span></code></a>)</p></li>
+<li><p>Populated io (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/4faa1dbce7c2cfdddc7356e5422a074c8311aeca"><code class="docutils literal notranslate"><span class="pre">4faa1db</span></code></a>)</p></li>
+<li><p>Error Propagation (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/6f2854cb11c1ff634c88dfabf7f68209a650e96a"><code class="docutils literal notranslate"><span class="pre">6f2854c</span></code></a>)</p></li>
+<li><p>Error Propagation (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/d0b87f29e0a39ff81055171aacfc48ead22bfb74"><code class="docutils literal notranslate"><span class="pre">d0b87f2</span></code></a>)</p></li>
+<li><p>Error Propagation (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/d0a040b7bcfcb6d5df8b6a6fb9b27113044e6727"><code class="docutils literal notranslate"><span class="pre">d0a040b</span></code></a>)</p></li>
+<li><p>Missed comma (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/09fecf11165e805d3470ef0628b5ead7a0eb2137"><code class="docutils literal notranslate"><span class="pre">09fecf1</span></code></a>)</p></li>
+<li><p>Updates to the logger (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/f09b5df83757a281d50eb143f3c6bd86984b49f2"><code class="docutils literal notranslate"><span class="pre">f09b5df</span></code></a>)</p></li>
+<li><p>fix renaming of ProcessStep (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/0de2352ad4f8e2e26db1099bf0aeed28c52675a9"><code class="docutils literal notranslate"><span class="pre">0de2352</span></code></a>)</p></li>
+<li><p>fix relative import error (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/6fa77f4f518b535d224927a88c959d6f25640afb"><code class="docutils literal notranslate"><span class="pre">6fa77f4</span></code></a>)</p></li>
+<li><p>dynamic requirements.txt (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/90b233b63d250cabeb82731316d1b79df9049993"><code class="docutils literal notranslate"><span class="pre">90b233b</span></code></a>)</p></li>
+<li><p>fix scatteringdata duplicate and databundle import (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/0a02cbd9b119f3be445e4c8bdb173bca87ff6929"><code class="docutils literal notranslate"><span class="pre">0a02cbd</span></code></a>)</p></li>
+<li><p>fix imports (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/886002c3f7f2f6e5320b56eda257e1bddbe26dc7"><code class="docutils literal notranslate"><span class="pre">886002c</span></code></a>)</p></li>
+<li><p>Modified imports (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/7993f938806ab4e7d526e4171557a2c01370c831"><code class="docutils literal notranslate"><span class="pre">7993f93</span></code></a>)</p></li>
+<li><p>Modifed ProcessStep (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/22d05d1cbbe5080fc934e1ab668c8d59d23fde51"><code class="docutils literal notranslate"><span class="pre">22d05d1</span></code></a>)</p></li>
+<li><p>Tox modifications (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/b8ee1aa88e1b701785aff2ab458716137ead2913"><code class="docutils literal notranslate"><span class="pre">b8ee1aa</span></code></a>)</p></li>
+<li><p>databundle (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/1d18bca7e9a3ee2e7d8d4a649dc26bf1051738d4"><code class="docutils literal notranslate"><span class="pre">1d18bca</span></code></a>)</p></li>
+<li><p>One step further (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/c9e0fd0e99a5a5a03a15827261c4df851343eaba"><code class="docutils literal notranslate"><span class="pre">c9e0fd0</span></code></a>)</p></li>
+<li><p>Changes for tox (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/142582e78d3bb5e1fc0ab6576297b9b7af66d6cc"><code class="docutils literal notranslate"><span class="pre">142582e</span></code></a>)</p></li>
+<li><p>fix import all modules (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/5561826227301d80b5e61f2ff4b9a7ab8cd8fe56"><code class="docutils literal notranslate"><span class="pre">5561826</span></code></a>)</p></li>
+<li><p>fix all relative imports in tests (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/675e5041dfb01263c36a307b80cc557d569466e1"><code class="docutils literal notranslate"><span class="pre">675e504</span></code></a>)</p></li>
+<li><p>move test into project … (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/ad171a43ea719c8c780eaca08f016b05191720e4"><code class="docutils literal notranslate"><span class="pre">ad171a4</span></code></a>)</p></li>
+<li><p>License modification (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/5d331e4747380a5aed4e7b0fd677a4d58ccc9dcc"><code class="docutils literal notranslate"><span class="pre">5d331e4</span></code></a>)</p></li>
+<li><p>ScatteringData to DataBundle (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/108e8a406520a7c9aef0466c4df3fc133dfdc87e"><code class="docutils literal notranslate"><span class="pre">108e8a4</span></code></a>)</p></li>
+<li><p>Small updates (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/d176c4916a27ef1c914a4085897f2b76dcc91c6c"><code class="docutils literal notranslate"><span class="pre">d176c49</span></code></a>)</p></li>
+<li><p>Updated processstep naming and content (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/7ae6ca7d78b7f69d3b714ee8be73ab5f5955cab0"><code class="docutils literal notranslate"><span class="pre">7ae6ca7</span></code></a>)</p></li>
+<li><p>adding the flow charts (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/e07cb55cfb1139b535e24e96b8a378bb39f5147c"><code class="docutils literal notranslate"><span class="pre">e07cb55</span></code></a>)</p></li>
+<li><p>typos (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/fb85395f9ec5260efad6b7bc20e06e2db8ac8e3d"><code class="docutils literal notranslate"><span class="pre">fb85395</span></code></a>)</p></li>
+<li><p>migrate dask array to numpy (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/62fd3b2652d53226372b152d7452b6ed261eba14"><code class="docutils literal notranslate"><span class="pre">62fd3b2</span></code></a>)</p></li>
+<li><p>implement base dataclass (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/80490307ddbd9e1c7bee168140139ec039e7e640"><code class="docutils literal notranslate"><span class="pre">8049030</span></code></a>)</p></li>
+<li><p>implement normalization and variances in dict (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/f41c0ab72ade5ab0e1f7eba3b13b67fc5a7dc9c2"><code class="docutils literal notranslate"><span class="pre">f41c0ab</span></code></a>)</p></li>
+<li><p>modified to use the actual datapoint in basedata now. (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/d9bd9518e1cbf0829bb7df6a30d006e7a569c03d"><code class="docutils literal notranslate"><span class="pre">d9bd951</span></code></a>)</p></li>
+<li><p>Getting towards a working concept (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/0772d80305539be57ff7323ed3360db07e998310"><code class="docutils literal notranslate"><span class="pre">0772d80</span></code></a>)</p></li>
+<li><p>something like this (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/dfd97bfdb1c6ad03ed808c36c5205e8c7f413f95"><code class="docutils literal notranslate"><span class="pre">dfd97bf</span></code></a>)</p></li>
+<li><p>Getting towards a proof-of-principle (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/2a772073dfc0445500eb27140f9a1fa55280f1a3"><code class="docutils literal notranslate"><span class="pre">2a77207</span></code></a>)</p></li>
+<li><p>more experimentation to explore delayed execution (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/5f365a1c2525a826bcba4c14e3c37763f6cbf335"><code class="docutils literal notranslate"><span class="pre">5f365a1</span></code></a>)</p></li>
+<li><p>Making changes to classes based on experimentation… (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/1710f400fd736aa8377189704fe631f50f70ac1a"><code class="docutils literal notranslate"><span class="pre">1710f40</span></code></a>)</p></li>
+<li><p>Added some flow diagrams to help clarify… (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/b17ff22ae01998e94faf9e7ae9b9e7ab8919aba1"><code class="docutils literal notranslate"><span class="pre">b17ff22</span></code></a>)</p></li>
+<li><p>Update README.rst (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/1e658e22c527e1a3f48ca87a853e58a2bfc63130"><code class="docutils literal notranslate"><span class="pre">1e658e2</span></code></a>)</p></li>
+<li><p>Changed name of note to step_note (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/accd141a42228d1ad811bc68dfd5295b1eef73d9"><code class="docutils literal notranslate"><span class="pre">accd141</span></code></a>)</p></li>
+<li><p>fixed tests and validator. (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/4b768e6db2c5393707cf4c2d9849ca274b959585"><code class="docutils literal notranslate"><span class="pre">4b768e6</span></code></a>)</p></li>
+<li><p>Changed naming slightly, and added a message handler placeholder (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/08802703c66c9e087dbca7b35ad6c832ca7e255b"><code class="docutils literal notranslate"><span class="pre">0880270</span></code></a>)</p></li>
+<li><p>changes broke tests (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/e81e3698651ca0a7fdada91a090ad85dc5c96be7"><code class="docutils literal notranslate"><span class="pre">e81e369</span></code></a>)</p></li>
+<li><p>test implementation of basedata and processstep dataclasses (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/eb6dcc45a6aca867b78e57c8aa7d81a8b3b909da"><code class="docutils literal notranslate"><span class="pre">eb6dcc4</span></code></a>)</p></li>
+</ul>
+</section>
+</section>
+<section id="v0-0-0-2025-02-13">
+<h2>v0.0.0 (2025-02-13)<a class="headerlink" href="#v0-0-0-2025-02-13" title="Link to this heading">#</a></h2>
+<section id="id1">
+<h3>Unknown<a class="headerlink" href="#id1" title="Link to this heading">#</a></h3>
+<ul class="simple">
+<li><p>Initial commit (<a class="reference external" href="https://github.com/BAMresearch/MoDaCor/commit/4753f2a4a718cb1fbd5979f252ee90e4504866f0"><code class="docutils literal notranslate"><span class="pre">4753f2a</span></code></a>)</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="authors.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Authors</p>
+      </div>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#v1-0-0-2025-06-16">v1.0.0 (2025-06-16)</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#unknown">Unknown</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#v0-0-0-2025-02-13">v0.0.0 (2025-02-13)</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id1">Unknown</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/changelog.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025-2026, Brian R. Pauw and Tim Snow.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

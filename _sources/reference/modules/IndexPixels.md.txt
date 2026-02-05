@@ -1,0 +1,58 @@
+# Index Pixels
+
+## Summary
+Compute per-pixel bin indices (radial or azimuthal) for later 1D averaging.
+
+## Metadata
+- **Module ID:** IndexPixels
+- **Module path:** /home/runner/work/MoDaCor/MoDaCor/src/modacor/modules/technique_modules/scattering/index_pixels.py
+- **Module version:** 20251130.1
+- **Keywords:** radial, azimuthal, pixel indexing, binning, scattering
+
+## Required data keys
+- signal
+- Q
+- Psi
+
+## Modifies
+- _None_
+
+## Required arguments
+- with_processing_keys
+- averaging_direction
+
+## Default configuration
+```json
+{
+  "averaging_direction": "radial",
+  "bin_type": "log",
+  "n_bins": 100,
+  "psi_limits_unit": null,
+  "psi_max": null,
+  "psi_min": null,
+  "q_limits_unit": null,
+  "q_max": null,
+  "q_min": null,
+  "with_processing_keys": null
+}
+```
+
+## Argument specification
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `averaging_direction` | str | Yes | radial | Averaging direction: 'radial' or 'azimuthal'. |
+| `bin_type` | str | No | log | Binning type: 'linear' or 'log'. |
+| `n_bins` | int | No | 100 | Number of bins. |
+| `psi_limits_unit` | str or NoneType | No | - | Units for psi_min/psi_max if provided. |
+| `psi_max` | float or int or NoneType | No | - | Maximum Psi value for binning. |
+| `psi_min` | float or int or NoneType | No | - | Minimum Psi value for binning. |
+| `q_limits_unit` | str or NoneType | No | - | Units for q_min/q_max if provided. |
+| `q_max` | float or int or NoneType | No | - | Maximum Q value for binning. |
+| `q_min` | float or int or NoneType | No | - | Minimum Q value for binning. |
+| `with_processing_keys` | str or list or NoneType | Yes | - | ProcessingData key or list of keys to index. |
+
+## References
+DOI 10.1088/0953-8984/25/38/383201
+
+## Notes
+IndexPixels computes bin indices purely from geometry (Q, Psi) and user-defined limits; Mask is not used here so it can be applied per frame in downstream steps.

@@ -1,0 +1,51 @@
+# Combine masks within one DataBundle (bitwise OR)
+
+## Summary
+Combine multiple mask arrays stored as different BaseData keys in the same DataBundle.
+
+## Metadata
+- **Module ID:** BitwiseOrMasksInBundle
+- **Module path:** /home/runner/work/MoDaCor/MoDaCor/src/modacor/modules/base_modules/bitwise_or_masks.py
+- **Module version:** 20260109.3
+- **Keywords:** mask, bitmask, bitwise, or, databundle
+
+## Required data keys
+- mask
+
+## Modifies
+- **mask**: signal
+
+## Required arguments
+- with_processing_keys
+- source_mask_keys
+
+## Default configuration
+```json
+{
+  "source_mask_keys": [],
+  "target_mask_key": "mask",
+  "with_processing_keys": [
+    "sample"
+  ]
+}
+```
+
+## Argument specification
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `source_mask_keys` | list | Yes | [] | List of BaseData keys to OR into the target mask. |
+| `target_mask_key` | str | No | mask | BaseData key for the target mask inside the DataBundle. |
+| `with_processing_keys` | list | Yes | ["sample"] | Single processing key identifying the DataBundle to update. |
+
+## References
+NeXus mask bit-field convention (NXdata/NXdetector masks)
+
+## Notes
+
+            Configuration:
+              with_processing_keys: [sample]     # required, single databundle key
+              target_mask_key: mask              # optional, default: mask
+              source_mask_keys: [bs_mask, ...]   # required, one or more
+
+            Performs:
+              target_mask |= source_mask  (in-place, for each source)

@@ -1,0 +1,43 @@
+# average or sum, weighted or unweighted, over axes
+
+## Summary
+Compute (default weighted) mean of the BaseData signal over the given axes, with proper uncertainty propagation.
+
+## Metadata
+- **Module ID:** ReduceDimensionality
+- **Module path:** /home/runner/work/MoDaCor/MoDaCor/src/modacor/modules/base_modules/reduce_dimensionality.py
+- **Module version:** 20251116.1
+- **Keywords:** average, mean, weighted, nanmean, reduce, axis, sum
+
+## Required data keys
+- signal
+
+## Modifies
+- **signal**: signal, uncertainties, units, weights
+
+## Required arguments
+- _None_
+
+## Default configuration
+```json
+{
+  "axes": null,
+  "nan_policy": "omit",
+  "reduction": "mean",
+  "use_weights": true
+}
+```
+
+## Argument specification
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `axes` | int or list or tuple or NoneType | No | - | Axis or axes to reduce (int, list/tuple, or None for all). |
+| `nan_policy` | str | No | omit | NaN handling policy: 'omit' or 'propagate'. |
+| `reduction` | str | No | mean | Reduction method: 'mean' or 'sum'. |
+| `use_weights` | bool | No | True | Use BaseData weights for weighted reduction. |
+
+## References
+DOI 10.1088/0953-8984/25/38/383201
+
+## Notes
+This step reduces the dimensionality of the signal by averaging over one or more axes. Units are preserved; axes metadata is currently not adjusted and is left empty on the result.

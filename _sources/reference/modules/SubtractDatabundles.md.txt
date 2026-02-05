@@ -1,0 +1,40 @@
+# Subtract another DataBundle
+
+## Summary
+Subtract a DataBundle element using another DataBundle
+
+## Metadata
+- **Module ID:** SubtractDatabundles
+- **Module path:** /home/runner/work/MoDaCor/MoDaCor/src/modacor/modules/base_modules/subtract_databundles.py
+- **Module version:** 20251029.1
+- **Keywords:** subtract, background, databundle
+
+## Required data keys
+- signal
+
+## Modifies
+- **signal**: signal, uncertainties, units
+
+## Required arguments
+- with_processing_keys
+
+## Default configuration
+```json
+{
+  "with_processing_keys": null
+}
+```
+
+## Argument specification
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `with_processing_keys` | list | Yes | - | Two processing keys: minuend then subtrahend. |
+
+## References
+DOI 10.1088/0953-8984/25/38/383201
+
+## Notes
+
+            This subtracts one DataBundle's signal from another, useful for background subtraction.
+            'with_processing_keys' in the configuration should contain two keys, the operation
+            will subtract the second key's DataBundle from the first key's DataBundle.

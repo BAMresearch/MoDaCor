@@ -1,0 +1,68 @@
+# Add Q, Psi, TwoTheta, Omega
+
+## Summary
+Add geometric information Q, Psi, TwoTheta, and Solid Angle to the data
+
+## Metadata
+- **Module ID:** XSGeometry
+- **Module path:** /home/runner/work/MoDaCor/MoDaCor/src/modacor/modules/technique_modules/scattering/xs_geometry.py
+- **Module version:** 20251122.1
+- **Keywords:** geometry, Q, Psi, TwoTheta, Solid Angle, Omega, X-ray scattering
+
+## Required data keys
+- signal
+
+## Modifies
+- **Q**: signal, uncertainties
+- **Q0**: signal, uncertainties
+- **Q1**: signal, uncertainties
+- **Q2**: signal, uncertainties
+- **Psi**: signal, uncertainties
+- **TwoTheta**: signal, uncertainties
+- **Omega**: signal, uncertainties
+
+## Required arguments
+- detector_distance_source
+- pixel_size_source
+- beam_center_source
+- wavelength_source
+
+## Default configuration
+```json
+{
+  "beam_center_source": null,
+  "beam_center_uncertainties_sources": {},
+  "beam_center_units_source": null,
+  "detector_distance_source": null,
+  "detector_distance_uncertainties_sources": {},
+  "detector_distance_units_source": null,
+  "pixel_size_source": null,
+  "pixel_size_uncertainties_sources": {},
+  "pixel_size_units_source": null,
+  "wavelength_source": null,
+  "wavelength_uncertainties_sources": {},
+  "wavelength_units_source": null
+}
+```
+
+## Argument specification
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `beam_center_source` | str or NoneType | Yes | - | IoSources key for beam center signal. |
+| `beam_center_uncertainties_sources` | dict | No | {} | Uncertainty sources for beam center. |
+| `beam_center_units_source` | str or NoneType | No | - | IoSources key for beam center units. |
+| `detector_distance_source` | str or NoneType | Yes | - | IoSources key for detector distance signal. |
+| `detector_distance_uncertainties_sources` | dict | No | {} | Uncertainty sources for detector distance. |
+| `detector_distance_units_source` | str or NoneType | No | - | IoSources key for detector distance units. |
+| `pixel_size_source` | str or NoneType | Yes | - | IoSources key for pixel size signal. |
+| `pixel_size_uncertainties_sources` | dict | No | {} | Uncertainty sources for pixel size. |
+| `pixel_size_units_source` | str or NoneType | No | - | IoSources key for pixel size units. |
+| `wavelength_source` | str or NoneType | Yes | - | IoSources key for wavelength signal. |
+| `wavelength_uncertainties_sources` | dict | No | {} | Uncertainty sources for wavelength. |
+| `wavelength_units_source` | str or NoneType | No | - | IoSources key for wavelength units. |
+
+## References
+DOI 10.1088/0953-8984/25/38/383201
+
+## Notes
+This calculates geometric factors relevant for X-ray scattering data

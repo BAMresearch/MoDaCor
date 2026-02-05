@@ -1,0 +1,795 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Quickstart &#8212; MoDaCor 1.0.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=34bb78ad" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=e7fff540"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'getting_started/quickstart';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Pipeline operations" href="../pipeline_operations/index.html" />
+    <link rel="prev" title="Getting started" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="1.0.1" />
+    <meta name="docbuild:last-update" content="Feb 05, 2026 (git a2c8326)"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">MoDaCor 1.0.1 documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../readme.html">
+    Documentation contributor guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Getting started
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../pipeline_operations/index.html">
+    Pipeline operations
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../extending/index.html">
+    Extending MoDaCor
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/index.html">
+    Application examples
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../reference/index.html">
+    Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../usage.html">
+    Usage
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../authors.html">
+    Authors
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../changelog.html">
+    Changelog
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/BAMresearch/MoDaCor" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../readme.html">
+    Documentation contributor guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Getting started
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../pipeline_operations/index.html">
+    Pipeline operations
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../extending/index.html">
+    Extending MoDaCor
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Application examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../reference/index.html">
+    Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../usage.html">
+    Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../authors.html">
+    Authors
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../changelog.html">
+    Changelog
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/BAMresearch/MoDaCor" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Quickstart</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Getting started</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Quickstart</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="quickstart">
+<h1>Quickstart<a class="headerlink" href="#quickstart" title="Link to this heading">#</a></h1>
+<p>Run a three-step MoDaCor pipeline against the bundled MOUSE example dataset, see how data sources plug into a
+configuration file, and inspect the pipeline trace that records what changed at every step.</p>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Python 3.11 or newer</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pip</span></code>, <code class="docutils literal notranslate"><span class="pre">curl</span></code> (or <code class="docutils literal notranslate"><span class="pre">wget</span></code>) and a POSIX-like shell</p></li>
+<li><p>Approximately 1.3 GB of free disk space for the sample NeXus file</p></li>
+</ul>
+<p>If you are working from the cloned MoDaCor repository, activate the project virtual environment instead of creating a
+new one and use <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-e</span> <span class="pre">.</span></code> to install the package in editable mode.</p>
+</section>
+<section id="step-1-prepare-a-working-folder">
+<h2>Step 1 – Prepare a working folder<a class="headerlink" href="#step-1-prepare-a-working-folder" title="Link to this heading">#</a></h2>
+<p>Create a clean folder, bootstrap a virtual environment, and install MoDaCor:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>modacor-quickstart
+<span class="nb">cd</span><span class="w"> </span>modacor-quickstart
+python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
+<span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
+pip<span class="w"> </span>install<span class="w"> </span>modacor
+</pre></div>
+</div>
+</section>
+<section id="step-2-download-example-data-and-metadata">
+<h2>Step 2 – Download example data and metadata<a class="headerlink" href="#step-2-download-example-data-and-metadata" title="Link to this heading">#</a></h2>
+<p>Grab the MOUSE sample dataset and create a small metadata file describing the detector dark current:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-LO<span class="w"> </span>https://github.com/BAMresearch/modacor/raw/main/tests/testdata/MOUSE_20250324_1_160_stacked.nxs
+
+cat<span class="w"> </span><span class="s">&lt;&lt;&#39;YAML&#39; &gt; mouse_metadata.yaml</span>
+<span class="s">---</span>
+<span class="s">detector:</span>
+<span class="s">  darkcurrent:</span>
+<span class="s">    value: 1.0e-5</span>
+<span class="s">    units: counts/second</span>
+<span class="s">    uncertainty: 1.0e-6</span>
+<span class="s">YAML</span>
+</pre></div>
+</div>
+<p>The NeXus file exposes counts in <code class="docutils literal notranslate"><span class="pre">entry1/instrument/detector00/data</span></code> and the exposure time in
+<code class="docutils literal notranslate"><span class="pre">entry1/instrument/detector00/frame_exposure_time</span></code>. The metadata file supplies a scalar dark-current estimate so the
+last pipeline step can remove it.</p>
+</section>
+<section id="step-3-create-the-pipeline-configuration">
+<h2>Step 3 – Create the pipeline configuration<a class="headerlink" href="#step-3-create-the-pipeline-configuration" title="Link to this heading">#</a></h2>
+<p>Save the following pipeline definition as <code class="docutils literal notranslate"><span class="pre">mouse_quickstart.yaml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mouse_quickstart</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">1</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">add_poisson_uncertainties</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PoissonUncertainties</span>
+<span class="w">    </span><span class="nt">requires_steps</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">with_processing_keys</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample</span>
+<span class="w">  </span><span class="nt">2</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">normalize_by_exposure</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Divide</span>
+<span class="w">    </span><span class="nt">requires_steps</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">with_processing_keys</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample</span>
+<span class="w">      </span><span class="nt">divisor_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample::entry1/instrument/detector00/frame_exposure_time</span>
+<span class="w">      </span><span class="nt">divisor_units_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample::entry1/instrument/detector00/frame_exposure_time@units</span>
+<span class="w">  </span><span class="nt">3</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subtract_darkcurrent</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Subtract</span>
+<span class="w">    </span><span class="nt">requires_steps</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">with_processing_keys</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample</span>
+<span class="w">      </span><span class="nt">subtrahend_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">metadata::detector/darkcurrent/value</span>
+<span class="w">      </span><span class="nt">subtrahend_units_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">metadata::detector/darkcurrent/units</span>
+<span class="w">      </span><span class="nt">subtrahend_uncertainties_sources</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">propagate_to_all</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">metadata::detector/darkcurrent/uncertainty</span>
+</pre></div>
+</div>
+</section>
+<section id="step-4-create-a-runner-script">
+<h2>Step 4 – Create a runner script<a class="headerlink" href="#step-4-create-a-runner-script" title="Link to this heading">#</a></h2>
+<p>Place the script below in <code class="docutils literal notranslate"><span class="pre">run_mouse_pipeline.py</span></code>. It registers the data sources, prepares a <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code> object,
+runs the pipeline, and prints both numeric results and a compact pipeline trace.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">time</span><span class="w"> </span><span class="kn">import</span> <span class="n">perf_counter</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modacor</span><span class="w"> </span><span class="kn">import</span> <span class="n">ureg</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modacor.dataclasses.basedata</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modacor.dataclasses.databundle</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataBundle</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modacor.dataclasses.processing_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProcessingData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modacor.debug.pipeline_tracer</span><span class="w"> </span><span class="kn">import</span> <span class="n">PipelineTracer</span><span class="p">,</span> <span class="n">PlainUnicodeRenderer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modacor.io.hdf.hdf_source</span><span class="w"> </span><span class="kn">import</span> <span class="n">HDFSource</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modacor.io.io_sources</span><span class="w"> </span><span class="kn">import</span> <span class="n">IoSources</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modacor.io.yaml.yaml_source</span><span class="w"> </span><span class="kn">import</span> <span class="n">YAMLSource</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modacor.runner.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">Pipeline</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_decode_unit</span><span class="p">(</span><span class="n">unit_value</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">unit_value</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">unit_value</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+    <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">unit_value</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">build_processing_data</span><span class="p">(</span><span class="n">sources</span><span class="p">:</span> <span class="n">IoSources</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProcessingData</span><span class="p">:</span>
+    <span class="n">processing</span> <span class="o">=</span> <span class="n">ProcessingData</span><span class="p">()</span>
+    <span class="n">processing</span><span class="p">[</span><span class="s2">&quot;sample&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">DataBundle</span><span class="p">()</span>
+
+    <span class="n">signal</span> <span class="o">=</span> <span class="n">sources</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="s2">&quot;sample::entry1/instrument/detector00/data&quot;</span><span class="p">)</span>
+    <span class="n">signal_unit</span> <span class="o">=</span> <span class="n">_decode_unit</span><span class="p">(</span>
+        <span class="n">sources</span><span class="o">.</span><span class="n">get_data_attributes</span><span class="p">(</span><span class="s2">&quot;sample::entry1/instrument/detector00/data&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;units&quot;</span><span class="p">,</span> <span class="s2">&quot;counts&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">processing</span><span class="p">[</span><span class="s2">&quot;sample&quot;</span><span class="p">][</span><span class="s2">&quot;signal&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">BaseData</span><span class="p">(</span>
+        <span class="n">signal</span><span class="o">=</span><span class="n">signal</span><span class="p">,</span>
+        <span class="n">units</span><span class="o">=</span><span class="n">ureg</span><span class="o">.</span><span class="n">Unit</span><span class="p">(</span><span class="n">signal_unit</span><span class="p">),</span>
+        <span class="n">rank_of_data</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>  <span class="c1"># last two dimensions carry detector pixels</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">processing</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">pipeline</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="o">.</span><span class="n">from_yaml_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;mouse_quickstart.yaml&quot;</span><span class="p">))</span>
+
+    <span class="n">sources</span> <span class="o">=</span> <span class="n">IoSources</span><span class="p">()</span>
+    <span class="n">sources</span><span class="o">.</span><span class="n">register_source</span><span class="p">(</span>
+        <span class="n">YAMLSource</span><span class="p">(</span><span class="n">source_reference</span><span class="o">=</span><span class="s2">&quot;metadata&quot;</span><span class="p">,</span> <span class="n">resource_location</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;mouse_metadata.yaml&quot;</span><span class="p">))</span>
+    <span class="p">)</span>
+    <span class="n">sources</span><span class="o">.</span><span class="n">register_source</span><span class="p">(</span>
+        <span class="n">HDFSource</span><span class="p">(</span><span class="n">source_reference</span><span class="o">=</span><span class="s2">&quot;sample&quot;</span><span class="p">,</span> <span class="n">resource_location</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;MOUSE_20250324_1_160_stacked.nxs&quot;</span><span class="p">))</span>
+    <span class="p">)</span>
+
+    <span class="n">processing_data</span> <span class="o">=</span> <span class="n">build_processing_data</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span>
+    <span class="n">tracer</span> <span class="o">=</span> <span class="n">PipelineTracer</span><span class="p">(</span><span class="n">watch</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;sample&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;signal&quot;</span><span class="p">]})</span>
+
+    <span class="n">pipeline</span><span class="o">.</span><span class="n">prepare</span><span class="p">()</span>
+    <span class="k">while</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">is_active</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">get_ready</span><span class="p">():</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">processing_data</span> <span class="o">=</span> <span class="n">processing_data</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">io_sources</span> <span class="o">=</span> <span class="n">sources</span>
+
+            <span class="n">start</span> <span class="o">=</span> <span class="n">perf_counter</span><span class="p">()</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">processing_data</span><span class="p">)</span>
+            <span class="n">tracer</span><span class="o">.</span><span class="n">after_step</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">processing_data</span><span class="p">,</span> <span class="n">duration_s</span><span class="o">=</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">)</span>
+
+            <span class="n">pipeline</span><span class="o">.</span><span class="n">done</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+
+    <span class="n">sample_signal</span> <span class="o">=</span> <span class="n">processing_data</span><span class="p">[</span><span class="s2">&quot;sample&quot;</span><span class="p">][</span><span class="s2">&quot;signal&quot;</span><span class="p">]</span>
+    <span class="n">mean_intensity</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">sample_signal</span><span class="o">.</span><span class="n">signal</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mean intensity after corrections: </span><span class="si">{</span><span class="n">mean_intensity</span><span class="si">:</span><span class="s2">.6g</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">sample_signal</span><span class="o">.</span><span class="n">units</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Pipeline trace (last few events):</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">tracer</span><span class="o">.</span><span class="n">last_report</span><span class="p">(</span><span class="n">renderer</span><span class="o">=</span><span class="n">PlainUnicodeRenderer</span><span class="p">()))</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Mermaid flowchart definition:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">to_mermaid</span><span class="p">())</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="step-5-run-the-pipeline">
+<h2>Step 5 – Run the pipeline<a class="headerlink" href="#step-5-run-the-pipeline" title="Link to this heading">#</a></h2>
+<p>Execute the script:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>run_mouse_pipeline.py
+</pre></div>
+</div>
+<p>You should see the corrected mean intensity, a compact trace summarising what changed in each step (unit conversions,
+shape, NaN counts, etc.), and a Mermaid flowchart definition that can be pasted into <a class="reference external" href="https://mermaid.live">https://mermaid.live</a> for a visual
+graph.</p>
+</section>
+<section id="step-6-where-to-go-next">
+<h2>Step 6 – Where to go next<a class="headerlink" href="#step-6-where-to-go-next" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Swap out <code class="docutils literal notranslate"><span class="pre">mouse_metadata.yaml</span></code> for the metadata produced by your instrument and adjust <code class="docutils literal notranslate"><span class="pre">with_processing_keys</span></code> for
+additional <code class="docutils literal notranslate"><span class="pre">DataBundle</span></code> entries (for example <code class="docutils literal notranslate"><span class="pre">background</span></code> or <code class="docutils literal notranslate"><span class="pre">calibration</span></code>).</p></li>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">pipeline.attach_tracer_event(node,</span> <span class="pre">tracer,</span> <span class="pre">include_rendered_trace=True)</span></code> inside the execution loop if you want to
+export the trace alongside the configuration.</p></li>
+<li><p>Explore the <strong>Pipeline operations</strong> and <strong>Extending MoDaCor</strong> sections for branching workflows, module development,
+and integration best practices.</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Getting started</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../pipeline_operations/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Pipeline operations</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#prerequisites">Prerequisites</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#step-1-prepare-a-working-folder">Step 1 – Prepare a working folder</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#step-2-download-example-data-and-metadata">Step 2 – Download example data and metadata</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#step-3-create-the-pipeline-configuration">Step 3 – Create the pipeline configuration</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#step-4-create-a-runner-script">Step 4 – Create a runner script</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#step-5-run-the-pipeline">Step 5 – Run the pipeline</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#step-6-where-to-go-next">Step 6 – Where to go next</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/getting_started/quickstart.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025-2026, Brian R. Pauw and Tim Snow.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>
