@@ -4,12 +4,12 @@
 New modular data corrections for any neutron or X-ray technique that produces 1D or 2D scattering/diffraction/imaging
 data.
 
-[![PyPI Package latest release](https://img.shields.io/pypi/v/modacor.svg)](https://test.pypi.org/project/modacor)<!-- -->
+[![PyPI Package latest release](https://img.shields.io/pypi/v/modacor.svg)](https://pypi.org/project/modacor)<!-- -->
 [![Commits since latest release](https://img.shields.io/github/commits-since/BAMresearch/modacor/v1.0.0.svg)](https://github.com/BAMresearch/modacor/compare/v1.0.0...main)<!-- -->
 [![License](https://img.shields.io/pypi/l/modacor.svg)](https://en.wikipedia.org/wiki/MIT_license)<!-- -->
-[![Supported Python versions](https://img.shields.io/pypi/pyversions/modacor.svg)](https://test.pypi.org/project/modacor)<!-- -->
-[![PyPI Wheel](https://img.shields.io/pypi/wheel/modacor.svg)](https://test.pypi.org/project/modacor#files)<!-- -->
-[![Weekly PyPI downloads](https://img.shields.io/pypi/dw/modacor.svg)](https://test.pypi.org/project/modacor/)<!-- -->
+[![Supported Python versions](https://img.shields.io/pypi/pyversions/modacor.svg)](https://pypi.org/project/modacor)<!-- -->
+[![PyPI Wheel](https://img.shields.io/pypi/wheel/modacor.svg)](https://pypi.org/project/modacor#files)<!-- -->
+[![Weekly PyPI downloads](https://img.shields.io/pypi/dw/modacor.svg)](https://pypi.org/project/modacor/)<!-- -->
 [![CI/CD status](https://github.com/BAMresearch/modacor/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/BAMresearch/modacor/actions/workflows/ci-cd.yml)<!-- -->
 [![Coverage report](https://img.shields.io/endpoint?url=https://BAMresearch.github.io/modacor/coverage-report/cov.json)](https://BAMresearch.github.io/modacor/coverage-report/)
 
@@ -29,6 +29,14 @@ or as a reference to validate faster, more integrated data-correction implementa
 
 ```bash
 pip install modacor
+```
+
+### Optional extras
+
+Support for the Tiled-backed IoSource is provided via an optional dependency set. Install it with:
+
+```bash
+pip install modacor[tiled]
 ```
 
 To install the in-development version:
@@ -59,6 +67,8 @@ Planned documentation stubs now live in the repository to signal the intended st
 - `docs/examples/` – instrument-specific walkthrough placeholders for MOUSE and SAXSess pipelines.
 
 These pages currently contain explicit TODO notes and will be expanded during the documentation refresh.
+
+Documentation contributors can follow `docs/README.md` for local build instructions and authoring notes.
 
 ## Development
 

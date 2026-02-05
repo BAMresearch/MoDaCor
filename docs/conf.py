@@ -19,15 +19,17 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
-    "sphinx.ext.inheritance_diagram",
-    "sphinx.ext.graphviz",
     "myst_parser",
+    "sphinxcontrib.mermaid",
 ]
 myst_enable_extensions = [
     "colon_fence",
+    "deflist",
+    "linkify",
 ]
-inheritance_edge_attrs = dict(color="gray")  # readable in darkmode too
-autosummary_generate = True  # Turn on sphinx.ext.autosummary
+myst_heading_anchors = 3
+autosummary_generate = ["reference/index"]  # Generate stubs for the reference landing page
+autosummary_generate_overwrite = True
 templates_path = ["_templates"]
 source_suffix = {
     ".md": "markdown",
@@ -67,7 +69,18 @@ extlinks = {
     "issue": (join(project_meta["project"]["urls"]["repository"], "issues", "%s"), "#%s"),
     "pr": (join(project_meta["project"]["urls"]["repository"], "pull", "%s"), "PR #%s"),
 }
-html_theme = "furo"
+html_theme = "pydata_sphinx_theme"
+html_theme_options = {
+    "navigation_with_keys": True,
+    "show_toc_level": 2,
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": project_meta["project"]["urls"]["repository"],
+            "icon": "fa-brands fa-github",
+        },
+    ],
+}
 
 html_use_smartypants = True
 html_last_updated_fmt = "%b %d, %Y"

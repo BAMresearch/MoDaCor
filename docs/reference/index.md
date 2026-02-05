@@ -8,3 +8,9 @@
 
 modacor
 ```
+
+```{toctree}
+:maxdepth: 1
+
+modules/index
+```

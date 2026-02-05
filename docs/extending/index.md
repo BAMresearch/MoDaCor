@@ -1,9 +1,6 @@
-
 # Extending MoDaCor
 
-```{warning}
-Documentation stub. This section outlines the future structure for module- and IO-extension guides.
-```
+> **Warning:** Documentation stub. This section outlines the future structure for module- and IO-extension guides.
 
 ```{toctree}
 :maxdepth: 1
