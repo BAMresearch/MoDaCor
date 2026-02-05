@@ -77,6 +77,7 @@ class ProcessStep:
     requires_steps: list[str] = field(factory=list)
     step_id: int | str = field(default=-1, validator=v.instance_of((Integral, str)))
     executed: bool = field(default=False, validator=v.instance_of(bool))
+    short_title: str | None = field(default=None, validator=v.optional(v.instance_of(str)))
 
     # if the process produces intermediate arrays, they are stored here, optionally cached
     produced_outputs: dict[str, Any] = field(factory=dict)

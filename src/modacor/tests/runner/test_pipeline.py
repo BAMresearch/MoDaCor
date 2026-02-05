@@ -290,9 +290,9 @@ def test_to_dot_matches_spec():
     # Basic header
     assert 'digraph "dot_test"' in dot_src
 
-    # Node labels should include "<id>: <calling_name>"
-    assert '"1" [label="1: Dummy step"];' in dot_src
-    assert '"2" [label="2: Dummy step"];' in dot_src
+    # Node labels should include "<id>: <module name>"
+    assert '"1" [label="1: DummyNode"];' in dot_src
+    assert '"2" [label="2: DummyNode"];' in dot_src
 
     # Edge representation
     assert '"1" -> "2";' in dot_src
@@ -314,6 +314,7 @@ def test_to_mermaid_flowchart():
 
     n1 = DummyNode(step_id="1")
     n2 = DummyNode(step_id="2")
+    n2.short_title = "custom purpose"
     graph = {n2: {n1}, n1: set()}
 
     pipeline = Pipeline(graph=graph, name="mermaid_test")
@@ -323,9 +324,9 @@ def test_to_mermaid_flowchart():
     # Header
     assert mermaid_src.splitlines()[0] == "flowchart TB"
 
-    # Nodes: 1 and 2 with labels "1: Dummy step" etc.
-    assert '1["1: Dummy step"]' in mermaid_src
-    assert '2["2: Dummy step"]' in mermaid_src
+    # Nodes: 1 and 2 with labels "1: DummyNode" etc.
+    assert '1["1: DummyNode"]' in mermaid_src
+    assert '2["2: DummyNode<br/>custom purpose"]' in mermaid_src
 
     # Edge: 1 --> 2
     assert "1 --> 2" in mermaid_src
