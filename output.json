@@ -151,7 +151,7 @@
 {"filename": "changelog.md", "lineno": 311, "status": "ignored", "code": 0, "uri": "https://github.com/BAMresearch/MoDaCor/commit/eb6dcc45a6aca867b78e57c8aa7d81a8b3b909da", "info": ""}
 {"filename": "changelog.md", "lineno": 317, "status": "ignored", "code": 0, "uri": "https://github.com/BAMresearch/MoDaCor/commit/4753f2a4a718cb1fbd5979f252ee90e4504866f0", "info": ""}
 {"filename": "getting_started/quickstart.md", "lineno": 180, "status": "working", "code": 0, "uri": "https://mermaid.live", "info": ""}
-{"filename": "contributing.md", "lineno": 49, "status": "working", "code": 0, "uri": "https://tox.wiki/en/latest/installation.html", "info": ""}
 {"filename": "changelog.md", "lineno": 21, "status": "broken", "code": 0, "uri": "http://license.py", "info": "HTTPConnectionPool(host='license.py', port=80): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPConnection(host='license.py', port=80): Failed to resolve 'license.py' ([Errno -2] Name or service not known)\"))"}
+{"filename": "contributing.md", "lineno": 49, "status": "working", "code": 0, "uri": "https://tox.wiki/en/latest/installation.html", "info": ""}
 {"filename": "contributing.md", "lineno": 9, "status": "working", "code": 0, "uri": "https://github.com/BAMresearch/modacor/issues", "info": ""}
 {"filename": "contributing.md", "lineno": 34, "status": "working", "code": 0, "uri": "https://github.com/BAMresearch/modacor", "info": ""}
