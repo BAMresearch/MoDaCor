@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-import pydata_sphinx_theme
-
 import subprocess
 from os.path import abspath, dirname, join
 
+import pydata_sphinx_theme
 import toml
 
 base_path = dirname(dirname(abspath(__file__)))
