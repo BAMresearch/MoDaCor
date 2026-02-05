@@ -18,7 +18,7 @@ import importlib
 import inspect
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 import attr
 
@@ -59,6 +59,18 @@ def _load_process_step(target: str):
         )
 
     return process_step_cls, documentation
+
+
+def _discover_targets(module_path: str = "modacor.modules") -> list[str]:
+    module = importlib.import_module(module_path)
+    names: Iterable[str] = getattr(module, "__all__", []) or []
+    targets: list[str] = []
+    for name in names:
+        obj = getattr(module, name, None)
+        if obj is None:
+            continue
+        targets.append(f"{obj.__module__}.{name}")
+    return targets
 
 
 def _format_list(items: list[Any]) -> str:
@@ -192,10 +204,28 @@ def build_markdown(step_cls, documentation: ProcessStepDescriber) -> str:
     return "\n".join(content).rstrip() + "\n"
 
 
+def _write_module_index(index_path: Path, module_files: list[Path]) -> None:
+    entries = "\n".join(path.stem for path in module_files)
+    content = "\n".join(
+        [
+            "# Module reference",
+            "",
+            "```{toctree}",
+            ":maxdepth: 1",
+            "",
+            entries,
+            "```",
+            "",
+        ]
+    )
+    index_path.write_text(content, encoding="utf-8")
+
+
 def run_cli() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "target",
+        nargs="?",
         help=(
             "Fully-qualified dotted path to the ProcessStep class (e.g. 'modacor.modules.base_modules.divide.Divide')."
         ),
@@ -206,7 +236,44 @@ def run_cli() -> int:
         type=Path,
         help="Optional output Markdown file. If omitted, the documentation is written to stdout.",
     )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Generate documentation for all modules exposed via modacor.modules.__all__.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Output directory for per-module Markdown files (used with --all).",
+    )
+    parser.add_argument(
+        "--index",
+        type=Path,
+        help="Optional index Markdown file to write a toctree for generated modules.",
+    )
     args = parser.parse_args()
+
+    if args.all:
+        if args.output_dir is None:
+            raise SystemExit("--output-dir is required when using --all.")
+        targets = _discover_targets()
+        output_dir = args.output_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        generated_files: list[Path] = []
+        for target in targets:
+            step_cls, documentation = _load_process_step(target)
+            markdown = build_markdown(step_cls, documentation)
+            output_path = output_dir / f"{step_cls.__name__}.md"
+            output_path.write_text(markdown, encoding="utf-8")
+            generated_files.append(output_path)
+
+        if args.index:
+            _write_module_index(args.index, generated_files)
+        return 0
+
+    if not args.target:
+        raise SystemExit("Either a target or --all must be provided.")
 
     step_cls, documentation = _load_process_step(args.target)
     markdown = build_markdown(step_cls, documentation)

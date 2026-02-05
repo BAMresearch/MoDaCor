@@ -90,3 +90,31 @@ def test_cli_stdout(monkeypatch):
 def test_cli_error_on_missing_documentation(tmp_path: Path, monkeypatch):
     with pytest.raises(SystemExit):
         generate_module_doc._load_process_step("collections.Counter")
+
+
+def test_cli_generate_all(tmp_path: Path):
+    output_dir = tmp_path / "modules"
+    index_path = output_dir / "index.md"
+
+    completed = subprocess.run(
+        [
+            "python3",
+            "scripts/generate_module_doc.py",
+            "--all",
+            "--output-dir",
+            str(output_dir),
+            "--index",
+            str(index_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=PROJECT_ROOT,
+    )
+
+    assert index_path.exists()
+    assert "Module reference" in index_path.read_text(encoding="utf-8")
+    assert completed.stdout == ""
+
+    module_files = list(output_dir.glob("*.md"))
+    assert module_files

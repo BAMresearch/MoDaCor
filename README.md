@@ -68,6 +68,8 @@ Planned documentation stubs now live in the repository to signal the intended st
 
 These pages currently contain explicit TODO notes and will be expanded during the documentation refresh.
 
+Documentation contributors can follow `docs/README.md` for local build instructions and authoring notes.
+
 ## Development
 
 For coding contributions, we strongly recommend:

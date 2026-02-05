@@ -1,10 +1,10 @@
 
 # Reference
 
-```{autosummary}
-:toctree: autosummary
-:template: module.rst
-:recursive:
+The module reference pages are generated automatically from each ProcessStep and listed below.
 
-modacor
+```{toctree}
+:maxdepth: 1
+
+modules/index
 ```

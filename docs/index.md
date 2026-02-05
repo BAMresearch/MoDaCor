@@ -1,24 +1,23 @@
----
-myst:
-  toctree:
-    maxdepth: 2
-    entries:
-      - readme
-      - installation
-      - getting_started/index
-      - pipeline_operations/index
-      - extending/index
-      - examples/index
-      - reference/index
-      - contributing
-      - authors
-      - changelog
-      - View on GitHub <https://github.com/BAMresearch/modacor>
----
+# MoDaCor documentation
 
-# Contents
+MoDaCor provides traceable, stepwise data corrections with unit and uncertainty propagation. Use the sections below to
+get started quickly, build pipelines, or extend the library with new modules.
 
-This documentation skeleton highlights the future structure discussed in the documentation refresh plan. Pages flagged as placeholders will be populated iteratively.
+```{toctree}
+:maxdepth: 2
+
+readme
+installation
+getting_started/index
+pipeline_operations/index
+extending/index
+examples/index
+reference/index
+usage
+contributing
+authors
+changelog
+```
 
 ## Indices and tables
 

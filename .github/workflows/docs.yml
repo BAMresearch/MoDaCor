@@ -23,6 +23,9 @@ jobs:
           cache: pip
           cache-dependency-path: |
             ci/requirements.txt
+            docs/requirements.txt
+            requirements.txt
+            pyproject.toml
 
       - name: Install required system packages
         shell: sh

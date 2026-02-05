@@ -189,4 +189,3 @@ graph.
   export the trace alongside the configuration.
 - Explore the **Pipeline operations** and **Extending MoDaCor** sections for branching workflows, module development,
   and integration best practices.
-}
