@@ -1,6 +1,6 @@
-# SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: BSD-3-Clause
 
 from __future__ import annotations
 

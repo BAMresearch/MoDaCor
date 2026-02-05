@@ -1,17 +1,18 @@
+# MoDaCor (v1.0.0)
 
-# Overview
+## Overview
 
 New modular data corrections for any neutron or X-ray technique that produces 1D or 2D scattering/diffraction/imaging
 data.
 
-[![PyPI Package latest release](https://img.shields.io/pypi/v/modacor.svg)](https://pypi.org/project/modacor)<!-- -->
-[![Commits since latest release](https://img.shields.io/github/commits-since/BAMresearch/modacor/v1.0.0.svg)](https://github.com/BAMresearch/modacor/compare/v1.0.0...main)<!-- -->
-[![License](https://img.shields.io/pypi/l/modacor.svg)](https://en.wikipedia.org/wiki/MIT_license)<!-- -->
-[![Supported Python versions](https://img.shields.io/pypi/pyversions/modacor.svg)](https://pypi.org/project/modacor)<!-- -->
-[![PyPI Wheel](https://img.shields.io/pypi/wheel/modacor.svg)](https://pypi.org/project/modacor#files)<!-- -->
-[![Weekly PyPI downloads](https://img.shields.io/pypi/dw/modacor.svg)](https://pypi.org/project/modacor/)<!-- -->
-[![CI/CD status](https://github.com/BAMresearch/modacor/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/BAMresearch/modacor/actions/workflows/ci-cd.yml)<!-- -->
-[![Coverage report](https://img.shields.io/endpoint?url=https://BAMresearch.github.io/modacor/coverage-report/cov.json)](https://BAMresearch.github.io/modacor/coverage-report/)
+[![PyPI Package latest release](https://img.shields.io/pypi/v/modacor.svg)](https://test.pypi.org/project/modacor)
+[![Commits since latest release](https://img.shields.io/github/commits-since/BAMresearch/MoDaCor/v1.0.0.svg)](https://github.com/BAMresearch/MoDaCor/compare/v1.0.0...main)
+[![License](https://img.shields.io/pypi/l/modacor.svg)](https://en.wikipedia.org/wiki/BSD-3-Clause)
+[![Supported versions](https://img.shields.io/pypi/pyversions/modacor.svg)](https://test.pypi.org/project/modacor)
+[![PyPI Wheel](https://img.shields.io/pypi/wheel/modacor.svg)](https://test.pypi.org/project/modacor#files)
+[![Weekly PyPI downloads](https://img.shields.io/pypi/dw/modacor.svg)](https://test.pypi.org/project/modacor/)
+[![Continuous Integration and Deployment Status](https://github.com/BAMresearch/MoDaCor/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/BAMresearch/MoDaCor/actions/workflows/ci-cd.yml)
+[![Coverage report](https://img.shields.io/endpoint?url=https://BAMresearch.github.io/MoDaCor/coverage-report/cov.json)](https://BAMresearch.github.io/MoDaCor/coverage-report/)
 
 ## Summary
 
@@ -27,9 +28,7 @@ or as a reference to validate faster, more integrated data-correction implementa
 
 ## Installation
 
-```bash
-pip install modacor
-```
+    pip install modacor
 
 ### Optional extras
 
@@ -41,13 +40,11 @@ pip install modacor[tiled]
 
 To install the in-development version:
 
-```bash
-pip install git+https://github.com/BAMresearch/modacor.git@main
-```
+    pip install git+https://github.com/BAMresearch/MoDaCor.git@main
 
 ## Documentation structure
 
-The published documentation at <https://BAMresearch.github.io/modacor> is organised around three main tracks:
+The published documentation at <https://BAMresearch.github.io/MoDaCor> is organised around three main tracks:
 
 - **Getting started** – a Quickstart walkthrough that runs a sample pipeline with the bundled MOUSE dataset and
   highlights pipeline tracing.
@@ -77,23 +74,36 @@ For coding contributions, we strongly recommend:
 - using `flake8` and/or `black` for consistent formatting;
 - writing tests for every added functionality to encourage test-driven development practices.
 
-To run all the tests:
+### Testing
 
-```bash
-tox
-```
+See which tests are available (arguments after `--` get passed to *pytest* which runs the tests):
 
-To combine coverage data from all `tox` environments:
+    tox -e py -- --co
 
-- **Windows**
+Run a specific test only:
 
-  ```cmd
-  set PYTEST_ADDOPTS=--cov-append
-  tox
-  ```
+    tox -e py -- -k <test_name from listing before>
 
-- **Other platforms**
+Run all tests with:
 
-  ```bash
-  PYTEST_ADDOPTS=--cov-append tox
-  ```
+    tox -e py
+
+### Package Version
+
+Get the next version number and how the GIT history would be interpreted for that:
+
+    pip install python-semantic-release
+    semantic-release -v version --print
+
+This prints its interpretation of the commits in detail. Make sure to supply the `--print`
+argument to not raise the version number which is done automatically by the *release* job
+of the GitHub Action Workflows.
+
+### Project template
+
+Update the project configuration from the *copier* template and make sure the required packages
+are installed:
+
+    pip install copier jinja2-time
+    copier update --trust --skip-answered
+

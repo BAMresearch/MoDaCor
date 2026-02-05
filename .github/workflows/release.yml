@@ -12,10 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
+      # depth=0 is needed for semantic-release
       - name: Checking out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: main
 
       - name: Setup git user
         shell: sh
@@ -23,21 +25,20 @@ jobs:
           git config user.name "${GITHUB_ACTOR}"
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 
-      # see *py_ver* in ci/update.py
       - name: Setting up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: |
-            ci/requirements.txt
+            pyproject.toml
 
       - name: Install dependencies
         shell: sh
         run: |
           [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
           python -m pip install --upgrade pip
-          python -m pip install --progress-bar=off -r ci/requirements.txt
+          python -m pip install --progress-bar=off .[ci]
 
       - name: Determine a version number
         env:
@@ -46,8 +47,10 @@ jobs:
         run: |
           set -x
           NEWVER=$(semantic-release version --print)
-          sed -i -e "s/v\([0-9]\+\.\)\{3\}/v$NEWVER./" README.md
-          sed -i -e "s/\([0-9]\+\.\)\{2\}[0-9]\+/$NEWVER/" .cookiecutterrc
-          git add README.md .cookiecutterrc
+          # version number updates with regexp which is not supported by
+          # semantic_release.version_variables in pyproject.toml
+          sed -i -e "s/v\([0-9]\+\.\)\{2\}\([0-9]\+\)/v$NEWVER/g" README.md
+          sed -i -e "/version:/s/\([0-9]\+\.\)\{2\}[0-9]\+/$NEWVER/" .copier-answers.yml
+          git add README.md .copier-answers.yml
           # creates a release only if there are relevant changes/commits starting with 'fix/feat()'
           semantic-release version

@@ -21,7 +21,7 @@ From the repository root:
 python -m venv .venv-docs
 source .venv-docs/bin/activate
 pip install --upgrade pip
-pip install -r docs/requirements.txt
+pip install .[docs]
 
 sphinx-build -E -b html docs dist/docs
 ```

@@ -5,8 +5,8 @@ on:
   workflow_call:
 
 env:
-  DOCS_URL: https://BAMresearch.github.io/modacor
-  COV_REPORT_BASE_DIR: coverage-report
+  DOCS_URL: https://BAMresearch.github.io/MoDaCor
+  COV_REPORT_BASE_DIR: coverage-report  # see pyproject.toml
 
 jobs:
   combine:
@@ -17,28 +17,30 @@ jobs:
     steps:
 
       - name: Checking out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          ref: main
 
-      # see *py_ver* in ci/update.py
       - name: Setting up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: |
-            ci/requirements.txt
+            pyproject.toml
 
       - name: Install dependencies
         shell: sh
         run: |
           [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
           python -m pip install --upgrade pip
-          python -m pip install --progress-bar=off -r ci/requirements.txt
+          python -m pip install --progress-bar=off .[ci]
 
       - name: Download coverage data
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
-          name: coverage
+          pattern: coverage.*
+          merge-multiple: true
 
       - name: Combine and report
         id: combine
@@ -51,7 +53,7 @@ jobs:
           coverage html --debug=pathmap
 
       - name: Upload HTML report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: html_report
           path: htmlcov
@@ -90,7 +92,7 @@ jobs:
 
       - name: Checkout documentation pages branch
         if: ${{ github.ref == 'refs/heads/main' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: gh-pages
           path: pages
@@ -101,14 +103,14 @@ jobs:
 
       - name: Download previously generated documentation
         if: ${{ github.ref == 'refs/heads/main' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: docs
           path: pages
 
       - name: Download coverage HTML report
         if: ${{ github.ref == 'refs/heads/main' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: html_report
           path: pages/${{ env.report_dir }}
@@ -138,7 +140,8 @@ jobs:
           echo "{\"schemaVersion\":1,\"label\":\"Coverage\",\"message\":\"${{ env.total }}%\",\"color\":\"hsl($HUE, 100%, 40%)\"}" > "$BADGE_JSON"
           # Commit.
           cd ./pages
-          rm ${{ env.report_dir }}/.gitignore
+          rm -f ${{ env.report_dir }}/.gitignore
+          touch .nojekyll  # not a jekyll page here, do not ignore _static
           # ls -la ${{ env.report_dir }} # for debugging
           # ${{ env.report_dir }}/* "${REDIR_HTML#*/}" "${BADGE_JSON#*/}"
           git add -A

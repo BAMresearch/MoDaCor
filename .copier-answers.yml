@@ -1,0 +1,24 @@
+# Changes here will be overwritten by Copier
+_commit: v1.1.13
+_src_path: yapy-copier-template
+author_count: 2
+author_emails: brian.pauw@bam.de, tim.snow@diamond.ac.uk
+author_names: Brian R. Pauw, Tim Snow
+author_websites: https://lookingatnothing.com, https://www.diamond.ac.uk/Instruments/Soft-Condensed-Matter/small-angle/I22/Staff/Tim-Snow.html
+copyright_from: 2025
+docs_url: https://BAMresearch.github.io/MoDaCor
+license: BSD-3-Clause
+project_description: A new modular data correction software for any neutron or X-ray
+    technique that produces 1D or 2D scattering, diffraction, or imaging data.
+project_name: MoDaCor
+pypi_host: test.pypi.org
+python_versions:
+- '3.12'
+- '3.13'
+release_date_question: 25-05-21
+repo_hosting_domain: github.com
+repo_main_branch: main
+repo_name: MoDaCor
+repo_userorg: BAMresearch
+sphinx_theme: furo
+version: 1.0.0

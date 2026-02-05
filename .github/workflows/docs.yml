@@ -11,20 +11,17 @@ jobs:
     steps:
 
       - name: Checking out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: main
 
-      # see *py_ver* in ci/update.py
       - name: Setting up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: |
-            ci/requirements.txt
-            docs/requirements.txt
-            requirements.txt
             pyproject.toml
 
       - name: Install required system packages
@@ -33,6 +30,7 @@ jobs:
           PLATFORM="$(echo "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')"
           REQFN="ci/requirements_$PLATFORM.txt"
           if [ "$PLATFORM" = "linux" ] && [ -f "$REQFN" ]; then
+            sudo apt-get update  # update package DB, to avoid outdated lists
             sudo apt-get -y install $(sed -e '/^\s*#/d' "$REQFN")
           elif [ "$PLATFORM" = "windows" ] && [ -f "$REQFN" ]; then
             choco install $(sed -e '/^\s*#/d' "$REQFN")
@@ -45,18 +43,14 @@ jobs:
         run: |
           [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
           python -m pip install --upgrade pip
-          python -m pip install --progress-bar=off -r ci/requirements.txt
-
-      - name: Check
-        shell: sh
-        run: tox -e check -v
+          python -m pip install --progress-bar=off .[ci]
 
       - name: Generate documentation
         shell: sh
         run: tox -e docs -v
 
       - name: Upload docs for finalization later
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: docs
           path: dist/docs
