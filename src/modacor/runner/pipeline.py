@@ -151,6 +151,7 @@ class Pipeline(TopologicalSorter):
 
             configuration = module_data.get("configuration") or {}
             requires_raw = module_data.get("requires_steps") or []
+            short_title = module_data.get("short_title")
 
             # Normalize dependencies to strings as well
             requires_steps = {str(dep) for dep in requires_raw}
@@ -161,6 +162,8 @@ class Pipeline(TopologicalSorter):
             # Pass the normalized string step_id into the ProcessStep
             step_instance: ProcessStep = step_cls(io_sources=None, io_sinks=None, step_id=step_id)
             step_instance.modify_config_by_dict(configuration)
+            if short_title is not None:
+                step_instance.short_title = str(short_title)
 
             process_step_instances[step_id] = step_instance
             dependency_ids[step_id] = requires_steps
@@ -410,6 +413,8 @@ class Pipeline(TopologicalSorter):
                 "requires_steps": prereq_ids,
                 "produced_outputs": sorted(getattr(node, "produced_outputs", {}).keys()),
             }
+            if getattr(node, "short_title", None):
+                node_spec["short_title"] = node.short_title
 
             cfg_json = json.dumps(node_spec["config"], sort_keys=True, default=str).encode("utf-8")
             node_spec["config_hash"] = sha256(cfg_json).hexdigest()
@@ -455,7 +460,10 @@ class Pipeline(TopologicalSorter):
         for node in spec["nodes"]:
             nid = node["id"]
             # Show both id and label so it's easy to match YAML <-> graph
-            label = f'{node["id"]}: {node["label"]}'
+            label = f'{node["id"]}: {node["module"]}'
+            short_title = node.get("short_title")
+            if short_title:
+                label = f"{label}\\n{short_title}"
             esc_label = label.replace('"', '\\"')
             lines.append(f'  "{nid}" [label="{esc_label}"];')  # noqa: E702, E231
 
@@ -492,7 +500,10 @@ class Pipeline(TopologicalSorter):
         # Nodes
         for node in spec["nodes"]:
             nid = id_map[node["id"]]
-            label = f'{node["id"]}: {node["label"]}'
+            label = f'{node["id"]}: {node["module"]}'
+            short_title = node.get("short_title")
+            if short_title:
+                label = f"{label}<br/>{short_title}"
             esc_label = label.replace('"', '\\"')
             lines.append(f'    {nid}["{esc_label}"]')
 
@@ -547,6 +558,7 @@ class Pipeline(TopologicalSorter):
             module_name = node["module"]
             cfg = node.get("config", {}) or {}
             requires = requires_map.get(sid, [])
+            short_title = node.get("short_title")
 
             step_dict: dict[str, Any] = {
                 "module": module_name,
@@ -555,6 +567,8 @@ class Pipeline(TopologicalSorter):
                 step_dict["requires_steps"] = requires
             if cfg:
                 step_dict["configuration"] = cfg
+            if short_title:
+                step_dict["short_title"] = short_title
 
             steps[sid] = step_dict
 
