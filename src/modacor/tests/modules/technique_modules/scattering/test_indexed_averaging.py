@@ -369,6 +369,7 @@ def test_indexedaverager_uncertainty_propagation_and_sem():
     sig_1d = out["bundle"]["signal"]
     assert "sigma" in sig_1d.uncertainties
     assert "SEM" in sig_1d.uncertainties
+    assert "STD" in sig_1d.uncertainties
 
     # Expected propagated sigma on bin means:
     # bin 0: pixels 0,1, sigma=0.1 each
@@ -386,9 +387,46 @@ def test_indexedaverager_uncertainty_propagation_and_sem():
     # Effective N_eff = (sum_w^2 / sum_w2) = 4/2 = 2
     # sem = sqrt(var_spread / N_eff) = sqrt(0.25/2) = sqrt(0.125)
     expected_sem = np.full(2, np.sqrt(0.125), dtype=float)
+    expected_std = np.full(2, 0.5, dtype=float)
 
     sem = sig_1d.uncertainties["SEM"]
+    std = sig_1d.uncertainties["STD"]
     assert_allclose(sem, expected_sem, rtol=1e-12, atol=1e-12)
+    assert_allclose(std, expected_std, rtol=1e-12, atol=1e-12)
+
+
+def test_indexedaverager_stats_keys_selection():
+    """
+    If stats_keys is provided, only those BaseData entries receive SEM/STD.
+    """
+    step = IndexedAverager(io_sources=IoSources())
+
+    processing_data = ProcessingData()
+    processing_data["bundle"] = make_1d_bundle_basic()
+
+    step.processing_data = processing_data
+    step.configuration.update(
+        {
+            "with_processing_keys": ["bundle"],
+            "output_processing_key": None,
+            "averaging_direction": "azimuthal",
+            "use_signal_weights": True,
+            "use_signal_uncertainty_weights": False,
+            "uncertainty_weight_key": None,
+            "stats_keys": ["Q"],
+        }
+    )
+
+    step.prepare_execution()
+    out = step.calculate()
+
+    sig_1d = out["bundle"]["signal"]
+    q_1d = out["bundle"]["Q"]
+
+    assert "SEM" not in sig_1d.uncertainties
+    assert "STD" not in sig_1d.uncertainties
+    assert "SEM" in q_1d.uncertainties
+    assert "STD" in q_1d.uncertainties
 
 
 def test_indexedaverager_raises_on_missing_uncertainty_weight_key():
