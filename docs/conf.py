@@ -20,6 +20,7 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
     "myst_parser",
+    "sphinxcontrib.mermaid",
 ]
 myst_enable_extensions = [
     "colon_fence",
