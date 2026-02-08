@@ -27,4 +27,4 @@ Q_ = ureg.Quantity
 # recommended for pickling and unpickling:
 set_application_registry(ureg)
 ureg.formatter.default_format = "~P"
-ureg.setup_matplotlib(True)
+# ureg.setup_matplotlib(True)
