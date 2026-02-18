@@ -27,6 +27,8 @@ myst_enable_extensions = [
     "linkify",
 ]
 myst_heading_anchors = 3
+inheritance_edge_attrs = dict(color="gray")  # readable in darkmode too
+autosummary_generate = True  # Turn on sphinx.ext.autosummary
 autosummary_generate = ["reference/index"]  # Generate stubs for the reference landing page
 autosummary_generate_overwrite = True
 templates_path = ["_templates"]
