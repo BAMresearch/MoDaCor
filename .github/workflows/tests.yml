@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setting up Python ${{ env.PYTHON }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '${{ env.PYTHON }}'
           architecture: '${{ matrix.python_arch }}'
