@@ -1,2 +1,1 @@
-contributing.md:49: [broken] https://tox.wiki/en/latest/installation.html: 404 Client Error: Not Found for url: https://tox.wiki/en/latest/installation.html
 changelog.md:21: [broken] http://license.py: HTTPConnectionPool(host='license.py', port=80): Max retries exceeded with url: / (Caused by NameResolutionError("HTTPConnection(host='license.py', port=80): Failed to resolve 'license.py' ([Errno -2] Name or service not known)"))
