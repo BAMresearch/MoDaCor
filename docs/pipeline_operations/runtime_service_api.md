@@ -175,6 +175,21 @@ Request:
 
 Equivalent to `PUT /sources` with a single-item `sources` list.
 
+### `POST /sessions/{session_id}/sample`
+
+Convenience shortcut for the common "new sample file arrived" workflow.
+This endpoint updates source ref `sample` directly.
+
+Request:
+
+```json
+{
+  "location": "/data/new_sample.nxs",
+  "type": "hdf",
+  "kwargs": {}
+}
+```
+
 ### `DELETE /sessions/{session_id}/sources/{ref}`
 
 Remove one source registration.

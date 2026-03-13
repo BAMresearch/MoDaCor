@@ -186,3 +186,31 @@ def test_cli_session_dry_run_calls_api(monkeypatch):
     assert captured["method"] == "POST"
     assert captured["path"] == "/v1/sessions/s1/process/dry-run"
     assert captured["payload"]["changed_keys"] == ["sample.signal"]
+
+
+def test_cli_session_set_sample_calls_shortcut_endpoint(monkeypatch, tmp_path: Path):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = payload
+        return {"source": {"ref": "sample"}}
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    loc = tmp_path / "sample.nxs"
+    rc = main(
+        [
+            "session",
+            "set-sample",
+            "--session-id",
+            "s1",
+            "--location",
+            str(loc),
+        ]
+    )
+    assert rc == 0
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/v1/sessions/s1/sample"
+    assert captured["payload"]["location"] == str(loc)
+    assert captured["payload"]["type"] == "hdf"

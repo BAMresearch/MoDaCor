@@ -218,6 +218,19 @@ def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.Argument
         help="JSON object with extra source kwargs (default '{}').",
     )
 
+    set_sample_parser = session_subparsers.add_parser(
+        "set-sample",
+        help="Shortcut to upsert the 'sample' source reference.",
+    )
+    set_sample_parser.add_argument("--session-id", required=True)
+    set_sample_parser.add_argument("--location", required=True, type=Path)
+    set_sample_parser.add_argument("--type", default="hdf", dest="source_type")
+    set_sample_parser.add_argument(
+        "--kwargs-json",
+        default="{}",
+        help="JSON object with extra source kwargs (default '{}').",
+    )
+
     del_source_parser = session_subparsers.add_parser("delete-source", help="Delete one source registration.")
     del_source_parser.add_argument("--session-id", required=True)
     del_source_parser.add_argument("--ref", required=True)
@@ -367,6 +380,23 @@ def _session_set_source(base_url: str, args: argparse.Namespace) -> int:
     return 0
 
 
+def _session_set_sample(base_url: str, args: argparse.Namespace) -> int:
+    try:
+        kwargs_obj = json.loads(args.kwargs_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid --kwargs-json payload: {exc}") from exc
+    if not isinstance(kwargs_obj, dict):
+        raise ValueError("--kwargs-json must decode to an object/dict.")
+
+    payload = {
+        "location": str(args.location),
+        "type": args.source_type,
+        "kwargs": kwargs_obj,
+    }
+    _print_json(_http_request_json(base_url, "POST", f"/v1/sessions/{args.session_id}/sample", payload))
+    return 0
+
+
 def _session_delete_source(base_url: str, args: argparse.Namespace) -> int:
     _http_request_json(base_url, "DELETE", f"/v1/sessions/{args.session_id}/sources/{args.ref}")
     print(f"Deleted source '{args.ref}' from session '{args.session_id}'.")
@@ -431,6 +461,7 @@ def _session_command(args: argparse.Namespace) -> int:
         "delete": _session_delete,
         "status": _session_status,
         "set-source": _session_set_source,
+        "set-sample": _session_set_sample,
         "delete-source": _session_delete_source,
         "process": _session_process,
         "dry-run": _session_dry_run,

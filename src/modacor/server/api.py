@@ -337,6 +337,33 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
             "sources": list(session.sources.values()),
         }
 
+    @app.post("/v1/sessions/{session_id}/sample")
+    def set_sample_source(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        location = str(payload.get("location", "")).strip()
+        source_type = str(payload.get("type", "hdf")).strip()
+        kwargs = payload.get("kwargs", {}) or {}
+
+        if not location:
+            raise HTTPException(status_code=422, detail="'location' is required.")
+        if not source_type:
+            raise HTTPException(status_code=422, detail="'type' must be non-empty.")
+        if not isinstance(kwargs, dict):
+            raise HTTPException(status_code=422, detail="'kwargs' must be an object when provided.")
+
+        try:
+            session = manager.upsert_sources(
+                session_id,
+                sources=[{"ref": "sample", "type": source_type, "location": location, "kwargs": kwargs}],
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        return {
+            "session_id": session.session_id,
+            "source": session.sources.get("sample"),
+            "sources": list(session.sources.values()),
+        }
+
     @app.delete("/v1/sessions/{session_id}/sources/{ref}", status_code=204)
     def delete_source(session_id: str, ref: str) -> None:
         try:

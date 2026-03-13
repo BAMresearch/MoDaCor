@@ -46,10 +46,11 @@ Complexity: medium
 Reason: improves observability and post-mortem diagnostics.
 
 6. `U6` “Last sample” shortcut endpoint
-Status: `planned`
+Status: `done`
 Benefit: high
 Complexity: low
 Reason: maps the most frequent operation to a single focused API call.
+Notes: implemented as `POST /v1/sessions/{id}/sample` plus CLI `modacor session set-sample ...`.
 
 7. `U8` Health/readiness split endpoints with runtime metrics
 Status: `planned`

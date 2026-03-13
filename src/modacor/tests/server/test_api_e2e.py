@@ -173,6 +173,34 @@ def test_api_source_templates_and_profile_validation():
     assert second_resp.status_code != 422
 
 
+def test_api_set_sample_shortcut_upserts_sample_source():
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    _post_json(
+        client,
+        "/v1/sessions",
+        {"session_id": "sess-sample-shortcut", "pipeline": {"yaml_text": "name: p\nsteps: {}\n"}},
+    )
+
+    first = _post_json(
+        client,
+        "/v1/sessions/sess-sample-shortcut/sample",
+        {"location": "/tmp/sample_a.nxs"},
+    )
+    assert first["source"]["ref"] == "sample"
+    assert first["source"]["type"] == "hdf"
+    assert first["source"]["location"] == "/tmp/sample_a.nxs"
+
+    second = _post_json(
+        client,
+        "/v1/sessions/sess-sample-shortcut/sample",
+        {"location": "/tmp/sample_b.nxs", "type": "hdf"},
+    )
+    assert second["source"]["location"] == "/tmp/sample_b.nxs"
+
+
 def test_api_process_dry_run_returns_plan_and_missing_profile_sources():
     manager = SessionManager()
     app = create_app(session_manager=manager)

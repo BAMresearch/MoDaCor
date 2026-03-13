@@ -191,6 +191,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /sessions/{session_id}/sample:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      tags: [Sources]
+      summary: Shortcut to upsert the `sample` source reference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [location]
+              properties:
+                location:
+                  type: string
+                type:
+                  type: string
+                  default: hdf
+                kwargs:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: Sample source updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                  source:
+                    $ref: "#/components/schemas/SourceRegistration"
+                  sources:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SourceRegistration"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /sessions/{session_id}/process:
     parameters:
       - $ref: "#/components/parameters/SessionId"
