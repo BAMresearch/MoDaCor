@@ -51,6 +51,19 @@ def _read_json_dataset(group: h5py.Group, name: str) -> dict | list:
     return json.loads(payload)
 
 
+def _read_text_dataset(group: h5py.Group, name: str) -> str:
+    data = group[name][()]
+    if isinstance(data, bytes):
+        return data.decode("utf-8")
+    return str(data)
+
+
+def _read_str_value(value: str | bytes) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return str(value)
+
+
 def test_hdf_processing_sink_writes_result_and_metadata(
     tmp_path: Path, processing_data_with_uncertainties: ProcessingData
 ):
@@ -58,13 +71,29 @@ def test_hdf_processing_sink_writes_result_and_metadata(
     sink = HDFProcessingSink(resource_location=out_file, iosink_method_kwargs={"compression": "gzip"})
 
     pipeline_spec = {"name": "demo", "version": "1.0"}
-    trace_events = [{"step_id": "S1", "module": "Example", "datasets": {}}]
+    pipeline_yaml = "name: demo\nsteps: {}\n"
+    trace_events = [
+        {
+            "step_id": "S1",
+            "module": "Example",
+            "duration_s": 0.1,
+            "config": {"a": 1},
+            "datasets": {
+                "sample.signal": {
+                    "diff": ["units"],
+                    "prev": {"units": "count"},
+                    "now": {"units": "1/s"},
+                }
+            },
+        }
+    ]
 
     sink.write(
         "run1",
         processing_data_with_uncertainties,
         data_paths=["/sample/signal/signal"],
         pipeline_spec=pipeline_spec,
+        pipeline_yaml=pipeline_yaml,
         trace_events=trace_events,
     )
 
@@ -84,9 +113,19 @@ def test_hdf_processing_sink_writes_result_and_metadata(
 
         pipeline_group = h5["processing/pipeline/run1"]
         assert _read_json_dataset(pipeline_group, "spec") == pipeline_spec
+        assert _read_text_dataset(pipeline_group, "yaml") == pipeline_yaml
 
         tracer_group = h5["processing/tracer/run1"]
         assert _read_json_dataset(tracer_group, "events") == trace_events
+        assert tracer_group.attrs["schema_version"] == "1.1"
+        assert _read_str_value(tracer_group["index/step_ids"][0]) == "S1"
+        assert _read_str_value(tracer_group["index/modules"][0]) == "Example"
+        assert bool(tracer_group["index/any_change"][0]) is True
+        dataset_group = tracer_group["steps/0001_S1/datasets/sample.signal"]
+        assert dataset_group.attrs["path"] == "sample.signal"
+        assert _read_str_value(dataset_group["changed_kinds"][0]) == "units"
+        assert json.loads(_read_text_dataset(dataset_group, "prev_json")) == {"units": "count"}
+        assert json.loads(_read_text_dataset(dataset_group, "now_json")) == {"units": "1/s"}
 
 
 def test_hdf_processing_sink_defaults_to_run_default(

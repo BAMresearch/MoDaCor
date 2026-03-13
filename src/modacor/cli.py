@@ -153,6 +153,7 @@ def _run_command(args: argparse.Namespace) -> int:
             result.processing_data,
             data_paths=args.write_path,
             pipeline_spec=result.pipeline.to_spec(),
+            pipeline_yaml=result.pipeline.to_yaml(),
             trace_events=result.tracer.events if result.tracer is not None else None,
         )
         print(f"Wrote HDF output: {args.write_hdf}")
