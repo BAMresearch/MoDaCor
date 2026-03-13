@@ -4,8 +4,16 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 from pathlib import Path
 from typing import Any
+
+from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
+from modacor.io.hdf.hdf_source import HDFSource
+from modacor.io.io_sources import IoSources
+from modacor.io.yaml.yaml_source import YAMLSource
+from modacor.runner import run_pipeline_job
+from modacor.runner.pipeline import Pipeline
 
 from .session_manager import PipelineSession, SessionManager
 
@@ -36,6 +44,87 @@ def _session_detail(session: PipelineSession) -> dict[str, Any]:
         }
     )
     return out
+
+
+def _resolve_effective_mode(requested_mode: str) -> tuple[str, str | None]:
+    if requested_mode in {"partial", "auto"}:
+        # Conservative execution until dirty-subgraph invalidation is implemented.
+        return "full", "partial/auto currently execute as full reruns in scaffold mode"
+    return "full", None
+
+
+def _load_custom_source_class(class_path: str):
+    module_path, class_name = class_path.rsplit(".", 1)
+    module = import_module(module_path)
+    return getattr(module, class_name)
+
+
+def _build_sources_from_session(session: PipelineSession) -> IoSources:
+    from modacor.io.csv.csv_source import CSVSource
+
+    sources = IoSources()
+    type_map: dict[str, Any] = {
+        "hdf": HDFSource,
+        "yaml": YAMLSource,
+        "csv": CSVSource,
+    }
+
+    for ref in sorted(session.sources.keys()):
+        reg = session.sources[ref]
+        source_type = str(reg["type"]).strip().lower()
+        location = Path(str(reg["location"]))
+        kwargs = dict(reg.get("kwargs", {}) or {})
+
+        if source_type == "custom":
+            class_path = kwargs.pop("class_path", None)
+            if not class_path:
+                raise ValueError(f"Custom source '{ref}' requires kwargs.class_path.")
+            source_cls = _load_custom_source_class(str(class_path))
+        else:
+            if source_type not in type_map:
+                raise ValueError(f"Unsupported source type '{source_type}' for ref '{ref}'.")
+            source_cls = type_map[source_type]
+
+        source = source_cls(
+            source_reference=ref,
+            resource_location=location,
+            iosource_method_kwargs=kwargs.get("iosource_method_kwargs", kwargs),
+        )
+        sources.register_source(source)
+    return sources
+
+
+def _maybe_write_hdf_output(
+    write_hdf: dict[str, Any] | None,
+    *,
+    run_name: str,
+    result: Any,
+    pipeline_yaml: str,
+) -> str | None:
+    if not write_hdf:
+        return None
+
+    out_path_raw = write_hdf.get("path")
+    if not out_path_raw:
+        raise ValueError("write_hdf.path is required when write_hdf is provided.")
+
+    data_paths = list(write_hdf.get("data_paths", []) or [])
+    write_all = bool(write_hdf.get("write_all_processing_data", False))
+    if not data_paths and not write_all:
+        raise ValueError("write_hdf requires data_paths or write_all_processing_data=true.")
+
+    out_path = Path(str(out_path_raw))
+    sink = HDFProcessingSink(resource_location=out_path)
+    sink.write(
+        run_name,
+        result.processing_data,
+        data_paths=data_paths or None,
+        write_all_processing_data=write_all,
+        pipeline_spec=result.pipeline.to_spec(),
+        pipeline_yaml=pipeline_yaml,
+        trace_events=result.tracer.events if result.tracer is not None else None,
+    )
+    return str(out_path)
 
 
 def create_app(session_manager: SessionManager | None = None):  # noqa: C901
@@ -144,13 +233,82 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
         changed_sources = payload.get("changed_sources") or []
         if mode == "partial" and not changed_sources:
             raise HTTPException(status_code=422, detail="changed_sources is required for partial mode.")
+        session = manager.get_session(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found.")
+
+        effective_mode, mode_note = _resolve_effective_mode(mode)
         try:
-            run_meta = manager.enqueue_run(session_id, mode=mode, changed_sources=list(changed_sources))
+            run_meta = manager.enqueue_run(
+                session_id,
+                mode=mode,
+                changed_sources=list(changed_sources),
+                effective_mode=effective_mode,
+            )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except RuntimeError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        return {"session_id": session_id, "run_id": run_meta["run_id"], "state": "accepted"}
+
+        run_id = str(run_meta["run_id"])
+        try:
+            pipeline = Pipeline.from_yaml(session.pipeline_yaml or "")
+            sources = _build_sources_from_session(session)
+
+            reuse_processing_data = effective_mode == "partial" and session.processing_data is not None
+            result = run_pipeline_job(
+                pipeline,
+                sources=sources,
+                processing_data=session.processing_data if reuse_processing_data else None,
+                trace=session.trace_enabled,
+                trace_watch=session.trace_watch,
+            )
+            session.processing_data = result.processing_data
+
+            write_hdf = payload.get("write_hdf", None)
+            hdf_out_path = _maybe_write_hdf_output(
+                write_hdf if isinstance(write_hdf, dict) else None,
+                run_name=str(payload.get("run_name") or run_id),
+                result=result,
+                pipeline_yaml=session.pipeline_yaml or "",
+            )
+
+            details = {
+                "status": "succeeded",
+                "executed_steps": result.executed_steps,
+                "num_steps": len(result.executed_steps),
+            }
+            if mode_note:
+                details["note"] = mode_note
+            if hdf_out_path is not None:
+                details["hdf_output"] = hdf_out_path
+
+            run_meta = manager.mark_run_succeeded(session_id, run_id, details=details)
+            return {
+                "session_id": session_id,
+                "run_id": run_id,
+                "state": "idle",
+                "status": run_meta.get("status"),
+                "effective_mode": run_meta.get("effective_mode"),
+                "note": mode_note,
+                "hdf_output": run_meta.get("hdf_output"),
+            }
+        except Exception as exc:
+            manager.mark_run_failed(
+                session_id,
+                run_id,
+                code="RUN_FAILED",
+                message=str(exc),
+                details={"exception_type": type(exc).__name__},
+            )
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "code": "RUN_FAILED",
+                    "message": str(exc),
+                    "details": {"session_id": session_id, "run_id": run_id},
+                },
+            ) from exc
 
     @app.post("/v1/sessions/{session_id}/reset")
     def reset(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -174,18 +332,19 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                 session = manager.get_session(session_id)
                 assert session is not None
                 return {"session_id": session_id, "state": session.state, "strategy": strategy}
-
-            run_meta = manager.enqueue_run(
-                session_id,
-                mode="full",
-                changed_sources=list(payload.get("changed_sources", []) or []),
-            )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except RuntimeError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-        return {"session_id": session_id, "run_id": run_meta["run_id"], "state": "accepted", "strategy": strategy}
+        # Reuse /process execution path for actual rerun.
+        process_payload: dict[str, Any] = {"mode": "full", "changed_sources": list(payload.get("changed_sources", []))}
+        if "write_hdf" in payload:
+            process_payload["write_hdf"] = payload["write_hdf"]
+        if "run_name" in payload:
+            process_payload["run_name"] = payload["run_name"]
+        process_response = process(session_id, process_payload)
+        process_response["strategy"] = strategy
+        return process_response
 
     @app.get("/v1/sessions/{session_id}/runs")
     def list_runs(session_id: str) -> dict[str, Any]:

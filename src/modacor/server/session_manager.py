@@ -30,6 +30,8 @@ class PipelineSession:
     active_run_id: str | None = None
     updated_utc: str = field(default_factory=_utc_now_iso)
     run_history: list[dict[str, Any]] = field(default_factory=list)
+    processing_data: Any | None = None
+    last_error: dict[str, Any] | None = None
 
 
 class SessionManager:
@@ -101,7 +103,14 @@ class SessionManager:
             session.updated_utc = _utc_now_iso()
             return existed
 
-    def enqueue_run(self, session_id: str, *, mode: str, changed_sources: list[str] | None = None) -> dict[str, Any]:
+    def enqueue_run(
+        self,
+        session_id: str,
+        *,
+        mode: str,
+        changed_sources: list[str] | None = None,
+        effective_mode: str | None = None,
+    ) -> dict[str, Any]:
         with self._lock:
             session = self._sessions.get(session_id)
             if session is None:
@@ -110,19 +119,78 @@ class SessionManager:
                 raise RuntimeError(f"Session '{session_id}' is busy.")
 
             run_id = f"run-{uuid4().hex[:12]}"
-            state = "running_partial" if mode == "partial" else "running_full"
+            run_mode = effective_mode or mode
+            state = "running_partial" if run_mode == "partial" else "running_full"
             session.state = state
             session.active_run_id = run_id
             session.updated_utc = _utc_now_iso()
+            session.last_error = None
 
             run_meta = {
                 "run_id": run_id,
                 "mode": mode,
+                "effective_mode": run_mode,
                 "status": "queued",
                 "changed_sources": changed_sources or [],
                 "started_utc": _utc_now_iso(),
+                "finished_utc": None,
+                "failed_step_id": None,
             }
             session.run_history.append(run_meta)
+            return run_meta
+
+    def mark_run_succeeded(
+        self, session_id: str, run_id: str, *, details: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise KeyError(f"Session '{session_id}' not found.")
+
+            run_meta = next((item for item in session.run_history if item.get("run_id") == run_id), None)
+            if run_meta is None:
+                raise KeyError(f"Run '{run_id}' not found in session '{session_id}'.")
+
+            run_meta["status"] = "succeeded"
+            run_meta["finished_utc"] = _utc_now_iso()
+            if details:
+                run_meta.update(details)
+
+            session.active_run_id = None
+            session.state = "idle"
+            session.updated_utc = _utc_now_iso()
+            session.last_error = None
+            return run_meta
+
+    def mark_run_failed(
+        self,
+        session_id: str,
+        run_id: str,
+        *,
+        code: str,
+        message: str,
+        details: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise KeyError(f"Session '{session_id}' not found.")
+
+            run_meta = next((item for item in session.run_history if item.get("run_id") == run_id), None)
+            if run_meta is None:
+                raise KeyError(f"Run '{run_id}' not found in session '{session_id}'.")
+
+            run_meta["status"] = "failed"
+            run_meta["finished_utc"] = _utc_now_iso()
+            if details:
+                run_meta.update(details)
+
+            error_payload = {"code": code, "message": message, "details": details or {}}
+            session.last_error = error_payload
+            session.active_run_id = None
+            failed_mode = run_meta.get("effective_mode") or run_meta.get("mode")
+            session.state = "error_partial" if failed_mode == "partial" else "error_full"
+            session.updated_utc = _utc_now_iso()
             return run_meta
 
     def reset_session(self, session_id: str, *, mode: str) -> PipelineSession:
@@ -132,6 +200,9 @@ class SessionManager:
                 raise KeyError(f"Session '{session_id}' not found.")
             session.active_run_id = None
             session.state = "idle"
+            if mode == "full":
+                session.processing_data = None
+                session.last_error = None
             session.updated_utc = _utc_now_iso()
             session.run_history.append(
                 {

@@ -326,6 +326,9 @@ A first API scaffold is available under:
 - `src/modacor/server/api.py`
 
 It provides route skeletons and an in-memory session manager aligned with this contract.
+`/process` is now wired to execute MoDaCor runs with registered sources and optional HDF output writing.
+In the current scaffold, `partial` and `auto` requests execute as conservative full reruns until dirty-subgraph
+invalidation is implemented.
 
 Run the scaffold service:
 
