@@ -1,6 +1,5 @@
 attrs
 entrypoints
-matplotlib
 numpy
 hdf5plugin
 h5py

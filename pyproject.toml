@@ -28,24 +28,23 @@ dependencies = [
     "numpy",
     "h5py",
     "pint",
-    "matplotlib",
     "scipy",
 ]
 
 [project.optional-dependencies]
 tests = [
-  "tox",
-  "pytest",
-  "pytest-cov",
-  "pre-commit",
+    "tox",
+    "pytest",
+    "pytest-cov",
+    "pre-commit",
 ]
 docs = [
     "sphinx>=6.2",
     "myst-parser>=2.0",
     "pydata-sphinx-theme>=0.14",
     "linkify-it-py",
-    "toml",
-    "sphinxcontrib-mermaid"
+    "sphinxcontrib-mermaid",
+    "toml"
 ]
 ci = [
     "tox",

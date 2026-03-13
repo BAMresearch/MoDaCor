@@ -27,6 +27,8 @@ myst_enable_extensions = [
     "linkify",
 ]
 myst_heading_anchors = 3
+inheritance_edge_attrs = dict(color="gray")  # readable in darkmode too
+autosummary_generate = True  # Turn on sphinx.ext.autosummary
 autosummary_generate = ["reference/index"]  # Generate stubs for the reference landing page
 autosummary_generate_overwrite = True
 templates_path = ["_templates"]
@@ -43,9 +45,7 @@ version = "1.0.1"
 release = version
 commit_id = None
 try:
-    commit_id = (
-        subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).strip().decode("ascii")
-    )
+    commit_id = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).strip().decode("ascii")
 except subprocess.CalledProcessError as e:
     print(e)
 
@@ -55,7 +55,6 @@ autodoc_mock_imports = [
     "notebook",
     "pandas",
     "ipywidgets",
-    "matplotlib",
     "scipy",
     "h5py",
     "pint",
@@ -110,7 +109,7 @@ linkcheck_ignore = [
     + r".*",
     # attempted fix of '406 Client Error: Not Acceptable for url'
     # https://github.com/sphinx-doc/sphinx/issues/1331
-    join(project_meta["project"]["urls"]["repository"], "commit", r"[0-9a-fA-F]+")
+    join(project_meta["project"]["urls"]["repository"], "commit", r"[0-9a-fA-F]+"),
 ]
 linkcheck_anchors_ignore_for_url = [
     r"https://pypi\.org/project/[^/]+",
