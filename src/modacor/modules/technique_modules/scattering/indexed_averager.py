@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw"]
@@ -25,6 +25,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.modules.helpers import get_first_present, normalize_str_list
 
 logger = MessageHandler(name=__name__)
 
@@ -183,21 +184,6 @@ class IndexedAverager(ProcessStep):
         ),
     )
 
-    def __attrs_post_init__(self) -> None:
-        super().__attrs_post_init__()
-
-    # ------------------------------------------------------------------
-    # Helper: normalise with_processing_keys to a list
-    # ------------------------------------------------------------------
-    def _normalised_keys(self) -> List[str]:
-        """
-        Normalise with_processing_keys into a non-empty list of strings.
-
-        If configuration value is None and exactly one databundle is present
-        in processing_data, that key is returned as the single entry.
-        """
-        return self._normalised_processing_keys()
-
     # ------------------------------------------------------------------
     # Helper: validate geometry, signal and pixel_index for a databundle
     # ------------------------------------------------------------------
@@ -232,12 +218,8 @@ class IndexedAverager(ProcessStep):
                 f"IndexedAverager: pixel_index shape {pix_bd.shape} does not match signal shape {spatial_shape}."
             )
 
-        mask_bd: BaseData | None = None
         # Optional mask: we accept 'Mask' or 'mask'
-        if "Mask" in databundle:
-            mask_bd = databundle["Mask"]
-        elif "mask" in databundle:
-            mask_bd = databundle["mask"]
+        mask_bd = get_first_present(databundle, "Mask", "mask")
 
         if mask_bd is not None and mask_bd.shape != spatial_shape:
             raise ValueError(
@@ -268,9 +250,9 @@ class IndexedAverager(ProcessStep):
         """
 
         # Flatten arrays
-        sig_full = np.asarray(signal_bd.signal, dtype=float).ravel()
-        q_full = np.asarray(q_bd.signal, dtype=float).ravel()
-        psi_full = np.asarray(psi_bd.signal, dtype=float).ravel()
+        sig_full = signal_bd.signal.ravel()
+        q_full = q_bd.signal.ravel()
+        psi_full = psi_bd.signal.ravel()
 
         pix_flat = np.asarray(pix_bd.signal, dtype=float).ravel().astype(int)
 
@@ -454,8 +436,6 @@ class IndexedAverager(ProcessStep):
         if stats_keys is None:
             stats_keys = ["signal", "Q", "Psi"]
 
-        stats_keys = [str(key) for key in stats_keys]
-
         # Effective sample size:
         sum_w2 = np.bincount(bin_idx, weights=w_valid**2, minlength=n_bins)
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -567,14 +547,12 @@ class IndexedAverager(ProcessStep):
             logger.warning("IndexedAverager: processing_data is None in calculate; nothing to do.")
             return output
 
-        keys = self._normalised_keys()
+        keys = self._normalised_processing_keys()
         use_signal_weights = bool(self.configuration.get("use_signal_weights", True))
         use_unc_w = bool(self.configuration.get("use_signal_uncertainty_weights", False))
         uncertainty_weight_key = self.configuration.get("uncertainty_weight_key", None)
         direction = str(self.configuration.get("averaging_direction", "azimuthal")).lower()
-        stats_keys_cfg = self.configuration.get("stats_keys", None)
-        if isinstance(stats_keys_cfg, str):
-            stats_keys_cfg = [stats_keys_cfg]
+        stats_keys_cfg = normalize_str_list(self.configuration.get("stats_keys", None))
 
         for key in keys:
             if key not in self.processing_data:

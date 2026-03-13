@@ -29,6 +29,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
+from modacor.modules.helpers import attach_prepared_data, normalize_str_list
 from modacor.modules.technique_modules.scattering.geometry_helpers import (
     prepare_static_scalar,
     require_scalar,
@@ -375,7 +376,7 @@ class PixelCoordinates3D(ProcessStep):
     def prepare_execution(self):
         super().prepare_execution()
 
-        with_keys = self.configuration.get("with_processing_keys") or []
+        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
         if not with_keys:
             raise ValueError("PixelCoordinates3D: configuration.with_processing_keys is empty.")
 
@@ -397,21 +398,15 @@ class PixelCoordinates3D(ProcessStep):
         self._prepared_data = {k: outputs[k] for k in ("coord_x", "coord_y", "coord_z")}
 
     def calculate(self):
-        with_keys = self.configuration.get("with_processing_keys") or []
+        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
         if not with_keys:
             logger.warning("PixelCoordinates3D: no with_processing_keys specified; nothing to do.")
             return {}
 
-        out: Dict[str, object] = {}
-        for key in with_keys:
-            bundle = self.processing_data.get(key)
-            if bundle is None:
-                logger.warning(
-                    f"PixelCoordinates3D: processing_data has no entry for key={key!r}; skipping."  # noqa: E702
-                )  # noqa: E702
-                continue
-            for out_key, bd in self._prepared_data.items():
-                bundle[out_key] = bd
-            out[key] = bundle
-
-        return out
+        return attach_prepared_data(
+            self.processing_data,
+            with_keys,
+            self._prepared_data,
+            logger=logger,
+            module_name="PixelCoordinates3D",
+        )

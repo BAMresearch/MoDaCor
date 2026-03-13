@@ -70,7 +70,7 @@ def prepare_static_scalar(
         out.rank_of_data = 0
         return out
 
-    x = np.asarray(bd.signal, dtype=float).ravel()
+    x = bd.signal.ravel()
 
     # --- robust weights handling ---
     if bd.weights is None:

@@ -15,6 +15,7 @@ from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.modules.helpers import attach_prepared_data, normalize_str_list
 from modacor.modules.technique_modules.scattering.geometry_helpers import (
     prepare_static_scalar,
     require_scalar,
@@ -218,7 +219,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
     def prepare_execution(self):
         super().prepare_execution()
 
-        with_keys = self.configuration.get("with_processing_keys") or []
+        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
         if not with_keys:
             raise ValueError("XSGeometryFromPixelCoordinates: configuration.with_processing_keys is empty.")
 
@@ -274,20 +275,15 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         self._prepared_data = {k: out[k] for k in self.output_keys}
 
     def calculate(self):
-        with_keys = self.configuration.get("with_processing_keys") or []
+        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
         if not with_keys:
             logger.warning("XSGeometryFromPixelCoordinates: no with_processing_keys specified; nothing to do.")
             return {}
 
-        out: Dict[str, object] = {}
-        for key in with_keys:
-            bundle = self.processing_data.get(key)
-            if bundle is None:
-                logger.warning(
-                    f"XSGeometryFromPixelCoordinates: no processing_data entry for key={key!r}; skipping."  # noqa: E702
-                )
-                continue
-            for out_key, bd in self._prepared_data.items():
-                bundle[out_key] = bd
-            out[key] = bundle
-        return out
+        return attach_prepared_data(
+            self.processing_data,
+            with_keys,
+            self._prepared_data,
+            logger=logger,
+            module_name="XSGeometryFromPixelCoordinates",
+        )

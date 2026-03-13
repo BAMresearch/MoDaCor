@@ -123,7 +123,7 @@ class ReduceDimensionality(ProcessStep):
             'mean' → μ = Σ w x / Σ w
             'sum'  → S = Σ w x
         """
-        x = np.asarray(bd.signal, dtype=float)
+        x = bd.signal
 
         # Choose weights
         if use_weights:
