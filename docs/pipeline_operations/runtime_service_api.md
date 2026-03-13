@@ -341,3 +341,77 @@ Run the scaffold service:
 pip install "modacor[server]"
 modacor serve --host 127.0.0.1 --port 8000
 ```
+
+## Quick use example
+
+The example below shows a complete session lifecycle with a MOUSE-style pipeline.
+
+1. Create a session from a pipeline file:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/sessions" \
+  -H "content-type: application/json" \
+  -d '{
+    "session_id": "mouse-main",
+    "name": "MOUSE production",
+    "pipeline": {
+      "yaml_path": "/Users/bpauw/Documents/BAM/Projects/2025/MOUSE_MoDaCor/processing_pipelines/MOUSE_solids.yaml"
+    },
+    "trace": {
+      "enabled": true,
+      "watch": {"sample": ["signal"], "background": ["signal"]},
+      "record_only_on_change": true
+    },
+    "auto_full_reset_on_partial_error": true
+  }'
+```
+
+2. Register/update sources (repeat this step whenever a new sample file arrives):
+
+```bash
+curl -X PUT "http://127.0.0.1:8000/v1/sessions/mouse-main/sources" \
+  -H "content-type: application/json" \
+  -d '{
+    "sources": [
+      {"ref": "sample", "type": "hdf", "location": "/data/MOUSE_sample_latest.nxs"},
+      {"ref": "background", "type": "hdf", "location": "/data/MOUSE_background.nxs"}
+    ]
+  }'
+```
+
+3. Trigger a partial run using changed keys, and write a full HDF artifact:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/sessions/mouse-main/process" \
+  -H "content-type: application/json" \
+  -d '{
+    "mode": "partial",
+    "changed_sources": ["sample"],
+    "changed_keys": ["sample.signal"],
+    "run_name": "mouse_run_2026_03_13T1530",
+    "write_hdf": {
+      "path": "/tmp/mouse_run_2026_03_13T1530.h5",
+      "write_all_processing_data": true
+    }
+  }'
+```
+
+4. Use auto mode to attempt partial first and fallback to full on failure:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/sessions/mouse-main/process" \
+  -H "content-type: application/json" \
+  -d '{
+    "mode": "auto",
+    "changed_sources": ["sample"],
+    "changed_keys": ["sample.signal"]
+  }'
+```
+
+5. If needed, force a complete reset without processing:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/sessions/mouse-main/reset" \
+  -H "content-type: application/json" \
+  -d '{"mode":"full"}'
+```
