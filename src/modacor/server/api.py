@@ -20,6 +20,7 @@ from modacor.runner.pipeline import Pipeline
 
 from .execution import find_dirty_step_ids
 from .session_manager import PipelineSession, SessionManager
+from .source_profiles import get_source_profile, list_source_profiles
 
 __all__ = ["create_app"]
 
@@ -45,6 +46,8 @@ def _session_detail(session: PipelineSession) -> dict[str, Any]:
                 "record_only_on_change": True,
             },
             "last_run": session.run_history[-1] if session.run_history else None,
+            "source_profile": session.source_profile,
+            "required_source_refs": list(session.required_source_refs),
         }
     )
     return out
@@ -161,6 +164,10 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/v1/source-templates")
+    def source_templates() -> dict[str, Any]:
+        return {"templates": list_source_profiles()}
+
     @app.get("/v1/sessions")
     def list_sessions() -> dict[str, Any]:
         return {"sessions": [_session_summary(s) for s in manager.list_sessions()]}
@@ -188,6 +195,16 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
         else:
             pipeline_yaml = str(yaml_text)
 
+        source_profile_name = payload.get("source_profile")
+        required_source_refs: list[str] = []
+        normalized_profile: str | None = None
+        if source_profile_name is not None:
+            profile = get_source_profile(str(source_profile_name))
+            if profile is None:
+                raise HTTPException(status_code=422, detail=f"Unknown source_profile: {source_profile_name!r}")
+            normalized_profile = str(source_profile_name).strip().lower()
+            required_source_refs = [str(item["ref"]) for item in profile.get("required_sources", [])]
+
         trace = payload.get("trace", {}) or {}
         try:
             session = manager.create_session(
@@ -197,6 +214,8 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                 trace_enabled=bool(trace.get("enabled", False)),
                 trace_watch=dict(trace.get("watch", {}) or {}),
                 auto_full_reset_on_partial_error=bool(payload.get("auto_full_reset_on_partial_error", True)),
+                source_profile=normalized_profile,
+                required_source_refs=required_source_refs,
             )
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -276,6 +295,22 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
         session = manager.get_session(session_id)
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found.")
+        if session.required_source_refs:
+            present_refs = set(session.sources.keys())
+            missing_refs = [ref for ref in session.required_source_refs if ref not in present_refs]
+            if missing_refs:
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": "MISSING_REQUIRED_SOURCES",
+                        "message": "Session source profile requirements are not satisfied.",
+                        "details": {
+                            "source_profile": session.source_profile,
+                            "missing_refs": missing_refs,
+                            "required_refs": session.required_source_refs,
+                        },
+                    },
+                )
 
         effective_mode, mode_note = _resolve_effective_mode(mode)
         if effective_mode == "partial" and session.processing_data is None:

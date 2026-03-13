@@ -127,6 +127,52 @@ def test_api_sources_patch_upserts_single_source():
     assert session.sources["sample"]["location"] == "/tmp/sample2.nxs"
 
 
+def test_api_source_templates_and_profile_validation():
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    templates_resp = client.get("/v1/source-templates")
+    assert templates_resp.status_code == 200
+    templates = templates_resp.json()["templates"]
+    assert "mouse" in templates
+
+    create_resp = client.post(
+        "/v1/sessions",
+        json={
+            "session_id": "sess-profile",
+            "pipeline": {"yaml_text": "name: p\nsteps: {}\n"},
+            "source_profile": "mouse",
+        },
+    )
+    assert create_resp.status_code in {200, 201}
+
+    # "mouse" profile requires sample + background, so this should fail until both are set.
+    fail_resp = client.post(
+        "/v1/sessions/sess-profile/process",
+        json={"mode": "full"},
+    )
+    assert fail_resp.status_code == 422
+    fail_detail = fail_resp.json().get("detail", {})
+    assert fail_detail.get("code") == "MISSING_REQUIRED_SOURCES"
+    assert "sample" in fail_detail.get("details", {}).get("missing_refs", [])
+
+    _post_json(
+        client,
+        "/v1/sessions/sess-profile/sources/patch",
+        {"ref": "sample", "type": "hdf", "location": "/tmp/sample.nxs"},
+    )
+    _post_json(
+        client,
+        "/v1/sessions/sess-profile/sources/patch",
+        {"ref": "background", "type": "hdf", "location": "/tmp/background.nxs"},
+    )
+
+    # Execution may still fail later because files do not exist, but profile validation should pass.
+    second_resp = client.post("/v1/sessions/sess-profile/process", json={"mode": "full"})
+    assert second_resp.status_code != 422
+
+
 def test_api_process_auto_fallback_after_partial_failure(monkeypatch):
     manager = SessionManager()
     app = create_app(session_manager=manager)

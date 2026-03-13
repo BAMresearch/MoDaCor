@@ -32,6 +32,8 @@ class PipelineSession:
     run_history: list[dict[str, Any]] = field(default_factory=list)
     processing_data: Any | None = None
     last_error: dict[str, Any] | None = None
+    source_profile: str | None = None
+    required_source_refs: list[str] = field(default_factory=list)
 
 
 class SessionManager:
@@ -58,6 +60,8 @@ class SessionManager:
         trace_enabled: bool = False,
         trace_watch: dict[str, list[str]] | None = None,
         auto_full_reset_on_partial_error: bool = True,
+        source_profile: str | None = None,
+        required_source_refs: list[str] | None = None,
     ) -> PipelineSession:
         with self._lock:
             if session_id in self._sessions:
@@ -69,6 +73,8 @@ class SessionManager:
                 trace_enabled=trace_enabled,
                 trace_watch=trace_watch or {},
                 auto_full_reset_on_partial_error=auto_full_reset_on_partial_error,
+                source_profile=source_profile,
+                required_source_refs=list(required_source_refs or []),
             )
             self._sessions[session_id] = session
             return session

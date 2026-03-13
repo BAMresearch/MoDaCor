@@ -92,6 +92,10 @@ Base path: `/v1`
 
 ## Sessions
 
+### `GET /source-templates`
+
+List built-in source templates/profiles (for example `mouse`, `saxsess`) with required/optional source refs.
+
 ### `POST /sessions`
 
 Create a named session.
@@ -102,6 +106,7 @@ Request:
 {
   "session_id": "mouse-main",
   "name": "MOUSE production",
+  "source_profile": "mouse",
   "pipeline": {
     "yaml_text": "name: ...",
     "yaml_path": "/opt/pipelines/MOUSE_solids.yaml"
@@ -119,6 +124,7 @@ Rules:
 
 - Exactly one of `yaml_text` or `yaml_path` must be provided.
 - `session_id` must be unique.
+- If `source_profile` is set, required source refs must be registered before `/process` is allowed.
 
 ### `GET /sessions`
 

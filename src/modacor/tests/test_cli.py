@@ -85,6 +85,30 @@ def test_cli_session_create_calls_api(monkeypatch):
     assert captured["payload"]["trace"]["watch"] == {"sample": ["signal"]}
 
 
+def test_cli_session_create_with_source_template(monkeypatch):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):
+        captured["payload"] = payload
+        return {"session_id": "s2"}
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    rc = main(
+        [
+            "session",
+            "create",
+            "--session-id",
+            "s2",
+            "--pipeline-yaml-text",
+            "name: demo\nsteps: {}\n",
+            "--source-template",
+            "mouse",
+        ]
+    )
+    assert rc == 0
+    assert captured["payload"]["source_profile"] == "mouse"
+
+
 def test_cli_session_process_builds_write_hdf_payload(monkeypatch, tmp_path: Path):
     captured = {}
 
@@ -119,3 +143,18 @@ def test_cli_session_process_builds_write_hdf_payload(monkeypatch, tmp_path: Pat
     assert captured["payload"]["changed_keys"] == ["sample.signal"]
     assert captured["payload"]["write_hdf"]["path"] == str(out_path)
     assert captured["payload"]["write_hdf"]["write_all_processing_data"] is True
+
+
+def test_cli_session_templates_calls_api(monkeypatch):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):
+        captured["method"] = method
+        captured["path"] = path
+        return {"templates": {"mouse": {}}}
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    rc = main(["session", "templates"])
+    assert rc == 0
+    assert captured["method"] == "GET"
+    assert captured["path"] == "/v1/source-templates"

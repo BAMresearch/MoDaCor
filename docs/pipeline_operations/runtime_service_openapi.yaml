@@ -14,6 +14,23 @@ tags:
   - name: Runs
 
 paths:
+  /source-templates:
+    get:
+      tags: [Sources]
+      summary: List built-in source templates/profiles
+      responses:
+        "200":
+          description: Templates map
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templates:
+                    type: object
+                    additionalProperties:
+                      type: object
+
   /sessions:
     get:
       tags: [Sessions]
@@ -365,6 +382,8 @@ components:
           type: string
         name:
           type: string
+        source_profile:
+          type: string
         pipeline:
           $ref: "#/components/schemas/PipelineReference"
         trace:
@@ -483,6 +502,13 @@ components:
               $ref: "#/components/schemas/TraceConfig"
             last_run:
               $ref: "#/components/schemas/RunSummary"
+            source_profile:
+              type: string
+              nullable: true
+            required_source_refs:
+              type: array
+              items:
+                type: string
 
     RunStatus:
       type: string

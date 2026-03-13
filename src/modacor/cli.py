@@ -179,6 +179,11 @@ def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     create_parser = session_subparsers.add_parser("create", help="Create a session.")
     create_parser.add_argument("--session-id", required=True)
     create_parser.add_argument("--name", default=None)
+    create_parser.add_argument(
+        "--source-template",
+        default=None,
+        help="Optional source template/profile name (for example 'mouse' or 'saxsess').",
+    )
     create_group = create_parser.add_mutually_exclusive_group(required=True)
     create_group.add_argument("--pipeline-yaml-path", type=Path)
     create_group.add_argument("--pipeline-yaml-text")
@@ -234,6 +239,8 @@ def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     runs_parser = session_subparsers.add_parser("runs", help="List runs or fetch one run.")
     runs_parser.add_argument("--session-id", required=True)
     runs_parser.add_argument("--run-id", default=None)
+
+    session_subparsers.add_parser("templates", help="List available source templates/profiles.")
 
 
 def _run_command(args: argparse.Namespace) -> int:
@@ -315,6 +322,8 @@ def _session_create(base_url: str, args: argparse.Namespace) -> int:
         },
         "auto_full_reset_on_partial_error": not bool(args.no_auto_full_reset_on_partial_error),
     }
+    if args.source_template is not None:
+        payload["source_profile"] = str(args.source_template)
     _print_json(_http_request_json(base_url, "POST", "/v1/sessions", payload))
     return 0
 
@@ -394,6 +403,11 @@ def _session_runs(base_url: str, args: argparse.Namespace) -> int:
     return 0
 
 
+def _session_templates(base_url: str, args: argparse.Namespace) -> int:  # noqa: ARG001
+    _print_json(_http_request_json(base_url, "GET", "/v1/source-templates"))
+    return 0
+
+
 def _session_command(args: argparse.Namespace) -> int:
     handlers = {
         "list": _session_list,
@@ -405,6 +419,7 @@ def _session_command(args: argparse.Namespace) -> int:
         "process": _session_process,
         "reset": _session_reset,
         "runs": _session_runs,
+        "templates": _session_templates,
     }
     try:
         handler = handlers[args.session_command]

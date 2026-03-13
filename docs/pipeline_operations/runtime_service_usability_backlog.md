@@ -20,7 +20,8 @@ Status: `done`
 Notes: implemented in `src/modacor/server/api.py` with OpenAPI + docs updates.
 
 3. `U3` Source templates/profiles (e.g. MOUSE, SAXSess)
-Status: `planned`
+Status: `done`
+Notes: implemented as built-in profiles with `GET /v1/source-templates` and session-level `source_profile` validation.
 
 4. `U4` Dry-run endpoint for invalidation preview
 Status: `planned`
