@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from importlib import import_module
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from modacor.io.yaml.yaml_source import YAMLSource
 from modacor.runner import run_pipeline_job
 from modacor.runner.pipeline import Pipeline
 
+from .execution import find_dirty_step_ids
 from .session_manager import PipelineSession, SessionManager
 
 __all__ = ["create_app"]
@@ -47,9 +49,10 @@ def _session_detail(session: PipelineSession) -> dict[str, Any]:
 
 
 def _resolve_effective_mode(requested_mode: str) -> tuple[str, str | None]:
-    if requested_mode in {"partial", "auto"}:
-        # Conservative execution until dirty-subgraph invalidation is implemented.
-        return "full", "partial/auto currently execute as full reruns in scaffold mode"
+    if requested_mode == "partial":
+        return "partial", None
+    if requested_mode == "auto":
+        return "partial", "auto mode: partial first, full fallback on failure"
     return "full", None
 
 
@@ -238,6 +241,12 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
             raise HTTPException(status_code=404, detail="Session not found.")
 
         effective_mode, mode_note = _resolve_effective_mode(mode)
+        if effective_mode == "partial" and session.processing_data is None:
+            effective_mode = "full"
+            mode_note = "No previous ProcessingData snapshot available; executed full rerun."
+        if mode == "auto" and not changed_sources:
+            effective_mode = "full"
+            mode_note = "Auto mode without changed_sources defaults to full rerun."
         try:
             run_meta = manager.enqueue_run(
                 session_id,
@@ -256,12 +265,40 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
             sources = _build_sources_from_session(session)
 
             reuse_processing_data = effective_mode == "partial" and session.processing_data is not None
+            selected_step_ids: set[str] | None = None
+            snapshot_before_partial = None
+            if effective_mode == "partial":
+                selected_step_ids = find_dirty_step_ids(pipeline, changed_sources)
+                if not selected_step_ids:
+                    run_meta = manager.mark_run_succeeded(
+                        session_id,
+                        run_id,
+                        details={
+                            "status": "succeeded",
+                            "executed_steps": [],
+                            "num_steps": 0,
+                            "note": "No pipeline steps matched changed_sources.",
+                        },
+                    )
+                    return {
+                        "session_id": session_id,
+                        "run_id": run_id,
+                        "state": "idle",
+                        "status": run_meta.get("status"),
+                        "effective_mode": run_meta.get("effective_mode"),
+                        "note": run_meta.get("note"),
+                    }
+
+                if session.processing_data is not None:
+                    snapshot_before_partial = deepcopy(session.processing_data)
+
             result = run_pipeline_job(
                 pipeline,
                 sources=sources,
                 processing_data=session.processing_data if reuse_processing_data else None,
                 trace=session.trace_enabled,
                 trace_watch=session.trace_watch,
+                selected_step_ids=selected_step_ids,
             )
             session.processing_data = result.processing_data
 
@@ -294,17 +331,85 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                 "hdf_output": run_meta.get("hdf_output"),
             }
         except Exception as exc:
+            if effective_mode == "partial" and snapshot_before_partial is not None:
+                session.processing_data = snapshot_before_partial
             manager.mark_run_failed(
                 session_id,
                 run_id,
-                code="RUN_FAILED",
+                code="PARTIAL_RUN_FAILED" if effective_mode == "partial" else "RUN_FAILED",
                 message=str(exc),
                 details={"exception_type": type(exc).__name__},
             )
+            # "auto" mode: fallback to a full rerun after partial failure.
+            if mode == "auto":
+                fallback_run = manager.enqueue_run(
+                    session_id,
+                    mode="full",
+                    changed_sources=list(changed_sources),
+                    effective_mode="full",
+                )
+                fallback_id = str(fallback_run["run_id"])
+                try:
+                    fallback_result = run_pipeline_job(
+                        Pipeline.from_yaml(session.pipeline_yaml or ""),
+                        sources=sources,
+                        processing_data=None,
+                        trace=session.trace_enabled,
+                        trace_watch=session.trace_watch,
+                    )
+                    session.processing_data = fallback_result.processing_data
+
+                    write_hdf = payload.get("write_hdf", None)
+                    hdf_out_path = _maybe_write_hdf_output(
+                        write_hdf if isinstance(write_hdf, dict) else None,
+                        run_name=str(payload.get("run_name") or fallback_id),
+                        result=fallback_result,
+                        pipeline_yaml=session.pipeline_yaml or "",
+                    )
+
+                    done = manager.mark_run_succeeded(
+                        session_id,
+                        fallback_id,
+                        details={
+                            "status": "succeeded",
+                            "executed_steps": fallback_result.executed_steps,
+                            "num_steps": len(fallback_result.executed_steps),
+                            "note": "Auto fallback succeeded after partial failure.",
+                            "recovered_from_run_id": run_id,
+                            **({"hdf_output": hdf_out_path} if hdf_out_path else {}),
+                        },
+                    )
+                    return {
+                        "session_id": session_id,
+                        "run_id": fallback_id,
+                        "state": "idle",
+                        "status": done.get("status"),
+                        "effective_mode": done.get("effective_mode"),
+                        "note": done.get("note"),
+                        "recovered_from_run_id": run_id,
+                        "hdf_output": done.get("hdf_output"),
+                    }
+                except Exception as fallback_exc:
+                    manager.mark_run_failed(
+                        session_id,
+                        fallback_id,
+                        code="FULL_RUN_FAILED",
+                        message=str(fallback_exc),
+                        details={"exception_type": type(fallback_exc).__name__, "recovered_from_run_id": run_id},
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail={
+                            "code": "FULL_RUN_FAILED",
+                            "message": str(fallback_exc),
+                            "details": {"session_id": session_id, "run_id": fallback_id},
+                        },
+                    ) from fallback_exc
+
             raise HTTPException(
                 status_code=500,
                 detail={
-                    "code": "RUN_FAILED",
+                    "code": "PARTIAL_RUN_FAILED" if effective_mode == "partial" else "RUN_FAILED",
                     "message": str(exc),
                     "details": {"session_id": session_id, "run_id": run_id},
                 },

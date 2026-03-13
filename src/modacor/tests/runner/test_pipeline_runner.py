@@ -10,6 +10,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.processing_data import ProcessingData
 from modacor.runner.pipeline import Pipeline
 from modacor.runner.pipeline_runner import run_pipeline_job
 
@@ -55,3 +56,23 @@ def test_run_pipeline_job_can_stop_after_step():
     assert result.executed_steps == ["first"]
     assert result.stopped_after_step == "first"
     assert np.allclose(result.processing_data["sample"]["signal"].signal, np.array([1.0]))
+
+
+def test_run_pipeline_job_can_execute_selected_steps_only():
+    s1 = SeedSignal(step_id="seed")
+    s2 = AddOne(step_id="add")
+    pipeline = Pipeline.from_dict({s1: set(), s2: {s1}}, name="unit-test-select")
+
+    processing_data = ProcessingData()
+    bundle = DataBundle()
+    bundle["signal"] = BaseData(signal=np.array([10.0]), units=ureg.dimensionless)
+    processing_data["sample"] = bundle
+
+    result = run_pipeline_job(
+        pipeline,
+        processing_data=processing_data,
+        selected_step_ids={"add"},
+    )
+
+    assert result.executed_steps == ["add"]
+    assert np.allclose(result.processing_data["sample"]["signal"].signal, np.array([11.0]))

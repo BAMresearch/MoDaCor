@@ -46,6 +46,7 @@ def run_pipeline_job(
     trace_watch: dict[str, list[str]] | None = None,
     tracer_kwargs: dict[str, Any] | None = None,
     stop_after: str | None = None,
+    selected_step_ids: set[str] | list[str] | tuple[str, ...] | None = None,
 ) -> RunResult:
     """
     Execute a pipeline end-to-end.
@@ -71,6 +72,7 @@ def run_pipeline_job(
     pipeline_obj.prepare()
 
     stop_token = str(stop_after) if stop_after is not None else None
+    selected_steps = {str(step_id) for step_id in selected_step_ids} if selected_step_ids is not None else None
     step_durations: dict[str, float] = {}
     executed_steps: list[str] = []
     stopped_after_step: str | None = None
@@ -82,23 +84,24 @@ def run_pipeline_job(
             node.io_sources = sources_obj
             node.io_sinks = sinks_obj
 
-            t0 = perf_counter()
-            node.execute(processing_data_obj)
-            duration = perf_counter() - t0
-
             step_id = str(node.step_id)
-            step_durations[step_id] = duration
-            executed_steps.append(step_id)
+            if selected_steps is None or step_id in selected_steps:
+                t0 = perf_counter()
+                node.execute(processing_data_obj)
+                duration = perf_counter() - t0
 
-            if tracer is not None:
-                tracer.after_step(node, processing_data_obj, duration_s=duration)
-                pipeline_obj.attach_tracer_event(
-                    node,
-                    tracer,
-                    include_rendered_trace=True,
-                    include_rendered_config=True,
-                    rendered_format="text/html",
-                )
+                step_durations[step_id] = duration
+                executed_steps.append(step_id)
+
+                if tracer is not None:
+                    tracer.after_step(node, processing_data_obj, duration_s=duration)
+                    pipeline_obj.attach_tracer_event(
+                        node,
+                        tracer,
+                        include_rendered_trace=True,
+                        include_rendered_config=True,
+                        rendered_format="text/html",
+                    )
 
             pipeline_obj.done(node)
 

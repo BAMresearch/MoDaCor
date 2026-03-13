@@ -327,8 +327,9 @@ A first API scaffold is available under:
 
 It provides route skeletons and an in-memory session manager aligned with this contract.
 `/process` is now wired to execute MoDaCor runs with registered sources and optional HDF output writing.
-In the current scaffold, `partial` and `auto` requests execute as conservative full reruns until dirty-subgraph
-invalidation is implemented.
+The scaffold now includes dirty-step detection by changed source references and executes selected subgraphs for
+`partial` mode when prior `ProcessingData` exists. `auto` mode attempts partial first and falls back to full rerun on
+partial failure.
 
 Run the scaffold service:
 
