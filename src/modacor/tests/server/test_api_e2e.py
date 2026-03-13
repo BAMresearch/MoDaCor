@@ -70,10 +70,61 @@ steps:
     )
     assert result["status"] == "succeeded"
     assert result["effective_mode"] == "partial"
+    assert "run_id" in result
 
     session_after = manager.get_session("sess-partial")
     assert session_after is not None
     assert "Poisson" in session_after.processing_data["sample"]["signal"].uncertainties
+    run_meta = next(item for item in session_after.run_history if item["run_id"] == result["run_id"])
+    assert "skipped_steps" in run_meta
+    assert "step_durations_s" in run_meta
+    assert "elapsed_s" in run_meta
+    assert "dirty_steps" in run_meta
+
+
+def test_api_sources_patch_upserts_single_source():
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    pipeline_yaml = "name: e2e_patch\nsteps: {}\n"
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "sess-patch",
+            "pipeline": {"yaml_text": pipeline_yaml},
+        },
+    )
+
+    patched = _post_json(
+        client,
+        "/v1/sessions/sess-patch/sources/patch",
+        {
+            "ref": "sample",
+            "type": "hdf",
+            "location": "/tmp/sample1.nxs",
+            "kwargs": {"iosource_method_kwargs": {"cache": True}},
+        },
+    )
+    assert patched["session_id"] == "sess-patch"
+    assert patched["source"]["ref"] == "sample"
+    assert patched["source"]["location"] == "/tmp/sample1.nxs"
+
+    patched2 = _post_json(
+        client,
+        "/v1/sessions/sess-patch/sources/patch",
+        {
+            "ref": "sample",
+            "type": "hdf",
+            "location": "/tmp/sample2.nxs",
+        },
+    )
+    assert patched2["source"]["location"] == "/tmp/sample2.nxs"
+
+    session = manager.get_session("sess-patch")
+    assert session is not None
+    assert session.sources["sample"]["location"] == "/tmp/sample2.nxs"
 
 
 def test_api_process_auto_fallback_after_partial_failure(monkeypatch):
@@ -134,4 +185,5 @@ steps:
     assert result["status"] == "succeeded"
     assert result["effective_mode"] == "full"
     assert result["recovered_from_run_id"].startswith("run-")
+    assert "fallback_reason" in result
     assert call_count["n"] == 2

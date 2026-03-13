@@ -7,6 +7,7 @@ Status: design contract (target architecture), not final implementation.
 Companion draft OpenAPI schema:
 
 - `docs/pipeline_operations/runtime_service_openapi.yaml`
+- `docs/pipeline_operations/runtime_service_usability_backlog.md` (usability upgrade tracker)
 
 ## Goals
 
@@ -151,6 +152,23 @@ Request:
 
 Response includes accepted refs and current source map.
 
+### `POST /sessions/{session_id}/sources/patch`
+
+Convenience endpoint to upsert a single source.
+
+Request:
+
+```json
+{
+  "ref": "sample",
+  "type": "hdf",
+  "location": "/data/new_sample.nxs",
+  "kwargs": {}
+}
+```
+
+Equivalent to `PUT /sources` with a single-item `sources` list.
+
 ### `DELETE /sessions/{session_id}/sources/{ref}`
 
 Remove one source registration.
@@ -222,7 +240,14 @@ List run history metadata.
 
 ### `GET /sessions/{session_id}/runs/{run_id}`
 
-Run details: timings, dirty set, status, output artifact locations.
+Run details include:
+
+- `dirty_steps`
+- `skipped_steps`
+- `step_durations_s`
+- `elapsed_s`
+- fallback metadata (`fallback_reason`, `recovered_from_run_id`) for auto recovery cases
+- output artifact locations (e.g. `hdf_output`)
 
 ## WebSocket events
 
@@ -340,6 +365,12 @@ Run the scaffold service:
 ```bash
 pip install "modacor[server]"
 modacor serve --host 127.0.0.1 --port 8000
+```
+
+Optional convenience wrapper for API usage:
+
+```bash
+modacor session --url http://127.0.0.1:8000 list
 ```
 
 ## Quick use example

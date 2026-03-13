@@ -5,7 +5,9 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
+from urllib import error, request
 
 from modacor.debug.pipeline_tracer import PlainUnicodeRenderer
 from modacor.io.csv.csv_sink import CSVSink
@@ -40,6 +42,28 @@ def _parse_trace_watch(entries: list[str] | None) -> dict[str, list[str]]:
             raise ValueError(f"Invalid --trace-watch value {item!r}: no keys supplied.")
         watch.setdefault(bundle.strip(), []).extend(keys)
     return watch
+
+
+def _http_request_json(base_url: str, method: str, path: str, payload: dict | None = None) -> dict | list | None:
+    url = base_url.rstrip("/") + path
+    data = None
+    headers = {}
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+
+    req = request.Request(url, method=method.upper(), data=data, headers=headers)
+    try:
+        with request.urlopen(req) as resp:  # noqa: S310
+            raw = resp.read()
+            if not raw:
+                return None
+            return json.loads(raw.decode("utf-8"))
+    except error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"HTTP {exc.code} {method.upper()} {path}: {body}") from exc
+    except error.URLError as exc:
+        raise RuntimeError(f"Request failed for {method.upper()} {path}: {exc.reason}") from exc
 
 
 def _build_sources(
@@ -141,6 +165,77 @@ def _add_serve_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     serve_parser.add_argument("--port", default=8000, type=int, help="Bind port for the HTTP server.")
 
 
+def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    session_parser = subparsers.add_parser("session", help="Manage runtime service sessions.")
+    session_parser.add_argument(
+        "--url",
+        default="http://127.0.0.1:8000",
+        help="Runtime service base URL.",
+    )
+    session_subparsers = session_parser.add_subparsers(dest="session_command", required=True)
+
+    session_subparsers.add_parser("list", help="List sessions.")
+
+    create_parser = session_subparsers.add_parser("create", help="Create a session.")
+    create_parser.add_argument("--session-id", required=True)
+    create_parser.add_argument("--name", default=None)
+    create_group = create_parser.add_mutually_exclusive_group(required=True)
+    create_group.add_argument("--pipeline-yaml-path", type=Path)
+    create_group.add_argument("--pipeline-yaml-text")
+    create_parser.add_argument("--trace", action="store_true")
+    create_parser.add_argument(
+        "--trace-watch",
+        action="append",
+        default=[],
+        metavar="BUNDLE:KEY[,KEY...]",
+        help="Tracer watch spec (repeatable).",
+    )
+    create_parser.add_argument(
+        "--no-auto-full-reset-on-partial-error",
+        action="store_true",
+        help="Disable automatic full reset fallback after partial failures.",
+    )
+
+    delete_parser = session_subparsers.add_parser("delete", help="Delete a session.")
+    delete_parser.add_argument("--session-id", required=True)
+
+    status_parser = session_subparsers.add_parser("status", help="Get session details.")
+    status_parser.add_argument("--session-id", required=True)
+
+    set_source_parser = session_subparsers.add_parser("set-source", help="Upsert one source registration.")
+    set_source_parser.add_argument("--session-id", required=True)
+    set_source_parser.add_argument("--ref", required=True)
+    set_source_parser.add_argument("--type", required=True, dest="source_type")
+    set_source_parser.add_argument("--location", required=True, type=Path)
+    set_source_parser.add_argument(
+        "--kwargs-json",
+        default="{}",
+        help="JSON object with extra source kwargs (default '{}').",
+    )
+
+    del_source_parser = session_subparsers.add_parser("delete-source", help="Delete one source registration.")
+    del_source_parser.add_argument("--session-id", required=True)
+    del_source_parser.add_argument("--ref", required=True)
+
+    process_parser = session_subparsers.add_parser("process", help="Trigger processing.")
+    process_parser.add_argument("--session-id", required=True)
+    process_parser.add_argument("--mode", required=True, choices=["partial", "full", "auto"])
+    process_parser.add_argument("--changed-source", action="append", default=[], dest="changed_sources")
+    process_parser.add_argument("--changed-key", action="append", default=[], dest="changed_keys")
+    process_parser.add_argument("--run-name", default=None)
+    process_parser.add_argument("--write-hdf-path", default=None, type=Path)
+    process_parser.add_argument("--write-all-processing-data", action="store_true")
+    process_parser.add_argument("--write-path", action="append", default=[])
+
+    reset_parser = session_subparsers.add_parser("reset", help="Reset session runtime state.")
+    reset_parser.add_argument("--session-id", required=True)
+    reset_parser.add_argument("--mode", required=True, choices=["partial", "full"])
+
+    runs_parser = session_subparsers.add_parser("runs", help="List runs or fetch one run.")
+    runs_parser.add_argument("--session-id", required=True)
+    runs_parser.add_argument("--run-id", default=None)
+
+
 def _run_command(args: argparse.Namespace) -> int:
     trace_watch = _parse_trace_watch(args.trace_watch)
     sources = _build_sources(hdf_sources=args.hdf_source, yaml_sources=args.yaml_source)
@@ -193,11 +288,137 @@ def _serve_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_json(data: object) -> None:
+    print(json.dumps(data, indent=2, ensure_ascii=False))
+
+
+def _session_list(base_url: str, args: argparse.Namespace) -> int:  # noqa: ARG001
+    _print_json(_http_request_json(base_url, "GET", "/v1/sessions"))
+    return 0
+
+
+def _session_create(base_url: str, args: argparse.Namespace) -> int:
+    pipeline_payload: dict[str, str]
+    if args.pipeline_yaml_path is not None:
+        pipeline_payload = {"yaml_path": str(args.pipeline_yaml_path)}
+    else:
+        pipeline_payload = {"yaml_text": str(args.pipeline_yaml_text)}
+
+    payload = {
+        "session_id": args.session_id,
+        "name": args.name,
+        "pipeline": pipeline_payload,
+        "trace": {
+            "enabled": bool(args.trace),
+            "watch": _parse_trace_watch(args.trace_watch),
+            "record_only_on_change": True,
+        },
+        "auto_full_reset_on_partial_error": not bool(args.no_auto_full_reset_on_partial_error),
+    }
+    _print_json(_http_request_json(base_url, "POST", "/v1/sessions", payload))
+    return 0
+
+
+def _session_delete(base_url: str, args: argparse.Namespace) -> int:
+    _http_request_json(base_url, "DELETE", f"/v1/sessions/{args.session_id}")
+    print(f"Deleted session: {args.session_id}")
+    return 0
+
+
+def _session_status(base_url: str, args: argparse.Namespace) -> int:
+    _print_json(_http_request_json(base_url, "GET", f"/v1/sessions/{args.session_id}"))
+    return 0
+
+
+def _session_set_source(base_url: str, args: argparse.Namespace) -> int:
+    try:
+        kwargs_obj = json.loads(args.kwargs_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid --kwargs-json payload: {exc}") from exc
+    if not isinstance(kwargs_obj, dict):
+        raise ValueError("--kwargs-json must decode to an object/dict.")
+
+    payload = {
+        "sources": [
+            {
+                "ref": args.ref,
+                "type": args.source_type,
+                "location": str(args.location),
+                "kwargs": kwargs_obj,
+            }
+        ]
+    }
+    _print_json(_http_request_json(base_url, "PUT", f"/v1/sessions/{args.session_id}/sources", payload))
+    return 0
+
+
+def _session_delete_source(base_url: str, args: argparse.Namespace) -> int:
+    _http_request_json(base_url, "DELETE", f"/v1/sessions/{args.session_id}/sources/{args.ref}")
+    print(f"Deleted source '{args.ref}' from session '{args.session_id}'.")
+    return 0
+
+
+def _session_process(base_url: str, args: argparse.Namespace) -> int:
+    payload: dict[str, object] = {"mode": args.mode}
+    if args.changed_sources:
+        payload["changed_sources"] = args.changed_sources
+    if args.changed_keys:
+        payload["changed_keys"] = args.changed_keys
+    if args.run_name is not None:
+        payload["run_name"] = args.run_name
+
+    if args.write_hdf_path is not None:
+        write_hdf: dict[str, object] = {
+            "path": str(args.write_hdf_path),
+            "write_all_processing_data": bool(args.write_all_processing_data),
+        }
+        if args.write_path:
+            write_hdf["data_paths"] = list(args.write_path)
+        payload["write_hdf"] = write_hdf
+
+    _print_json(_http_request_json(base_url, "POST", f"/v1/sessions/{args.session_id}/process", payload))
+    return 0
+
+
+def _session_reset(base_url: str, args: argparse.Namespace) -> int:
+    payload = {"mode": args.mode}
+    _print_json(_http_request_json(base_url, "POST", f"/v1/sessions/{args.session_id}/reset", payload))
+    return 0
+
+
+def _session_runs(base_url: str, args: argparse.Namespace) -> int:
+    path = f"/v1/sessions/{args.session_id}/runs"
+    if args.run_id is not None:
+        path = f"{path}/{args.run_id}"
+    _print_json(_http_request_json(base_url, "GET", path))
+    return 0
+
+
+def _session_command(args: argparse.Namespace) -> int:
+    handlers = {
+        "list": _session_list,
+        "create": _session_create,
+        "delete": _session_delete,
+        "status": _session_status,
+        "set-source": _session_set_source,
+        "delete-source": _session_delete_source,
+        "process": _session_process,
+        "reset": _session_reset,
+        "runs": _session_runs,
+    }
+    try:
+        handler = handlers[args.session_command]
+    except KeyError as exc:
+        raise ValueError(f"Unknown session command: {args.session_command}") from exc
+    return handler(args.url, args)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="modacor", description="MoDaCor command-line interface.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_run_parser(subparsers)
     _add_serve_parser(subparsers)
+    _add_session_parser(subparsers)
     return parser
 
 
@@ -209,6 +430,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_command(args)
     if args.command == "serve":
         return _serve_command(args)
+    if args.command == "session":
+        return _session_command(args)
 
     parser.error(f"Unknown command: {args.command}")
     return 2

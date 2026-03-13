@@ -49,3 +49,73 @@ def test_cli_serve_parser_accepts_host_port():
     assert args.command == "serve"
     assert args.host == "0.0.0.0"
     assert args.port == 9000
+
+
+def test_cli_session_create_calls_api(monkeypatch):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):
+        captured["base_url"] = base_url
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = payload
+        return {"session_id": "s1"}
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    rc = main(
+        [
+            "session",
+            "--url",
+            "http://127.0.0.1:8000",
+            "create",
+            "--session-id",
+            "s1",
+            "--pipeline-yaml-text",
+            "name: demo\nsteps: {}\n",
+            "--trace",
+            "--trace-watch",
+            "sample:signal",
+        ]
+    )
+    assert rc == 0
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/v1/sessions"
+    assert captured["payload"]["session_id"] == "s1"
+    assert captured["payload"]["trace"]["enabled"] is True
+    assert captured["payload"]["trace"]["watch"] == {"sample": ["signal"]}
+
+
+def test_cli_session_process_builds_write_hdf_payload(monkeypatch, tmp_path: Path):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = payload
+        return {"run_id": "r1"}
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    out_path = tmp_path / "out.h5"
+    rc = main(
+        [
+            "session",
+            "process",
+            "--session-id",
+            "s1",
+            "--mode",
+            "partial",
+            "--changed-source",
+            "sample",
+            "--changed-key",
+            "sample.signal",
+            "--write-hdf-path",
+            str(out_path),
+            "--write-all-processing-data",
+        ]
+    )
+    assert rc == 0
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/v1/sessions/s1/process"
+    assert captured["payload"]["changed_keys"] == ["sample.signal"]
+    assert captured["payload"]["write_hdf"]["path"] == str(out_path)
+    assert captured["payload"]["write_hdf"]["write_all_processing_data"] is True

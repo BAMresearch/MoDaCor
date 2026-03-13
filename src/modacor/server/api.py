@@ -8,6 +8,7 @@ from copy import deepcopy
 from graphlib import TopologicalSorter
 from importlib import import_module
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
@@ -224,6 +225,36 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return {"session_id": session.session_id, "sources": list(session.sources.values())}
 
+    @app.post("/v1/sessions/{session_id}/sources/patch")
+    def patch_source(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        ref = str(payload.get("ref", "")).strip()
+        source_type = str(payload.get("type", "")).strip()
+        location = str(payload.get("location", "")).strip()
+        kwargs = payload.get("kwargs", {}) or {}
+
+        if not ref:
+            raise HTTPException(status_code=422, detail="'ref' is required.")
+        if not source_type:
+            raise HTTPException(status_code=422, detail="'type' is required.")
+        if not location:
+            raise HTTPException(status_code=422, detail="'location' is required.")
+        if not isinstance(kwargs, dict):
+            raise HTTPException(status_code=422, detail="'kwargs' must be an object when provided.")
+
+        try:
+            session = manager.upsert_sources(
+                session_id,
+                sources=[{"ref": ref, "type": source_type, "location": location, "kwargs": kwargs}],
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        return {
+            "session_id": session.session_id,
+            "source": session.sources.get(ref),
+            "sources": list(session.sources.values()),
+        }
+
     @app.delete("/v1/sessions/{session_id}/sources/{ref}", status_code=204)
     def delete_source(session_id: str, ref: str) -> None:
         try:
@@ -294,6 +325,10 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                             "num_steps": 0,
                             "note": "No pipeline steps matched changed_sources.",
                             "changed_keys": list(changed_keys),
+                            "dirty_steps": [],
+                            "skipped_steps": topo_ids,
+                            "step_durations_s": {},
+                            "elapsed_s": 0.0,
                         },
                     )
                     return {
@@ -309,6 +344,7 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                     # Boundary checkpoint: restore this snapshot if partial chain fails.
                     snapshot_before_partial = deepcopy(session.processing_data)
 
+            run_t0 = perf_counter()
             result = run_pipeline_job(
                 pipeline,
                 sources=sources,
@@ -317,6 +353,7 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                 trace_watch=session.trace_watch,
                 selected_step_ids=selected_step_ids,
             )
+            elapsed_s = perf_counter() - run_t0
             session.processing_data = result.processing_data
 
             write_hdf = payload.get("write_hdf", None)
@@ -327,12 +364,18 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                 pipeline_yaml=session.pipeline_yaml or "",
             )
 
+            topo_ids = _ordered_step_ids(pipeline)
+            executed_set = set(result.executed_steps)
+            skipped_steps = [step_id for step_id in topo_ids if step_id not in executed_set]
             details = {
                 "status": "succeeded",
                 "executed_steps": result.executed_steps,
                 "num_steps": len(result.executed_steps),
                 "changed_sources": list(changed_sources),
                 "changed_keys": list(changed_keys),
+                "skipped_steps": skipped_steps,
+                "step_durations_s": result.step_durations,
+                "elapsed_s": elapsed_s,
             }
             if mode_note:
                 details["note"] = mode_note
@@ -373,6 +416,7 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                 )
                 fallback_id = str(fallback_run["run_id"])
                 try:
+                    fallback_t0 = perf_counter()
                     fallback_result = run_pipeline_job(
                         Pipeline.from_yaml(session.pipeline_yaml or ""),
                         sources=sources,
@@ -380,6 +424,7 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                         trace=session.trace_enabled,
                         trace_watch=session.trace_watch,
                     )
+                    fallback_elapsed = perf_counter() - fallback_t0
                     session.processing_data = fallback_result.processing_data
 
                     write_hdf = payload.get("write_hdf", None)
@@ -390,6 +435,12 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                         pipeline_yaml=session.pipeline_yaml or "",
                     )
 
+                    fallback_pipeline = Pipeline.from_yaml(session.pipeline_yaml or "")
+                    fallback_topo_ids = _ordered_step_ids(fallback_pipeline)
+                    fallback_executed_set = set(fallback_result.executed_steps)
+                    fallback_skipped = [
+                        step_id for step_id in fallback_topo_ids if step_id not in fallback_executed_set
+                    ]
                     done = manager.mark_run_succeeded(
                         session_id,
                         fallback_id,
@@ -399,8 +450,12 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                             "num_steps": len(fallback_result.executed_steps),
                             "note": "Auto fallback succeeded after partial failure.",
                             "recovered_from_run_id": run_id,
+                            "fallback_reason": str(exc),
                             "changed_sources": list(changed_sources),
                             "changed_keys": list(changed_keys),
+                            "skipped_steps": fallback_skipped,
+                            "step_durations_s": fallback_result.step_durations,
+                            "elapsed_s": fallback_elapsed,
                             **({"hdf_output": hdf_out_path} if hdf_out_path else {}),
                         },
                     )
@@ -412,6 +467,7 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                         "effective_mode": done.get("effective_mode"),
                         "note": done.get("note"),
                         "recovered_from_run_id": run_id,
+                        "fallback_reason": done.get("fallback_reason"),
                         "hdf_output": done.get("hdf_output"),
                     }
                 except Exception as fallback_exc:
