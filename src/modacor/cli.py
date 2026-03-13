@@ -117,6 +117,11 @@ def _add_run_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPars
         help="ProcessingData path to export to HDF (repeatable).",
     )
     run_parser.add_argument(
+        "--write-all-processing-data",
+        action="store_true",
+        help="Export all BaseData entries currently present in ProcessingData to HDF.",
+    )
+    run_parser.add_argument(
         "--run-name",
         default="default",
         help="Run label written under /processing/<...>/<run-name> in the HDF output.",
@@ -145,13 +150,14 @@ def _run_command(args: argparse.Namespace) -> int:
     )
 
     if args.write_hdf is not None:
-        if not args.write_path:
-            raise ValueError("--write-hdf requires at least one --write-path.")
+        if not args.write_path and not args.write_all_processing_data:
+            raise ValueError("--write-hdf requires --write-all-processing-data or at least one --write-path.")
         hdf_sink = HDFProcessingSink(resource_location=args.write_hdf)
         hdf_sink.write(
             args.run_name,
             result.processing_data,
-            data_paths=args.write_path,
+            data_paths=args.write_path or None,
+            write_all_processing_data=args.write_all_processing_data,
             pipeline_spec=result.pipeline.to_spec(),
             pipeline_yaml=result.pipeline.to_yaml(),
             trace_events=result.tracer.events if result.tracer is not None else None,

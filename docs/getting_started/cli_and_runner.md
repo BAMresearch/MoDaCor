@@ -73,11 +73,24 @@ modacor run \
   --write-path /background/signal/signal
 ```
 
+If you want to store the entire current `ProcessingData` (all `BaseData` entries) without listing paths:
+
+```bash
+modacor run \
+  --pipeline processing_pipelines/MOUSE_solids.yaml \
+  --write-hdf output/results_full.h5 \
+  --write-all-processing-data
+```
+
 Semantics:
 
 - `--write-hdf` sets the output file.
 - each `--write-path` adds one `ProcessingData` path to `data_paths`.
+- `--write-all-processing-data` auto-selects all `BaseData` entries from `ProcessingData`.
 - `--run-name` maps to the HDF sink run subpath (default: `default`).
+- the HDF output stores reproducibility metadata under `processing/pipeline/<run-name>/`:
+  `spec` (JSON) and `yaml` (pipeline YAML).
+- trace output is stored under `processing/tracer/<run-name>/` as raw `events` JSON and indexed `steps/` + `index/`.
 
 ## Shared Python runner API
 

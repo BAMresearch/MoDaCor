@@ -160,3 +160,27 @@ def test_hdf_processing_sink_accepts_string_data_path(
 
     with h5py.File(out_file, "r") as h5:
         assert "processing/result/run2/sample/signal/signal" in h5
+
+
+def test_hdf_processing_sink_can_write_all_processing_data(tmp_path: Path):
+    out_file = tmp_path / "out_all.h5"
+    sink = HDFProcessingSink(resource_location=out_file)
+
+    processing_data = ProcessingData()
+    bundle = DataBundle()
+    bundle["signal"] = BaseData(signal=np.array([1.0, 2.0]), units=ureg.Unit("count"))
+    bundle["Q"] = BaseData(signal=np.array([0.1, 0.2]), units=ureg.Unit("1/nm"))
+    bundle["note"] = "not-basedata"
+    processing_data["sample"] = bundle
+
+    sink.write(
+        "run_all",
+        processing_data,
+        data_paths=None,
+        write_all_processing_data=True,
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        assert "processing/result/run_all/sample/signal/signal" in h5
+        assert "processing/result/run_all/sample/Q/signal" in h5
+        assert "processing/result/run_all/sample/note" not in h5

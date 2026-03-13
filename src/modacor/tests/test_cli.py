@@ -29,7 +29,9 @@ def test_cli_write_hdf_requires_write_path(tmp_path: Path):
     output_path = tmp_path / "out.h5"
     _write_empty_pipeline(pipeline_path)
 
-    with pytest.raises(ValueError, match="--write-hdf requires at least one --write-path"):
+    with pytest.raises(
+        ValueError, match="--write-hdf requires --write-all-processing-data or at least one --write-path"
+    ):
         main(
             [
                 "run",

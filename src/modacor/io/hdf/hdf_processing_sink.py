@@ -184,6 +184,16 @@ def _write_trace_indexed(parent: h5py.Group, trace_events: list[dict[str, Any]])
     index_group.create_dataset("any_change", data=any_change, dtype=bool)
 
 
+def _collect_all_basedata_paths(processing_data: ProcessingData) -> list[str]:
+    paths: list[str] = []
+    for bundle_key in sorted(processing_data.keys()):
+        databundle = processing_data[bundle_key]
+        for basedata_name in sorted(databundle.keys()):
+            if isinstance(databundle[basedata_name], BaseData):
+                paths.append(f"/{bundle_key}/{basedata_name}")
+    return paths
+
+
 @define(kw_only=True)
 class HDFProcessingSink(IoSink):
     """Write selected ProcessingData leaves and metadata into an HDF5 file."""
@@ -199,16 +209,26 @@ class HDFProcessingSink(IoSink):
         self,
         subpath: str,
         processing_data: ProcessingData,
-        data_paths: Sequence[str] | str,
+        data_paths: Sequence[str] | str | None,
         *,
+        write_all_processing_data: bool = False,
         pipeline_spec: dict[str, Any] | None = None,
         pipeline_yaml: str | None = None,
         trace_events: Any | None = None,
         override_resource_location: Path | None = None,
     ) -> Path:
+        resolved_data_paths: list[str] = []
         if isinstance(data_paths, str):
-            data_paths = [data_paths]
-        elif not data_paths:
+            resolved_data_paths = [data_paths]
+        elif data_paths is not None:
+            resolved_data_paths = [str(path) for path in data_paths]
+
+        if write_all_processing_data:
+            resolved_data_paths.extend(_collect_all_basedata_paths(processing_data))
+
+        # Stable order + de-duplication
+        resolved_data_paths = list(dict.fromkeys(resolved_data_paths))
+        if not resolved_data_paths:
             raise ValueError("HDFProcessingSink.write requires one or more data_paths.")
 
         out_path = (override_resource_location or self.resource_location).expanduser()
@@ -233,7 +253,7 @@ class HDFProcessingSink(IoSink):
             result_root = processing_group.require_group("result")
             run_result_group = _recreate_group(result_root, run_name)
 
-            for path in data_paths:
+            for path in resolved_data_paths:
                 parsed = parse_processing_path(path)
                 bundle_key = parsed.databundle_key
                 basedata_name = parsed.basedata_name
