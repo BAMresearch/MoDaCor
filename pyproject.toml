@@ -94,6 +94,9 @@ documentation = "https://BAMresearch.github.io/MoDaCor"
 repository = "https://github.com/BAMresearch/MoDaCor"
 changelog = "https://BAMresearch.github.io/MoDaCor/changelog.html"
 
+[project.scripts]
+modacor = "modacor.cli:main"
+
 [build-system]
 requires = [
     "setuptools>=40.6",
