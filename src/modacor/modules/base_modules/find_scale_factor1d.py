@@ -69,7 +69,7 @@ def _extract_dependent(bd: BaseData) -> DependentData1D:
     if bd.rank_of_data != 1:
         raise ValueError("Dependent BaseData must be rank-1.")
 
-    y = np.asarray(bd.signal, dtype=float).squeeze()
+    y = bd.signal.squeeze()
     if y.ndim != 1:
         raise ValueError("Dependent signal must be 1D.")
 
@@ -287,8 +287,8 @@ class FindScaleFactor1D(ProcessStep):
         if x_work_bd.units != x_ref_bd.units:
             x_work_bd.to_units(x_ref_bd.units)
 
-        x_work = np.asarray(x_work_bd.signal, dtype=float).squeeze()
-        x_ref = np.asarray(x_ref_bd.signal, dtype=float).squeeze()
+        x_work = x_work_bd.signal.squeeze()
+        x_ref = x_ref_bd.signal.squeeze()
 
         dep_work = _extract_dependent(y_work_bd)
         dep_ref = _extract_dependent(y_ref_bd)

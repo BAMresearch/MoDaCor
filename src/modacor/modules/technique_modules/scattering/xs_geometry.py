@@ -25,6 +25,7 @@ from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.modules.helpers import attach_prepared_data, normalize_str_list
 
 # Module-level handler; facilities can swap MessageHandler implementation as needed
 logger = MessageHandler(name=__name__)
@@ -461,7 +462,9 @@ class XSGeometry(ProcessStep):
         """
         super().prepare_execution()
 
-        pkey = self.configuration.get("with_processing_keys")
+        pkey = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
+        if not pkey:
+            raise ValueError("XSGeometry: configuration.with_processing_keys is empty.")
         signal_bd: BaseData = self.processing_data[pkey[0]]["signal"]
         RoD = signal_bd.rank_of_data
         spatial_shape: tuple[int, ...] = signal_bd.shape[-RoD:] if RoD > 0 else ()
@@ -542,29 +545,18 @@ class XSGeometry(ProcessStep):
         to the databundles specified in 'with_processing_keys'.
         """
         data = self.processing_data
-        output: Dict[str, object] = {}
-
-        with_keys = self.configuration.get("with_processing_keys", [])
+        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
         if not with_keys:
             logger.warning("XSGeometry: no with_processing_keys specified; nothing to calculate.")
         else:
             logger.info(f"XSGeometry: adding geometry outputs to keys={with_keys}")
-
-        for key in with_keys:
-            databundle = data.get(key)
-            if databundle is None:
-                logger.warning(f"XSGeometry: processing_data has no entry for key={key!r}; skipping.")  # noqa: E702
-                continue
-
-            databundle["Q"] = self._prepared_data["Q"]
-            databundle["Q0"] = self._prepared_data["Q0"]
-            databundle["Q1"] = self._prepared_data["Q1"]
-            databundle["Q2"] = self._prepared_data["Q2"]
-            databundle["Psi"] = self._prepared_data["Psi"]
-            databundle["TwoTheta"] = self._prepared_data["TwoTheta"]
-            databundle["Omega"] = self._prepared_data["Omega"]
-
-            output[key] = databundle
+        output = attach_prepared_data(
+            data,
+            with_keys,
+            self._prepared_data,
+            logger=logger,
+            module_name="XSGeometry",
+        )
 
         logger.info(f"XSGeometry: geometry outputs attached for {len(output)} keys.")
 
