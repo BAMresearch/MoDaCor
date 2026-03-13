@@ -14,7 +14,7 @@ __status__ = "Development"  # "Development", "Production"
 """HDF5 sink for writing processing results, pipeline metadata, and trace events."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 import h5py
 from attrs import define, field, validators
@@ -64,6 +64,23 @@ def _write_basedata(group: h5py.Group, basedata: BaseData, *, compression: str |
             dset.attrs["units"] = str(basedata.units)
 
 
+def _write_json_or_mark_empty(
+    parent: h5py.Group,
+    run_name: str,
+    dataset_name: str,
+    payload: Any | None,
+) -> None:
+    run_group = _recreate_group(parent, run_name)
+    if payload is None:
+        run_group.attrs["empty"] = True
+        return
+
+    import json
+
+    json_bytes = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    run_group.create_dataset(dataset_name, data=json_bytes)
+
+
 @define(kw_only=True)
 class HDFProcessingSink(IoSink):
     """Write selected ProcessingData leaves and metadata into an HDF5 file."""
@@ -79,7 +96,7 @@ class HDFProcessingSink(IoSink):
         self,
         subpath: str,
         processing_data: ProcessingData,
-        data_paths: list[str],
+        data_paths: Sequence[str] | str,
         *,
         pipeline_spec: dict[str, Any] | None = None,
         trace_events: Any | None = None,
@@ -138,27 +155,11 @@ class HDFProcessingSink(IoSink):
 
             # Pipeline specification (stored as JSON string)
             pipeline_group = processing_group.require_group("pipeline")
-            run_pipeline_group = _recreate_group(pipeline_group, run_name)
-            if resolved_pipeline_spec is not None:
-                json_bytes = str(self._as_json_string(resolved_pipeline_spec)).encode("utf-8")
-                run_pipeline_group.create_dataset("spec", data=json_bytes)
-            else:
-                run_pipeline_group.attrs["empty"] = True
+            _write_json_or_mark_empty(pipeline_group, run_name, "spec", resolved_pipeline_spec)
 
             # Trace events (stored as JSON string)
             tracer_group = processing_group.require_group("tracer")
-            run_tracer_group = _recreate_group(tracer_group, run_name)
-            if resolved_trace_events is not None:
-                json_bytes = str(self._as_json_string(resolved_trace_events)).encode("utf-8")
-                run_tracer_group.create_dataset("events", data=json_bytes)
-            else:
-                run_tracer_group.attrs["empty"] = True
+            _write_json_or_mark_empty(tracer_group, run_name, "events", resolved_trace_events)
 
         self.logger.info(f"Wrote processing results to {out_path} (run={run_name}).")
         return out_path
-
-    @staticmethod
-    def _as_json_string(data: Any) -> str:
-        import json
-
-        return json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False)

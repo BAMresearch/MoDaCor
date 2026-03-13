@@ -105,3 +105,19 @@ def test_hdf_processing_sink_defaults_to_run_default(
         assert "processing/result/default/sample/signal/signal" in h5
         assert bool(h5["processing/pipeline/default"].attrs["empty"]) is True
         assert bool(h5["processing/tracer/default"].attrs["empty"]) is True
+
+
+def test_hdf_processing_sink_accepts_string_data_path(
+    tmp_path: Path, processing_data_with_uncertainties: ProcessingData
+):
+    out_file = tmp_path / "out_single_path.h5"
+    sink = HDFProcessingSink(resource_location=out_file)
+
+    sink.write(
+        "run2",
+        processing_data_with_uncertainties,
+        data_paths="/sample/signal/signal",
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        assert "processing/result/run2/sample/signal/signal" in h5

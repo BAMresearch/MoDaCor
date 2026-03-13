@@ -41,7 +41,6 @@ def attach_prepared_data(
             if logger is not None:
                 logger.warning(f"{module_name}: processing_data has no entry for key={key!r}; skipping.")  # noqa: E702
             continue
-        for out_key, bd in prepared_data.items():
-            databundle[out_key] = bd
+        databundle.update(prepared_data)
         output[key] = databundle
     return output

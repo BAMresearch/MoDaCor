@@ -11,11 +11,11 @@ __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-# import pytest
 import logging
 import unittest
 
 import numpy as np
+import pytest
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
@@ -308,6 +308,30 @@ def test_reduce_dimensionality_rank_and_axes_reduce_as_expected():
     assert out_all.rank_of_data == 0
     # axes should be empty for scalar
     assert out_all.axes == []
+
+
+def test_reduce_dimensionality_nan_uncertainty_omit_policy_is_explicit():
+    signal = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=float)
+    unc = np.array([[0.1, np.nan], [0.2, 0.3]], dtype=float)
+
+    bd = BaseData(
+        signal=signal,
+        units=ureg.Unit("count"),
+        uncertainties={"u": unc},
+        weights=np.ones_like(signal),
+    )
+
+    out = ReduceDimensionality._weighted_mean_with_uncertainty(
+        bd=bd,
+        axis=0,
+        use_weights=False,
+        nan_policy="omit",
+        reduction="mean",
+    )
+
+    np.testing.assert_allclose(out.signal, np.array([2.0, 3.0]))
+    assert out.uncertainties["u"][0] == pytest.approx(np.sqrt(0.1**2 + 0.2**2) / 2.0)
+    assert np.isnan(out.uncertainties["u"][1])
 
 
 def test_reduce_dimensionality_emits_info_and_debug_logs(caplog):
