@@ -47,3 +47,17 @@ def test_find_dirty_step_ids_handles_append_source_style_identifier():
 
     dirty = find_dirty_step_ids(pipeline, changed_sources=["background"])
     assert dirty == {"src", "down"}
+
+
+def test_find_dirty_step_ids_with_changed_keys_matches_processing_patterns():
+    load = DummyStep(step_id="load")
+    corr = DummyStep(step_id="corr")
+
+    load.configuration["processing_key"] = "sample"
+    load.configuration["databundle_output_key"] = "signal"
+    corr.configuration["with_processing_keys"] = ["sample"]
+
+    pipeline = Pipeline.from_dict({load: set(), corr: {load}}, name="dirty-test-keys")
+
+    dirty = find_dirty_step_ids(pipeline, changed_keys=["sample.signal"])
+    assert dirty == {"load", "corr"}

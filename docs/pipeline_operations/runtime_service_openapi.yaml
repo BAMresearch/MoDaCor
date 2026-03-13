@@ -389,6 +389,10 @@ components:
           type: array
           items:
             type: string
+        changed_keys:
+          type: array
+          items:
+            type: string
         run_name:
           type: string
         write_hdf:
@@ -480,10 +484,17 @@ components:
               type: array
               items:
                 type: string
+            changed_keys:
+              type: array
+              items:
+                type: string
             dirty_steps:
               type: array
               items:
                 type: string
+            checkpoint_boundary_step:
+              type: string
+              nullable: true
             hdf_output:
               type: string
               nullable: true

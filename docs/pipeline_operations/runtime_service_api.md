@@ -167,6 +167,7 @@ Request:
 {
   "mode": "partial",
   "changed_sources": ["sample"],
+  "changed_keys": ["sample.signal"],
   "run_name": "sample_2026_03_13_153045",
   "write_hdf": {
     "path": "/data/out/sample_2026_03_13_153045.h5",
@@ -184,7 +185,8 @@ Request:
 
 Notes:
 
-- `changed_sources` is required for `partial` and optional for `auto`.
+- `changed_sources` or `changed_keys` is required for `partial`; both are optional for `auto`.
+- `changed_keys` enables key-aware invalidation (e.g. `sample.signal`, `sample.Q`) for tighter partial reruns.
 - `write_hdf` is optional; if provided, pipeline spec/yaml and trace are persisted.
 
 ### `POST /sessions/{session_id}/reset`
@@ -330,6 +332,8 @@ It provides route skeletons and an in-memory session manager aligned with this c
 The scaffold now includes dirty-step detection by changed source references and executes selected subgraphs for
 `partial` mode when prior `ProcessingData` exists. `auto` mode attempts partial first and falls back to full rerun on
 partial failure.
+When partial mode runs, the service records a boundary checkpoint before the first dirty step and restores it if
+partial execution fails.
 
 Run the scaffold service:
 

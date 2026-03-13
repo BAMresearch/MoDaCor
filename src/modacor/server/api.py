@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from graphlib import TopologicalSorter
 from importlib import import_module
 from pathlib import Path
 from typing import Any
@@ -54,6 +55,10 @@ def _resolve_effective_mode(requested_mode: str) -> tuple[str, str | None]:
     if requested_mode == "auto":
         return "partial", "auto mode: partial first, full fallback on failure"
     return "full", None
+
+
+def _ordered_step_ids(pipeline: Pipeline) -> list[str]:
+    return [str(node.step_id) for node in TopologicalSorter(pipeline.graph).static_order()]
 
 
 def _load_custom_source_class(class_path: str):
@@ -234,8 +239,9 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
         if mode not in {"partial", "full", "auto"}:
             raise HTTPException(status_code=422, detail="mode must be one of: partial, full, auto.")
         changed_sources = payload.get("changed_sources") or []
-        if mode == "partial" and not changed_sources:
-            raise HTTPException(status_code=422, detail="changed_sources is required for partial mode.")
+        changed_keys = payload.get("changed_keys") or []
+        if mode == "partial" and not changed_sources and not changed_keys:
+            raise HTTPException(status_code=422, detail="partial mode requires changed_sources or changed_keys.")
         session = manager.get_session(session_id)
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found.")
@@ -244,9 +250,9 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
         if effective_mode == "partial" and session.processing_data is None:
             effective_mode = "full"
             mode_note = "No previous ProcessingData snapshot available; executed full rerun."
-        if mode == "auto" and not changed_sources:
+        if mode == "auto" and not changed_sources and not changed_keys:
             effective_mode = "full"
-            mode_note = "Auto mode without changed_sources defaults to full rerun."
+            mode_note = "Auto mode without changed_sources/changed_keys defaults to full rerun."
         try:
             run_meta = manager.enqueue_run(
                 session_id,
@@ -267,8 +273,17 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
             reuse_processing_data = effective_mode == "partial" and session.processing_data is not None
             selected_step_ids: set[str] | None = None
             snapshot_before_partial = None
+            dirty_step_ids_ordered: list[str] = []
+            boundary_step_id: str | None = None
             if effective_mode == "partial":
-                selected_step_ids = find_dirty_step_ids(pipeline, changed_sources)
+                selected_step_ids = find_dirty_step_ids(
+                    pipeline,
+                    changed_sources=list(changed_sources),
+                    changed_keys=list(changed_keys),
+                )
+                topo_ids = _ordered_step_ids(pipeline)
+                dirty_step_ids_ordered = [step_id for step_id in topo_ids if step_id in selected_step_ids]
+                boundary_step_id = dirty_step_ids_ordered[0] if dirty_step_ids_ordered else None
                 if not selected_step_ids:
                     run_meta = manager.mark_run_succeeded(
                         session_id,
@@ -278,6 +293,7 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                             "executed_steps": [],
                             "num_steps": 0,
                             "note": "No pipeline steps matched changed_sources.",
+                            "changed_keys": list(changed_keys),
                         },
                     )
                     return {
@@ -290,6 +306,7 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                     }
 
                 if session.processing_data is not None:
+                    # Boundary checkpoint: restore this snapshot if partial chain fails.
                     snapshot_before_partial = deepcopy(session.processing_data)
 
             result = run_pipeline_job(
@@ -314,9 +331,15 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                 "status": "succeeded",
                 "executed_steps": result.executed_steps,
                 "num_steps": len(result.executed_steps),
+                "changed_sources": list(changed_sources),
+                "changed_keys": list(changed_keys),
             }
             if mode_note:
                 details["note"] = mode_note
+            if dirty_step_ids_ordered:
+                details["dirty_steps"] = dirty_step_ids_ordered
+            if boundary_step_id is not None:
+                details["checkpoint_boundary_step"] = boundary_step_id
             if hdf_out_path is not None:
                 details["hdf_output"] = hdf_out_path
 
@@ -376,6 +399,8 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                             "num_steps": len(fallback_result.executed_steps),
                             "note": "Auto fallback succeeded after partial failure.",
                             "recovered_from_run_id": run_id,
+                            "changed_sources": list(changed_sources),
+                            "changed_keys": list(changed_keys),
                             **({"hdf_output": hdf_out_path} if hdf_out_path else {}),
                         },
                     )

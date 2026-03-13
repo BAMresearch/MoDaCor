@@ -42,14 +42,83 @@ def _step_source_refs(config: dict[str, Any]) -> set[str]:
     return refs
 
 
-def find_dirty_step_ids(pipeline: Pipeline, changed_sources: list[str] | set[str] | tuple[str, ...]) -> set[str]:
+def _normalize_processing_keys(value: Any) -> list[str]:
+    if value is None:
+        return ["*"]
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value]
+    return ["*"]
+
+
+def _step_processing_key_patterns(config: dict[str, Any]) -> tuple[set[str], set[str]]:
+    """
+    Return (reads, writes) key patterns like:
+      - sample.*           (bundle-level pattern)
+      - sample.signal      (specific basedata key)
+      - *                  (conservative wildcard)
+    """
+    cfg = config or {}
+    reads: set[str] = set()
+    writes: set[str] = set()
+
+    with_keys = _normalize_processing_keys(cfg.get("with_processing_keys"))
+    for key in with_keys:
+        reads.add(f"{key}.*" if key != "*" else "*")
+        writes.add(f"{key}.*" if key != "*" else "*")
+
+    # AppendProcessingData-style config
+    processing_key = cfg.get("processing_key")
+    databundle_output_key = cfg.get("databundle_output_key")
+    if isinstance(processing_key, str) and processing_key.strip():
+        pkey = processing_key.strip()
+        if isinstance(databundle_output_key, str) and databundle_output_key.strip():
+            writes.add(f"{pkey}.{databundle_output_key.strip()}")
+        else:
+            writes.add(f"{pkey}.*")
+
+    # Explicit output processing key (for modules that write to a dedicated key)
+    output_processing_key = cfg.get("output_processing_key")
+    if isinstance(output_processing_key, str) and output_processing_key.strip():
+        writes.add(f"{output_processing_key.strip()}.*")
+
+    # If no signal at all, keep conservative wildcard so we do not miss dependencies.
+    if not reads:
+        reads.add("*")
+    if not writes:
+        writes.add("*")
+
+    return reads, writes
+
+
+def _match_changed_key(changed_key: str, patterns: set[str]) -> bool:
+    if "*" in patterns:
+        return True
+    for pattern in patterns:
+        if pattern.endswith(".*"):
+            prefix = pattern[:-2]
+            if changed_key == prefix or changed_key.startswith(prefix + "."):
+                return True
+        if changed_key == pattern:
+            return True
+    return False
+
+
+def find_dirty_step_ids(
+    pipeline: Pipeline,
+    changed_sources: list[str] | set[str] | tuple[str, ...] | None = None,
+    changed_keys: list[str] | set[str] | tuple[str, ...] | None = None,
+) -> set[str]:
     """
     Determine dirty steps for a partial rerun.
 
-    Dirty set = seed steps that reference any changed source + all descendants.
+    Dirty set = seed steps that reference any changed source or read any changed
+    processing key + all descendants.
     """
-    changed = {str(item) for item in changed_sources if str(item).strip()}
-    if not changed:
+    changed_source_set = {str(item) for item in changed_sources or [] if str(item).strip()}
+    changed_key_set = {str(item) for item in changed_keys or [] if str(item).strip()}
+    if not changed_source_set and not changed_key_set:
         return set()
 
     id_by_node = {node: str(node.step_id) for node in pipeline.graph}
@@ -58,7 +127,11 @@ def find_dirty_step_ids(pipeline: Pipeline, changed_sources: list[str] | set[str
     for node, sid in id_by_node.items():
         cfg = dict(getattr(node, "configuration", {}) or {})
         refs = _step_source_refs(cfg)
-        if refs & changed:
+        reads, _writes = _step_processing_key_patterns(cfg)
+
+        source_match = bool(refs & changed_source_set)
+        key_match = any(_match_changed_key(changed_key, reads) for changed_key in changed_key_set)
+        if source_match or key_match:
             seed_ids.add(sid)
 
     if not seed_ids:
