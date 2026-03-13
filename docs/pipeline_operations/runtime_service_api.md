@@ -213,6 +213,30 @@ Notes:
 - `changed_keys` enables key-aware invalidation (e.g. `sample.signal`, `sample.Q`) for tighter partial reruns.
 - `write_hdf` is optional; if provided, pipeline spec/yaml and trace are persisted.
 
+### `POST /sessions/{session_id}/process/dry-run`
+
+Preview what would run without executing any pipeline steps.
+
+Request (same shape as `/process`, excluding `write_hdf` in typical usage):
+
+```json
+{
+  "mode": "partial",
+  "changed_sources": ["sample"],
+  "changed_keys": ["sample.signal"]
+}
+```
+
+Response includes:
+
+- `effective_mode`
+- `dirty_steps`
+- `skipped_steps`
+- `checkpoint_boundary_step`
+- `missing_required_sources`
+- `warnings`
+- `can_process`
+
 ### `POST /sessions/{session_id}/reset`
 
 Reset without immediate processing.

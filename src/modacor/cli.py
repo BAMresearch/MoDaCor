@@ -232,6 +232,12 @@ def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     process_parser.add_argument("--write-all-processing-data", action="store_true")
     process_parser.add_argument("--write-path", action="append", default=[])
 
+    dry_run_parser = session_subparsers.add_parser("dry-run", help="Preview dirty-step plan without execution.")
+    dry_run_parser.add_argument("--session-id", required=True)
+    dry_run_parser.add_argument("--mode", required=True, choices=["partial", "full", "auto"])
+    dry_run_parser.add_argument("--changed-source", action="append", default=[], dest="changed_sources")
+    dry_run_parser.add_argument("--changed-key", action="append", default=[], dest="changed_keys")
+
     reset_parser = session_subparsers.add_parser("reset", help="Reset session runtime state.")
     reset_parser.add_argument("--session-id", required=True)
     reset_parser.add_argument("--mode", required=True, choices=["partial", "full"])
@@ -389,6 +395,16 @@ def _session_process(base_url: str, args: argparse.Namespace) -> int:
     return 0
 
 
+def _session_dry_run(base_url: str, args: argparse.Namespace) -> int:
+    payload: dict[str, object] = {"mode": args.mode}
+    if args.changed_sources:
+        payload["changed_sources"] = args.changed_sources
+    if args.changed_keys:
+        payload["changed_keys"] = args.changed_keys
+    _print_json(_http_request_json(base_url, "POST", f"/v1/sessions/{args.session_id}/process/dry-run", payload))
+    return 0
+
+
 def _session_reset(base_url: str, args: argparse.Namespace) -> int:
     payload = {"mode": args.mode}
     _print_json(_http_request_json(base_url, "POST", f"/v1/sessions/{args.session_id}/reset", payload))
@@ -417,6 +433,7 @@ def _session_command(args: argparse.Namespace) -> int:
         "set-source": _session_set_source,
         "delete-source": _session_delete_source,
         "process": _session_process,
+        "dry-run": _session_dry_run,
         "reset": _session_reset,
         "runs": _session_runs,
         "templates": _session_templates,

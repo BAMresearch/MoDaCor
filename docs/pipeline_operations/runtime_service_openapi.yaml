@@ -216,6 +216,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/process/dry-run:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      tags: [Processing]
+      summary: Preview invalidation/selection plan without executing a run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProcessRequest"
+      responses:
+        "200":
+          description: Dry-run plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DryRunPlan"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "409":
           description: Session busy
           content:
@@ -589,6 +615,55 @@ components:
           type: string
         state:
           $ref: "#/components/schemas/SessionState"
+
+    DryRunPlan:
+      type: object
+      required: [session_id, mode, effective_mode, dirty_steps, can_process]
+      properties:
+        session_id:
+          type: string
+        mode:
+          type: string
+          enum: [partial, full, auto]
+        effective_mode:
+          type: string
+          enum: [partial, full]
+        changed_sources:
+          type: array
+          items:
+            type: string
+        changed_keys:
+          type: array
+          items:
+            type: string
+        topological_steps:
+          type: array
+          items:
+            type: string
+        dirty_steps:
+          type: array
+          items:
+            type: string
+        skipped_steps:
+          type: array
+          items:
+            type: string
+        checkpoint_boundary_step:
+          type: string
+          nullable: true
+        fallback_strategy:
+          type: string
+          nullable: true
+        missing_required_sources:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        can_process:
+          type: boolean
 
     ErrorObject:
       type: object

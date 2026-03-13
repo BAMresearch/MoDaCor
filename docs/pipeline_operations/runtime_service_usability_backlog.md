@@ -33,7 +33,7 @@ Complexity: medium
 Reason: prevents misconfiguration and standardizes source expectations per instrument family.
 
 4. `U4` Dry-run endpoint for invalidation preview
-Status: `planned`
+Status: `done`
 Benefit: very high
 Complexity: low-medium
 Reason: immediate visibility into dirty-step decisions; improves trust and debugging without executing a run.

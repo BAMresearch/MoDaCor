@@ -65,6 +65,69 @@ def _ordered_step_ids(pipeline: Pipeline) -> list[str]:
     return [str(node.step_id) for node in TopologicalSorter(pipeline.graph).static_order()]
 
 
+def _build_dry_run_plan(
+    session: PipelineSession,
+    *,
+    mode: str,
+    changed_sources: list[str],
+    changed_keys: list[str],
+) -> dict[str, Any]:
+    pipeline = Pipeline.from_yaml(session.pipeline_yaml or "")
+    topo_ids = _ordered_step_ids(pipeline)
+
+    effective_mode, mode_note = _resolve_effective_mode(mode)
+    warnings: list[str] = []
+    if mode_note:
+        warnings.append(mode_note)
+
+    if effective_mode == "partial" and session.processing_data is None:
+        effective_mode = "full"
+        warnings.append("No previous ProcessingData snapshot available; dry-run assumes full rerun.")
+    if mode == "auto" and not changed_sources and not changed_keys:
+        effective_mode = "full"
+        warnings.append("Auto mode without changed_sources/changed_keys defaults to full rerun.")
+
+    missing_refs: list[str] = []
+    if session.required_source_refs:
+        present_refs = set(session.sources.keys())
+        missing_refs = [ref for ref in session.required_source_refs if ref not in present_refs]
+        if missing_refs:
+            warnings.append(
+                f"Missing required sources for profile '{session.source_profile}': {', '.join(missing_refs)}."
+            )
+
+    if effective_mode == "partial":
+        dirty_ids = find_dirty_step_ids(
+            pipeline,
+            changed_sources=changed_sources,
+            changed_keys=changed_keys,
+        )
+        dirty_steps = [step_id for step_id in topo_ids if step_id in dirty_ids]
+        skipped_steps = [step_id for step_id in topo_ids if step_id not in dirty_ids]
+    else:
+        dirty_steps = list(topo_ids)
+        skipped_steps = []
+
+    boundary_step = dirty_steps[0] if dirty_steps else None
+    can_process = len(missing_refs) == 0
+
+    return {
+        "session_id": session.session_id,
+        "mode": mode,
+        "effective_mode": effective_mode,
+        "changed_sources": list(changed_sources),
+        "changed_keys": list(changed_keys),
+        "topological_steps": topo_ids,
+        "dirty_steps": dirty_steps,
+        "skipped_steps": skipped_steps,
+        "checkpoint_boundary_step": boundary_step,
+        "fallback_strategy": "full_on_partial_failure" if mode == "auto" else None,
+        "missing_required_sources": missing_refs,
+        "warnings": warnings,
+        "can_process": can_process,
+    }
+
+
 def _load_custom_source_class(class_path: str):
     module_path, class_name = class_path.rsplit(".", 1)
     module = import_module(module_path)
@@ -528,6 +591,37 @@ def create_app(session_manager: SessionManager | None = None):  # noqa: C901
                     "code": "PARTIAL_RUN_FAILED" if effective_mode == "partial" else "RUN_FAILED",
                     "message": str(exc),
                     "details": {"session_id": session_id, "run_id": run_id},
+                },
+            ) from exc
+
+    @app.post("/v1/sessions/{session_id}/process/dry-run")
+    def process_dry_run(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        mode = str(payload.get("mode", "")).strip()
+        if mode not in {"partial", "full", "auto"}:
+            raise HTTPException(status_code=422, detail="mode must be one of: partial, full, auto.")
+        changed_sources = list(payload.get("changed_sources") or [])
+        changed_keys = list(payload.get("changed_keys") or [])
+        if mode == "partial" and not changed_sources and not changed_keys:
+            raise HTTPException(status_code=422, detail="partial mode requires changed_sources or changed_keys.")
+
+        session = manager.get_session(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found.")
+
+        try:
+            return _build_dry_run_plan(
+                session,
+                mode=mode,
+                changed_sources=changed_sources,
+                changed_keys=changed_keys,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "code": "DRY_RUN_FAILED",
+                    "message": str(exc),
+                    "details": {"session_id": session_id},
                 },
             ) from exc
 

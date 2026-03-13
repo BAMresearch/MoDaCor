@@ -158,3 +158,31 @@ def test_cli_session_templates_calls_api(monkeypatch):
     assert rc == 0
     assert captured["method"] == "GET"
     assert captured["path"] == "/v1/source-templates"
+
+
+def test_cli_session_dry_run_calls_api(monkeypatch):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = payload
+        return {"dirty_steps": ["p"]}
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    rc = main(
+        [
+            "session",
+            "dry-run",
+            "--session-id",
+            "s1",
+            "--mode",
+            "partial",
+            "--changed-key",
+            "sample.signal",
+        ]
+    )
+    assert rc == 0
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/v1/sessions/s1/process/dry-run"
+    assert captured["payload"]["changed_keys"] == ["sample.signal"]

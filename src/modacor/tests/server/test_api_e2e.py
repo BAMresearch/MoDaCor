@@ -173,6 +173,52 @@ def test_api_source_templates_and_profile_validation():
     assert second_resp.status_code != 422
 
 
+def test_api_process_dry_run_returns_plan_and_missing_profile_sources():
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "sess-dry",
+            "pipeline": {
+                "yaml_text": (
+                    """
+name: dry_run_demo
+steps:
+  p:
+    module: PoissonUncertainties
+    requires_steps: []
+    configuration:
+      with_processing_keys:
+        - sample
+"""
+                )
+            },
+            "source_profile": "mouse",
+        },
+    )
+
+    # Seed processing data so partial dry-run keeps partial mode.
+    session = manager.get_session("sess-dry")
+    assert session is not None
+    session.processing_data = ProcessingData()
+
+    response = client.post(
+        "/v1/sessions/sess-dry/process/dry-run",
+        json={"mode": "partial", "changed_keys": ["sample.signal"]},
+    )
+    assert response.status_code == 200
+    plan = response.json()
+    assert plan["effective_mode"] == "partial"
+    assert "p" in plan["dirty_steps"]
+    assert plan["checkpoint_boundary_step"] == "p"
+    assert plan["can_process"] is False
+    assert "sample" in plan["missing_required_sources"]
+
+
 def test_api_process_auto_fallback_after_partial_failure(monkeypatch):
     manager = SessionManager()
     app = create_app(session_manager=manager)
