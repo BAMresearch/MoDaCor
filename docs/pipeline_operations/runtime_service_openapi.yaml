@@ -1,0 +1,521 @@
+openapi: 3.1.0
+info:
+  title: MoDaCor Runtime Service API
+  version: 0.1.0-draft
+  description: |
+    Draft OpenAPI contract for long-lived MoDaCor pipeline sessions.
+    This schema follows the design in runtime_service_api.md.
+servers:
+  - url: /v1
+tags:
+  - name: Sessions
+  - name: Sources
+  - name: Processing
+  - name: Runs
+
+paths:
+  /sessions:
+    get:
+      tags: [Sessions]
+      summary: List all sessions
+      responses:
+        "200":
+          description: Session summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SessionSummary"
+    post:
+      tags: [Sessions]
+      summary: Create a new session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionDetail"
+        "409":
+          description: Session id already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      tags: [Sessions]
+      summary: Get session details
+      responses:
+        "200":
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionDetail"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Sessions]
+      summary: Delete a session
+      responses:
+        "204":
+          description: Session deleted
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/sources:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    put:
+      tags: [Sources]
+      summary: Upsert one or more source registrations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertSourcesRequest"
+      responses:
+        "200":
+          description: Sources updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                  sources:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SourceRegistration"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/sources/{ref}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - name: ref
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Sources]
+      summary: Delete a source registration
+      responses:
+        "204":
+          description: Source removed
+        "404":
+          description: Session or source not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/process:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      tags: [Processing]
+      summary: Trigger processing run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProcessRequest"
+      responses:
+        "202":
+          description: Run accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunAcceptedResponse"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Session busy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/reset:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      tags: [Processing]
+      summary: Reset session state (without processing)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetRequest"
+      responses:
+        "202":
+          description: Reset accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                  mode:
+                    type: string
+                    enum: [partial, full]
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/recover:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      tags: [Processing]
+      summary: Recover after failed partial/full run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoverRequest"
+      responses:
+        "202":
+          description: Recovery accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunAcceptedResponse"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/runs:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      tags: [Runs]
+      summary: List runs for a session
+      responses:
+        "200":
+          description: Run summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                  runs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RunSummary"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/runs/{run_id}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Runs]
+      summary: Get detailed run metadata
+      responses:
+        "200":
+          description: Run detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunDetail"
+        "404":
+          description: Session or run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  parameters:
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    SessionState:
+      type: string
+      enum: [idle, running_partial, running_full, error_partial, error_full]
+
+    PipelineReference:
+      type: object
+      properties:
+        yaml_text:
+          type: string
+        yaml_path:
+          type: string
+      oneOf:
+        - required: [yaml_text]
+        - required: [yaml_path]
+
+    TraceConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: false
+        watch:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        record_only_on_change:
+          type: boolean
+          default: true
+
+    CreateSessionRequest:
+      type: object
+      required: [session_id, pipeline]
+      properties:
+        session_id:
+          type: string
+        name:
+          type: string
+        pipeline:
+          $ref: "#/components/schemas/PipelineReference"
+        trace:
+          $ref: "#/components/schemas/TraceConfig"
+        auto_full_reset_on_partial_error:
+          type: boolean
+          default: true
+
+    SourceRegistration:
+      type: object
+      required: [ref, type, location]
+      properties:
+        ref:
+          type: string
+        type:
+          type: string
+          enum: [hdf, yaml, csv, tiled, custom]
+        location:
+          type: string
+        kwargs:
+          type: object
+          additionalProperties: true
+
+    UpsertSourcesRequest:
+      type: object
+      required: [sources]
+      properties:
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceRegistration"
+
+    WriteHdfRequest:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+        run_name:
+          type: string
+        write_all_processing_data:
+          type: boolean
+          default: false
+        data_paths:
+          type: array
+          items:
+            type: string
+
+    ProcessRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [partial, full, auto]
+        changed_sources:
+          type: array
+          items:
+            type: string
+        run_name:
+          type: string
+        write_hdf:
+          $ref: "#/components/schemas/WriteHdfRequest"
+
+    ResetRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [partial, full]
+
+    RecoverRequest:
+      type: object
+      required: [strategy]
+      properties:
+        strategy:
+          type: string
+          enum: [full_reset_then_process, full_reset_only]
+        changed_sources:
+          type: array
+          items:
+            type: string
+
+    SessionSummary:
+      type: object
+      required: [session_id, state]
+      properties:
+        session_id:
+          type: string
+        name:
+          type: string
+        state:
+          $ref: "#/components/schemas/SessionState"
+        active_run_id:
+          type: string
+          nullable: true
+        updated_utc:
+          type: string
+          format: date-time
+
+    SessionDetail:
+      allOf:
+        - $ref: "#/components/schemas/SessionSummary"
+        - type: object
+          properties:
+            sources:
+              type: array
+              items:
+                $ref: "#/components/schemas/SourceRegistration"
+            trace:
+              $ref: "#/components/schemas/TraceConfig"
+            last_run:
+              $ref: "#/components/schemas/RunSummary"
+
+    RunStatus:
+      type: string
+      enum: [queued, running, succeeded, failed]
+
+    RunSummary:
+      type: object
+      required: [run_id, status, mode]
+      properties:
+        run_id:
+          type: string
+        mode:
+          type: string
+          enum: [partial, full, auto]
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        started_utc:
+          type: string
+          format: date-time
+        finished_utc:
+          type: string
+          format: date-time
+          nullable: true
+        failed_step_id:
+          type: string
+          nullable: true
+
+    RunDetail:
+      allOf:
+        - $ref: "#/components/schemas/RunSummary"
+        - type: object
+          properties:
+            changed_sources:
+              type: array
+              items:
+                type: string
+            dirty_steps:
+              type: array
+              items:
+                type: string
+            hdf_output:
+              type: string
+              nullable: true
+            error:
+              $ref: "#/components/schemas/ErrorObject"
+
+    RunAcceptedResponse:
+      type: object
+      required: [session_id, run_id, state]
+      properties:
+        session_id:
+          type: string
+        run_id:
+          type: string
+        state:
+          $ref: "#/components/schemas/SessionState"
+
+    ErrorObject:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/ErrorObject"

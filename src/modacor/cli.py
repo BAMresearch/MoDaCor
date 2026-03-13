@@ -135,6 +135,12 @@ def _add_run_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPars
     )
 
 
+def _add_serve_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    serve_parser = subparsers.add_parser("serve", help="Start the MoDaCor runtime API service.")
+    serve_parser.add_argument("--host", default="127.0.0.1", help="Bind host for the HTTP server.")
+    serve_parser.add_argument("--port", default=8000, type=int, help="Bind port for the HTTP server.")
+
+
 def _run_command(args: argparse.Namespace) -> int:
     trace_watch = _parse_trace_watch(args.trace_watch)
     sources = _build_sources(hdf_sources=args.hdf_source, yaml_sources=args.yaml_source)
@@ -174,10 +180,24 @@ def _run_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _serve_command(args: argparse.Namespace) -> int:
+    try:
+        import uvicorn
+    except ImportError as exc:  # pragma: no cover - runtime dependency
+        raise RuntimeError("uvicorn is not installed. Install server extras: pip install modacor[server].") from exc
+
+    from modacor.server.api import create_app
+
+    app = create_app()
+    uvicorn.run(app, host=args.host, port=args.port)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="modacor", description="MoDaCor command-line interface.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_run_parser(subparsers)
+    _add_serve_parser(subparsers)
     return parser
 
 
@@ -187,6 +207,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         return _run_command(args)
+    if args.command == "serve":
+        return _serve_command(args)
 
     parser.error(f"Unknown command: {args.command}")
     return 2

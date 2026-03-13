@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from modacor.cli import main
+from modacor.cli import build_parser, main
 
 
 def _write_empty_pipeline(path: Path) -> None:
@@ -41,3 +41,11 @@ def test_cli_write_hdf_requires_write_path(tmp_path: Path):
                 str(output_path),
             ]
         )
+
+
+def test_cli_serve_parser_accepts_host_port():
+    parser = build_parser()
+    args = parser.parse_args(["serve", "--host", "0.0.0.0", "--port", "9000"])
+    assert args.command == "serve"
+    assert args.host == "0.0.0.0"
+    assert args.port == 9000

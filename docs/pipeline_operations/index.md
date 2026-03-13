@@ -8,4 +8,5 @@
 pipeline_basics
 configuration_reference
 tracing_and_debugging
+runtime_service_api
 ```

@@ -46,6 +46,10 @@ docs = [
     "sphinxcontrib-mermaid",
     "toml"
 ]
+server = [
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+]
 ci = [
     "tox",
     "build",
