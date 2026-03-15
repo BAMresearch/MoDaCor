@@ -29,7 +29,6 @@ myst_enable_extensions = [
 myst_heading_anchors = 3
 inheritance_edge_attrs = dict(color="gray")  # readable in darkmode too
 autosummary_generate = True  # Turn on sphinx.ext.autosummary
-autosummary_generate = ["reference/index"]  # Generate stubs for the reference landing page
 autosummary_generate_overwrite = True
 templates_path = ["_templates"]
 source_suffix = {
@@ -39,9 +38,11 @@ source_suffix = {
 master_doc = "index"
 project = "MoDaCor"
 year = "2025-2026"
-author = "Brian R. Pauw and Tim Snow"
+author = (
+    "Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow"
+)
 copyright = "{0}, {1}".format(year, author)
-version = "1.0.1"
+version = "1.0.0"
 release = version
 commit_id = None
 try:
@@ -80,7 +81,6 @@ html_theme_options = {
             "icon": "fa-brands fa-github",
         },
     ],
-    "githuburl": "https://github.com/BAMresearch/MoDaCor/",
 }
 
 html_use_smartypants = True
