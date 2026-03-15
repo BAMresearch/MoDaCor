@@ -66,6 +66,10 @@ def create_app(  # noqa: C901
     def get_session(session_id: str) -> dict[str, Any]:
         return _call(service.get_session, session_id)
 
+    @app.get("/v1/sessions/{session_id}/errors/latest")
+    def latest_error(session_id: str) -> dict[str, Any]:
+        return _call(service.latest_error, session_id)
+
     @app.delete("/v1/sessions/{session_id}", status_code=204)
     def delete_session(session_id: str) -> None:
         _call(service.delete_session, session_id)

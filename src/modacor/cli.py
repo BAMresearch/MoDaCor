@@ -199,6 +199,9 @@ def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     status_parser = session_subparsers.add_parser("status", help="Get session details.")
     status_parser.add_argument("--session-id", required=True)
 
+    last_error_parser = session_subparsers.add_parser("last-error", help="Get latest error diagnostics.")
+    last_error_parser.add_argument("--session-id", required=True)
+
     set_source_parser = session_subparsers.add_parser("set-source", help="Upsert one source registration.")
     set_source_parser.add_argument("--session-id", required=True)
     set_source_parser.add_argument("--ref", required=True)
@@ -348,6 +351,11 @@ def _session_status(base_url: str, args: argparse.Namespace) -> int:
     return 0
 
 
+def _session_last_error(base_url: str, args: argparse.Namespace) -> int:
+    _print_json(_http_request_json(base_url, "GET", f"/v1/sessions/{args.session_id}/errors/latest"))
+    return 0
+
+
 def _session_set_source(base_url: str, args: argparse.Namespace) -> int:
     try:
         kwargs_obj = json.loads(args.kwargs_json)
@@ -450,6 +458,7 @@ def _session_command(args: argparse.Namespace) -> int:
         "create": _session_create,
         "delete": _session_delete,
         "status": _session_status,
+        "last-error": _session_last_error,
         "set-source": _session_set_source,
         "set-sample": _session_set_sample,
         "delete-source": _session_delete_source,

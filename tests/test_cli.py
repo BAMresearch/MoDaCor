@@ -107,6 +107,23 @@ def test_cli_session_create_with_source_template(monkeypatch):
     assert captured["payload"]["source_profile"] == "mouse"
 
 
+def test_cli_session_last_error_calls_api(monkeypatch):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = payload
+        return {"latest_error": None}
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    rc = main(["session", "last-error", "--session-id", "s1"])
+    assert rc == 0
+    assert captured["method"] == "GET"
+    assert captured["path"] == "/v1/sessions/s1/errors/latest"
+    assert captured["payload"] is None
+
+
 def test_cli_session_process_builds_write_hdf_payload(monkeypatch, tmp_path: Path):
     captured = {}
 

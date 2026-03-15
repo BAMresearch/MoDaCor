@@ -21,7 +21,8 @@ The first structural refactor tranche between `U6` and `U8` is now in place:
 - `src/modacor/io/runtime_support.py` provides shared source/sink builders and HDF export handling for both the CLI and runtime service.
 
 This keeps the design contract below aligned with the codebase structure that is
-now stable through `U8`.
+now stable through the latest diagnostics work (`U10`), with persistence and
+advanced streaming still pending.
 
 ## Goals
 
@@ -187,6 +188,51 @@ List sessions and summary status.
 ### `GET /sessions/{session_id}`
 
 Get full session metadata, current sources, state, and last run summary.
+
+### `GET /sessions/{session_id}/errors/latest`
+
+Return the current session error state plus the latest recorded failed-run
+diagnostics.
+
+Example response after a failed full run:
+
+```json
+{
+  "session_id": "mouse-main",
+  "state": "error_full",
+  "active_run_id": null,
+  "updated_utc": "2026-03-15T10:10:00+00:00",
+  "current_error": {
+    "code": "RUN_FAILED",
+    "message": "synthetic failure",
+    "details": {"exception_type": "RuntimeError"},
+    "run_id": "run-abc123",
+    "recorded_utc": "2026-03-15T10:10:00+00:00",
+    "effective_mode": "full"
+  },
+  "latest_error": {
+    "code": "RUN_FAILED",
+    "message": "synthetic failure",
+    "details": {"exception_type": "RuntimeError"},
+    "run_id": "run-abc123",
+    "recorded_utc": "2026-03-15T10:10:00+00:00",
+    "effective_mode": "full"
+  },
+  "latest_failed_run": {
+    "run_id": "run-abc123",
+    "mode": "full",
+    "effective_mode": "full",
+    "status": "failed"
+  }
+}
+```
+
+Semantics:
+
+- `current_error` reflects the session's current error state and becomes `null`
+  after a successful recovery or full reset.
+- `latest_error` is derived from the most recent failed run in history and
+  remains available after recovery for post-mortem inspection.
 
 ### `DELETE /sessions/{session_id}`
 
@@ -459,7 +505,8 @@ partial failure.
 When partial mode runs, the service records a boundary checkpoint before the first dirty step and restores it if
 partial execution fails.
 The scaffold also includes the `U8` health/readiness split for operational
-probes and basic runtime metrics.
+probes and basic runtime metrics, plus the `U10` latest-error diagnostics
+endpoint for post-failure inspection.
 
 Run the scaffold service:
 

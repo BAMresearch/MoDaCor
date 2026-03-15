@@ -191,10 +191,18 @@ class SessionManager:
             if details:
                 run_meta.update(details)
 
-            error_payload = {"code": code, "message": message, "details": details or {}}
+            failed_mode = run_meta.get("effective_mode") or run_meta.get("mode")
+            error_payload = {
+                "code": code,
+                "message": message,
+                "details": details or {},
+                "run_id": run_id,
+                "recorded_utc": run_meta["finished_utc"],
+                "effective_mode": failed_mode,
+            }
+            run_meta["error"] = error_payload
             session.last_error = error_payload
             session.active_run_id = None
-            failed_mode = run_meta.get("effective_mode") or run_meta.get("mode")
             session.state = "error_partial" if failed_mode == "partial" else "error_full"
             session.updated_utc = _utc_now_iso()
             return run_meta

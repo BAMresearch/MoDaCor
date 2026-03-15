@@ -84,6 +84,22 @@ class RuntimeService:
             },
         }
 
+    def latest_error(self, session_id: str) -> dict[str, Any]:
+        """Return the current and latest recorded error diagnostics for a session."""
+
+        session = self._require_session(session_id)
+        latest_failed_run = self._latest_failed_run(session)
+        latest_error = None if latest_failed_run is None else latest_failed_run.get("error")
+        return {
+            "session_id": session.session_id,
+            "state": session.state,
+            "active_run_id": session.active_run_id,
+            "updated_utc": session.updated_utc,
+            "current_error": session.last_error,
+            "latest_error": latest_error,
+            "latest_failed_run": latest_failed_run,
+        }
+
     def session_summary(self, session: PipelineSession) -> dict[str, Any]:
         return {
             "session_id": session.session_id,
@@ -378,6 +394,12 @@ class RuntimeService:
         if session is None:
             raise ApiError(status_code=404, detail="Session not found.")
         return session
+
+    def _latest_failed_run(self, session: PipelineSession) -> dict[str, Any] | None:
+        for run_meta in reversed(session.run_history):
+            if run_meta.get("status") == "failed":
+                return dict(run_meta)
+        return None
 
     def _ensure_required_sources(self, session: PipelineSession) -> None:
         missing_refs = missing_required_source_refs(session)

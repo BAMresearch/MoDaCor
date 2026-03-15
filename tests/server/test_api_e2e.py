@@ -78,6 +78,56 @@ def test_api_health_and_readiness_expose_runtime_metrics():
     }
 
 
+def test_api_latest_error_diagnostics_returns_current_and_historical_failure():
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    manager.create_session(session_id="sess-error-diagnostics", pipeline_yaml="name: diag\nsteps: {}\n")
+
+    empty_response = client.get("/v1/sessions/sess-error-diagnostics/errors/latest")
+    assert empty_response.status_code == 200
+    assert empty_response.json() == {
+        "session_id": "sess-error-diagnostics",
+        "state": "idle",
+        "active_run_id": None,
+        "updated_utc": manager.get_session("sess-error-diagnostics").updated_utc,
+        "current_error": None,
+        "latest_error": None,
+        "latest_failed_run": None,
+    }
+
+    first_run = manager.enqueue_run("sess-error-diagnostics", mode="full", effective_mode="full")
+    manager.mark_run_failed(
+        "sess-error-diagnostics",
+        first_run["run_id"],
+        code="RUN_FAILED",
+        message="synthetic failure",
+        details={"exception_type": "RuntimeError", "failed_step_id": "p"},
+    )
+
+    failed_response = client.get("/v1/sessions/sess-error-diagnostics/errors/latest")
+    assert failed_response.status_code == 200
+    failed_payload = failed_response.json()
+    assert failed_payload["state"] == "error_full"
+    assert failed_payload["current_error"]["code"] == "RUN_FAILED"
+    assert failed_payload["current_error"]["run_id"] == first_run["run_id"]
+    assert failed_payload["latest_error"]["message"] == "synthetic failure"
+    assert failed_payload["latest_failed_run"]["run_id"] == first_run["run_id"]
+    assert failed_payload["latest_failed_run"]["error"]["effective_mode"] == "full"
+
+    second_run = manager.enqueue_run("sess-error-diagnostics", mode="full", effective_mode="full")
+    manager.mark_run_succeeded("sess-error-diagnostics", second_run["run_id"], details={"num_steps": 0})
+
+    recovered_response = client.get("/v1/sessions/sess-error-diagnostics/errors/latest")
+    assert recovered_response.status_code == 200
+    recovered_payload = recovered_response.json()
+    assert recovered_payload["state"] == "idle"
+    assert recovered_payload["current_error"] is None
+    assert recovered_payload["latest_error"]["run_id"] == first_run["run_id"]
+    assert recovered_payload["latest_failed_run"]["status"] == "failed"
+
+
 def test_api_process_partial_with_changed_keys_runs_selected_subgraph():
     manager = SessionManager()
     app = create_app(session_manager=manager)

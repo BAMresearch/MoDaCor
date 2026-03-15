@@ -15,9 +15,10 @@ The `U6` to `U8` maintenance window is now closed.
 
 - `U6` is complete.
 - `U8` is now complete.
-- `U10`, `U9`, and `U7` remain planned feature upgrades.
+- `U10` is now complete.
+- `U9` and `U7` remain planned feature upgrades.
 - The immediate follow-up is documentation tightening and the next operational
-  diagnostics features.
+  persistence and streaming features.
 
 ## Upgrade ledger
 
@@ -74,10 +75,14 @@ for service usability plus runtime metrics (`session_count`,
 `last_updated_utc`).
 
 8. `U10` Latest error diagnostics endpoint
-Status: `planned`
+Status: `done`
 Benefit: medium-high
 Complexity: low-medium
 Reason: speeds triage and recovery after failed runs.
+Notes: implemented as `GET /v1/sessions/{id}/errors/latest`, returning the
+current session error state plus the latest recorded failed-run diagnostics.
+The CLI wrapper now exposes the same payload via
+`modacor session last-error --session-id ...`.
 
 9. `U9` Persistent session store
 Status: `planned`
@@ -150,9 +155,8 @@ upgrades less error-prone.
 
 ## Recommended next feature order
 
-1. `U10` (latest error diagnostics endpoint)
-2. `U9` (persistent session store)
-3. `U7` (advanced streaming)
+1. `U9` (persistent session store)
+2. `U7` (advanced streaming)
 
 ## Notes
 

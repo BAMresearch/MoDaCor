@@ -118,6 +118,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/errors/latest:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      tags: [Sessions]
+      summary: Get latest error diagnostics for a session
+      responses:
+        "200":
+          description: Current and latest recorded error diagnostics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDiagnosticsResponse"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     delete:
       tags: [Sessions]
       summary: Delete a session
@@ -642,6 +662,33 @@ components:
               items:
                 type: string
 
+    ErrorDiagnosticsResponse:
+      type: object
+      required: [session_id, state, active_run_id, updated_utc, current_error, latest_error, latest_failed_run]
+      properties:
+        session_id:
+          type: string
+        state:
+          $ref: "#/components/schemas/SessionState"
+        active_run_id:
+          type: string
+          nullable: true
+        updated_utc:
+          type: string
+          format: date-time
+        current_error:
+          allOf:
+            - $ref: "#/components/schemas/ErrorObject"
+          nullable: true
+        latest_error:
+          allOf:
+            - $ref: "#/components/schemas/ErrorObject"
+          nullable: true
+        latest_failed_run:
+          allOf:
+            - $ref: "#/components/schemas/RunDetail"
+          nullable: true
+
     RunStatus:
       type: string
       enum: [queued, running, succeeded, failed]
@@ -782,6 +829,14 @@ components:
         details:
           type: object
           additionalProperties: true
+        run_id:
+          type: string
+        recorded_utc:
+          type: string
+          format: date-time
+        effective_mode:
+          type: string
+          enum: [partial, full, auto]
 
     ErrorResponse:
       type: object
