@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from modacor import ureg
@@ -173,6 +175,26 @@ def test_api_source_templates_and_profile_validation():
     assert second_resp.status_code != 422
 
 
+def test_api_create_session_accepts_yaml_path(tmp_path: Path):
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    pipeline_path = tmp_path / "pipeline.yaml"
+    pipeline_path.write_text("name: via-path\nsteps: {}\n", encoding="utf-8")
+
+    response = client.post(
+        "/v1/sessions",
+        json={
+            "session_id": "sess-path",
+            "pipeline": {"yaml_path": str(pipeline_path)},
+        },
+    )
+    assert response.status_code in {200, 201}
+    payload = response.json()
+    assert payload["session_id"] == "sess-path"
+
+
 def test_api_set_sample_shortcut_upserts_sample_source():
     manager = SessionManager()
     app = create_app(session_manager=manager)
@@ -291,7 +313,7 @@ steps:
             stopped_after_step=None,
         )
 
-    monkeypatch.setattr("modacor.server.api.run_pipeline_job", fake_run_pipeline_job)
+    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
 
     result = _post_json(
         client,

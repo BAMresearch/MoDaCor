@@ -10,12 +10,9 @@ from pathlib import Path
 from urllib import error, request
 
 from modacor.debug.pipeline_tracer import PlainUnicodeRenderer
-from modacor.io.csv.csv_sink import CSVSink
-from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
-from modacor.io.hdf.hdf_source import HDFSource
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
-from modacor.io.yaml.yaml_source import YAMLSource
+from modacor.io.runtime_support import build_sinks_from_specs, build_sources_from_specs, write_processing_data_hdf
 from modacor.runner import run_pipeline_job
 
 __all__ = ["main"]
@@ -70,19 +67,14 @@ def _build_sources(
     hdf_sources: list[tuple[str, Path]] | None,
     yaml_sources: list[tuple[str, Path]] | None,
 ) -> IoSources:
-    sources = IoSources()
-    for source_reference, resource_location in hdf_sources or []:
-        sources.register_source(HDFSource(source_reference=source_reference, resource_location=resource_location))
-    for source_reference, resource_location in yaml_sources or []:
-        sources.register_source(YAMLSource(source_reference=source_reference, resource_location=resource_location))
-    return sources
+    specs = [{"ref": ref, "type": "hdf", "location": path} for ref, path in hdf_sources or []]
+    specs.extend({"ref": ref, "type": "yaml", "location": path} for ref, path in yaml_sources or [])
+    return build_sources_from_specs(specs)
 
 
 def _build_sinks(csv_sinks: list[tuple[str, Path]] | None) -> IoSinks:
-    sinks = IoSinks()
-    for sink_reference, resource_location in csv_sinks or []:
-        sinks.register_sink(CSVSink(sink_reference=sink_reference, resource_location=resource_location))
-    return sinks
+    specs = [{"ref": ref, "type": "csv", "location": path} for ref, path in csv_sinks or []]
+    return build_sinks_from_specs(specs)
 
 
 def _add_run_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -277,17 +269,15 @@ def _run_command(args: argparse.Namespace) -> int:
     )
 
     if args.write_hdf is not None:
-        if not args.write_path and not args.write_all_processing_data:
-            raise ValueError("--write-hdf requires --write-all-processing-data or at least one --write-path.")
-        hdf_sink = HDFProcessingSink(resource_location=args.write_hdf)
-        hdf_sink.write(
-            args.run_name,
-            result.processing_data,
-            data_paths=args.write_path or None,
-            write_all_processing_data=args.write_all_processing_data,
-            pipeline_spec=result.pipeline.to_spec(),
+        write_processing_data_hdf(
+            {
+                "path": str(args.write_hdf),
+                "data_paths": list(args.write_path),
+                "write_all_processing_data": bool(args.write_all_processing_data),
+            },
+            run_name=args.run_name,
+            result=result,
             pipeline_yaml=result.pipeline.to_yaml(),
-            trace_events=result.tracer.events if result.tracer is not None else None,
         )
         print(f"Wrote HDF output: {args.write_hdf}")
 

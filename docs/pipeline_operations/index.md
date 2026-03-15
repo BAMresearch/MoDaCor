@@ -1,6 +1,9 @@
 # Pipeline operations
 
-> **Warning:** This section is currently a documentation stub. It outlines the intended structure for a future refresh of the pipeline-operations guide.
+This section tracks how MoDaCor pipelines are executed, observed, and operated.
+The runtime-service work is currently in a maintenance window between `U6` and
+`U8`; the companion backlog records both feature upgrades and structural
+refactors.
 
 ```{toctree}
 :maxdepth: 1
@@ -9,5 +12,5 @@ pipeline_basics
 configuration_reference
 tracing_and_debugging
 runtime_service_api
-runtime_service_usability_backlog
+backlog
 ```

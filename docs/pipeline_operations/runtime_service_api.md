@@ -2,12 +2,26 @@
 
 This document defines the proposed daemon/runtime interface for long-lived MoDaCor processing sessions.
 
-Status: design contract (target architecture), not final implementation.
+Status: design contract with an active implementation refresh.
 
 Companion draft OpenAPI schema:
 
 - `docs/pipeline_operations/runtime_service_openapi.yaml`
-- `docs/pipeline_operations/runtime_service_usability_backlog.md` (usability upgrade tracker)
+- `docs/pipeline_operations/backlog.md` (upgrade and maintenance tracker)
+
+## Current implementation status
+
+The first structural refactor tranche between `U6` and `U8` is now in place:
+
+- `src/modacor/server/api.py` is a thin FastAPI binding layer.
+- `src/modacor/server/runtime_service.py` owns session orchestration and run lifecycle behavior.
+- `src/modacor/server/planning.py` owns dry-run planning and dirty-step calculations.
+- `src/modacor/server/io_utils.py` adapts session source registrations into runtime IO objects.
+- `src/modacor/server/errors.py` defines framework-neutral service exceptions.
+- `src/modacor/io/runtime_support.py` provides shared source/sink builders and HDF export handling for both the CLI and runtime service.
+
+This keeps the design contract below aligned with the codebase structure that is
+currently being stabilized ahead of `U8`.
 
 ## Goals
 
