@@ -2,6 +2,7 @@
 name = "modacor"
 description = "A new modular data correction software for any neutron or X-ray technique that produces 1D or 2D scattering, diffraction, or imaging data."
 dynamic = ["version", "readme"]
+requires-python = ">=3.12"
 license = "BSD-3-Clause"
 classifiers = [
   # complete classifier list: http://pypi.python.org/pypi?%3Aaction=list_classifiers
@@ -112,6 +113,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["modacor*"]
+exclude = ["modacor.tests*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "modacor.__version__"}

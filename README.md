@@ -28,6 +28,8 @@ or as a reference to validate faster, more integrated data-correction implementa
 
 ## Installation
 
+MoDaCor requires Python 3.12 or newer.
+
     pip install modacor
 
 ### Optional extras
