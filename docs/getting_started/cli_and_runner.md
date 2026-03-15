@@ -5,7 +5,7 @@ Use MoDaCor either from the command line (`modacor run`) or from Python via a sh
 
 ## Prerequisites
 
-- Install MoDaCor in an environment with Python 3.11+.
+- Install MoDaCor in an environment with Python 3.12+.
 - If using a source checkout, install in editable mode:
 
 ```bash

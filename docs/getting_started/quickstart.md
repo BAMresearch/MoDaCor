@@ -6,7 +6,7 @@ configuration file, and inspect the pipeline trace that records what changed at 
 
 ## Prerequisites
 
-- Python 3.11 or newer
+- Python 3.12 or newer
 - `pip`, `curl` (or `wget`) and a POSIX-like shell
 - Approximately 1.3 GB of free disk space for the sample NeXus file
 
