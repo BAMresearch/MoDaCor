@@ -54,6 +54,36 @@ class RuntimeService:
 
     manager: SessionManager
 
+    def health(self) -> dict[str, str]:
+        """Return a lightweight liveness payload for process health checks."""
+
+        return {"status": "ok"}
+
+    def readiness(self) -> dict[str, Any]:
+        """
+        Return runtime readiness and high-level session metrics.
+
+        The service stays `ready` as long as it can accept new requests. Session
+        failures downgrade the status to `degraded` without making the service
+        unavailable.
+        """
+
+        sessions = self.manager.list_sessions()
+        error_session_ids = [session.session_id for session in sessions if session.state.startswith("error_")]
+        last_updated_utc = max((session.updated_utc for session in sessions), default=None)
+
+        return {
+            "status": "degraded" if error_session_ids else "ready",
+            "ready": True,
+            "metrics": {
+                "session_count": len(sessions),
+                "active_run_count": sum(1 for session in sessions if session.active_run_id is not None),
+                "error_session_count": len(error_session_ids),
+                "error_session_ids": error_session_ids,
+                "last_updated_utc": last_updated_utc,
+            },
+        }
+
     def session_summary(self, session: PipelineSession) -> dict[str, Any]:
         return {
             "session_id": session.session_id,

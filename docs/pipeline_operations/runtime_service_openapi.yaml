@@ -8,12 +8,41 @@ info:
 servers:
   - url: /v1
 tags:
+  - name: Service
   - name: Sessions
   - name: Sources
   - name: Processing
   - name: Runs
 
 paths:
+  /health:
+    get:
+      tags: [Service]
+      summary: Liveness probe for the runtime process
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: ok
+
+  /readiness:
+    get:
+      tags: [Service]
+      summary: Readiness probe with runtime metrics
+      responses:
+        "200":
+          description: Service readiness and session metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+
   /source-templates:
     get:
       tags: [Sources]
@@ -414,6 +443,38 @@ components:
         type: string
 
   schemas:
+    ReadinessMetrics:
+      type: object
+      properties:
+        session_count:
+          type: integer
+          minimum: 0
+        active_run_count:
+          type: integer
+          minimum: 0
+        error_session_count:
+          type: integer
+          minimum: 0
+        error_session_ids:
+          type: array
+          items:
+            type: string
+        last_updated_utc:
+          type: [string, "null"]
+          format: date-time
+
+    ReadinessResponse:
+      type: object
+      required: [status, ready, metrics]
+      properties:
+        status:
+          type: string
+          enum: [ready, degraded]
+        ready:
+          type: boolean
+        metrics:
+          $ref: "#/components/schemas/ReadinessMetrics"
+
     SessionState:
       type: string
       enum: [idle, running_partial, running_full, error_partial, error_full]

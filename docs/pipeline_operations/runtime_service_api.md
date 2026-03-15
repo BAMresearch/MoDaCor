@@ -21,7 +21,7 @@ The first structural refactor tranche between `U6` and `U8` is now in place:
 - `src/modacor/io/runtime_support.py` provides shared source/sink builders and HDF export handling for both the CLI and runtime service.
 
 This keeps the design contract below aligned with the codebase structure that is
-currently being stabilized ahead of `U8`.
+now stable through `U8`.
 
 ## Goals
 
@@ -103,6 +103,46 @@ Initial policy is conservative (descendant closure). Fine-grained optimizations 
 ## API schema (REST)
 
 Base path: `/v1`
+
+## Service status
+
+### `GET /health`
+
+Liveness probe for orchestration systems. This endpoint only answers the
+question "is the process alive enough to respond?" and currently returns:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+### `GET /readiness`
+
+Readiness probe for runtime usability. This endpoint reports whether the
+service can still accept work and includes high-level runtime metrics.
+
+Example response:
+
+```json
+{
+  "status": "degraded",
+  "ready": true,
+  "metrics": {
+    "session_count": 3,
+    "active_run_count": 1,
+    "error_session_count": 1,
+    "error_session_ids": ["sess-error"],
+    "last_updated_utc": "2026-03-15T10:10:00+00:00"
+  }
+}
+```
+
+Current semantics:
+
+- `ready: true` means the service can accept requests.
+- `status: "degraded"` means one or more sessions are in an error state, even
+  though the API itself remains usable.
 
 ## Sessions
 
@@ -402,7 +442,7 @@ Recommended codes:
 4. `Production polish`
 - authn/authz
 - persistence for session definitions
-- rate limits, health probes, structured logs, OpenTelemetry
+- rate limits, structured logs, OpenTelemetry
 
 ## Scaffold status in this repository
 
@@ -418,6 +458,8 @@ The scaffold now includes dirty-step detection by changed source references and 
 partial failure.
 When partial mode runs, the service records a boundary checkpoint before the first dirty step and restores it if
 partial execution fails.
+The scaffold also includes the `U8` health/readiness split for operational
+probes and basic runtime metrics.
 
 Run the scaffold service:
 

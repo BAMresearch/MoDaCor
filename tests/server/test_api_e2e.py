@@ -28,6 +28,56 @@ def _post_json(client: TestClient, url: str, payload: dict):
     return response.json()
 
 
+def test_api_health_and_readiness_expose_runtime_metrics():
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    health_response = client.get("/v1/health")
+    assert health_response.status_code == 200
+    assert health_response.json() == {"status": "ok"}
+
+    ready_empty = client.get("/v1/readiness")
+    assert ready_empty.status_code == 200
+    assert ready_empty.json() == {
+        "status": "ready",
+        "ready": True,
+        "metrics": {
+            "session_count": 0,
+            "active_run_count": 0,
+            "error_session_count": 0,
+            "error_session_ids": [],
+            "last_updated_utc": None,
+        },
+    }
+
+    idle = manager.create_session(session_id="sess-idle", pipeline_yaml="name: idle\nsteps: {}\n")
+    running = manager.create_session(session_id="sess-running", pipeline_yaml="name: running\nsteps: {}\n")
+    errored = manager.create_session(session_id="sess-error", pipeline_yaml="name: error\nsteps: {}\n")
+
+    idle.updated_utc = "2026-03-15T10:00:00+00:00"
+    running.active_run_id = "run-123"
+    running.state = "running_full"
+    running.updated_utc = "2026-03-15T10:05:00+00:00"
+    errored.state = "error_full"
+    errored.last_error = {"code": "RUN_FAILED", "message": "synthetic failure", "details": {}}
+    errored.updated_utc = "2026-03-15T10:10:00+00:00"
+
+    ready_response = client.get("/v1/readiness")
+    assert ready_response.status_code == 200
+    assert ready_response.json() == {
+        "status": "degraded",
+        "ready": True,
+        "metrics": {
+            "session_count": 3,
+            "active_run_count": 1,
+            "error_session_count": 1,
+            "error_session_ids": ["sess-error"],
+            "last_updated_utc": "2026-03-15T10:10:00+00:00",
+        },
+    }
+
+
 def test_api_process_partial_with_changed_keys_runs_selected_subgraph():
     manager = SessionManager()
     app = create_app(session_manager=manager)

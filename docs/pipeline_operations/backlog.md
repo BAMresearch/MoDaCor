@@ -11,12 +11,13 @@ Status legend:
 
 ## Current focus
 
-The current maintenance window sits between `U6` and `U8`.
+The `U6` to `U8` maintenance window is now closed.
 
 - `U6` is complete.
-- `U8`, `U9`, `U10`, and `U7` remain planned feature upgrades.
-- The immediate goal is to reduce implementation drift before adding more API
-  surface area.
+- `U8` is now complete.
+- `U10`, `U9`, and `U7` remain planned feature upgrades.
+- The immediate follow-up is documentation tightening and the next operational
+  diagnostics features.
 
 ## Upgrade ledger
 
@@ -63,10 +64,14 @@ Reason: maps the most frequent operation to a single focused API call.
 Notes: implemented as `POST /v1/sessions/{id}/sample` plus CLI `modacor session set-sample ...`.
 
 7. `U8` Health/readiness split endpoints with runtime metrics
-Status: `planned`
+Status: `done`
 Benefit: high
 Complexity: low
 Reason: improves deployability and operational safety (orchestration probes, monitoring).
+Notes: implemented as `GET /v1/health` for liveness and `GET /v1/readiness`
+for service usability plus runtime metrics (`session_count`,
+`active_run_count`, `error_session_count`, `error_session_ids`,
+`last_updated_utc`).
 
 8. `U10` Latest error diagnostics endpoint
 Status: `planned`
@@ -145,10 +150,9 @@ upgrades less error-prone.
 
 ## Recommended next feature order
 
-1. `U8` (health/readiness split endpoints with runtime metrics)
-2. `U10` (latest error diagnostics endpoint)
-3. `U9` (persistent session store)
-4. `U7` (advanced streaming)
+1. `U10` (latest error diagnostics endpoint)
+2. `U9` (persistent session store)
+3. `U7` (advanced streaming)
 
 ## Notes
 

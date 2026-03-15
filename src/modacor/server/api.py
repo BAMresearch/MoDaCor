@@ -44,7 +44,11 @@ def create_app(  # noqa: C901
 
     @app.get("/v1/health")
     def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return _call(service.health)
+
+    @app.get("/v1/readiness")
+    def readiness() -> dict[str, Any]:
+        return _call(service.readiness)
 
     @app.get("/v1/source-templates")
     def source_templates() -> dict[str, Any]:
