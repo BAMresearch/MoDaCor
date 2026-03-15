@@ -76,6 +76,22 @@ For coding contributions, we strongly recommend:
 - using `flake8` and/or `black` for consistent formatting;
 - writing tests for every added functionality to encourage test-driven development practices.
 
+Set up a local editable environment with the test and lint tooling installed:
+
+```bash
+python -m venv .venv-dev
+source .venv-dev/bin/activate
+pip install --upgrade pip
+pip install -e ".[tests,lint]"
+```
+
+Run the local lint checks with:
+
+```bash
+python -m flake8
+python -m isort --check-only --diff --filter-files .
+```
+
 ### Testing
 
 See which tests are available (arguments after `--` get passed to *pytest* which runs the tests):

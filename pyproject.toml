@@ -39,6 +39,11 @@ tests = [
     "pytest-cov",
     "pre-commit",
 ]
+lint = [
+    "check-manifest",
+    "flake8",
+    "isort",
+]
 docs = [
     "sphinx>=6.2",
     "myst-parser>=2.0",
