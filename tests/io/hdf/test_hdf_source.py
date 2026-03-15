@@ -19,7 +19,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from ....io.hdf.hdf_source import HDFSource
+from modacor.io.hdf.hdf_source import HDFSource
 
 
 class TestHDFSource(unittest.TestCase):

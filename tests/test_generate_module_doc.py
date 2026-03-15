@@ -12,10 +12,14 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 import subprocess
+from importlib import import_module
 from importlib.util import module_from_spec, spec_from_file_location
+from inspect import getmembers, isclass
 from pathlib import Path
 
 import pytest
+
+from modacor.dataclasses.process_step import ProcessStep
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = PROJECT_ROOT / "scripts" / "generate_module_doc.py"
@@ -27,6 +31,26 @@ def _load_script_module():
     module = module_from_spec(spec)
     spec.loader.exec_module(module)  # type: ignore[attr-defined]
     return module
+
+
+def _expected_process_step_targets() -> set[str]:
+    targets: set[str] = set()
+    modules_root = PROJECT_ROOT / "src" / "modacor" / "modules"
+    for py_file in sorted(modules_root.rglob("*.py")):
+        if py_file.name == "__init__.py":
+            continue
+
+        module_name = ".".join(py_file.relative_to(PROJECT_ROOT / "src").with_suffix("").parts)
+        module = import_module(module_name)
+        for name, obj in getmembers(module, isclass):
+            if obj is ProcessStep:
+                continue
+            if obj.__module__ != module_name:
+                continue
+            if not issubclass(obj, ProcessStep):
+                continue
+            targets.add(f"{module_name}.{name}")
+    return targets
 
 
 generate_module_doc = _load_script_module()
@@ -118,3 +142,13 @@ def test_cli_generate_all(tmp_path: Path):
 
     module_files = list(output_dir.glob("*.md"))
     assert module_files
+
+
+def test_exports_and_doc_generation_cover_all_process_steps():
+    import modacor.modules
+
+    expected_targets = _expected_process_step_targets()
+    exported_targets = {f"{getattr(modacor.modules, name).__module__}.{name}" for name in modacor.modules.__all__}
+
+    assert exported_targets == expected_targets
+    assert set(generate_module_doc._discover_targets()) == expected_targets

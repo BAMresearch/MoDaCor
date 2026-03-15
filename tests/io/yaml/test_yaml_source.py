@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ....io.yaml.yaml_source import YAMLSource
+from modacor.io.yaml.yaml_source import YAMLSource
 
 filepath = Path(__file__).parent / "static_data_example.yaml"
 
