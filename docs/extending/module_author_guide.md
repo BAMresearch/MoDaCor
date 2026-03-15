@@ -10,6 +10,9 @@ from pipeline YAML, resolved by name through `modacor.modules` and the
 - Put broadly reusable steps in `src/modacor/modules/base_modules/`.
 - Put technique-specific steps in a dedicated subpackage under
   `src/modacor/modules/technique_modules/`.
+- Bespoke instrument-specific steps should be put in a subfolder of `src/modacor/modules/instrument_modules/`, where the subfolders follow the following structure:
+`[institute abbreviation]/[instrument abbreviation]`. For example:
+`src/modacor/modules/instrument_modules/DLS/I22/`.
 - Export any public step from `src/modacor/modules/__init__.py` so the curated
   registry and generated reference docs stay aligned.
 
