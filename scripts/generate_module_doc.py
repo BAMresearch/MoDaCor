@@ -17,12 +17,52 @@ import argparse
 import importlib
 import inspect
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Iterable
 
-import attr
+# Allow running this script directly from a source checkout without requiring
+# an editable install in the active interpreter.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_ROOT = PROJECT_ROOT / "src"
+if SRC_ROOT.is_dir():
+    sys.path.insert(0, str(SRC_ROOT))
 
-from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+
+def _maybe_reexec_with_local_venv() -> None:
+    """Retry with a project-local interpreter if current Python misses deps."""
+    if os.environ.get("MODACOR_DOCGEN_REEXEC") == "1":
+        return
+
+    candidate_bins = [
+        PROJECT_ROOT / ".venv-dev" / "bin" / "python",
+        PROJECT_ROOT / ".venv" / "bin" / "python",
+    ]
+    for candidate in candidate_bins:
+        if not candidate.exists():
+            continue
+        if Path(sys.executable).resolve() == candidate.resolve():
+            continue
+
+        env = dict(os.environ)
+        env["MODACOR_DOCGEN_REEXEC"] = "1"
+        completed = subprocess.run([str(candidate), *sys.argv], env=env, check=False)
+        raise SystemExit(completed.returncode)
+
+
+if sys.version_info < (3, 11):
+    _maybe_reexec_with_local_venv()
+
+
+try:
+    import attr
+
+    from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+except ModuleNotFoundError:
+    _maybe_reexec_with_local_venv()
+    raise
 
 
 def _load_process_step(target: str):

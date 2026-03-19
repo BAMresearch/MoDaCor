@@ -6,7 +6,7 @@ configuration file, and inspect the pipeline trace that records what changed at 
 
 ## Prerequisites
 
-- Python 3.11 or newer
+- Python 3.12 or newer
 - `pip`, `curl` (or `wget`) and a POSIX-like shell
 - Approximately 1.3 GB of free disk space for the sample NeXus file
 
@@ -187,5 +187,7 @@ graph.
   additional `DataBundle` entries (for example `background` or `calibration`).
 - Add `pipeline.attach_tracer_event(node, tracer, include_rendered_trace=True)` inside the execution loop if you want to
   export the trace alongside the configuration.
+- Use the dedicated [CLI And Runner API](cli_and_runner.md) guide for production command-line runs (`modacor run`) and
+  the shared `run_pipeline_job(...)` Python interface.
 - Explore the **Pipeline operations** and **Extending MoDaCor** sections for branching workflows, module development,
   and integration best practices.

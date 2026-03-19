@@ -30,7 +30,7 @@ def _install_dummy_iosource_module(monkeypatch) -> Tuple[str, List[tuple]]:
     """
     calls: List[tuple] = []
 
-    module_name = "modacor.tests.dummy_iosource_module"
+    module_name = "tests.dummy_iosource_module"
     mod = types.ModuleType(module_name)
 
     class DummySource(IoSource):

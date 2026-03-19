@@ -12,6 +12,9 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 # official steps are imported here for ease
+from modacor.modules.base_modules.append_processing_data import AppendProcessingData
+from modacor.modules.base_modules.append_sink import AppendSink
+from modacor.modules.base_modules.append_source import AppendSource
 from modacor.modules.base_modules.bitwise_or_masks import BitwiseOrMasks
 from modacor.modules.base_modules.combine_uncertainties import CombineUncertainties
 from modacor.modules.base_modules.combine_uncertainties_max import CombineUncertaintiesMax
@@ -21,8 +24,10 @@ from modacor.modules.base_modules.multiply import Multiply
 from modacor.modules.base_modules.multiply_databundles import MultiplyDatabundles
 from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertainties
 from modacor.modules.base_modules.reduce_dimensionality import ReduceDimensionality
+from modacor.modules.base_modules.sink_processing_data import SinkProcessingData
 from modacor.modules.base_modules.subtract import Subtract
 from modacor.modules.base_modules.subtract_databundles import SubtractDatabundles
+from modacor.modules.base_modules.units_label_update import UnitsLabelUpdate
 from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
 from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
@@ -33,6 +38,9 @@ from modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordin
 )
 
 __all__ = [
+    "AppendProcessingData",
+    "AppendSink",
+    "AppendSource",
     "BitwiseOrMasks",
     "CombineUncertainties",
     "CombineUncertaintiesMax",
@@ -45,9 +53,11 @@ __all__ = [
     "PixelCoordinates3D",
     "PoissonUncertainties",
     "ReduceDimensionality",
+    "SinkProcessingData",
     "SolidAngleCorrection",
     "SubtractDatabundles",
     "Subtract",
+    "UnitsLabelUpdate",
     "XSGeometry",
     "XSGeometryFromPixelCoordinates",
 ]

@@ -21,8 +21,8 @@ jobs:
         # os: ['ubuntu', 'windows', 'macos']
         os: ['ubuntu']
     env:
-      PYTHON: ${{ join(matrix.python, '.') }}  # e.g. '3.11'
-      TOX_ENV: ${{ format('{0}{1}', 'py', join(matrix.python, '')) }}  # e.g. 'py311'
+      PYTHON: ${{ join(matrix.python, '.') }}  # e.g. '3.12'
+      TOX_ENV: ${{ format('{0}{1}', 'py', join(matrix.python, '')) }}  # e.g. 'py312'
     runs-on: ${{ format('{0}-latest', matrix.os) }}
     name: "Test py-${{ join(matrix.python, '.') }} (${{ matrix.os }})"
     steps:

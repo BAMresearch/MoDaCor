@@ -12,29 +12,28 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 
-"""try to import all sub-modules from the project"""
+"""Try to import all submodules from the installed modacor package tree."""
 
 import importlib
-import os
+from pathlib import Path
 
-dirname = os.path.dirname
+import modacor
 
 
 def test_import_all():
-    project_dir = dirname(dirname(os.path.abspath(__file__)))
-    start = len(project_dir) - len("modacor")
+    package_dir = Path(modacor.__file__).resolve().parent
     modules = []
-    for path, dirs, files in os.walk(project_dir):
-        for f in files:
-            if f.endswith(".py") and not f.startswith("__"):
-                modules.append(os.path.join(path[start:], f[:-3]))
+    for py_file in package_dir.rglob("*.py"):
+        if py_file.name.startswith("__"):
+            continue
+        module_path = py_file.with_suffix("").relative_to(package_dir.parent)
+        modules.append(".".join(module_path.parts))
     cnt = 0
     for i in modules:
-        j = i.replace(os.sep, ".")
         try:
-            _ = importlib.import_module(j)
+            _ = importlib.import_module(i)
         except Exception as err:
-            print(f"{type(err).__name__} in {j}: {err}.")
+            print(f"{type(err).__name__} in {i}: {err}.")
             cnt += 1
     assert cnt == 0, f"{cnt} submodules could not import properly"
 

@@ -20,16 +20,15 @@ import numpy as np
 import pytest
 
 from modacor import ureg
-
-from ...dataclasses.basedata import BaseData
-from ...dataclasses.databundle import DataBundle
-from ...dataclasses.process_step import ProcessStep
-from ...dataclasses.processing_data import ProcessingData
-from ...io.hdf.hdf_source import HDFSource
-from ...io.io_sources import IoSources
-from ...io.yaml.yaml_source import YAMLSource
-from ...modules.base_modules.poisson_uncertainties import PoissonUncertainties
-from ...runner.pipeline import Pipeline
+from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.hdf.hdf_source import HDFSource
+from modacor.io.io_sources import IoSources
+from modacor.io.yaml.yaml_source import YAMLSource
+from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertainties
+from modacor.runner.pipeline import Pipeline
 
 TEST_IO_SOURCES = IoSources()
 TEST_DATA = ProcessingData()
@@ -98,8 +97,7 @@ class TestRealisticPipeline(unittest.TestCase):
         self.temp_file_path = self.temp_file_handle.name
         self.temp_file_handle.close()
         with open(self.temp_file_path, "w") as yaml_file:
-            yaml_file.write(
-                """
+            yaml_file.write("""
             instrument:
               name: "SAXSess I"
               type: "X-ray scattering"
@@ -118,8 +116,7 @@ class TestRealisticPipeline(unittest.TestCase):
                 value: 1e-5
                 units: "counts/second"
                 uncertainty: 0.1e-5
-              """
-            )
+              """)
         # setup two small hdf5 files for sample and background
         self.temp_dataset_shape = (10, 2)
         self.temp_time_handle = "frame_exposure_time"

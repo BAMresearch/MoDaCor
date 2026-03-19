@@ -6,4 +6,5 @@ Start here to install MoDaCor, run a first pipeline, and learn the core concepts
 :maxdepth: 1
 
 quickstart
+cli_and_runner
 ```
