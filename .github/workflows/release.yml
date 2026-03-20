@@ -17,6 +17,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          # ensure actual branch name instead of a commit SHA
+          ref: ${{ github.head_ref || github.ref }}
 
       - name: Setup git user
         shell: sh
