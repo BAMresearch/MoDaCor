@@ -135,7 +135,7 @@ version_variables = [                        # version location
     "src/modacor/__init__.py:__version__",
     "docs/conf.py:version",
 ]
-[tool.semantic_release.release_groups]
+[[tool.semantic_release.release_groups]]
 # allow PRs to make a release version, for testing, exists in that branch only then
 branches = ["*"]
 [tool.semantic_release.commit_parser_options]
