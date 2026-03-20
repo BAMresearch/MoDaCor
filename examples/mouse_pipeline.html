@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>MOUSE instrument pipeline stub &#8212; MoDaCor 1.0.1 documentation</title>
+    <title>MOUSE pipeline patterns &#8212; MoDaCor 1.1.0 documentation</title>
   
   
   
@@ -38,18 +38,18 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=e7fff540"></script>
+    <script src="../_static/documentation_options.js?v=2a705162"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'examples/mouse_pipeline';</script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="SAXSess instrument pipeline stub" href="saxsess_pipeline.html" />
+    <link rel="next" title="SAXSess pipeline patterns" href="saxsess_pipeline.html" />
     <link rel="prev" title="Application examples" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="1.0.1" />
-    <meta name="docbuild:last-update" content="Mar 13, 2026 (git 735a9f6)"/>
+  <meta name="docsearch:version" content="1.1.0" />
+    <meta name="docbuild:last-update" content="Mar 20, 2026 (git b82c0a8)"/>
   </head>
   
   
@@ -111,7 +111,7 @@
   
   
   
-    <p class="title logo__title">MoDaCor 1.0.1 documentation</p>
+    <p class="title logo__title">MoDaCor 1.1.0 documentation</p>
   
 </a></div>
     
@@ -204,7 +204,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -372,7 +372,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -426,15 +426,15 @@
 <li class="toctree-l1"><a class="reference internal" href="../pipeline_operations/index.html">Pipeline operations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extending/index.html">Extending MoDaCor</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Application examples</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#">MOUSE instrument pipeline stub</a></li>
-<li class="toctree-l2"><a class="reference internal" href="saxsess_pipeline.html">SAXSess instrument pipeline stub</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">MOUSE pipeline patterns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="saxsess_pipeline.html">SAXSess pipeline patterns</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../authors.html">Authors</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">CHANGELOG</a></li>
 </ul>
 </div>
         <div class="sidebar-primary-item">
@@ -485,7 +485,7 @@
     
     <li class="breadcrumb-item"><a href="index.html" class="nav-link">Application examples</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">MOUSE instrument pipeline stub</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">MOUSE pipeline patterns</span></li>
   </ul>
 </nav>
 </div>
@@ -502,11 +502,88 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="mouse-instrument-pipeline-stub">
-<h1>MOUSE instrument pipeline stub<a class="headerlink" href="#mouse-instrument-pipeline-stub" title="Link to this heading">#</a></h1>
-<blockquote>
-<div><p><strong>Note:</strong> Placeholder content. This page will present the full MOUSE instrument processing pipeline, including configuration snippets, metadata requirements, tracer output highlights, and result interpretation guides.</p>
-</div></blockquote>
+  <section id="mouse-pipeline-patterns">
+<h1>MOUSE pipeline patterns<a class="headerlink" href="#mouse-pipeline-patterns" title="Link to this heading">#</a></h1>
+<p>MoDaCor does not currently ship a full production MOUSE pipeline definition in
+the repository, but it does already provide a stable MOUSE-oriented workflow
+through the quickstart, bundled test data, and the runtime-service <code class="docutils literal notranslate"><span class="pre">mouse</span></code>
+source profile.</p>
+<section id="current-repo-assets">
+<h2>Current repo assets<a class="headerlink" href="#current-repo-assets" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/getting_started/quickstart.md</span></code> runs a small MOUSE correction example
+against <code class="docutils literal notranslate"><span class="pre">tests/testdata/MOUSE_20250324_1_160_stacked.nxs</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">src/modacor/server/source_profiles.py</span></code> defines the <code class="docutils literal notranslate"><span class="pre">mouse</span></code> source profile
+used by the runtime service and session CLI.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/pipeline_operations/runtime_service_api.md</span></code> shows a full API lifecycle
+using a MOUSE-style session.</p></li>
+</ul>
+</section>
+<section id="typical-source-set">
+<h2>Typical source set<a class="headerlink" href="#typical-source-set" title="Link to this heading">#</a></h2>
+<p>The runtime-service <code class="docutils literal notranslate"><span class="pre">mouse</span></code> profile currently expects:</p>
+<ul class="simple">
+<li><p>required: <code class="docutils literal notranslate"><span class="pre">sample</span></code>, <code class="docutils literal notranslate"><span class="pre">background</span></code></p></li>
+<li><p>optional: <code class="docutils literal notranslate"><span class="pre">defaults</span></code>, <code class="docutils literal notranslate"><span class="pre">intensity_calibration</span></code>,
+<code class="docutils literal notranslate"><span class="pre">intensity_calibration_background</span></code></p></li>
+</ul>
+<p>For smaller local experiments, the quickstart uses only:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">sample</span></code> as an HDF/NeXus source</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">metadata</span></code> as a YAML source containing scalar defaults such as detector dark
+current</p></li>
+</ul>
+</section>
+<section id="minimal-correction-pattern">
+<h2>Minimal correction pattern<a class="headerlink" href="#minimal-correction-pattern" title="Link to this heading">#</a></h2>
+<p>The quickstart demonstrates a compact three-step MOUSE-style flow:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">PoissonUncertainties</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Divide</span></code> by frame exposure time from the sample file</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Subtract</span></code> a scalar dark-current estimate from YAML metadata</p></li>
+</ol>
+<p>That pattern is useful when validating a new installation because it exercises:</p>
+<ul class="simple">
+<li><p>HDF-backed <code class="docutils literal notranslate"><span class="pre">IoSource</span></code> access</p></li>
+<li><p>YAML-backed metadata lookup</p></li>
+<li><p>unit propagation</p></li>
+<li><p>pipeline tracing and graph rendering</p></li>
+</ul>
+</section>
+<section id="example-snippet">
+<h2>Example snippet<a class="headerlink" href="#example-snippet" title="Link to this heading">#</a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">1</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PoissonUncertainties</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">with_processing_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sample</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">2</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Divide</span>
+<span class="w">    </span><span class="nt">requires_steps</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">with_processing_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sample</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">divisor_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample::entry1/instrument/detector00/frame_exposure_time</span>
+<span class="w">      </span><span class="nt">divisor_units_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample::entry1/instrument/detector00/frame_exposure_time@units</span>
+<span class="w">  </span><span class="nt">3</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Subtract</span>
+<span class="w">    </span><span class="nt">requires_steps</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">with_processing_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sample</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">subtrahend_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">metadata::detector/darkcurrent/value</span>
+<span class="w">      </span><span class="nt">subtrahend_units_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">metadata::detector/darkcurrent/units</span>
+</pre></div>
+</div>
+</section>
+<section id="where-to-go-next">
+<h2>Where to go next<a class="headerlink" href="#where-to-go-next" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Use the quickstart if you need a runnable local example.</p></li>
+<li><p>Use the runtime-service docs if you need session-based orchestration with a
+<code class="docutils literal notranslate"><span class="pre">mouse</span></code> profile.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">docs/pipeline_operations/pipeline_basics.md</span></code> if you need to explain how
+sources, <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code>, and partial reruns fit together.</p></li>
+</ul>
+</section>
 </section>
 
 
@@ -533,7 +610,7 @@
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">SAXSess instrument pipeline stub</p>
+        <p class="prev-next-title">SAXSess pipeline patterns</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -547,6 +624,22 @@
                 <dialog id="pst-secondary-sidebar-modal"></dialog>
                 <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
 
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#current-repo-assets">Current repo assets</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#typical-source-set">Typical source set</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#minimal-correction-pattern">Minimal correction pattern</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#example-snippet">Example snippet</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#where-to-go-next">Where to go next</a></li>
+</ul>
+  </nav></div>
 
   <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">
@@ -582,7 +675,7 @@
 
   <p class="copyright">
     
-      © Copyright 2025-2026, Brian R. Pauw and Tim Snow.
+      © Copyright 2025-2026, Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow.
       <br/>
     
   </p>

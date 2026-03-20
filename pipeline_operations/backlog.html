@@ -1,0 +1,792 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Pipeline Operations Backlog &#8212; MoDaCor 1.1.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=34bb78ad" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=2a705162"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'pipeline_operations/backlog';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Extending MoDaCor" href="../extending/index.html" />
+    <link rel="prev" title="Runtime Service API (Design Contract)" href="runtime_service_api.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="1.1.0" />
+    <meta name="docbuild:last-update" content="Mar 20, 2026 (git b82c0a8)"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">MoDaCor 1.1.0 documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../readme.html">
+    Documentation contributor guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/index.html">
+    Getting started
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Pipeline operations
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../extending/index.html">
+    Extending MoDaCor
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/index.html">
+    Application examples
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../reference/index.html">
+    Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../usage.html">
+    Usage
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../authors.html">
+    Authors
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../changelog.html">
+    CHANGELOG
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/BAMresearch/MoDaCor" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../readme.html">
+    Documentation contributor guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/index.html">
+    Getting started
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Pipeline operations
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../extending/index.html">
+    Extending MoDaCor
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Application examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../reference/index.html">
+    Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../usage.html">
+    Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../authors.html">
+    Authors
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../changelog.html">
+    CHANGELOG
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/BAMresearch/MoDaCor" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<div id="searchbox"></div></div>
+        <div class="sidebar-primary-item">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../readme.html">Documentation contributor guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Pipeline operations</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="pipeline_basics.html">Pipeline Basics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration_reference.html">Pipeline configuration reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tracing_and_debugging.html">Tracing and debugging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime_service_api.html">Runtime Service API (Design Contract)</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Pipeline Operations Backlog</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../extending/index.html">Extending MoDaCor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/index.html">Application examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../authors.html">Authors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">CHANGELOG</a></li>
+</ul>
+</div>
+        <div class="sidebar-primary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/pipeline_operations/backlog.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Pipeline operations</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Pipeline Operations Backlog</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="pipeline-operations-backlog">
+<h1>Pipeline Operations Backlog<a class="headerlink" href="#pipeline-operations-backlog" title="Link to this heading">#</a></h1>
+<p>This page tracks runtime-service feature upgrades and the structural refactors
+that keep the pipeline-operations code maintainable as the service grows.</p>
+<p>Status legend:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">planned</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">in_progress</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">done</span></code></p></li>
+</ul>
+<section id="current-focus">
+<h2>Current focus<a class="headerlink" href="#current-focus" title="Link to this heading">#</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">U6</span></code> to <code class="docutils literal notranslate"><span class="pre">U8</span></code> maintenance window is now closed.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">U6</span></code> is complete.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U8</span></code> is now complete.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U10</span></code> is now complete.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U9</span></code> and <code class="docutils literal notranslate"><span class="pre">U7</span></code> remain planned feature upgrades.</p></li>
+<li><p>The immediate follow-up is documentation tightening and the next operational
+persistence and streaming features.</p></li>
+</ul>
+</section>
+<section id="upgrade-ledger">
+<h2>Upgrade ledger<a class="headerlink" href="#upgrade-ledger" title="Link to this heading">#</a></h2>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">U1</span></code> <code class="docutils literal notranslate"><span class="pre">modacor</span> <span class="pre">session</span></code> CLI wrapper for session lifecycle and processing calls
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Notes: implemented in <code class="docutils literal notranslate"><span class="pre">src/modacor/cli.py</span></code> as <code class="docutils literal notranslate"><span class="pre">modacor</span> <span class="pre">session</span> <span class="pre">...</span></code> with commands:
+<code class="docutils literal notranslate"><span class="pre">list</span></code>, <code class="docutils literal notranslate"><span class="pre">create</span></code>, <code class="docutils literal notranslate"><span class="pre">delete</span></code>, <code class="docutils literal notranslate"><span class="pre">status</span></code>, <code class="docutils literal notranslate"><span class="pre">set-source</span></code>, <code class="docutils literal notranslate"><span class="pre">delete-source</span></code>, <code class="docutils literal notranslate"><span class="pre">process</span></code>, <code class="docutils literal notranslate"><span class="pre">reset</span></code>, <code class="docutils literal notranslate"><span class="pre">runs</span></code>.
+Benefit: high
+Complexity: medium
+Reason: removes raw HTTP friction and improves day-to-day operator ergonomics.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U2</span></code> Source patch convenience endpoint (<code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/sessions/{id}/sources/patch</span></code>)
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Notes: implemented in <code class="docutils literal notranslate"><span class="pre">src/modacor/server/api.py</span></code> with OpenAPI + docs updates.
+Benefit: medium
+Complexity: low
+Reason: simplifies common single-source update workflow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U3</span></code> Source templates/profiles (e.g. MOUSE, SAXSess)
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Notes: implemented as built-in profiles with <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/v1/source-templates</span></code> and session-level <code class="docutils literal notranslate"><span class="pre">source_profile</span></code> validation.
+Benefit: high
+Complexity: medium
+Reason: prevents misconfiguration and standardizes source expectations per instrument family.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U4</span></code> Dry-run endpoint for invalidation preview
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Benefit: very high
+Complexity: low-medium
+Reason: immediate visibility into dirty-step decisions; improves trust and debugging without executing a run.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U5</span></code> Richer run summaries (dirty/skipped steps, fallback reason, timings)
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Notes: run metadata now includes <code class="docutils literal notranslate"><span class="pre">dirty_steps</span></code>, <code class="docutils literal notranslate"><span class="pre">skipped_steps</span></code>, <code class="docutils literal notranslate"><span class="pre">step_durations_s</span></code>, <code class="docutils literal notranslate"><span class="pre">elapsed_s</span></code>, and fallback fields.
+Benefit: high
+Complexity: medium
+Reason: improves observability and post-mortem diagnostics.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U6</span></code> “Last sample” shortcut endpoint
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Benefit: high
+Complexity: low
+Reason: maps the most frequent operation to a single focused API call.
+Notes: implemented as <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/v1/sessions/{id}/sample</span></code> plus CLI <code class="docutils literal notranslate"><span class="pre">modacor</span> <span class="pre">session</span> <span class="pre">set-sample</span> <span class="pre">...</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U8</span></code> Health/readiness split endpoints with runtime metrics
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Benefit: high
+Complexity: low
+Reason: improves deployability and operational safety (orchestration probes, monitoring).
+Notes: implemented as <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/v1/health</span></code> for liveness and <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/v1/readiness</span></code>
+for service usability plus runtime metrics (<code class="docutils literal notranslate"><span class="pre">session_count</span></code>,
+<code class="docutils literal notranslate"><span class="pre">active_run_count</span></code>, <code class="docutils literal notranslate"><span class="pre">error_session_count</span></code>, <code class="docutils literal notranslate"><span class="pre">error_session_ids</span></code>,
+<code class="docutils literal notranslate"><span class="pre">last_updated_utc</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U10</span></code> Latest error diagnostics endpoint
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Benefit: medium-high
+Complexity: low-medium
+Reason: speeds triage and recovery after failed runs.
+Notes: implemented as <code class="docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/v1/sessions/{id}/errors/latest</span></code>, returning the
+current session error state plus the latest recorded failed-run diagnostics.
+The CLI wrapper now exposes the same payload via
+<code class="docutils literal notranslate"><span class="pre">modacor</span> <span class="pre">session</span> <span class="pre">last-error</span> <span class="pre">--session-id</span> <span class="pre">...</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U9</span></code> Persistent session store
+Status: <code class="docutils literal notranslate"><span class="pre">planned</span></code>
+Benefit: high
+Complexity: medium-high
+Reason: preserves runtime definitions/state across restarts; requires careful state/version handling.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U7</span></code> Improved event streaming (persistent WS + SSE option)
+Status: <code class="docutils literal notranslate"><span class="pre">planned</span></code>
+Benefit: medium-high
+Complexity: high
+Reason: valuable for real-time UIs and remote control loops but introduces more protocol/runtime complexity.</p></li>
+</ol>
+</section>
+<section id="structural-maintenance-window">
+<h2>Structural maintenance window<a class="headerlink" href="#structural-maintenance-window" title="Link to this heading">#</a></h2>
+<p>These tasks are intentionally scheduled between <code class="docutils literal notranslate"><span class="pre">U6</span></code> and <code class="docutils literal notranslate"><span class="pre">U8</span></code> so the runtime
+service grows on a cleaner foundation.</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">S1</span></code> Runtime-service module split
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Scope: <code class="docutils literal notranslate"><span class="pre">src/modacor/server/api.py</span></code> now stays focused on FastAPI route bindings
+and HTTP translation, while <code class="docutils literal notranslate"><span class="pre">src/modacor/server/runtime_service.py</span></code> owns
+session orchestration, <code class="docutils literal notranslate"><span class="pre">src/modacor/server/planning.py</span></code> owns dry-run and dirty
+step planning, <code class="docutils literal notranslate"><span class="pre">src/modacor/server/io_utils.py</span></code> adapts session source
+registrations, and <code class="docutils literal notranslate"><span class="pre">src/modacor/server/errors.py</span></code> defines framework-agnostic
+service errors.
+Benefit: high
+Complexity: medium
+Reason: separates transport concerns from runtime behavior and makes service
+logic easier to test in isolation.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">S2</span></code> Python 3.12 floor alignment
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Scope: package metadata, CI, tox, and installation documentation all target
+Python <code class="docutils literal notranslate"><span class="pre">3.12+</span></code>.
+Benefit: high
+Complexity: low
+Reason: removes unsupported-version ambiguity and matches the codebase’s
+typing/runtime requirements.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">S3</span></code> Test-package separation
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Scope: package-internal tests were moved out of <code class="docutils literal notranslate"><span class="pre">src/modacor/tests</span></code> into the
+top-level <code class="docutils literal notranslate"><span class="pre">tests/</span></code> tree, and distribution discovery now excludes
+<code class="docutils literal notranslate"><span class="pre">modacor.tests*</span></code>.
+Benefit: high
+Complexity: medium
+Reason: keeps shipped packages lean and avoids coupling runtime imports to test
+helpers.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">S4</span></code> Process-step export and docs unification
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Scope: <code class="docutils literal notranslate"><span class="pre">modacor.modules.__all__</span></code> now exports every supported <code class="docutils literal notranslate"><span class="pre">ProcessStep</span></code>, and
+the module-doc generation tests assert that exported steps and generated docs
+stay in sync.
+Benefit: high
+Complexity: medium
+Reason: removes the split between runtime discovery and reference
+documentation.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">S5</span></code> Shared runtime I/O helpers for CLI and service execution
+Status: <code class="docutils literal notranslate"><span class="pre">done</span></code>
+Scope: <code class="docutils literal notranslate"><span class="pre">src/modacor/io/runtime_support.py</span></code> now centralizes source builders,
+sink builders, and shared HDF export handling used by both <code class="docutils literal notranslate"><span class="pre">modacor</span> <span class="pre">run</span></code> and
+the runtime service.
+Benefit: high
+Complexity: medium
+Reason: eliminates duplicated source/HDF handling and makes future runtime
+upgrades less error-prone.</p></li>
+</ol>
+</section>
+<section id="recommended-next-feature-order">
+<h2>Recommended next feature order<a class="headerlink" href="#recommended-next-feature-order" title="Link to this heading">#</a></h2>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">U9</span></code> (persistent session store)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">U7</span></code> (advanced streaming)</p></li>
+</ol>
+</section>
+<section id="notes">
+<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Upgrades are implemented incrementally, with structural maintenance work
+allowed between feature upgrades when it reduces future implementation risk.</p></li>
+<li><p>This file is the source of truth for progress tracking.</p></li>
+<li><p>Companion design notes live in <code class="docutils literal notranslate"><span class="pre">docs/pipeline_operations/runtime_service_api.md</span></code>.</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="runtime_service_api.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Runtime Service API (Design Contract)</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../extending/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Extending MoDaCor</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#current-focus">Current focus</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#upgrade-ledger">Upgrade ledger</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#structural-maintenance-window">Structural maintenance window</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#recommended-next-feature-order">Recommended next feature order</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#notes">Notes</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/pipeline_operations/backlog.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025-2026, Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

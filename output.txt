@@ -1,1 +1,3 @@
-changelog.md:21: [broken] http://license.py: HTTPConnectionPool(host='license.py', port=80): Max retries exceeded with url: / (Caused by NameResolutionError("HTTPConnection(host='license.py', port=80): Failed to resolve 'license.py' ([Errno -2] Name or service not known)"))
+changelog.md:44: [redirected permanently] http://pypi.org to https://pypi.org/
+changelog.md:44: [redirected permanently] http://test.pypi.org to https://test.pypi.org/
+changelog.md:536: [broken] http://license.py: HTTPConnectionPool(host='license.py', port=80): Max retries exceeded with url: / (Caused by NameResolutionError("HTTPConnection(host='license.py', port=80): Failed to resolve 'license.py' ([Errno -2] Name or service not known)"))

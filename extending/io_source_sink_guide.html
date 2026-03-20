@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>IO source and sink extension &#8212; MoDaCor 1.0.1 documentation</title>
+    <title>IO source and sink extension &#8212; MoDaCor 1.1.0 documentation</title>
   
   
   
@@ -38,7 +38,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=e7fff540"></script>
+    <script src="../_static/documentation_options.js?v=2a705162"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'extending/io_source_sink_guide';</script>
@@ -48,8 +48,8 @@
     <link rel="prev" title="Module author guide" href="module_author_guide.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="1.0.1" />
-    <meta name="docbuild:last-update" content="Mar 13, 2026 (git 735a9f6)"/>
+  <meta name="docsearch:version" content="1.1.0" />
+    <meta name="docbuild:last-update" content="Mar 20, 2026 (git b82c0a8)"/>
   </head>
   
   
@@ -111,7 +111,7 @@
   
   
   
-    <p class="title logo__title">MoDaCor 1.0.1 documentation</p>
+    <p class="title logo__title">MoDaCor 1.1.0 documentation</p>
   
 </a></div>
     
@@ -204,7 +204,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -372,7 +372,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -435,7 +435,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../authors.html">Authors</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">CHANGELOG</a></li>
 </ul>
 </div>
         <div class="sidebar-primary-item">
@@ -505,9 +505,101 @@
                   
   <section id="io-source-and-sink-extension">
 <h1>IO source and sink extension<a class="headerlink" href="#io-source-and-sink-extension" title="Link to this heading">#</a></h1>
-<blockquote>
-<div><p><strong>Note:</strong> Planned documentation stub. This page will describe how to implement new <code class="docutils literal notranslate"><span class="pre">IoSource</span></code>/<code class="docutils literal notranslate"><span class="pre">IoSink</span></code> classes and register them safely within MoDaCor deployments.</p>
-</div></blockquote>
+<p>MoDaCor separates data access from processing steps through <code class="docutils literal notranslate"><span class="pre">IoSource</span></code>,
+<code class="docutils literal notranslate"><span class="pre">IoSources</span></code>, <code class="docutils literal notranslate"><span class="pre">IoSink</span></code>, and <code class="docutils literal notranslate"><span class="pre">IoSinks</span></code>. New readers and writers should follow the
+same contracts used by the built-in HDF, YAML, CSV, and HDF-processing
+implementations.</p>
+<section id="source-contract">
+<h2>Source contract<a class="headerlink" href="#source-contract" title="Link to this heading">#</a></h2>
+<p>Subclass <code class="docutils literal notranslate"><span class="pre">modacor.io.io_source.IoSource</span></code> and implement the methods your format
+supports:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">get_data(data_key,</span> <span class="pre">load_slice=...)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_data_shape(data_key)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_data_dtype(data_key)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_data_attributes(data_key)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_static_metadata(data_key)</span></code></p></li>
+</ul>
+<p>Built-in examples:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">src/modacor/io/hdf/hdf_source.py</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">src/modacor/io/yaml/yaml_source.py</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">src/modacor/io/csv/csv_source.py</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">src/modacor/io/tiled/tiled_source.py</span></code></p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">IoSources</span></code> exposes all sources through a shared <code class="docutils literal notranslate"><span class="pre">ref::path</span></code> syntax. For
+example:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">sample::entry1/instrument/detector00/data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">defaults::detector/darkcurrent/value</span></code></p></li>
+</ul>
+<p>HDF attributes can be addressed with <code class="docutils literal notranslate"><span class="pre">&#64;attribute</span></code>, for example
+<code class="docutils literal notranslate"><span class="pre">sample::entry1/instrument/detector00/frame_exposure_time&#64;units</span></code>.</p>
+</section>
+<section id="sink-contract">
+<h2>Sink contract<a class="headerlink" href="#sink-contract" title="Link to this heading">#</a></h2>
+<p>Subclass <code class="docutils literal notranslate"><span class="pre">modacor.io.io_sink.IoSink</span></code> and implement:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">write(subpath,</span> <span class="pre">*args,</span> <span class="pre">**kwargs)</span></code></p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">IoSinks</span></code> routes writes through <code class="docutils literal notranslate"><span class="pre">sink_ref::subpath</span></code>. The current built-in sink
+examples are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">src/modacor/io/csv/csv_sink.py</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">src/modacor/io/hdf/hdf_processing_sink.py</span></code></p></li>
+</ul>
+</section>
+<section id="registration-paths">
+<h2>Registration paths<a class="headerlink" href="#registration-paths" title="Link to this heading">#</a></h2>
+<p>There are three supported ways to add sources or sinks:</p>
+<ol class="arabic simple">
+<li><p>Register them directly in Python with <code class="docutils literal notranslate"><span class="pre">IoSources.register_source(...)</span></code> or
+<code class="docutils literal notranslate"><span class="pre">IoSinks.register_sink(...)</span></code>.</p></li>
+<li><p>Add them dynamically inside a pipeline with the <code class="docutils literal notranslate"><span class="pre">AppendSource</span></code> and
+<code class="docutils literal notranslate"><span class="pre">AppendSink</span></code> process steps.</p></li>
+<li><p>Build them from normalized runtime specs via
+<code class="docutils literal notranslate"><span class="pre">modacor.io.runtime_support.build_sources_from_specs(...)</span></code> and
+<code class="docutils literal notranslate"><span class="pre">build_sinks_from_specs(...)</span></code>.</p></li>
+</ol>
+<p>The shared CLI/runtime builder currently supports:</p>
+<ul class="simple">
+<li><p>source types: <code class="docutils literal notranslate"><span class="pre">hdf</span></code>, <code class="docutils literal notranslate"><span class="pre">yaml</span></code>, <code class="docutils literal notranslate"><span class="pre">csv</span></code>, and <code class="docutils literal notranslate"><span class="pre">custom</span></code></p></li>
+<li><p>sink types: <code class="docutils literal notranslate"><span class="pre">csv</span></code></p></li>
+</ul>
+<p>For <code class="docutils literal notranslate"><span class="pre">custom</span></code> sources, the runtime spec must include <code class="docutils literal notranslate"><span class="pre">kwargs.class_path</span></code> with
+the fully qualified class import path.</p>
+</section>
+<section id="runtime-service-profiles">
+<h2>Runtime-service profiles<a class="headerlink" href="#runtime-service-profiles" title="Link to this heading">#</a></h2>
+<p>If you are adding facility-facing runtime workflows, also check
+<code class="docutils literal notranslate"><span class="pre">src/modacor/server/source_profiles.py</span></code>. That file defines the named source
+profiles exposed by the API and CLI, such as <code class="docutils literal notranslate"><span class="pre">mouse</span></code> and <code class="docutils literal notranslate"><span class="pre">saxsess</span></code>.</p>
+</section>
+<section id="testing-expectations">
+<h2>Testing expectations<a class="headerlink" href="#testing-expectations" title="Link to this heading">#</a></h2>
+<p>Add targeted tests under <code class="docutils literal notranslate"><span class="pre">tests/io/...</span></code> for format behavior and under
+<code class="docutils literal notranslate"><span class="pre">tests/modules/...</span></code> if the new class is used by <code class="docutils literal notranslate"><span class="pre">AppendSource</span></code> or <code class="docutils literal notranslate"><span class="pre">AppendSink</span></code>.
+Current examples include:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/io/hdf/test_hdf_source.py</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/io/yaml/test_yaml_source.py</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/io/csv/test_csv_source.py</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/modules/base_modules/test_append_source.py</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/modules/base_modules/test_append_sink.py</span></code></p></li>
+</ul>
+</section>
+<section id="practical-guidance">
+<h2>Practical guidance<a class="headerlink" href="#practical-guidance" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Keep source references stable and descriptive; they become part of pipeline
+configuration.</p></li>
+<li><p>Prefer explicit internal paths and metadata keys over implicit defaults.</p></li>
+<li><p>If the format only supports a subset of the full interface, raise
+<code class="docutils literal notranslate"><span class="pre">NotImplementedError</span></code> rather than silently guessing.</p></li>
+<li><p>Reuse the existing registry and runtime-support helpers instead of creating a
+parallel configuration path.</p></li>
+</ul>
+</section>
 </section>
 
 
@@ -550,6 +642,23 @@
 
 
   <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#source-contract">Source contract</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sink-contract">Sink contract</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#registration-paths">Registration paths</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-service-profiles">Runtime-service profiles</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#testing-expectations">Testing expectations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#practical-guidance">Practical guidance</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
@@ -583,7 +692,7 @@
 
   <p class="copyright">
     
-      © Copyright 2025-2026, Brian R. Pauw and Tim Snow.
+      © Copyright 2025-2026, Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow.
       <br/>
     
   </p>

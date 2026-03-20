@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>SAXSess instrument pipeline stub &#8212; MoDaCor 1.0.1 documentation</title>
+    <title>SAXSess pipeline patterns &#8212; MoDaCor 1.1.0 documentation</title>
   
   
   
@@ -38,18 +38,18 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=e7fff540"></script>
+    <script src="../_static/documentation_options.js?v=2a705162"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'examples/saxsess_pipeline';</script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Reference" href="../reference/index.html" />
-    <link rel="prev" title="MOUSE instrument pipeline stub" href="mouse_pipeline.html" />
+    <link rel="prev" title="MOUSE pipeline patterns" href="mouse_pipeline.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="1.0.1" />
-    <meta name="docbuild:last-update" content="Mar 13, 2026 (git 735a9f6)"/>
+  <meta name="docsearch:version" content="1.1.0" />
+    <meta name="docbuild:last-update" content="Mar 20, 2026 (git b82c0a8)"/>
   </head>
   
   
@@ -111,7 +111,7 @@
   
   
   
-    <p class="title logo__title">MoDaCor 1.0.1 documentation</p>
+    <p class="title logo__title">MoDaCor 1.1.0 documentation</p>
   
 </a></div>
     
@@ -204,7 +204,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -372,7 +372,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -426,15 +426,15 @@
 <li class="toctree-l1"><a class="reference internal" href="../pipeline_operations/index.html">Pipeline operations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../extending/index.html">Extending MoDaCor</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Application examples</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="mouse_pipeline.html">MOUSE instrument pipeline stub</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">SAXSess instrument pipeline stub</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mouse_pipeline.html">MOUSE pipeline patterns</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">SAXSess pipeline patterns</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../authors.html">Authors</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">CHANGELOG</a></li>
 </ul>
 </div>
         <div class="sidebar-primary-item">
@@ -485,7 +485,7 @@
     
     <li class="breadcrumb-item"><a href="index.html" class="nav-link">Application examples</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">SAXSess instrument pipeline stub</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">SAXSess pipeline patterns</span></li>
   </ul>
 </nav>
 </div>
@@ -502,11 +502,88 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="saxsess-instrument-pipeline-stub">
-<h1>SAXSess instrument pipeline stub<a class="headerlink" href="#saxsess-instrument-pipeline-stub" title="Link to this heading">#</a></h1>
-<blockquote>
-<div><p><strong>Note:</strong> Placeholder content. This page will capture the SAXSess workflow, including branching structure for calibration and intensity corrections, sample data references, and illustrative plots.</p>
-</div></blockquote>
+  <section id="saxsess-pipeline-patterns">
+<h1>SAXSess pipeline patterns<a class="headerlink" href="#saxsess-pipeline-patterns" title="Link to this heading">#</a></h1>
+<p>The repository currently contains a semirealistic SAXSess-style workflow in the
+integration tests and an explicit runtime-service <code class="docutils literal notranslate"><span class="pre">saxsess</span></code> source profile. Use
+this page as the current reference for source conventions and correction order.</p>
+<section id="current-repo-assets">
+<h2>Current repo assets<a class="headerlink" href="#current-repo-assets" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/integration/test_pipeline_run.py</span></code> contains a full SAXSess-flavored
+pipeline assembled from temporary HDF and YAML inputs.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">src/modacor/server/source_profiles.py</span></code> defines the <code class="docutils literal notranslate"><span class="pre">saxsess</span></code> runtime source
+profile.</p></li>
+</ul>
+</section>
+<section id="typical-source-set">
+<h2>Typical source set<a class="headerlink" href="#typical-source-set" title="Link to this heading">#</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">saxsess</span></code> profile currently expects:</p>
+<ul class="simple">
+<li><p>required: <code class="docutils literal notranslate"><span class="pre">sample</span></code>, <code class="docutils literal notranslate"><span class="pre">sample_background</span></code>, <code class="docutils literal notranslate"><span class="pre">defaults</span></code></p></li>
+<li><p>optional: <code class="docutils literal notranslate"><span class="pre">intensity_calibration</span></code>,
+<code class="docutils literal notranslate"><span class="pre">intensity_calibration_background</span></code>, <code class="docutils literal notranslate"><span class="pre">gc_calibration</span></code></p></li>
+</ul>
+<p>This matches the common freestanding-solids flow where instrument defaults come
+from YAML, measurements come from HDF, and an optional glassy-carbon reference
+curve is supplied separately.</p>
+</section>
+<section id="representative-correction-pattern">
+<h2>Representative correction pattern<a class="headerlink" href="#representative-correction-pattern" title="Link to this heading">#</a></h2>
+<p>The integration test currently uses this step sequence:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">PoissonUncertainties</span></code> for sample and background</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Divide</span></code> by exposure time stored in each HDF file</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Subtract</span></code> dark current from YAML metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SubtractDatabundles</span></code> to remove the measured background</p></li>
+</ol>
+</section>
+<section id="example-snippet">
+<h2>Example snippet<a class="headerlink" href="#example-snippet" title="Link to this heading">#</a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">1</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PoissonUncertainties</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">with_processing_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sample</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">sample_background</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">2</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Divide</span>
+<span class="w">    </span><span class="nt">requires_steps</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">divisor_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample::detector/frame_exposure_time</span>
+<span class="w">      </span><span class="nt">divisor_units_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample::detector/frame_exposure_time@units</span>
+<span class="w">      </span><span class="nt">with_processing_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sample</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">sample_background</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">3</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Subtract</span>
+<span class="w">    </span><span class="nt">requires_steps</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">subtrahend_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yaml::detector/darkcurrent/value</span>
+<span class="w">      </span><span class="nt">subtrahend_units_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yaml::detector/darkcurrent/units</span>
+<span class="w">      </span><span class="nt">with_processing_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sample</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">sample_background</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">bg</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SubtractDatabundles</span>
+<span class="w">    </span><span class="nt">requires_steps</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">3</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">with_processing_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sample</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">sample_background</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</section>
+<section id="notes-on-naming">
+<h2>Notes on naming<a class="headerlink" href="#notes-on-naming" title="Link to this heading">#</a></h2>
+<p>The integration test uses <code class="docutils literal notranslate"><span class="pre">yaml</span></code> as the metadata source reference, while the
+runtime-service profile uses <code class="docutils literal notranslate"><span class="pre">defaults</span></code>. Both patterns are valid; choose one and
+use it consistently within a given pipeline definition.</p>
+</section>
+<section id="recommended-use">
+<h2>Recommended use<a class="headerlink" href="#recommended-use" title="Link to this heading">#</a></h2>
+<p>Use this workflow as a regression and onboarding example when you need:</p>
+<ul class="simple">
+<li><p>a branched multi-source pipeline</p></li>
+<li><p>both scalar metadata and array data access</p></li>
+<li><p>a realistic background-subtraction sequence</p></li>
+</ul>
+<p>For lower-friction local setup, start with the MOUSE quickstart first and then
+adapt the source naming and pipeline graph for SAXSess-specific work.</p>
+</section>
 </section>
 
 
@@ -525,7 +602,7 @@
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">MOUSE instrument pipeline stub</p>
+        <p class="prev-next-title">MOUSE pipeline patterns</p>
       </div>
     </a>
     <a class="right-next"
@@ -547,6 +624,23 @@
                 <dialog id="pst-secondary-sidebar-modal"></dialog>
                 <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
 
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#current-repo-assets">Current repo assets</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#typical-source-set">Typical source set</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#representative-correction-pattern">Representative correction pattern</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#example-snippet">Example snippet</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#notes-on-naming">Notes on naming</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#recommended-use">Recommended use</a></li>
+</ul>
+  </nav></div>
 
   <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">
@@ -582,7 +676,7 @@
 
   <p class="copyright">
     
-      © Copyright 2025-2026, Brian R. Pauw and Tim Snow.
+      © Copyright 2025-2026, Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow.
       <br/>
     
   </p>

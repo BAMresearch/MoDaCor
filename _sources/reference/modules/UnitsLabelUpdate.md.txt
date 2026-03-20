@@ -1,0 +1,34 @@
+# Update unit labels
+
+## Summary
+Update unit labels of one or more BaseData elements (no conversion).
+
+## Metadata
+- **Module ID:** UnitsLabelUpdate
+- **Module path:** /home/runner/work/MoDaCor/MoDaCor/src/modacor/modules/base_modules/units_label_update.py
+- **Module version:** 20251216.1
+- **Keywords:** units, update, standardize
+
+## Required data keys
+- 
+
+## Modifies
+- ****: units
+
+## Required arguments
+- update_pairs
+
+## Default configuration
+```json
+{
+  "update_pairs": {}
+}
+```
+
+## Argument specification
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `update_pairs` | dict | Yes | {} | Mapping of BaseData key to unit string or {'units': str}. |
+
+## References
+DOI 10.1088/0953-8984/25/38/383201

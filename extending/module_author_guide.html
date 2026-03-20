@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Module author guide &#8212; MoDaCor 1.0.1 documentation</title>
+    <title>Module author guide &#8212; MoDaCor 1.1.0 documentation</title>
   
   
   
@@ -38,7 +38,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=e7fff540"></script>
+    <script src="../_static/documentation_options.js?v=2a705162"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'extending/module_author_guide';</script>
@@ -48,8 +48,8 @@
     <link rel="prev" title="Extending MoDaCor" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="1.0.1" />
-    <meta name="docbuild:last-update" content="Mar 13, 2026 (git 735a9f6)"/>
+  <meta name="docsearch:version" content="1.1.0" />
+    <meta name="docbuild:last-update" content="Mar 20, 2026 (git b82c0a8)"/>
   </head>
   
   
@@ -111,7 +111,7 @@
   
   
   
-    <p class="title logo__title">MoDaCor 1.0.1 documentation</p>
+    <p class="title logo__title">MoDaCor 1.1.0 documentation</p>
   
 </a></div>
     
@@ -204,7 +204,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -372,7 +372,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -435,7 +435,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../authors.html">Authors</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">CHANGELOG</a></li>
 </ul>
 </div>
         <div class="sidebar-primary-item">
@@ -505,9 +505,113 @@
                   
   <section id="module-author-guide">
 <h1>Module author guide<a class="headerlink" href="#module-author-guide" title="Link to this heading">#</a></h1>
-<blockquote>
-<div><p><strong>Note:</strong> Placeholder content. This page will walk through implementing <code class="docutils literal notranslate"><span class="pre">ProcessStep</span></code> subclasses, <code class="docutils literal notranslate"><span class="pre">ProcessStepDescriber</span></code> metadata, and accompanying tests.</p>
-</div></blockquote>
+<p>MoDaCor processing modules are <code class="docutils literal notranslate"><span class="pre">ProcessStep</span></code> subclasses. They are instantiated
+from pipeline YAML, resolved by name through <code class="docutils literal notranslate"><span class="pre">modacor.modules</span></code> and the
+<code class="docutils literal notranslate"><span class="pre">ProcessStepRegistry</span></code>, and documented through their
+<code class="docutils literal notranslate"><span class="pre">ProcessStepDescriber</span></code> metadata.</p>
+<section id="where-modules-live">
+<h2>Where modules live<a class="headerlink" href="#where-modules-live" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Put broadly reusable steps in <code class="docutils literal notranslate"><span class="pre">src/modacor/modules/base_modules/</span></code>.</p></li>
+<li><p>Put technique-specific steps in a dedicated subpackage under
+<code class="docutils literal notranslate"><span class="pre">src/modacor/modules/technique_modules/</span></code>.</p></li>
+<li><p>Bespoke instrument-specific steps should be put in a subfolder of <code class="docutils literal notranslate"><span class="pre">src/modacor/modules/instrument_modules/</span></code>, where the subfolders follow the following structure:
+<code class="docutils literal notranslate"><span class="pre">[institute</span> <span class="pre">abbreviation]/[instrument</span> <span class="pre">abbreviation]</span></code>. For example:
+<code class="docutils literal notranslate"><span class="pre">src/modacor/modules/instrument_modules/DLS/I22/</span></code>.</p></li>
+<li><p>Export any public step from <code class="docutils literal notranslate"><span class="pre">src/modacor/modules/__init__.py</span></code> so the curated
+registry and generated reference docs stay aligned.</p></li>
+</ul>
+</section>
+<section id="required-class-structure">
+<h2>Required class structure<a class="headerlink" href="#required-class-structure" title="Link to this heading">#</a></h2>
+<p>Every module must:</p>
+<ol class="arabic simple">
+<li><p>Subclass <code class="docutils literal notranslate"><span class="pre">modacor.dataclasses.process_step.ProcessStep</span></code>.</p></li>
+<li><p>Define a class-level <code class="docutils literal notranslate"><span class="pre">documentation</span> <span class="pre">=</span> <span class="pre">ProcessStepDescriber(...)</span></code>.</p></li>
+<li><p>Implement <code class="docutils literal notranslate"><span class="pre">calculate(self)</span> <span class="pre">-&gt;</span> <span class="pre">dict[str,</span> <span class="pre">DataBundle]</span></code>.</p></li>
+</ol>
+<p>Optionally implement <code class="docutils literal notranslate"><span class="pre">prepare_execution()</span></code> if the step needs one-time setup or
+cached derived state before <code class="docutils literal notranslate"><span class="pre">calculate()</span></code> runs.</p>
+<p>The template in <code class="docutils literal notranslate"><span class="pre">docs/templates/correction_module_template.py</span></code> is the best
+starting point for new work.</p>
+</section>
+<section id="configuration-and-execution-contract">
+<h2>Configuration and execution contract<a class="headerlink" href="#configuration-and-execution-contract" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">ProcessStep</span></code> already provides shared configuration keys:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">with_processing_keys</span></code>: select which <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code> bundles the step should
+operate on.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">output_processing_key</span></code>: optional output target for steps that emit a new
+bundle instead of updating in place.</p></li>
+</ul>
+<p>Step-specific configuration belongs in <code class="docutils literal notranslate"><span class="pre">documentation.arguments</span></code>. Those entries
+seed the instance <code class="docutils literal notranslate"><span class="pre">configuration</span></code> automatically through
+<code class="docutils literal notranslate"><span class="pre">ProcessStepDescriber.initial_configuration()</span></code>.</p>
+<p>During execution the runner injects:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">processing_data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">io_sources</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">io_sinks</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">step_id</span></code></p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">calculate()</span></code> should return a mapping of <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code> key to updated
+<code class="docutils literal notranslate"><span class="pre">DataBundle</span></code>. The base <code class="docutils literal notranslate"><span class="pre">execute()</span></code> method merges that mapping back into the
+current <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code>.</p>
+<p>For steps that operate on existing bundles, prefer
+<code class="docutils literal notranslate"><span class="pre">self._normalised_processing_keys()</span></code> instead of duplicating input-selection
+logic.</p>
+</section>
+<section id="documentation-metadata">
+<h2>Documentation metadata<a class="headerlink" href="#documentation-metadata" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">ProcessStepDescriber</span></code> is not optional bookkeeping. It drives both runtime
+introspection and generated reference docs. At minimum, keep these fields
+accurate:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">calling_name</span></code>: human-facing short name</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">calling_id</span></code>: class name used in pipeline YAML</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">calling_module_path</span></code>: usually <code class="docutils literal notranslate"><span class="pre">Path(__file__)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">calling_version</span></code>: module version string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">required_data_keys</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">arguments</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">modifies</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">step_doc</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">step_note</span></code> and <code class="docutils literal notranslate"><span class="pre">step_keywords</span></code> where useful</p></li>
+</ul>
+<p>The generated pages under <code class="docutils literal notranslate"><span class="pre">docs/reference/modules/</span></code> come from that metadata via:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>scripts/generate_module_doc.py<span class="w"> </span>--all<span class="w"> </span>--output-dir<span class="w"> </span>docs/reference/modules<span class="w"> </span>--index<span class="w"> </span>docs/reference/modules/index.md
+</pre></div>
+</div>
+<p>If a new public step is added but not exported from <code class="docutils literal notranslate"><span class="pre">modacor.modules</span></code>, both the
+registry behavior and the generated docs become inconsistent.</p>
+</section>
+<section id="testing-expectations">
+<h2>Testing expectations<a class="headerlink" href="#testing-expectations" title="Link to this heading">#</a></h2>
+<p>Add tests close to the behavior you are changing:</p>
+<ul class="simple">
+<li><p>step-focused unit tests under <code class="docutils literal notranslate"><span class="pre">tests/modules/...</span></code></p></li>
+<li><p>registry/discovery tests under <code class="docutils literal notranslate"><span class="pre">tests/runner/...</span></code> when export or lookup
+behavior changes</p></li>
+<li><p>integration coverage under <code class="docutils literal notranslate"><span class="pre">tests/integration/...</span></code> when behavior only shows up
+in a full pipeline run</p></li>
+</ul>
+<p>The current suite already has good examples for new tests, including:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/modules/base_modules/test_append_source.py</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/modules/base_modules/test_append_sink.py</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/runner/test_process_step_registry.py</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/integration/test_pipeline_run.py</span></code></p></li>
+</ul>
+</section>
+<section id="maintainer-checklist-for-a-new-public-step">
+<h2>Maintainer checklist for a new public step<a class="headerlink" href="#maintainer-checklist-for-a-new-public-step" title="Link to this heading">#</a></h2>
+<ol class="arabic simple">
+<li><p>Add the module class and metadata.</p></li>
+<li><p>Export it from <code class="docutils literal notranslate"><span class="pre">src/modacor/modules/__init__.py</span></code>.</p></li>
+<li><p>Add or update tests.</p></li>
+<li><p>Regenerate <code class="docutils literal notranslate"><span class="pre">docs/reference/modules/</span></code>.</p></li>
+<li><p>Rebuild the docs if the step changes user-facing behavior.</p></li>
+</ol>
+</section>
 </section>
 
 
@@ -550,6 +654,23 @@
 
 
   <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#where-modules-live">Where modules live</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#required-class-structure">Required class structure</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#configuration-and-execution-contract">Configuration and execution contract</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#documentation-metadata">Documentation metadata</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#testing-expectations">Testing expectations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#maintainer-checklist-for-a-new-public-step">Maintainer checklist for a new public step</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
@@ -583,7 +704,7 @@
 
   <p class="copyright">
     
-      © Copyright 2025-2026, Brian R. Pauw and Tim Snow.
+      © Copyright 2025-2026, Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow.
       <br/>
     
   </p>

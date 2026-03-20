@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Contribution checklist &#8212; MoDaCor 1.0.1 documentation</title>
+    <title>Contribution checklist &#8212; MoDaCor 1.1.0 documentation</title>
   
   
   
@@ -38,7 +38,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=e7fff540"></script>
+    <script src="../_static/documentation_options.js?v=2a705162"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'extending/contribution_checklist';</script>
@@ -48,8 +48,8 @@
     <link rel="prev" title="IO source and sink extension" href="io_source_sink_guide.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="1.0.1" />
-    <meta name="docbuild:last-update" content="Mar 13, 2026 (git 735a9f6)"/>
+  <meta name="docsearch:version" content="1.1.0" />
+    <meta name="docbuild:last-update" content="Mar 20, 2026 (git b82c0a8)"/>
   </head>
   
   
@@ -111,7 +111,7 @@
   
   
   
-    <p class="title logo__title">MoDaCor 1.0.1 documentation</p>
+    <p class="title logo__title">MoDaCor 1.1.0 documentation</p>
   
 </a></div>
     
@@ -204,7 +204,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -372,7 +372,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -435,7 +435,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../authors.html">Authors</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">CHANGELOG</a></li>
 </ul>
 </div>
         <div class="sidebar-primary-item">
@@ -505,9 +505,63 @@
                   
   <section id="contribution-checklist">
 <h1>Contribution checklist<a class="headerlink" href="#contribution-checklist" title="Link to this heading">#</a></h1>
-<blockquote>
-<div><p><strong>Note:</strong> Placeholder content. The future checklist will summarise testing, linting, documentation, and review steps specific to MoDaCor contributions.</p>
-</div></blockquote>
+<p>Use this checklist before opening or merging a MoDaCor change.</p>
+<section id="environment">
+<h2>Environment<a class="headerlink" href="#environment" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Work against Python 3.12 or newer.</p></li>
+<li><p>Install the local development extras you need:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[tests,lint,docs]&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="code-and-tests">
+<h2>Code and tests<a class="headerlink" href="#code-and-tests" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Run the focused tests for the area you changed.</p></li>
+<li><p>Run the full suite before merging:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-q
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Run linting for touched files:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>flake8<span class="w"> </span>src/modacor<span class="w"> </span>tests
+python<span class="w"> </span>-m<span class="w"> </span>isort<span class="w"> </span>--check-only<span class="w"> </span>--diff<span class="w"> </span>--filter-files<span class="w"> </span>src/modacor<span class="w"> </span>tests
+</pre></div>
+</div>
+</section>
+<section id="documentation">
+<h2>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Update user-facing docs when CLI, runtime-service, pipeline behavior, or
+extension contracts change.</p></li>
+<li><p>If you add or change a public <code class="docutils literal notranslate"><span class="pre">ProcessStep</span></code>, regenerate the module reference
+pages:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>scripts/generate_module_doc.py<span class="w"> </span>--all<span class="w"> </span>--output-dir<span class="w"> </span>docs/reference/modules<span class="w"> </span>--index<span class="w"> </span>docs/reference/modules/index.md
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Rebuild the docs and confirm there are no warnings:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>sphinx<span class="w"> </span>-E<span class="w"> </span>-b<span class="w"> </span>html<span class="w"> </span>docs<span class="w"> </span>dist/docs
+</pre></div>
+</div>
+</section>
+<section id="review-points">
+<h2>Review points<a class="headerlink" href="#review-points" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Keep <code class="docutils literal notranslate"><span class="pre">modacor.modules.__all__</span></code> aligned with the intended public step surface.</p></li>
+<li><p>Keep CLI and runtime-service paths aligned when they share request or IO
+behavior.</p></li>
+<li><p>Preserve docstrings and type hints when simplifying code.</p></li>
+<li><p>Avoid leaving unfinished pages or stale backlog state after structural
+refactors.</p></li>
+</ul>
+</section>
 </section>
 
 
@@ -550,6 +604,21 @@
 
 
   <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#environment">Environment</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#code-and-tests">Code and tests</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#documentation">Documentation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#review-points">Review points</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
@@ -583,7 +652,7 @@
 
   <p class="copyright">
     
-      © Copyright 2025-2026, Brian R. Pauw and Tim Snow.
+      © Copyright 2025-2026, Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow.
       <br/>
     
   </p>

@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Quickstart &#8212; MoDaCor 1.0.1 documentation</title>
+    <title>Quickstart &#8212; MoDaCor 1.1.0 documentation</title>
   
   
   
@@ -38,18 +38,18 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=e7fff540"></script>
+    <script src="../_static/documentation_options.js?v=2a705162"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'getting_started/quickstart';</script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Pipeline operations" href="../pipeline_operations/index.html" />
+    <link rel="next" title="CLI And Runner API" href="cli_and_runner.html" />
     <link rel="prev" title="Getting started" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="1.0.1" />
-    <meta name="docbuild:last-update" content="Mar 13, 2026 (git 735a9f6)"/>
+  <meta name="docsearch:version" content="1.1.0" />
+    <meta name="docbuild:last-update" content="Mar 20, 2026 (git b82c0a8)"/>
   </head>
   
   
@@ -111,7 +111,7 @@
   
   
   
-    <p class="title logo__title">MoDaCor 1.0.1 documentation</p>
+    <p class="title logo__title">MoDaCor 1.1.0 documentation</p>
   
 </a></div>
     
@@ -204,7 +204,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -372,7 +372,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -424,6 +424,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting started</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Quickstart</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli_and_runner.html">CLI And Runner API</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../pipeline_operations/index.html">Pipeline operations</a></li>
@@ -433,7 +434,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../authors.html">Authors</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">CHANGELOG</a></li>
 </ul>
 </div>
         <div class="sidebar-primary-item">
@@ -508,7 +509,7 @@ configuration file, and inspect the pipeline trace that records what changed at 
 <section id="prerequisites">
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
 <ul class="simple">
-<li><p>Python 3.11 or newer</p></li>
+<li><p>Python 3.12 or newer</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">pip</span></code>, <code class="docutils literal notranslate"><span class="pre">curl</span></code> (or <code class="docutils literal notranslate"><span class="pre">wget</span></code>) and a POSIX-like shell</p></li>
 <li><p>Approximately 1.3 GB of free disk space for the sample NeXus file</p></li>
 </ul>
@@ -683,6 +684,8 @@ graph.</p>
 additional <code class="docutils literal notranslate"><span class="pre">DataBundle</span></code> entries (for example <code class="docutils literal notranslate"><span class="pre">background</span></code> or <code class="docutils literal notranslate"><span class="pre">calibration</span></code>).</p></li>
 <li><p>Add <code class="docutils literal notranslate"><span class="pre">pipeline.attach_tracer_event(node,</span> <span class="pre">tracer,</span> <span class="pre">include_rendered_trace=True)</span></code> inside the execution loop if you want to
 export the trace alongside the configuration.</p></li>
+<li><p>Use the dedicated <a class="reference internal" href="cli_and_runner.html"><span class="std std-doc">CLI And Runner API</span></a> guide for production command-line runs (<code class="docutils literal notranslate"><span class="pre">modacor</span> <span class="pre">run</span></code>) and
+the shared <code class="docutils literal notranslate"><span class="pre">run_pipeline_job(...)</span></code> Python interface.</p></li>
 <li><p>Explore the <strong>Pipeline operations</strong> and <strong>Extending MoDaCor</strong> sections for branching workflows, module development,
 and integration best practices.</p></li>
 </ul>
@@ -709,11 +712,11 @@ and integration best practices.</p></li>
       </div>
     </a>
     <a class="right-next"
-       href="../pipeline_operations/index.html"
+       href="cli_and_runner.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Pipeline operations</p>
+        <p class="prev-next-title">CLI And Runner API</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -780,7 +783,7 @@ and integration best practices.</p></li>
 
   <p class="copyright">
     
-      © Copyright 2025-2026, Brian R. Pauw and Tim Snow.
+      © Copyright 2025-2026, Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow.
       <br/>
     
   </p>

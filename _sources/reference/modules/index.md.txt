@@ -3,6 +3,9 @@
 ```{toctree}
 :maxdepth: 1
 
+AppendProcessingData
+AppendSink
+AppendSource
 BitwiseOrMasks
 CombineUncertainties
 CombineUncertaintiesMax
@@ -15,9 +18,11 @@ MultiplyDatabundles
 PixelCoordinates3D
 PoissonUncertainties
 ReduceDimensionality
+SinkProcessingData
 SolidAngleCorrection
 SubtractDatabundles
 Subtract
+UnitsLabelUpdate
 XSGeometry
 XSGeometryFromPixelCoordinates
 ```

@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Pipeline basics &#8212; MoDaCor 1.0.1 documentation</title>
+    <title>Pipeline Basics &#8212; MoDaCor 1.1.0 documentation</title>
   
   
   
@@ -38,7 +38,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=e7fff540"></script>
+    <script src="../_static/documentation_options.js?v=2a705162"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'pipeline_operations/pipeline_basics';</script>
@@ -48,8 +48,8 @@
     <link rel="prev" title="Pipeline operations" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="1.0.1" />
-    <meta name="docbuild:last-update" content="Mar 13, 2026 (git 735a9f6)"/>
+  <meta name="docsearch:version" content="1.1.0" />
+    <meta name="docbuild:last-update" content="Mar 20, 2026 (git b82c0a8)"/>
   </head>
   
   
@@ -111,7 +111,7 @@
   
   
   
-    <p class="title logo__title">MoDaCor 1.0.1 documentation</p>
+    <p class="title logo__title">MoDaCor 1.1.0 documentation</p>
   
 </a></div>
     
@@ -204,7 +204,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -372,7 +372,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -424,9 +424,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Pipeline operations</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Pipeline basics</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Pipeline Basics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration_reference.html">Pipeline configuration reference</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tracing_and_debugging.html">Tracing and debugging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime_service_api.html">Runtime Service API (Design Contract)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="backlog.html">Pipeline Operations Backlog</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../extending/index.html">Extending MoDaCor</a></li>
@@ -435,7 +437,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../authors.html">Authors</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">CHANGELOG</a></li>
 </ul>
 </div>
         <div class="sidebar-primary-item">
@@ -486,7 +488,7 @@
     
     <li class="breadcrumb-item"><a href="index.html" class="nav-link">Pipeline operations</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Pipeline basics</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Pipeline Basics</span></li>
   </ul>
 </nav>
 </div>
@@ -504,10 +506,186 @@
                 <article class="bd-article">
                   
   <section id="pipeline-basics">
-<h1>Pipeline basics<a class="headerlink" href="#pipeline-basics" title="Link to this heading">#</a></h1>
-<blockquote>
-<div><p><strong>Note:</strong> Placeholder content. This page will explain ProcessingData, DataBundle, BaseData, and graph orchestration concepts for new pipeline integrators.</p>
-</div></blockquote>
+<h1>Pipeline Basics<a class="headerlink" href="#pipeline-basics" title="Link to this heading">#</a></h1>
+<p>This page describes the core runtime model behind MoDaCor pipelines: what a
+pipeline graph is, how data moves through <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code>, where sources and
+sinks fit, and what “partial rerun” means in operational terms.</p>
+<section id="core-building-blocks">
+<h2>Core building blocks<a class="headerlink" href="#core-building-blocks" title="Link to this heading">#</a></h2>
+<section id="pipeline">
+<h3><code class="docutils literal notranslate"><span class="pre">Pipeline</span></code><a class="headerlink" href="#pipeline" title="Link to this heading">#</a></h3>
+<p>A MoDaCor pipeline is a directed acyclic graph of <code class="docutils literal notranslate"><span class="pre">ProcessStep</span></code> instances. In
+YAML, each step declares its module and upstream dependencies:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">minimal_demo</span>
+<span class="nt">steps</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">load_sample</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AppendSource</span>
+<span class="w">    </span><span class="nt">requires_steps</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">source_identifier</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample</span>
+<span class="w">      </span><span class="nt">output_key</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample</span>
+
+<span class="w">  </span><span class="nt">poisson</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PoissonUncertainties</span>
+<span class="w">    </span><span class="nt">requires_steps</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">load_sample</span>
+<span class="w">    </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">with_processing_keys</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sample</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Pipeline.from_yaml(...)</span></code> turns that specification into a graph. During
+execution, the scheduler visits steps in topological order and only runs a step
+once all of its declared prerequisites are complete.</p>
+</section>
+<section id="processingdata">
+<h3><code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code><a class="headerlink" href="#processingdata" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code> is the in-memory workspace shared by the pipeline. Every step
+reads from it, writes to it, or both. It is intentionally structured so the
+pipeline can preserve intermediate results for debugging, traceability, and
+partial reruns.</p>
+<p>The hierarchy is:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code>: mapping of bundle keys such as <code class="docutils literal notranslate"><span class="pre">sample</span></code>, <code class="docutils literal notranslate"><span class="pre">background</span></code>, or <code class="docutils literal notranslate"><span class="pre">result</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DataBundle</span></code>: mapping of named data products within one bundle</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">BaseData</span></code>: the actual array-like data plus metadata</p></li>
+</ul>
+<p>In practice, a path like <code class="docutils literal notranslate"><span class="pre">/sample/signal/signal</span></code> means:</p>
+<ul class="simple">
+<li><p>bundle key: <code class="docutils literal notranslate"><span class="pre">sample</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">BaseData</span></code> entry: <code class="docutils literal notranslate"><span class="pre">signal</span></code></p></li>
+<li><p>leaf attribute inside that <code class="docutils literal notranslate"><span class="pre">BaseData</span></code>: <code class="docutils literal notranslate"><span class="pre">signal</span></code></p></li>
+</ul>
+</section>
+<section id="basedata">
+<h3><code class="docutils literal notranslate"><span class="pre">BaseData</span></code><a class="headerlink" href="#basedata" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">BaseData</span></code> stores the numerical payload and the metadata required for traceable
+correction work:</p>
+<ul class="simple">
+<li><p>data arrays</p></li>
+<li><p>units</p></li>
+<li><p>uncertainties</p></li>
+<li><p>axes / rank metadata</p></li>
+<li><p>optional weights and masks</p></li>
+</ul>
+<p>This is why MoDaCor can run a correction step and still explain what happened to
+units and propagated uncertainties at each stage.</p>
+</section>
+</section>
+<section id="sources-and-sinks">
+<h2>Sources and sinks<a class="headerlink" href="#sources-and-sinks" title="Link to this heading">#</a></h2>
+<p>MoDaCor separates external I/O from the pipeline graph itself.</p>
+<section id="sources">
+<h3>Sources<a class="headerlink" href="#sources" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">IoSources</span></code> is a runtime registry of named inputs such as <code class="docutils literal notranslate"><span class="pre">sample</span></code>,
+<code class="docutils literal notranslate"><span class="pre">background</span></code>, or <code class="docutils literal notranslate"><span class="pre">defaults</span></code>. A source registration binds:</p>
+<ul class="simple">
+<li><p>a reference name</p></li>
+<li><p>a concrete source type such as HDF, YAML, or CSV</p></li>
+<li><p>a resource location</p></li>
+<li><p>optional reader-specific kwargs</p></li>
+</ul>
+<p>Sources can enter the system in two ways:</p>
+<ul class="simple">
+<li><p>directly through the CLI or runtime API, which is how the session-based
+runtime service works</p></li>
+<li><p>through pipeline steps such as <code class="docutils literal notranslate"><span class="pre">AppendSource</span></code>, which pull data from the
+<code class="docutils literal notranslate"><span class="pre">IoSources</span></code> registry into <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code></p></li>
+</ul>
+<p>This separation is useful operationally: the same pipeline can be reused while
+the actual file paths change from run to run.</p>
+</section>
+<section id="sinks">
+<h3>Sinks<a class="headerlink" href="#sinks" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">IoSinks</span></code> works the same way for outputs. A pipeline may emit results through a
+registered sink such as <code class="docutils literal notranslate"><span class="pre">CSVSink</span></code>, or the runtime/CLI layer may export the
+final <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code> snapshot directly, for example through the shared HDF
+export path used by <code class="docutils literal notranslate"><span class="pre">write_hdf</span></code>.</p>
+</section>
+</section>
+<section id="execution-modes">
+<h2>Execution modes<a class="headerlink" href="#execution-modes" title="Link to this heading">#</a></h2>
+<section id="full-run">
+<h3>Full run<a class="headerlink" href="#full-run" title="Link to this heading">#</a></h3>
+<p>A full run starts from a clean execution context and processes the whole graph.
+This is the default safest mode when:</p>
+<ul class="simple">
+<li><p>there is no previous <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code> snapshot</p></li>
+<li><p>the pipeline configuration changed</p></li>
+<li><p>the scope of the input change is unclear</p></li>
+</ul>
+</section>
+<section id="partial-run">
+<h3>Partial run<a class="headerlink" href="#partial-run" title="Link to this heading">#</a></h3>
+<p>A partial run is only possible when a previous <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code> snapshot exists.
+The runtime service uses <code class="docutils literal notranslate"><span class="pre">changed_sources</span></code> and <code class="docutils literal notranslate"><span class="pre">changed_keys</span></code> to find the dirty
+part of the graph.</p>
+<p>The current policy is conservative:</p>
+<ol class="arabic simple">
+<li><p>Find steps that reference the changed source or processing key.</p></li>
+<li><p>Expand that set to all downstream descendants.</p></li>
+<li><p>Reuse the prior <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code> snapshot.</p></li>
+<li><p>Execute only the selected dirty subgraph in topological order.</p></li>
+</ol>
+<p>This keeps unaffected upstream work intact while ensuring downstream results are
+recomputed consistently.</p>
+</section>
+<section id="auto-mode">
+<h3>Auto mode<a class="headerlink" href="#auto-mode" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">auto</span></code> mode tries a partial rerun first and falls back to a full rerun if the
+partial execution fails. This is mainly an operational convenience for long-lived
+sessions where new data arrives repeatedly but robustness matters more than
+forcing a partial path.</p>
+</section>
+</section>
+<section id="runtime-service-session-model">
+<h2>Runtime-service session model<a class="headerlink" href="#runtime-service-session-model" title="Link to this heading">#</a></h2>
+<p>The runtime API wraps pipeline execution in a <code class="docutils literal notranslate"><span class="pre">PipelineSession</span></code>. A session keeps:</p>
+<ul class="simple">
+<li><p>the pipeline YAML</p></li>
+<li><p>registered sources</p></li>
+<li><p>tracing configuration</p></li>
+<li><p>the latest <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code></p></li>
+<li><p>run history and error state</p></li>
+</ul>
+<p>That session state is what enables:</p>
+<ul class="simple">
+<li><p>incremental source updates via the API</p></li>
+<li><p>dry-run invalidation previews</p></li>
+<li><p>partial reruns against prior results</p></li>
+<li><p>readiness metrics such as active runs and error-state sessions</p></li>
+</ul>
+</section>
+<section id="partial-rerun-behavior-in-practice">
+<h2>Partial rerun behavior in practice<a class="headerlink" href="#partial-rerun-behavior-in-practice" title="Link to this heading">#</a></h2>
+<p>When an operator updates a source like <code class="docutils literal notranslate"><span class="pre">sample</span></code>, the typical sequence is:</p>
+<ol class="arabic simple">
+<li><p>Update the source registration in the session.</p></li>
+<li><p>Call <code class="docutils literal notranslate"><span class="pre">/process</span></code> with <code class="docutils literal notranslate"><span class="pre">mode=&quot;partial&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">mode=&quot;auto&quot;</span></code>.</p></li>
+<li><p>Let the runtime service compute the dirty step set.</p></li>
+<li><p>Reuse the prior <code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code> for unaffected parts of the graph.</p></li>
+<li><p>Record run metadata including dirty steps, skipped steps, durations, and any fallback reason.</p></li>
+</ol>
+<p>That means MoDaCor treats partial reruns as a graph-selection problem, not as a
+special alternative pipeline definition.</p>
+</section>
+<section id="operational-implications">
+<h2>Operational implications<a class="headerlink" href="#operational-implications" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Prefer stable bundle keys such as <code class="docutils literal notranslate"><span class="pre">sample</span></code> and <code class="docutils literal notranslate"><span class="pre">background</span></code>; partial rerun
+detection depends on them.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">changed_keys</span></code> when only a specific product changed and the dirty set can
+be narrowed further.</p></li>
+<li><p>Keep source registration external when file locations change frequently.</p></li>
+<li><p>Use dry-run before automating partial reruns against new instruments or new
+pipeline structures.</p></li>
+</ul>
+<p>The companion pages <a class="reference internal" href="runtime_service_api.html"><span class="std std-doc">runtime_service_api</span></a> and
+<a class="reference internal" href="backlog.html"><span class="std std-doc">backlog</span></a> describe how these concepts surface in the API and how the
+runtime service is evolving.</p>
+</section>
 </section>
 
 
@@ -550,6 +728,37 @@
 
 
   <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#core-building-blocks">Core building blocks</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pipeline"><code class="docutils literal notranslate"><span class="pre">Pipeline</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#processingdata"><code class="docutils literal notranslate"><span class="pre">ProcessingData</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#basedata"><code class="docutils literal notranslate"><span class="pre">BaseData</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sources-and-sinks">Sources and sinks</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#sources">Sources</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#sinks">Sinks</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#execution-modes">Execution modes</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#full-run">Full run</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#partial-run">Partial run</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#auto-mode">Auto mode</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-service-session-model">Runtime-service session model</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#partial-rerun-behavior-in-practice">Partial rerun behavior in practice</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#operational-implications">Operational implications</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
@@ -583,7 +792,7 @@
 
   <p class="copyright">
     
-      © Copyright 2025-2026, Brian R. Pauw and Tim Snow.
+      © Copyright 2025-2026, Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow.
       <br/>
     
   </p>

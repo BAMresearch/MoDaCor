@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Extending MoDaCor &#8212; MoDaCor 1.0.1 documentation</title>
+    <title>Extending MoDaCor &#8212; MoDaCor 1.1.0 documentation</title>
   
   
   
@@ -38,18 +38,18 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=e7fff540"></script>
+    <script src="../_static/documentation_options.js?v=2a705162"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'extending/index';</script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Module author guide" href="module_author_guide.html" />
-    <link rel="prev" title="Tracing and debugging" href="../pipeline_operations/tracing_and_debugging.html" />
+    <link rel="prev" title="Pipeline Operations Backlog" href="../pipeline_operations/backlog.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="1.0.1" />
-    <meta name="docbuild:last-update" content="Mar 13, 2026 (git 735a9f6)"/>
+  <meta name="docsearch:version" content="1.1.0" />
+    <meta name="docbuild:last-update" content="Mar 20, 2026 (git b82c0a8)"/>
   </head>
   
   
@@ -111,7 +111,7 @@
   
   
   
-    <p class="title logo__title">MoDaCor 1.0.1 documentation</p>
+    <p class="title logo__title">MoDaCor 1.1.0 documentation</p>
   
 </a></div>
     
@@ -204,7 +204,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -372,7 +372,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../changelog.html">
-    Changelog
+    CHANGELOG
   </a>
 </li>
 
@@ -435,7 +435,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../authors.html">Authors</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">CHANGELOG</a></li>
 </ul>
 </div>
         <div class="sidebar-primary-item">
@@ -502,9 +502,17 @@
                   
   <section id="extending-modacor">
 <h1>Extending MoDaCor<a class="headerlink" href="#extending-modacor" title="Link to this heading">#</a></h1>
-<blockquote>
-<div><p><strong>Warning:</strong> Documentation stub. This section outlines the future structure for module- and IO-extension guides.</p>
-</div></blockquote>
+<p>This section covers the extension points that are already used in the current
+codebase:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ProcessStep</span></code> subclasses under <code class="docutils literal notranslate"><span class="pre">src/modacor/modules/...</span></code> for pipeline
+computation.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">IoSource</span></code> and <code class="docutils literal notranslate"><span class="pre">IoSink</span></code> subclasses under <code class="docutils literal notranslate"><span class="pre">src/modacor/io/...</span></code> for external
+data access and export.</p></li>
+<li><p>the contributor workflow expected for tests, linting, and docs updates.</p></li>
+</ul>
+<p>Use the pages below as the current maintainer guide rather than as a future
+roadmap.</p>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="module_author_guide.html">Module author guide</a></li>
@@ -525,12 +533,12 @@
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../pipeline_operations/tracing_and_debugging.html"
+       href="../pipeline_operations/backlog.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Tracing and debugging</p>
+        <p class="prev-next-title">Pipeline Operations Backlog</p>
       </div>
     </a>
     <a class="right-next"
@@ -587,7 +595,7 @@
 
   <p class="copyright">
     
-      © Copyright 2025-2026, Brian R. Pauw and Tim Snow.
+      © Copyright 2025-2026, Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow.
       <br/>
     
   </p>
