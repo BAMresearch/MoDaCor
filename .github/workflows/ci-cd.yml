@@ -35,6 +35,9 @@ jobs:
     runs-on: 'ubuntu-latest'
     permissions:
       id-token: write
+    environment:
+      name: pypi
+    if: github.ref == 'refs/heads/main'
     steps:
 
       - name: Download package artifacts

@@ -7,8 +7,9 @@ on:
 jobs:
   # make a new version first, release or prerelease
   release:
-    # Only run this job if new work is pushed to "main"
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Only run this job if new work is pushed and not on PRs, avoids duplicate runs
+    # semantic-release github-actions bot can't push to main anyway, atm.
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
 
@@ -17,6 +18,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          # ensure actual branch name instead of a commit SHA
+          ref: ${{ github.head_ref || github.ref }}
 
       - name: Setup git user
         shell: sh
@@ -45,7 +48,9 @@ jobs:
         shell: sh
         run: |
           set -x
+          SEMANTIC_RELEASE_DEBUG=1 semantic-release version --print
           NEWVER=$(semantic-release version --print)
+          [ -z "$NEWVER" ] && exit 1
           # version number updates with regexp which is not supported by
           # semantic_release.version_variables in pyproject.toml
           sed -i -e "s/v\([0-9]\+\.\)\{2\}\([0-9]\+\)/v$NEWVER/g" README.md
