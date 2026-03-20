@@ -37,6 +37,7 @@ jobs:
       id-token: write
     environment:
       name: pypi
+    if: github.ref == 'refs/heads/main'
     steps:
 
       - name: Download package artifacts
