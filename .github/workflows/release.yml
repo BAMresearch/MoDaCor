@@ -7,8 +7,8 @@ on:
 jobs:
   # make a new version first, release or prerelease
   release:
-    # Only run this job if new work is pushed to "main"
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Only run this job if new work is pushed to a branch (PR)
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
 
