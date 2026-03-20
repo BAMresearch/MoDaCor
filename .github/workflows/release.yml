@@ -7,8 +7,9 @@ on:
 jobs:
   # make a new version first, release or prerelease
   release:
-    # Only run this job if new work is pushed to a branch (PR)
-    if: github.ref != 'refs/heads/main'
+    # Only run this job if new work is pushed and not on PRs, avoids duplicate runs
+    # semantic-release github-actions bot can't push to main anyway, atm.
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
 
