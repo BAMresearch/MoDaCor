@@ -135,9 +135,6 @@ version_variables = [                        # version location
     "src/modacor/__init__.py:__version__",
     "docs/conf.py:version",
 ]
-[[tool.semantic_release.release_groups]]
-# allow PRs to make a release version, for testing, exists in that branch only then
-branches = ["*"]
 [tool.semantic_release.commit_parser_options]
 allowed_tags = ["build", "chore", "ci", "docs", "feat", "enh", "fix", "perf", "style", "refactor", "test"]
 minor_tags = ["feat", "enh"]
@@ -146,6 +143,9 @@ patch_tags = ["fix", "perf"]
 exclude_commit_patterns = ["chore", ".*\\bGHA\\b.*", ".*\\b[gG][hH] actions?\\b.*"]
 [tool.semantic_release.publish]
 upload_to_vcs_release = false
+# allow PRs to make a release version, for testing, exists in that branch only then
+[[tool.semantic_release.release_groups]]
+branches = ["*"]
 
 [tool.black]
 line-length = 120

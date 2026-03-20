@@ -47,6 +47,7 @@ jobs:
         shell: sh
         run: |
           set -x
+          SEMANTIC_RELEASE_DEBUG=1 semantic-release version --print
           NEWVER=$(semantic-release version --print)
           [ -z "$NEWVER" ] && exit 1
           # version number updates with regexp which is not supported by
