@@ -8,8 +8,10 @@ jobs:
   # make a new version first, release or prerelease
   release:
     # Only run this job if new work is pushed and not on PRs, avoids duplicate runs
-    # semantic-release github-actions bot can't push to main anyway, atm.
-    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+    # semantic-release run on the commit and pushes new version to branch
+    # on merge there is already a new version in git history, no new commit needed
+    # semantic-release github-actions bot can't push to main anyway
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
 
