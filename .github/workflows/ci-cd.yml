@@ -33,9 +33,10 @@ jobs:
       id-token: write
     environment:
       name: pypi
-    if: github.ref == 'refs/heads/main'
+    # Publish package from main branch only, and only if there is a new version
+    # errors out otherwise, in any case
+    if: github.ref == 'refs/heads/main' && needs.release.outputs.new_version == 'true'
     steps:
-
       - name: Download package artifacts
         uses: actions/download-artifact@v8
         with:
