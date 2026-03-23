@@ -4,9 +4,10 @@ name: Docs
 on:
   workflow_call:
 
-# env:
-#   DOCS_URL: https://BAMresearch.github.io/MoDaCor
-#   COV_REPORT_BASE_DIR: coverage-report  # see pyproject.toml
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   generate:

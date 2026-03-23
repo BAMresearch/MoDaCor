@@ -35,7 +35,7 @@ jobs:
         run: tox -e build -v
 
       - name: Upload packages for publishing job
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: packages-${{ matrix.os }}
           path: |
