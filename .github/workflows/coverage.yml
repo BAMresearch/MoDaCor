@@ -9,13 +9,12 @@ env:
   COV_REPORT_BASE_DIR: coverage-report  # see pyproject.toml
 
 jobs:
-  combine:
-    name: Combine coverage data
+  coverage:
+    name: Coverage to HTML
     runs-on: ubuntu-latest
     outputs:
       total: ${{ steps.total.outputs.total }}
     steps:
-
       - name: Checking out the repo
         uses: actions/checkout@v6
 
@@ -62,11 +61,9 @@ jobs:
         run: |
           echo "total=$(coverage report --format=total)" >> $GITHUB_OUTPUT
 
-  publish:
-    name: Publish coverage report
-    needs: combine
+  assemble:
+    needs: coverage
     runs-on: ubuntu-latest
-
     steps:
       - name: Compute info for later steps
         id: info
@@ -77,27 +74,19 @@ jobs:
           export SLUG=$(date +'%Y%m%d')_$SHA10
           export REPORT_DIR=$COV_REPORT_BASE_DIR/$SLUG
           export REF="${{ github.ref }}"
-          echo "total=${{ needs.combine.outputs.total }}" >> $GITHUB_ENV
-          echo "sha10=$SHA10" >> $GITHUB_ENV
-          echo "slug=$SLUG" >> $GITHUB_ENV
+          echo "total=${{ needs.coverage.outputs.total }}" >> $GITHUB_ENV
+          #echo "sha10=$SHA10" >> $GITHUB_ENV
+          #echo "slug=$SLUG" >> $GITHUB_ENV
           echo "report_dir=$REPORT_DIR" >> $GITHUB_ENV
-          echo "branch=${REF#refs/heads/}" >> $GITHUB_ENV
+          #echo "branch=${REF#refs/heads/}" >> $GITHUB_ENV
 
       - name: Summarize
         shell: sh
         run: |
           echo '### Total coverage: ${{ env.total }}%' >> $GITHUB_STEP_SUMMARY
 
-      - name: Checkout documentation pages branch
-        if: ${{ github.ref == 'refs/heads/main' }}
-        uses: actions/checkout@v6
-        with:
-          ref: gh-pages
-          path: pages
-
-      - name: Purge old documentation files
-        shell: sh
-        run: cd pages && git rm -rf . || true
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
 
       - name: Download previously generated documentation
         if: ${{ github.ref == 'refs/heads/main' }}
@@ -113,7 +102,7 @@ jobs:
           name: html_report
           path: pages/${{ env.report_dir }}
 
-      - name: Push to report repo
+      - name: Final touches
         if: ${{ github.ref == 'refs/heads/main' }}
         shell: sh
         env:
@@ -127,11 +116,6 @@ jobs:
           echo "<html><head>" > "$REDIR_HTML"
           echo "<meta http-equiv='refresh' content='0;url=$REPORT_URL' />" >> "$REDIR_HTML"
           echo "<body>Coverage report redirect..." >> "$REDIR_HTML"
-          # Make the commit message.
-          echo "${{ env.total }}% - $COMMIT_MESSAGE" > commit.txt
-          echo "" >> commit.txt
-          echo "$REPORT_URL" >> commit.txt
-          echo "${{ env.sha10 }}: ${{ env.branch }}" >> commit.txt
           # Make badge json
           COL_MIN=10; COL_MAX=95;
           HUE=$(python3 -c "print(int((${{ env.total }} - $COL_MIN)/($COL_MAX - $COL_MIN) * 120))")
@@ -142,9 +126,20 @@ jobs:
           touch .nojekyll  # not a jekyll page here, do not ignore _static
           # ls -la ${{ env.report_dir }} # for debugging
           # ${{ env.report_dir }}/* "${REDIR_HTML#*/}" "${BADGE_JSON#*/}"
-          git add -A
-          git config user.name "${GITHUB_ACTOR}"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-          git commit --file=../commit.txt
-          git push
           echo "[$REPORT_URL]($REPORT_URL)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: pages
+
+  deploy:
+    needs: assemble
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
