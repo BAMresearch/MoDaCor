@@ -63,7 +63,9 @@ jobs:
     needs: generate
     runs-on: ubuntu-latest
     outputs:
-      total: ${{ steps.total.outputs.total }}
+      total: ${{ steps.info.outputs.total }}
+      reportpath: ${{ steps.info.outputs.reportpath }}
+      docurl: ${{ steps.info.outputs.docurl }}
     steps:
       - name: Checking out the repo
         uses: actions/checkout@v6
@@ -105,22 +107,12 @@ jobs:
           name: html_report
           path: htmlcov
 
-      - name: Get total
-        id: total
+      - name: Collect some info for jobs following
+        id: info
         shell: sh
         run: |
           echo "total=$(coverage report --format=total)" >> $GITHUB_OUTPUT
-
-      - name: Get report dir
-        id: reportpath
-        shell: sh
-        run: |
           python3 -c 'import toml; reportpath = toml.load("pyproject.toml")["tool"]["coverage"]["report"]["path"]; print(f"{reportpath=}")' >> $GITHUB_OUTPUT
-
-      - name: Get docs URL
-        id: docurl
-        shell: sh
-        run: |
           python3 -c 'import toml; docurl = toml.load("pyproject.toml")["project"]["urls"]["documentation"]; print(f"{docurl=}")' >> $GITHUB_OUTPUT
 
   assemble:
