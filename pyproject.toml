@@ -125,7 +125,7 @@ version = {attr = "modacor.__version__"}
 readme = {file = ["README.md", "CHANGELOG.md"], content-type = "text/markdown"}
 
 [tool.coverage.report]
-path = "coverage-report"  # see coverage.yml github action
+path = "coverage-report"  # see docs.yml github action
 
 # on version numbers: https://peps.python.org/pep-0440/
 # and bottom of https://softwareengineering.stackexchange.com/a/151558

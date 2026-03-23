@@ -4,9 +4,9 @@ name: Docs
 on:
   workflow_call:
 
-env:
-  DOCS_URL: https://BAMresearch.github.io/MoDaCor
-  COV_REPORT_BASE_DIR: coverage-report  # see pyproject.toml
+# env:
+#   DOCS_URL: https://BAMresearch.github.io/MoDaCor
+#   COV_REPORT_BASE_DIR: coverage-report  # see pyproject.toml
 
 jobs:
   generate:
@@ -106,10 +106,22 @@ jobs:
           path: htmlcov
 
       - name: Get total
-        id: total
+        #id: total
         shell: sh
         run: |
           echo "total=$(coverage report --format=total)" >> $GITHUB_OUTPUT
+
+      - name: Get report dir
+        #id: report-dir
+        shell: sh
+        run: |
+          python3 -c 'import toml; reportpath = toml.load("pyproject.toml")["tool"]["coverage"]["report"]["path"]; print(f"{reportpath=}")' >> $GITHUB_OUTPUT
+
+      - name: Get docs URL
+        #id: report-dir
+        shell: sh
+        run: |
+          python3 -c 'import toml; docurl = toml.load("pyproject.toml")["project"]["urls"]["documentation"]; print(f"{docurl=}")' >> $GITHUB_OUTPUT
 
   assemble:
     needs: coverage
@@ -122,7 +134,7 @@ jobs:
           set -xe
           export SHA10=$(echo ${{ github.sha }} | cut -c 1-10)
           export SLUG=$(date +'%Y%m%d')_$SHA10
-          export REPORT_DIR=$COV_REPORT_BASE_DIR/$SLUG
+          export REPORT_DIR=${{ needs.coverage.outputs.reportpath }}/$SLUG
           export REF="${{ github.ref }}"
           echo "total=${{ needs.coverage.outputs.total }}" >> $GITHUB_ENV
           #echo "sha10=$SHA10" >> $GITHUB_ENV
@@ -154,9 +166,9 @@ jobs:
         shell: sh
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          REDIR_HTML: "pages/${{ env.COV_REPORT_BASE_DIR }}/index.html"
-          BADGE_JSON: "pages/${{ env.COV_REPORT_BASE_DIR }}/cov.json"
-          REPORT_URL: "${{ env.DOCS_URL }}/${{ env.report_dir }}"
+          REDIR_HTML: "pages/${{ needs.coverage.outputs.reportpath }}/index.html"
+          BADGE_JSON: "pages/${{ needs.coverage.outputs.reportpath }}/cov.json"
+          REPORT_URL: "${{ needs.coverage.outputs.docurl }}/${{ env.report_dir }}"
         run: |
           set -xe
           # Make the redirect to the latest report.
