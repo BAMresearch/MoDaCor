@@ -112,8 +112,8 @@ jobs:
         shell: sh
         run: |
           echo "total=$(coverage report --format=total)" >> $GITHUB_OUTPUT
-          python3 -c 'import toml; reportpath = toml.load("pyproject.toml")["tool"]["coverage"]["report"]["path"]; print(f"{reportpath=}")' >> $GITHUB_OUTPUT
-          python3 -c 'import toml; docurl = toml.load("pyproject.toml")["project"]["urls"]["documentation"]; print(f"{docurl=}")' >> $GITHUB_OUTPUT
+          python3 -c 'import toml; print(f"reportpath={toml.load("pyproject.toml")["tool"]["coverage"]["report"]["path"]}")' >> $GITHUB_OUTPUT
+          python3 -c 'import toml; print(f"docurl={toml.load("pyproject.toml")["project"]["urls"]["documentation"]}")' >> $GITHUB_OUTPUT
 
   assemble:
     needs: coverage
