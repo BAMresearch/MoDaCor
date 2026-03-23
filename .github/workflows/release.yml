@@ -49,8 +49,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: sh
         run: |
-          set -x
-          SEMANTIC_RELEASE_DEBUG=1 semantic-release version --print
+          set -xe
           NEWVER=$(semantic-release version --print)
           [ -z "$NEWVER" ] && exit 1
           # version number updates with regexp which is not supported by
