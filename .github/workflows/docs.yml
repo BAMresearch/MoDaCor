@@ -106,19 +106,19 @@ jobs:
           path: htmlcov
 
       - name: Get total
-        #id: total
+        id: total
         shell: sh
         run: |
           echo "total=$(coverage report --format=total)" >> $GITHUB_OUTPUT
 
       - name: Get report dir
-        #id: report-dir
+        id: reportpath
         shell: sh
         run: |
           python3 -c 'import toml; reportpath = toml.load("pyproject.toml")["tool"]["coverage"]["report"]["path"]; print(f"{reportpath=}")' >> $GITHUB_OUTPUT
 
       - name: Get docs URL
-        #id: report-dir
+        id: docurl
         shell: sh
         run: |
           python3 -c 'import toml; docurl = toml.load("pyproject.toml")["project"]["urls"]["documentation"]; print(f"{docurl=}")' >> $GITHUB_OUTPUT
