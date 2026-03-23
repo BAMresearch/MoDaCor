@@ -18,20 +18,16 @@ jobs:
     uses: ./.github/workflows/release.yml
 
   build:
-    needs: [release, tests]  # build only if all tests are successful
+    needs: [tests, release]  # build only if all tests are successful
     uses: ./.github/workflows/build.yml
     secrets: inherit
 
   docs:
-    needs: [release]  # get (release) version number first
+    needs: [tests, release]  # get (release) version number first
     uses: ./.github/workflows/docs.yml
 
-  coverage:
-    needs: [tests, docs]  # coverage report is added to the docs webpage
-    uses: ./.github/workflows/coverage.yml
-
   publish:  # needs to be in the top-level .yml for Trusted Publishing to work @pypi
-    needs: [build,docs,coverage]
+    needs: [build,docs]
     runs-on: 'ubuntu-latest'
     permissions:
       id-token: write
