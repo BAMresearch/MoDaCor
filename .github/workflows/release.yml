@@ -13,6 +13,8 @@ jobs:
     # semantic-release github-actions bot can't push to main anyway
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.semver.outputs.new_version }}
     steps:
 
       # depth=0 is needed for semantic-release
@@ -47,11 +49,18 @@ jobs:
       - name: Determine a version number
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: semver
         shell: sh
         run: |
           set -xe
           NEWVER=$(semantic-release version --print)
           [ -z "$NEWVER" ] && exit 1
+          if [ "$NEWVER" = "$(semantic-release version --print-last-released 2>/dev/null)" ]; then
+            # make this info available for other job down the road
+            echo "new_version=false" >> $GITHUB_OUTPUT
+          else
+            echo "new_version=true" >> $GITHUB_OUTPUT
+          fi
           # version number updates with regexp which is not supported by
           # semantic_release.version_variables in pyproject.toml
           sed -i -e "s/v\([0-9]\+\.\)\{2\}\([0-9]\+\)/v$NEWVER/g" README.md
