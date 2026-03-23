@@ -89,21 +89,18 @@ jobs:
         uses: actions/configure-pages@v4
 
       - name: Download previously generated documentation
-        if: ${{ github.ref == 'refs/heads/main' }}
         uses: actions/download-artifact@v6
         with:
           name: docs
           path: pages
 
       - name: Download coverage HTML report
-        if: ${{ github.ref == 'refs/heads/main' }}
         uses: actions/download-artifact@v6
         with:
           name: html_report
           path: pages/${{ env.report_dir }}
 
       - name: Final touches
-        if: ${{ github.ref == 'refs/heads/main' }}
         shell: sh
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
@@ -133,6 +130,8 @@ jobs:
         with:
           path: pages
 
+  # Configure GitHub Pages to Use GitHub Actions as source
+  # In repository Settings → Pages, Under "Build and deployment"
   deploy:
     needs: assemble
     environment:
