@@ -86,7 +86,7 @@ jobs:
         run: mv .coverage coverage.${{ env.TOX_ENV }}.${{ matrix.os }}
 
       - name: Upload coverage data for next step
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: coverage.${{ env.TOX_ENV }}.${{ matrix.os }}
           path: coverage.*
