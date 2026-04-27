@@ -13,6 +13,8 @@ include .flake8
 include tox.ini
 include templates/*.j2
 include notebooks/*.ipynb
+include *.container
+include Dockerfile
 
 include *.md
 include AUTHORS.rst
