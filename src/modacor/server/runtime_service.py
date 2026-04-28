@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import traceback
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -641,7 +642,10 @@ class RuntimeService:
             run_id,
             code=error_code,
             message=str(exc),
-            details={"exception_type": type(exc).__name__},
+            details={
+                "exception_type": type(exc).__name__,
+                "traceback": traceback.format_exc(),
+            },
         )
         if request.mode == "auto" and effective_mode == "partial" and sources is not None:
             return self._run_auto_fallback(
@@ -738,6 +742,7 @@ class RuntimeService:
                 message=str(fallback_exc),
                 details={
                     "exception_type": type(fallback_exc).__name__,
+                    "traceback": traceback.format_exc(),
                     "recovered_from_run_id": recovered_from_run_id,
                 },
             )
