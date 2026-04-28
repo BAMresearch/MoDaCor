@@ -1,4 +1,4 @@
-# MoDaCor (v1.1.0)
+# MoDaCor (v1.2.0)
 
 ## Overview
 
@@ -6,7 +6,7 @@ New modular data corrections for any neutron or X-ray technique that produces 1D
 data.
 
 [![PyPI Package latest release](https://img.shields.io/pypi/v/modacor.svg)](https://pypi.org/project/modacor)
-[![Commits since latest release](https://img.shields.io/github/commits-since/BAMresearch/MoDaCor/v1.1.0.svg)](https://github.com/BAMresearch/MoDaCor/compare/v1.1.0...main)
+[![Commits since latest release](https://img.shields.io/github/commits-since/BAMresearch/MoDaCor/v1.2.0.svg)](https://github.com/BAMresearch/MoDaCor/compare/v1.2.0...main)
 [![License](https://img.shields.io/pypi/l/modacor.svg)](https://en.wikipedia.org/wiki/BSD-3-Clause)
 [![Supported versions](https://img.shields.io/pypi/pyversions/modacor.svg)](https://pypi.org/project/modacor)
 [![PyPI Wheel](https://img.shields.io/pypi/wheel/modacor.svg)](https://pypi.org/project/modacor#files)

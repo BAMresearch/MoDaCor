@@ -1,5 +1,51 @@
 # CHANGELOG
 
+## v1.2.0 (2026-04-28)
+
+### Bug fixes
+
+* **packaging**: update manifest ([`f24c269`](https://github.com/BAMresearch/MoDaCor/commit/f24c2699a3765532ebedc5df6a98b6017bfc351f))
+
+### Code style
+
+* **server**: fix whitespace formatting ([`44a04ac`](https://github.com/BAMresearch/MoDaCor/commit/44a04acea96fb29da7c96941e9956c86b4677dab))
+
+### Continuous integration
+
+* ci: Try to publish build results only for new version, fails otherwise on pypi ([`34987d7`](https://github.com/BAMresearch/MoDaCor/commit/34987d733767c6e1d480e770109380f569f75953))
+
+* ci: remove extra debug output from release job ([`fb5eae1`](https://github.com/BAMresearch/MoDaCor/commit/fb5eae13482693b45dd0c47b21e6698324adcecd))
+
+* ci: move docs permissions to job-level ([`9bc3ff1`](https://github.com/BAMresearch/MoDaCor/commit/9bc3ff1afe07b28147e2c20d31f91b548432a7c8))
+
+* ci: set permissions for deploying docs accordingly; missing version bump ([`4afa0cb`](https://github.com/BAMresearch/MoDaCor/commit/4afa0cba4ff6634b1333f9411977a3af2e1af1fd))
+
+* ci: bump GH Actions versions in use ([`85278b7`](https://github.com/BAMresearch/MoDaCor/commit/85278b7f28053be6651b1fd93bdd8ebf0e46eedc))
+
+* ci: syntax fix ([`189ef35`](https://github.com/BAMresearch/MoDaCor/commit/189ef35fcffdadd0c6e42c9911770a410de1e5dd))
+
+* ci: docs info outputs in one step, declare accordingly ([`604992f`](https://github.com/BAMresearch/MoDaCor/commit/604992f4e6550dcf2958478fff6eddc3c9b3b877))
+
+* ci: make sure GH Action step output is referencable ([`4f8be78`](https://github.com/BAMresearch/MoDaCor/commit/4f8be783cefe9b85a51d9e0ed6c485b4d3be7abf))
+
+* ci: replace hardcoded docurl+reportpath by parsing pyproject.toml ([`a653e08`](https://github.com/BAMresearch/MoDaCor/commit/a653e08de46432b92052993c3190c4c449614c56))
+
+* ci: deploy docs from main branch only (2) ([`b7a34f6`](https://github.com/BAMresearch/MoDaCor/commit/b7a34f6681b57018027cf58390ece95ee5e442dd))
+
+* ci: deploy docs from main branch only ([`823fe08`](https://github.com/BAMresearch/MoDaCor/commit/823fe08f3d150dea374512e01c12e0f2a7779bb4))
+
+* ci: prepare docs does not hurt on any branch ([`54eade5`](https://github.com/BAMresearch/MoDaCor/commit/54eade538faf825b6d3d9e632b7401c6837ab954))
+
+* ci: publish docs via GH Actions only ([`747f484`](https://github.com/BAMresearch/MoDaCor/commit/747f4842c415d256d9ee0c7ee8b7fa3c87279061))
+
+* ci: release job should run on main branch, no push will be made since no changes in history on PR merge expected ([`bb3cc74`](https://github.com/BAMresearch/MoDaCor/commit/bb3cc7426129ef0937b68a9d9eaa0102519fdd95))
+
+* ci: run release job on push events only ([`b7339fe`](https://github.com/BAMresearch/MoDaCor/commit/b7339fec51a75e9dff7ddff1c7318214895918ee))
+
+### Features
+
+* **Server**: extra files and fixes for building and setting up a container as systemd service ([`15c2215`](https://github.com/BAMresearch/MoDaCor/commit/15c2215ffecce4532852ed0a0399cae1e1e023d3))
+
 ## v1.1.0 (2026-03-20)
 
 ### Bug fixes
