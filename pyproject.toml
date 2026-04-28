@@ -55,6 +55,7 @@ docs = [
 server = [
     "fastapi>=0.110",
     "uvicorn>=0.27",
+    "pyyaml"
 ]
 ci = [
     "tox",
