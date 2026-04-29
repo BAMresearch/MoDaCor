@@ -21,4 +21,4 @@ repo_main_branch: main
 repo_name: MoDaCor
 repo_userorg: BAMresearch
 sphinx_theme: pydata-sphinx-theme
-version: 1.1.0
+version: 1.1.1

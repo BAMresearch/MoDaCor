@@ -10,7 +10,7 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "22/11/2025"
 __status__ = "Development"  # "Development", "Production"
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 from pint import UnitRegistry, set_application_registry
 
