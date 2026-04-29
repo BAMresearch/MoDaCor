@@ -18,6 +18,7 @@ from pathlib import Path
 
 import h5py
 import numpy as np
+import pytest
 
 from modacor.io.hdf.hdf_source import HDFSource
 
@@ -90,3 +91,9 @@ class TestHDFSource(unittest.TestCase):
         self.test_hdf_source._preload()
         data_attributes = self.test_hdf_source.get_data_attributes(self.temp_dataset_name)
         self.assertEqual({}, data_attributes)  # No attributes set, should return empty dict
+
+
+def test_hdf_source_missing_file_reports_filename():
+    missing = Path(__file__).parent / "does_not_exist.h5"
+    with pytest.raises(FileNotFoundError, match="does_not_exist.h5"):
+        HDFSource(source_reference="Test Data", resource_location=missing)

@@ -60,7 +60,10 @@ class HDFSource(IoSource):
         self._preload()  # load the HDF5 file structure immediately so we have some information, but not the data
 
     def _preload(self):
-        assert self._file_path.is_file(), self.logger.error(f"HDF5 file {self._file_path} does not exist.")
+        if self._file_path is None or not self._file_path.is_file():
+            message = f"HDF5 file {self._file_path} does not exist."
+            self.logger.error(message)
+            raise FileNotFoundError(message)
         try:
             with h5py.File(self._file_path, "r") as f:
                 f.visititems(self._find_datasets)

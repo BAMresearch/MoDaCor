@@ -72,9 +72,29 @@ class YAMLSource(IoSource):
         This method should be implemented to parse the YAML file and populate
         the _data_cache with SourceData objects.
         """
-        assert self._file_path.is_file(), self.logger.error(f"Static metadata file {self._file_path} does not exist.")
-        with open(self._file_path, "r") as f:
-            self._yaml_data.update(yaml.safe_load(f))
+        if self._file_path is None or not self._file_path.is_file():
+            message = f"Static metadata file {self._file_path} does not exist."
+            self.logger.error(message)
+            raise FileNotFoundError(message)
+
+        with open(self._file_path, "r", encoding="utf-8") as f:
+            try:
+                loaded = yaml.safe_load(f)
+            except yaml.YAMLError as exc:
+                message = f"Failed to parse YAML metadata file {self._file_path}: {exc}"
+                self.logger.error(message)
+                raise ValueError(message) from exc
+
+        if loaded is None:
+            return
+        if not isinstance(loaded, dict):
+            message = (
+                f"YAML metadata file {self._file_path} must contain a mapping at the top level, "
+                f"got {type(loaded).__name__}."
+            )
+            self.logger.error(message)
+            raise ValueError(message)
+        self._yaml_data.update(loaded)
 
     def get_static_metadata(self, data_key: str) -> Any:
         """Returns static metadata, which can be anything"""

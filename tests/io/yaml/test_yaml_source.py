@@ -45,3 +45,9 @@ def test_yaml_source_get_value():
         source.get_data("probe_properties/wavelength/unit")
     # but this works:
     assert source.get_static_metadata("probe_properties/wavelength/unit") == "nm"
+
+
+def test_yaml_source_missing_file_reports_filename():
+    missing = Path(__file__).parent / "does_not_exist.yaml"
+    with pytest.raises(FileNotFoundError, match="does_not_exist.yaml"):
+        YAMLSource(source_reference="defaults", resource_location=missing)
