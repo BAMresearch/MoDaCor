@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v1.2.1 (2026-05-04)
+
+### Bug fixes
+
+* **Server**: add data mount point to Dockerfile ([`9db459a`](https://github.com/BAMresearch/MoDaCor/commit/9db459a5f866aa8282b8f595d47b10a1468b6bcb))
+
+### Unknown Scope
+
+* adding traceback to the errors JSON ([`566c5b6`](https://github.com/BAMresearch/MoDaCor/commit/566c5b6150d9fff927136460d73f7fdab6d845d5))
+
 ## v1.2.0 (2026-04-28)
 
 ### Bug fixes
