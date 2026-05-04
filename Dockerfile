@@ -18,6 +18,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
+# create the data mount point
+WORKDIR /mnt/vsi-db
+# get the MoDaCor code
 WORKDIR /app
 COPY . /app
 
