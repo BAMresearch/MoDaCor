@@ -26,6 +26,7 @@ from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.modules.helpers import attach_prepared_data, normalize_str_list
+from modacor.modules.technique_modules.scattering.geometry_helpers import detector_index_basedata
 
 # Module-level handler; facilities can swap MessageHandler implementation as needed
 logger = MessageHandler(name=__name__)
@@ -40,9 +41,9 @@ class XSGeometry(ProcessStep):
     --------------
     * The last `rank_of_data` dimensions of `signal` are the detector dimensions,
     ordered as (..., y, x) for 2D and (..., y) for 1D.
-    * `beam_center.signal` is given in [y, x] pixel coordinates for 2D,
+    * `beam_center.signal` is given in [y, x] dimensionless detector index coordinates for 2D,
     and [y] for 1D.
-    * `pixel_size.signal` is [pixel_size_y, pixel_size_x] in length units / pixel.
+    * `pixel_size.signal` is [pixel_size_y, pixel_size_x] in length units.
     * `pixel_size` is a BaseData vector of length 2 or 3 (length units):
         - first component = pixel size along the "Q0" axis,
         - second component = pixel size along the "Q1" axis,
@@ -79,17 +80,17 @@ class XSGeometry(ProcessStep):
                 "type": (str, type(None)),
                 "required": True,
                 "default": None,
-                "doc": "IoSources key for pixel size signal.",
+                "doc": "IoSources key for detector element size signal.",
             },
             "pixel_size_units_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "IoSources key for pixel size units.",
+                "doc": "IoSources key for detector element size units.",
             },
             "pixel_size_uncertainties_sources": {
                 "type": dict,
                 "default": {},
-                "doc": "Uncertainty sources for pixel size.",
+                "doc": "Uncertainty sources for detector element size.",
             },
             "beam_center_source": {
                 "type": (str, type(None)),
@@ -209,6 +210,10 @@ class XSGeometry(ProcessStep):
                 raise ValueError(
                     f"Beam center must have {RoD} components for RoD={RoD}, got size={beam_center_bd.signal.size}."
                 )
+            if not beam_center_bd.units.is_compatible_with(ureg.dimensionless):
+                raise ValueError(
+                    f"Beam center units must be dimensionless detector indices, got {beam_center_bd.units}."
+                )
 
         # Pixel size: vector of 2 or 3 components.
         if pixel_size_bd.shape not in ((2,), (3,)):
@@ -220,11 +225,8 @@ class XSGeometry(ProcessStep):
         if RoD == 2 and len(spatial_shape) != 2:
             raise ValueError(f"RoD=2 expects 2D spatial shape, got {spatial_shape}.")
 
-        if pixel_size_bd.units.is_compatible_with(ureg.m / ureg.pixel) is False:
-            logger.warning(
-                f"Pixel size units are {pixel_size_bd.units}, xs_geometry expects pixel size units compatible with"
-                " [m/pixel]."
-            )
+        if not pixel_size_bd.units.is_compatible_with(ureg.m):
+            raise ValueError(f"Pixel size units must be length units such as m or mm, got {pixel_size_bd.units}.")
 
         logger.debug(
             f"XSGeometry: validated geometry for RoD={RoD}, spatial_shape={spatial_shape}, "
@@ -238,31 +240,12 @@ class XSGeometry(ProcessStep):
         uncertainty_key: str = "pixel_index",
     ) -> BaseData:
         """
-        Create a BaseData representing pixel indices along a given axis.
+        Create a BaseData representing detector indices along a given axis.
 
-        Each index gets an uncertainty of ±0.5 pixel to reflect the
-        pixel-center assumption.
-
-        the indices are shifted by half a pixel to represent pixel centers.
-        This means if you floor a float coordinate in pixel units, you get the correct pixel index.
+        Each index gets an uncertainty of ±0.5 index units to reflect the
+        detector-element center assumption.
         """
-        if len(shape) == 0:
-            signal = np.array(0.0, dtype=float)
-        else:
-            grids = np.meshgrid(
-                *[np.arange(n, dtype=float) + 0.5 for n in shape],
-                indexing="ij",
-            )
-            signal = grids[axis]
-
-        # always add half-pixel uncertainty estimate to pixel indices
-        uncertainties: Dict[str, np.ndarray] = {uncertainty_key: np.full_like(signal, 0.5, dtype=float)}
-
-        return BaseData(
-            signal=signal,
-            units=ureg.pixel,
-            uncertainties=uncertainties,
-        )
+        return detector_index_basedata(shape, axis, uncertainty_key=uncertainty_key)
 
     # ------------------------------------------------------------------
     # Coordinate calculation per dimensionality
@@ -273,8 +256,8 @@ class XSGeometry(ProcessStep):
         RoD: int,
         spatial_shape: tuple[int, ...],
         beam_center_bd: BaseData,
-        px0_bd: BaseData,
-        px1_bd: BaseData,
+        pitch0_bd: BaseData,
+        pitch1_bd: BaseData,
         detector_distance_bd: BaseData,
     ) -> Tuple[BaseData, BaseData, BaseData, BaseData]:
         """
@@ -287,9 +270,9 @@ class XSGeometry(ProcessStep):
         """
         if RoD == 0:
             # 0D: no spatial axes, use the detector distance directly.
-            x0_bd = BaseData(signal=np.array(0.0), units=px0_bd.units)
-            x1_bd = BaseData(signal=np.array(0.0), units=px1_bd.units)
-            r_perp_bd = BaseData(signal=np.array(0.0), units=px0_bd.units * ureg.pixel)
+            x0_bd = BaseData(signal=np.array(0.0), units=pitch0_bd.units)
+            x1_bd = BaseData(signal=np.array(0.0), units=pitch1_bd.units)
+            r_perp_bd = BaseData(signal=np.array(0.0), units=pitch0_bd.units)
             R_bd = detector_distance_bd
             logger.debug("XSGeometry: RoD=0, using detector distance directly for R.")
             return x0_bd, x1_bd, r_perp_bd, R_bd
@@ -299,7 +282,7 @@ class XSGeometry(ProcessStep):
             idx0_bd = self._make_index_basedata(shape=(n0,), axis=0)
 
             rel_idx0_bd = idx0_bd - beam_center_bd.indexed(0, rank_of_data=0)
-            x0_bd = rel_idx0_bd * px0_bd
+            x0_bd = rel_idx0_bd * pitch0_bd
             x1_bd = BaseData(
                 signal=np.zeros_like(x0_bd.signal),
                 units=x0_bd.units,
@@ -318,8 +301,8 @@ class XSGeometry(ProcessStep):
             rel_idx0_bd = idx0_bd - beam_center_bd.indexed(0, rank_of_data=0)
             rel_idx1_bd = idx1_bd - beam_center_bd.indexed(1, rank_of_data=0)
 
-            x0_bd = rel_idx0_bd * px0_bd
-            x1_bd = rel_idx1_bd * px1_bd
+            x0_bd = rel_idx0_bd * pitch0_bd
+            x1_bd = rel_idx1_bd * pitch1_bd
 
             logger.debug(
                 f"XSGeometry: computed 2D coordinates for spatial_shape={spatial_shape}, "
@@ -427,23 +410,22 @@ class XSGeometry(ProcessStep):
     def _compute_solid_angle(
         self,
         R_bd: BaseData,
-        px0_bd: BaseData,
-        px1_bd: BaseData,
+        pitch0_bd: BaseData,
+        pitch1_bd: BaseData,
         detector_distance_bd: BaseData,
     ) -> BaseData:
         """
-        Compute solid angle per pixel (Omega) as BaseData.
+        Compute solid angle subtended by each detector element (Omega) as BaseData.
 
         Approximation:
             dΩ ≈ A * D / R³
 
-        with A = pixel area (px0 * px1), D = detector distance, R = ray length.
+        with A = detector element area, D = detector distance, R = ray length.
         """
-        area_bd = px0_bd * px1_bd
+        area_bd = pitch0_bd * pitch1_bd
         R3_bd = R_bd**3
         Omega_bd = (area_bd * detector_distance_bd) / R3_bd  # dimensionless (sr)
-        # set units to steradian per pixel explicitly
-        Omega_bd.units = ureg.steradian / ureg.pixel
+        Omega_bd.units = ureg.steradian
 
         logger.debug(
             f"XSGeometry: computed solid angle; Omega.shape={Omega_bd.signal.shape}, Omega.units={Omega_bd.units}"  # noqa: E702
@@ -480,17 +462,17 @@ class XSGeometry(ProcessStep):
         beam_center_bd = geom["beam_center"]
         wavelength_bd = geom["wavelength"]
 
-        # 3. Extract pixel pitches along Q0/Q1
-        px0_bd = pixel_size_bd.indexed(0, rank_of_data=0)
-        px1_bd = pixel_size_bd.indexed(1, rank_of_data=0)
+        # 3. Extract detector element sizes along Q0/Q1
+        pitch0_bd = pixel_size_bd.indexed(0, rank_of_data=0)
+        pitch1_bd = pixel_size_bd.indexed(1, rank_of_data=0)
 
         # 4. Coordinates (x0, x1, r_perp, R)
         x0_bd, x1_bd, r_perp_bd, R_bd = self._compute_coordinates(
             RoD=RoD,
             spatial_shape=spatial_shape,
             beam_center_bd=beam_center_bd,
-            px0_bd=px0_bd,
-            px1_bd=px1_bd,
+            pitch0_bd=pitch0_bd,
+            pitch1_bd=pitch1_bd,
             detector_distance_bd=detector_distance_bd,
         )
 
@@ -518,8 +500,8 @@ class XSGeometry(ProcessStep):
         # 9. Solid angle (Omega)
         Omega_bd = self._compute_solid_angle(
             R_bd=R_bd,
-            px0_bd=px0_bd,
-            px1_bd=px1_bd,
+            pitch0_bd=pitch0_bd,
+            pitch1_bd=pitch1_bd,
             detector_distance_bd=detector_distance_bd,
         )
 

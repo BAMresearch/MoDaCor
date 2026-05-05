@@ -31,6 +31,7 @@ from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.modules.helpers import attach_prepared_data, normalize_str_list
 from modacor.modules.technique_modules.scattering.geometry_helpers import (
+    detector_index_basedata,
     prepare_static_scalar,
     require_scalar,
     unit_vec3,
@@ -50,13 +51,13 @@ class CanonicalDetectorFrame:
     - det_coord_x: lab-frame x-coordinate of the detector origin. This indicates the offset of the detector origin to the beam center in the lab frame. units of length.
     - det_coord_y: lab-frame y-coordinate of the detector origin. This indicates the offset of the detector origin to the beam center in the lab frame. units of length.
     - e_fast/e_slow/e_normal: unit vectors in lab frame (shape (3,)), defining detector orientation.
-    - pixel_pitch_{slow,fast}: scalar length/pixel
+    - pixel_pitch_{slow,fast}: scalar detector-element size in length units
 
     Notes:
     Tilt support will be integrated when needed following the NeXus pitch, yaw, roll for rotations around x, y, z.
     This implementation assumes a non-moving, planar detector.
     For other, instrument-specific implementations, subclass PixelCoordinates3D and replace _load_canonical_frame().
-    Origin of the detector is at pixel with index (0,0).
+    Origin of the detector is at detector element index (0,0).
     """
 
     det_coord_z: BaseData
@@ -78,18 +79,18 @@ class CanonicalDetectorFrame:
         object.__setattr__(
             self,
             "pixel_pitch_slow",
-            prepare_static_scalar(self.pixel_pitch_slow, require_units=ureg.m / ureg.pixel),
+            prepare_static_scalar(self.pixel_pitch_slow, require_units=ureg.m),
         )
         object.__setattr__(
             self,
             "pixel_pitch_fast",
-            prepare_static_scalar(self.pixel_pitch_fast, require_units=ureg.m / ureg.pixel),
+            prepare_static_scalar(self.pixel_pitch_fast, require_units=ureg.m),
         )
 
 
 class PixelCoordinates3D(ProcessStep):
     """
-    Primary arrays module: compute 3D pixel center coordinates in lab-frame NeXus-like axes.
+    Primary arrays module: compute 3D detector element center coordinates in lab-frame NeXus-like axes.
 
     Outputs (BaseData, length units, detector shape):
       - coord_x
@@ -161,33 +162,33 @@ class PixelCoordinates3D(ProcessStep):
                 "type": (str, type(None)),
                 "required": True,
                 "default": None,
-                "doc": "IoSources key for slow-axis pixel pitch signal.",
+                "doc": "IoSources key for slow-axis detector element size signal.",
             },
             "pixel_pitch_slow_units_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "IoSources key for slow-axis pixel pitch units.",
+                "doc": "IoSources key for slow-axis detector element size units.",
             },
             "pixel_pitch_slow_uncertainties_sources": {
                 "type": dict,
                 "default": {},
-                "doc": "Uncertainty sources for slow-axis pixel pitch.",
+                "doc": "Uncertainty sources for slow-axis detector element size.",
             },
             "pixel_pitch_fast_source": {
                 "type": (str, type(None)),
                 "required": True,
                 "default": None,
-                "doc": "IoSources key for fast-axis pixel pitch signal.",
+                "doc": "IoSources key for fast-axis detector element size signal.",
             },
             "pixel_pitch_fast_units_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "IoSources key for fast-axis pixel pitch units.",
+                "doc": "IoSources key for fast-axis detector element size units.",
             },
             "pixel_pitch_fast_uncertainties_sources": {
                 "type": dict,
                 "default": {},
-                "doc": "Uncertainty sources for fast-axis pixel pitch.",
+                "doc": "Uncertainty sources for fast-axis detector element size.",
             },
             "basis_fast": {
                 "type": tuple,
@@ -211,7 +212,7 @@ class PixelCoordinates3D(ProcessStep):
             "coord_z": ["signal", "uncertainties"],
         },
         step_keywords=["geometry", "coordinates", "detector"],
-        step_doc="Computes 3D pixel center coordinates in lab-frame axes.",
+        step_doc="Computes 3D detector element center coordinates in lab-frame axes.",
     )
 
     def _load_from_sources(self, key: str) -> BaseData:
@@ -241,14 +242,14 @@ class PixelCoordinates3D(ProcessStep):
 
         pitch_slow = prepare_static_scalar(
             self._load_from_sources("pixel_pitch_slow"),
-            require_units=ureg.m / ureg.pixel,
+            require_units=ureg.m,
             uncertainty_key="pixel_pitch_jitter",
-        )  # scalar length/pixel
+        )  # scalar length
         pitch_fast = prepare_static_scalar(
             self._load_from_sources("pixel_pitch_fast"),
-            require_units=ureg.m / ureg.pixel,
+            require_units=ureg.m,
             uncertainty_key="pixel_pitch_jitter",
-        )  # scalar length/pixel
+        )  # scalar length
 
         e_fast = unit_vec3(self.configuration.get("basis_fast", (1.0, 0.0, 0.0)), name="basis_fast")
         e_slow = unit_vec3(self.configuration.get("basis_slow", (0.0, 1.0, 0.0)), name="basis_slow")
@@ -287,23 +288,24 @@ class PixelCoordinates3D(ProcessStep):
         return v / n
 
     # ----------------------------
-    # broadcast-friendly pixel indices (pixel-center convention)
+    # broadcast-friendly detector indices (center-of-element convention)
     # ----------------------------
 
     @staticmethod
     def _idx_fast_1d(n_fast: int) -> BaseData:
-        sig = np.arange(n_fast, dtype=float) + 0.5
-        return BaseData(signal=sig, units=ureg.pixel, uncertainties={"pixel_index_fast": np.full_like(sig, 0.5)})
+        return detector_index_basedata((n_fast,), 0, uncertainty_key="pixel_index_fast")
 
     @staticmethod
     def _idx_slow_2d(n_slow: int) -> BaseData:
-        sig = (np.arange(n_slow, dtype=float) + 0.5)[:, None]
-        return BaseData(signal=sig, units=ureg.pixel, uncertainties={"pixel_index_slow": np.full_like(sig, 0.5)})
+        return detector_index_basedata((n_slow,), 0, uncertainty_key="pixel_index_slow").indexed(
+            (slice(None), None), rank_of_data=0
+        )
 
     @staticmethod
     def _idx_fast_2d(n_fast: int) -> BaseData:
-        sig = (np.arange(n_fast, dtype=float) + 0.5)[None, :]
-        return BaseData(signal=sig, units=ureg.pixel, uncertainties={"pixel_index_fast": np.full_like(sig, 0.5)})
+        return detector_index_basedata((n_fast,), 0, uncertainty_key="pixel_index_fast").indexed(
+            (None, slice(None)), rank_of_data=0
+        )
 
     # ----------------------------
     # core compute
@@ -318,8 +320,9 @@ class PixelCoordinates3D(ProcessStep):
     ) -> Dict[str, BaseData]:
         """
         here:
-        det_coord_x/y/z represent the lab-frame position of the detector “pixel grid origin” (i.e. the corner before applying the +0.5 pixel-center shift).
-        Pixel centers are at (i+0.5, j+0.5) which matches the current _idx_* methods and the ±0.5 px index uncertainty.
+        det_coord_x/y/z represent the lab-frame position of the detector grid
+        origin corner before applying the +0.5 center shift. Detector element
+        centers are at (i+0.5, j+0.5), matching the ±0.5 index uncertainty.
         """
 
         # Scalars in length units (already averaged + SEM in CanonicalDetectorFrame.__attrs_post_init__)
@@ -340,9 +343,9 @@ class PixelCoordinates3D(ProcessStep):
         # RoD==1: one detector axis ("fast")
         if RoD == 1:
             (n_fast,) = detector_shape
-            i_fast_px = self._idx_fast_1d(n_fast)  # (n_fast,), centers at i+0.5
+            i_fast_index = self._idx_fast_1d(n_fast)  # (n_fast,), centers at i+0.5
 
-            off_fast = i_fast_px * pitch_fast  # length along fast axis
+            off_fast = i_fast_index * pitch_fast  # length along fast axis
 
             coord_x = ox + (off_fast * e_fast[0])
             coord_y = oy + (off_fast * e_fast[1])
@@ -356,11 +359,11 @@ class PixelCoordinates3D(ProcessStep):
             )
 
         n_slow, n_fast = detector_shape
-        j_slow_px = self._idx_slow_2d(n_slow)  # (n_slow, 1)
-        i_fast_px = self._idx_fast_2d(n_fast)  # (1, n_fast)
+        j_slow_index = self._idx_slow_2d(n_slow)  # (n_slow, 1)
+        i_fast_index = self._idx_fast_2d(n_fast)  # (1, n_fast)
 
-        off_slow = j_slow_px * pitch_slow  # (n_slow, 1) length
-        off_fast = i_fast_px * pitch_fast  # (1, n_fast) length
+        off_slow = j_slow_index * pitch_slow  # (n_slow, 1) length
+        off_fast = i_fast_index * pitch_fast  # (1, n_fast) length
 
         # Broadcast to (n_slow, n_fast) automatically via BaseData arithmetic
         coord_x = ox + (off_slow * e_slow[0]) + (off_fast * e_fast[0])
