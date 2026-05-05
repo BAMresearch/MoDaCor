@@ -11,7 +11,7 @@ __date__ = "06/01/2026"
 __status__ = "Development"  # "Development", "Production"
 
 __version__ = "20260106.1"
-__all__ = ["unit_vec3", "require_scalar", "prepare_static_scalar"]
+__all__ = ["unit_vec3", "require_scalar", "prepare_static_scalar", "detector_index_basedata"]
 
 from typing import Tuple
 
@@ -38,6 +38,37 @@ def require_scalar(name: str, bd: BaseData) -> BaseData:
         raise ValueError(f"{name} must be scalar (size==1). Got shape={np.shape(out.signal)}.")
     out.rank_of_data = 0
     return out
+
+
+def detector_index_basedata(
+    shape: tuple[int, ...],
+    axis: int,
+    *,
+    uncertainty_key: str,
+) -> BaseData:
+    """
+    Build a dimensionless detector index grid with center-of-element convention.
+
+    Detector element indices are array coordinates, not physical units. The
+    nominal coordinate is shifted by 0.5 so index 0 represents the center of the
+    first detector element, and the default uncertainty is 0.5 index units.
+    """
+    if len(shape) == 0:
+        signal = np.array(0.0, dtype=float)
+    else:
+        if axis < 0 or axis >= len(shape):
+            raise ValueError(f"axis={axis} is outside detector shape with rank {len(shape)}.")
+        grids = np.meshgrid(
+            *[np.arange(n, dtype=float) + 0.5 for n in shape],
+            indexing="ij",
+        )
+        signal = grids[axis]
+
+    return BaseData(
+        signal=signal,
+        units=ureg.dimensionless,
+        uncertainties={uncertainty_key: np.full_like(signal, 0.5, dtype=float)},
+    )
 
 
 def prepare_static_scalar(

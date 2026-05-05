@@ -38,7 +38,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
     Inputs from configuration sources:
       - sample_z: scalar length (sample is at (0,0,sample_z))
       - wavelength: scalar length
-      - pixel_pitch_fast, pixel_pitch_slow: scalar length/pixel (for Omega)
+      - pixel_pitch_fast, pixel_pitch_slow: scalar detector element size in length units (for Omega)
 
     Outputs:
       - Q0, Q1, Q2, Q, Psi, TwoTheta, Omega
@@ -87,33 +87,33 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
                 "type": (str, type(None)),
                 "required": True,
                 "default": None,
-                "doc": "IoSources key for slow-axis pixel pitch signal.",
+                "doc": "IoSources key for slow-axis detector element size signal.",
             },
             "pixel_pitch_slow_units_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "IoSources key for slow-axis pixel pitch units.",
+                "doc": "IoSources key for slow-axis detector element size units.",
             },
             "pixel_pitch_slow_uncertainties_sources": {
                 "type": dict,
                 "default": {},
-                "doc": "Uncertainty sources for slow-axis pixel pitch.",
+                "doc": "Uncertainty sources for slow-axis detector element size.",
             },
             "pixel_pitch_fast_source": {
                 "type": (str, type(None)),
                 "required": True,
                 "default": None,
-                "doc": "IoSources key for fast-axis pixel pitch signal.",
+                "doc": "IoSources key for fast-axis detector element size signal.",
             },
             "pixel_pitch_fast_units_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "IoSources key for fast-axis pixel pitch units.",
+                "doc": "IoSources key for fast-axis detector element size units.",
             },
             "pixel_pitch_fast_uncertainties_sources": {
                 "type": dict,
                 "default": {},
-                "doc": "Uncertainty sources for fast-axis pixel pitch.",
+                "doc": "Uncertainty sources for fast-axis detector element size.",
             },
             "detector_normal": {
                 "type": tuple,
@@ -180,7 +180,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         two_pi = float(2.0 * np.pi)
         k = two_pi / wavelength  # 1/length
 
-        # unit direction to pixel
+        # unit direction to detector element center
         rhat_x = dx / R
         rhat_y = dy / R
         rhat_z = dz / R
@@ -196,19 +196,18 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         psi_signal = np.arctan2(dy.signal, dx.signal)
         Psi = BaseData(signal=psi_signal, units=ureg.radian)
 
-        # Solid angle per pixel:
+        # Solid angle per detector element:
         # dΩ ≈ A * cos(alpha) / R^2, with cos(alpha)=n·rhat
-        # Here A from pitches (length/pixel)×(length/pixel).
+        # Here A is computed from detector element sizes in length units.
         n = detector_normal
         cos_alpha = (rhat_x * n[0]) + (rhat_y * n[1]) + (rhat_z * n[2])
         cos_alpha_clipped = cos_alpha.copy()
         cos_alpha_clipped.signal = np.clip(cos_alpha.signal, 0.0, None)
         cos_alpha = cos_alpha_clipped
 
-        one_px = BaseData(signal=np.array(1.0, dtype=float), units=ureg.pixel, rank_of_data=0)
-        area_pixel = (pitch_fast * one_px) * (pitch_slow * one_px)  # -> m^2
+        area_pixel = pitch_fast * pitch_slow
         Omega = (area_pixel * cos_alpha) / (R**2)
-        Omega.units = ureg.steradian  # (steradian is dimensionless, but explicit is fine)
+        Omega.units = ureg.steradian
 
         return {"Q0": Q0, "Q1": Q1, "Q2": Q2, "Q": Q, "Psi": Psi, "TwoTheta": TwoTheta, "Omega": Omega}
 
@@ -241,12 +240,12 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         )
         pitch_slow = prepare_static_scalar(
             self._load_from_sources("pixel_pitch_slow"),
-            require_units=ureg.m / ureg.pixel,
+            require_units=ureg.m,
             uncertainty_key="pixel_pitch_jitter",
         )
         pitch_fast = prepare_static_scalar(
             self._load_from_sources("pixel_pitch_fast"),
-            require_units=ureg.m / ureg.pixel,
+            require_units=ureg.m,
             uncertainty_key="pixel_pitch_jitter",
         )
 

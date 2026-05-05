@@ -72,7 +72,7 @@ def make_1d_signal_bundle(
     # simple axis metadata (optional, but useful to check propagation)
     axis_bd = BaseData(
         signal=np.arange(n, dtype=float),
-        units=ureg.pixel,
+        units=ureg.dimensionless,
         rank_of_data=0,
     )
     signal_bd.axes = [axis_bd]
@@ -369,12 +369,12 @@ def test_indexpixels_prepare_and_calculate_integration_2d():
     # Add two spatial axes for completeness
     axis_row = BaseData(
         signal=np.arange(n0, dtype=float),
-        units=ureg.pixel,
+        units=ureg.dimensionless,
         rank_of_data=0,
     )
     axis_col = BaseData(
         signal=np.arange(n1, dtype=float),
-        units=ureg.pixel,
+        units=ureg.dimensionless,
         rank_of_data=0,
     )
     signal_bd.axes = [axis_row, axis_col]

@@ -35,8 +35,8 @@ def _make_processing_data_with_coords(shape=(11, 20), *, rod=2) -> ProcessingDat
     n_slow, n_fast = shape
 
     # Choose pitches that make expected arrays easy to compute
-    pitch_fast = 1e-3  # m / px
-    pitch_slow = 2e-3  # m / px
+    pitch_fast = 1e-3  # m
+    pitch_slow = 2e-3  # m
 
     x = (np.arange(n_fast, dtype=float) + 0.5)[None, :] * pitch_fast
     y = (np.arange(n_slow, dtype=float) + 0.5)[:, None] * pitch_slow
@@ -108,7 +108,7 @@ def _expected_geometry_arrays(
     n = n / np.linalg.norm(n)
     cos_alpha = rhat_x * n[0] + rhat_y * n[1] + rhat_z * n[2]
 
-    area = pitch_fast * pitch_slow  # (m/px)*(m/px) = m^2/px^2
+    area = pitch_fast * pitch_slow  # m^2
     omega = (area * cos_alpha) / (R * R)
 
     return two_theta, psi, Q0, Q1, Q2, Q, omega
@@ -130,9 +130,9 @@ def test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arr
     # wavelength scalar
     wavelength_bd = BaseData(signal=np.array(1.0e-10, dtype=float), units=ureg.m, rank_of_data=0)
 
-    # pitches scalar (m/pixel)
-    pitch_fast_bd = BaseData(signal=np.array(1e-3, dtype=float), units=ureg.m / ureg.pixel, rank_of_data=0)
-    pitch_slow_bd = BaseData(signal=np.array(2e-3, dtype=float), units=ureg.m / ureg.pixel, rank_of_data=0)
+    # pitches are scalar detector element sizes in length units
+    pitch_fast_bd = BaseData(signal=np.array(1e-3, dtype=float), units=ureg.m, rank_of_data=0)
+    pitch_slow_bd = BaseData(signal=np.array(2e-3, dtype=float), units=ureg.m, rank_of_data=0)
 
     sources = {
         "sample_z": sample_z_bd,
@@ -177,7 +177,7 @@ def test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arr
     assert out["TwoTheta"].units.is_compatible_with(ureg.radian)
     assert out["Psi"].units.is_compatible_with(ureg.radian)
     assert out["Q"].units.is_compatible_with(ureg.m**-1)
-    assert out["Omega"].units.is_compatible_with(ureg.steradian)
+    assert out["Omega"].units == ureg.steradian
 
 
 def test_geometry_from_pixel_coordinates_detector_normal_is_normalized():
@@ -191,8 +191,8 @@ def test_geometry_from_pixel_coordinates_detector_normal_is_normalized():
         signal=np.array([0.10, 0.12, 0.08, 0.11, 0.09], dtype=float).reshape(5, 1, 1, 1), units=ureg.m, rank_of_data=0
     )
     wavelength_bd = BaseData(signal=np.array(1.0e-10, dtype=float), units=ureg.m, rank_of_data=0)
-    pitch_fast_bd = BaseData(signal=np.array(1e-3, dtype=float), units=ureg.m / ureg.pixel, rank_of_data=0)
-    pitch_slow_bd = BaseData(signal=np.array(2e-3, dtype=float), units=ureg.m / ureg.pixel, rank_of_data=0)
+    pitch_fast_bd = BaseData(signal=np.array(1e-3, dtype=float), units=ureg.m, rank_of_data=0)
+    pitch_slow_bd = BaseData(signal=np.array(2e-3, dtype=float), units=ureg.m, rank_of_data=0)
 
     sources = {
         "sample_z": sample_z_bd,

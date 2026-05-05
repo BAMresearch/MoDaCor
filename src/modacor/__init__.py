@@ -10,16 +10,17 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "22/11/2025"
 __status__ = "Development"  # "Development", "Production"
 
-__version__ = "1.2.1"
+__version__ = "1.2.2"
 
 from pint import UnitRegistry, set_application_registry
 
-from .units import configure_detector_pixel_units
+from .units import remove_pixel_units
 
 ureg = UnitRegistry(system="SI")
 
-# Make pixel/px mean "detector element" everywhere in MoDaCor
-configure_detector_pixel_units(ureg)
+# Detector element indices are dimensionless in MoDaCor. Remove Pint's
+# display-pixel unit aliases so stale metadata such as "mm/pixel" fails fast.
+remove_pixel_units(ureg)
 
 # we need to define an arbitrary intensity unit for scaling of intensity data:
 ureg.define("AFU = [flux] = arbitrary_flux_unit")

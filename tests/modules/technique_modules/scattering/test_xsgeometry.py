@@ -52,8 +52,8 @@ def make_geom_2d(n0: int, n1: int):
 
     - Detector: n0 x n1
     - Detector distance: 1.0 m with 1 mm uncertainty
-    - Pixel size: 1e-3 m/pixel in both directions (with small uncertainty)
-    - Beam center: exact centre pixel (with 0.25 pixel uncertainty)
+    - Pixel size: 1e-3 m in both directions (with small uncertainty)
+    - Beam center: exact centre detector index (with 0.25 index uncertainty)
     - Wavelength: 1 Å (1e-10 m) with 2% uncertainty
     """
     # --- detector distance: 1.0 m ± 1 mm ---
@@ -65,23 +65,23 @@ def make_geom_2d(n0: int, n1: int):
         uncertainties={"propagate_to_all": np.array(D_unc, dtype=float)},
     )
 
-    # --- pixel size: 1e-3 m/pixel ± 1e-6 m/pixel ---
+    # --- pixel size: 1e-3 m ± 1e-6 m ---
     pixel_signal = np.asarray([1e-3, 1e-3], dtype=float)
     pixel_unc = np.full_like(pixel_signal, 1e-6, dtype=float)
     pixel_size_bd = BaseData(
         signal=pixel_signal,
-        units=ureg.meter / ureg.pixel,
+        units=ureg.meter,
         uncertainties={"propagate_to_all": pixel_unc},
     )
 
-    # --- beam centre: at the centre pixel, ±0.25 pixel ---
+    # --- beam centre: at the centre detector index, ±0.25 index units ---
     center_row = (n0 - 1) / 2.0
     center_col = (n1 - 1) / 2.0
     beam_signal = np.asarray([center_row, center_col], dtype=float)
     beam_unc = np.full_like(beam_signal, 0.25, dtype=float)
     beam_center_bd = BaseData(
         signal=beam_signal,
-        units=ureg.pixel,
+        units=ureg.dimensionless,
         uncertainties={"pixel_index": beam_unc},
     )
 
@@ -112,22 +112,22 @@ def make_geom_1d(n: int):
         uncertainties={"propagate_to_all": np.array(D_unc, dtype=float)},
     )
 
-    # --- pixel size: 1e-3 m/pixel ± 1e-6 m/pixel ---
+    # --- pixel size: 1e-3 m ± 1e-6 m ---
     pixel_signal = np.asarray([1e-3, 1e-3], dtype=float)
     pixel_unc = np.full_like(pixel_signal, 1e-6, dtype=float)
     pixel_size_bd = BaseData(
         signal=pixel_signal,
-        units=ureg.meter / ureg.pixel,
+        units=ureg.meter,
         uncertainties={"propagate_to_all": pixel_unc},
     )
 
-    # --- beam centre: central pixel ±0.25 pixel ---
+    # --- beam centre: central detector index ±0.25 index units ---
     center = (n - 1) / 2.0
     beam_signal = np.asarray([center], dtype=float)
     beam_unc = np.full_like(beam_signal, 0.25, dtype=float)
     beam_center_bd = BaseData(
         signal=beam_signal,
-        units=ureg.pixel,
+        units=ureg.dimensionless,
         uncertainties={"pixel_index": beam_unc},
     )
 
@@ -172,15 +172,15 @@ def test_xsgeometry_2d_center_q_zero_and_symmetry():
     n0, n1 = 5, 5
     spatial_shape = (n0, n1)
     D_bd, pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_2d(n0, n1)
-    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
+    pitch0_bd, pitch1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
 
     # coordinates
     x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
         RoD=2,
         spatial_shape=spatial_shape,
         beam_center_bd=beam_center_bd,
-        px0_bd=px0_bd,
-        px1_bd=px1_bd,
+        pitch0_bd=pitch0_bd,
+        pitch1_bd=pitch1_bd,
         detector_distance_bd=D_bd,
     )
 
@@ -199,8 +199,8 @@ def test_xsgeometry_2d_center_q_zero_and_symmetry():
     Psi_bd = step._compute_psi(x0_bd=x0_bd, x1_bd=x1_bd)
     Omega_bd = step._compute_solid_angle(
         R_bd=R_bd,
-        px0_bd=px0_bd,
-        px1_bd=px1_bd,
+        pitch0_bd=pitch0_bd,
+        pitch1_bd=pitch1_bd,
         detector_distance_bd=D_bd,
     )
 
@@ -289,6 +289,7 @@ def test_xsgeometry_2d_center_q_zero_and_symmetry():
     omega_corner = Omega_bd.signal[0, 0]
     assert omega_corner < omega_center
     assert np.all(Omega_bd.signal > 0.0)
+    assert Omega_bd.units == ureg.steradian
 
     # θ increases with distance from the centre along the central row
     theta_row = theta_bd.signal[row_c, :]
@@ -313,14 +314,14 @@ def test_xsgeometry_1d_center_q_zero_and_monotonic():
     n = 7
     spatial_shape = (n,)
     D_bd, pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_1d(n)
-    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
+    pitch0_bd, pitch1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
 
     x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
         RoD=1,
         spatial_shape=spatial_shape,
         beam_center_bd=beam_center_bd,
-        px0_bd=px0_bd,
-        px1_bd=px1_bd,
+        pitch0_bd=pitch0_bd,
+        pitch1_bd=pitch1_bd,
         detector_distance_bd=D_bd,
     )
 
@@ -367,17 +368,17 @@ def test_xsgeometry_0d_shapes_and_units():
     spatial_shape: tuple[int, ...] = ()
     D_bd = _bd_scalar(1.0, ureg.meter)
     # pixel size / beam center technically irrelevant for RoD=0, but we supply valid shapes
-    pixel_size_bd = _bd_vector([1e-3, 1e-3], ureg.meter / ureg.pixel)
-    beam_center_bd = _bd_vector([0.0], ureg.pixel)
+    pixel_size_bd = _bd_vector([1e-3, 1e-3], ureg.meter)
+    beam_center_bd = _bd_vector([0.0], ureg.dimensionless)
     wavelength_bd = _bd_scalar(1.0, ureg.meter)
 
-    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
+    pitch0_bd, pitch1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
     x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
         RoD=0,
         spatial_shape=spatial_shape,
         beam_center_bd=beam_center_bd,
-        px0_bd=px0_bd,
-        px1_bd=px1_bd,
+        pitch0_bd=pitch0_bd,
+        pitch1_bd=pitch1_bd,
         detector_distance_bd=D_bd,
     )
 
@@ -394,8 +395,8 @@ def test_xsgeometry_0d_shapes_and_units():
     )
     Omega_bd = step._compute_solid_angle(
         R_bd=R_bd,
-        px0_bd=px0_bd,
-        px1_bd=px1_bd,
+        pitch0_bd=pitch0_bd,
+        pitch1_bd=pitch1_bd,
         detector_distance_bd=D_bd,
     )
 
@@ -415,6 +416,62 @@ def test_xsgeometry_0d_shapes_and_units():
 
     # solid angle > 0
     assert Omega_bd.signal > 0.0
+    assert Omega_bd.units == ureg.steradian
+
+
+def test_xsgeometry_validate_accepts_dimensionless_beam_center_and_length_pixel_size():
+    step = XSGeometry(io_sources=IoSources())
+    n0, n1 = 5, 5
+    D_bd, pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_2d(n0, n1)
+
+    step._validate_geometry(
+        {
+            "detector_distance": D_bd,
+            "pixel_size": pixel_size_bd,
+            "beam_center": beam_center_bd,
+            "wavelength": wavelength_bd,
+        },
+        RoD=2,
+        spatial_shape=(n0, n1),
+    )
+
+
+def test_xsgeometry_validate_rejects_non_length_pixel_size():
+    step = XSGeometry(io_sources=IoSources())
+    n0, n1 = 5, 5
+    D_bd, _pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_2d(n0, n1)
+    bad_pixel_size_bd = _bd_vector([1.0, 1.0], ureg.second)
+
+    with pytest.raises(ValueError, match="Pixel size units must be length units"):
+        step._validate_geometry(
+            {
+                "detector_distance": D_bd,
+                "pixel_size": bad_pixel_size_bd,
+                "beam_center": beam_center_bd,
+                "wavelength": wavelength_bd,
+            },
+            RoD=2,
+            spatial_shape=(n0, n1),
+        )
+
+
+def test_xsgeometry_validate_rejects_non_dimensionless_beam_center():
+    step = XSGeometry(io_sources=IoSources())
+    n0, n1 = 5, 5
+    D_bd, pixel_size_bd, _beam_center_bd, wavelength_bd = make_geom_2d(n0, n1)
+    bad_beam_center_bd = _bd_vector([2.0, 2.0], ureg.second)
+
+    with pytest.raises(ValueError, match="Beam center units must be dimensionless detector indices"):
+        step._validate_geometry(
+            {
+                "detector_distance": D_bd,
+                "pixel_size": pixel_size_bd,
+                "beam_center": bad_beam_center_bd,
+                "wavelength": wavelength_bd,
+            },
+            RoD=2,
+            spatial_shape=(n0, n1),
+        )
 
 
 @pytest.mark.filterwarnings("ignore:divide by zero encountered in divide:RuntimeWarning")
@@ -428,14 +485,14 @@ def test_xsgeometry_pixel_index_uncertainty_propagates_to_coordinates():
     n0, n1 = 5, 5
     spatial_shape = (n0, n1)
     D_bd, pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_2d(n0, n1)
-    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
+    pitch0_bd, pitch1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
 
     x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
         RoD=2,
         spatial_shape=spatial_shape,
         beam_center_bd=beam_center_bd,
-        px0_bd=px0_bd,
-        px1_bd=px1_bd,
+        pitch0_bd=pitch0_bd,
+        pitch1_bd=pitch1_bd,
         detector_distance_bd=D_bd,
     )
 
@@ -469,14 +526,14 @@ def test_xsgeometry_Q_has_nonzero_uncertainty_off_center():
     n0, n1 = 5, 5
     spatial_shape = (n0, n1)
     D_bd, pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_2d(n0, n1)
-    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
+    pitch0_bd, pitch1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
 
     x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
         RoD=2,
         spatial_shape=spatial_shape,
         beam_center_bd=beam_center_bd,
-        px0_bd=px0_bd,
-        px1_bd=px1_bd,
+        pitch0_bd=pitch0_bd,
+        pitch1_bd=pitch1_bd,
         detector_distance_bd=D_bd,
     )
 
@@ -576,14 +633,14 @@ def test_xsgeometry_Q0_and_Omega_have_uncertainty_off_center():
     n0, n1 = 5, 5
     spatial_shape = (n0, n1)
     D_bd, pixel_size_bd, beam_center_bd, wavelength_bd = make_geom_2d(n0, n1)
-    px0_bd, px1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
+    pitch0_bd, pitch1_bd = pixel_size_bd.indexed(0, rank_of_data=0), pixel_size_bd.indexed(1, rank_of_data=0)
 
     x0_bd, x1_bd, r_perp_bd, R_bd = step._compute_coordinates(
         RoD=2,
         spatial_shape=spatial_shape,
         beam_center_bd=beam_center_bd,
-        px0_bd=px0_bd,
-        px1_bd=px1_bd,
+        pitch0_bd=pitch0_bd,
+        pitch1_bd=pitch1_bd,
         detector_distance_bd=D_bd,
     )
 
@@ -600,8 +657,8 @@ def test_xsgeometry_Q0_and_Omega_have_uncertainty_off_center():
     )
     Omega_bd = step._compute_solid_angle(
         R_bd=R_bd,
-        px0_bd=px0_bd,
-        px1_bd=px1_bd,
+        pitch0_bd=pitch0_bd,
+        pitch1_bd=pitch1_bd,
         detector_distance_bd=D_bd,
     )
 

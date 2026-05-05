@@ -60,12 +60,12 @@ def _make_frame(
 
     pitch_slow_s = prepare_static_scalar(
         pitch_slow,
-        require_units=ureg.m / ureg.pixel,
+        require_units=ureg.m,
         uncertainty_key="pixel_pitch_jitter",
     )
     pitch_fast_s = prepare_static_scalar(
         pitch_fast,
-        require_units=ureg.m / ureg.pixel,
+        require_units=ureg.m,
         uncertainty_key="pixel_pitch_jitter",
     )
 
@@ -134,7 +134,7 @@ def test_prepare_static_scalar_reduces_shape_5_1_1_1_to_scalar_mean_and_sem():
 
 
 def test_prepare_static_scalar_rejects_wrong_units():
-    bd = BaseData(signal=np.array([1.0, 2.0, 3.0]), units=ureg.pixel, rank_of_data=0)
+    bd = BaseData(signal=np.array([1.0, 2.0, 3.0]), units=ureg.dimensionless, rank_of_data=0)
     with pytest.raises(ValueError, match="Value must be in"):
         prepare_static_scalar(bd, require_units=ureg.m)
 
@@ -149,8 +149,8 @@ def test_pixel_coordinates_2d_identity_basis_constant_z_and_expected_x_y():
     2D detector: (slow, fast) = (11, 20)
 
     Convention under test:
-    - det_coord_* is the lab-frame position of the *pixel-grid origin corner* (before +0.5 center shift)
-    - pixel centers at (j+0.5, i+0.5)
+    - det_coord_* is the lab-frame position of the detector-grid origin corner (before +0.5 center shift)
+    - detector element centers are at (j+0.5, i+0.5)
     - identity basis: fast->x, slow->y, no z components => coord_z should be constant at det_coord_z
     """
     pd = _make_processing_data_2d((11, 20), rod=2)
@@ -162,8 +162,8 @@ def test_pixel_coordinates_2d_identity_basis_constant_z_and_expected_x_y():
     det_x = BaseData(signal=np.array(0.0), units=ureg.m, rank_of_data=0)
     det_y = BaseData(signal=np.array(0.0), units=ureg.m, rank_of_data=0)
 
-    pitch_fast = BaseData(signal=np.array(1e-3), units=ureg.m / ureg.pixel, rank_of_data=0)  # 1 mm/px
-    pitch_slow = BaseData(signal=np.array(2e-3), units=ureg.m / ureg.pixel, rank_of_data=0)  # 2 mm/px
+    pitch_fast = BaseData(signal=np.array(1e-3), units=ureg.m, rank_of_data=0)  # 1 mm
+    pitch_slow = BaseData(signal=np.array(2e-3), units=ureg.m, rank_of_data=0)  # 2 mm
 
     frame = _make_frame(
         det_x=det_x,
@@ -217,8 +217,8 @@ def test_pixel_coordinates_2d_offset_origin_shifts_coordinates():
     det_x = BaseData(signal=np.array(0.10), units=ureg.m, rank_of_data=0)  # 10 cm offset
     det_y = BaseData(signal=np.array(-0.05), units=ureg.m, rank_of_data=0)  # -5 cm offset
 
-    pitch_fast = BaseData(signal=np.array(1e-3), units=ureg.m / ureg.pixel, rank_of_data=0)
-    pitch_slow = BaseData(signal=np.array(1e-3), units=ureg.m / ureg.pixel, rank_of_data=0)
+    pitch_fast = BaseData(signal=np.array(1e-3), units=ureg.m, rank_of_data=0)
+    pitch_slow = BaseData(signal=np.array(1e-3), units=ureg.m, rank_of_data=0)
 
     frame = _make_frame(
         det_x=det_x,
@@ -241,7 +241,7 @@ def test_pixel_coordinates_2d_offset_origin_shifts_coordinates():
     cz = out["coord_z"].signal
 
     # Spot check a few pixels
-    # pixel (slow=j, fast=i) => center at (j+0.5, i+0.5)
+    # detector element (slow=j, fast=i) => center at (j+0.5, i+0.5)
     j0, i0 = 0, 0
     np.testing.assert_allclose(cx[j0, i0], 0.10 + 0.5e-3)
     np.testing.assert_allclose(cy[j0, i0], -0.05 + 0.5e-3)
@@ -263,8 +263,8 @@ def test_pixel_coordinates_rod0_returns_scalars():
         det_x=BaseData(signal=np.array(0.1), units=ureg.m, rank_of_data=0),
         det_y=BaseData(signal=np.array(0.2), units=ureg.m, rank_of_data=0),
         det_z=BaseData(signal=np.array(2.0), units=ureg.m, rank_of_data=0),
-        pitch_slow=BaseData(signal=np.array(1e-3), units=ureg.m / ureg.pixel, rank_of_data=0),
-        pitch_fast=BaseData(signal=np.array(1e-3), units=ureg.m / ureg.pixel, rank_of_data=0),
+        pitch_slow=BaseData(signal=np.array(1e-3), units=ureg.m, rank_of_data=0),
+        pitch_fast=BaseData(signal=np.array(1e-3), units=ureg.m, rank_of_data=0),
     )
 
     step = DummyPixelCoordinates3D(io_sources=IoSources(), frame=frame)

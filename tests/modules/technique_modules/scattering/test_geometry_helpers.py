@@ -170,7 +170,7 @@ def test_prepare_static_scalar_rejects_non_broadcastable_weights():
 
 
 def test_prepare_static_scalar_rejects_wrong_units():
-    bd = BaseData(signal=np.array([1.0, 2.0, 3.0]), units=ureg.pixel, rank_of_data=0)
+    bd = BaseData(signal=np.array([1.0, 2.0, 3.0]), units=ureg.second, rank_of_data=0)
     with pytest.raises(ValueError, match="Value must be in"):
         prepare_static_scalar(bd, require_units=ureg.m)
 

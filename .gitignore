@@ -80,3 +80,6 @@ docs/reference/modules
 
 # Local tooling
 .continue/
+example_notebook/playground.ipynb
+example_notebook/profile.html
+example_notebook/mydask.html

@@ -14,6 +14,8 @@ __version__ = "20251213.2"
 from collections import ChainMap
 from typing import Iterable
 
+__all__ = ["configure_detector_pixel_units", "remove_pixel_units"]
+
 
 def _delete_from_mapping(mapping, key: str) -> bool:
     """
@@ -67,31 +69,35 @@ def _delete_unit_names(ureg, names: Iterable[str]) -> None:
         build_cache()
 
 
+PIXEL_UNIT_NAMES = (
+    "pixel",
+    "pixels",
+    "px",
+    "css_pixel",
+    "dot",
+    "pel",
+    "picture_element",
+)
+
+
+def remove_pixel_units(ureg) -> None:
+    """
+    Remove Pint's display-pixel unit definitions from a registry.
+
+    MoDaCor treats detector element indices as dimensionless array coordinates,
+    not as physical units. After this cleanup, unit strings such as ``pixel``,
+    ``px``, ``mm/pixel`` and ``count/px`` fail during Pint parsing.
+    """
+    # Pint's pixel-related aliases vary by version, so delete a small superset.
+    _delete_unit_names(ureg, names=PIXEL_UNIT_NAMES)
+
+
 def configure_detector_pixel_units(ureg) -> None:
     """
-    Option B:
-      - We never use printing/display pixels.
-      - Interpret 'pixel', 'pixels', and 'px' as detector elements.
+    Backwards-compatible entry point for registry setup.
 
-    After this:
-      - 'mm/pixel' is length per detector element (NOT plain length)
-      - 'mm^2/pixel' and 'mm^3/pixel' behave as expected
+    Historically this function redefined ``pixel``/``px`` as detector-element
+    units. The current contract is stricter: detector indices are dimensionless,
+    and pixel unit strings are removed so stale metadata fails fast.
     """
-    # Remove Pint's built-in pixel meanings (printer pixel + css pixel) and typical aliases.
-    # These vary by Pint version, so we delete a small superset defensively.
-    _delete_unit_names(
-        ureg,
-        names=[
-            "pixel",
-            "pixels",
-            "px",
-            "css_pixel",
-            "dot",
-            "pel",
-            "picture_element",
-        ],
-    )
-
-    # Define detector pixel as a reference unit for a new dimension.
-    # Include plural and common shorthand as aliases.
-    ureg.define("pixel = [detector_pixel] = px = pixels")
+    remove_pixel_units(ureg)
