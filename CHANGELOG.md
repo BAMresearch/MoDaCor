@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v1.2.2 (2026-05-05)
+
+### Bug fixes
+
+* fix: remove pixel units to avoid confusion and inconsistent unit failures ([`a470610`](https://github.com/BAMresearch/MoDaCor/commit/a47061028ebc44f8fe8ef3414a6933a007962ff6))
+
 ## v1.2.1 (2026-05-04)
 
 ### Bug fixes
