@@ -96,9 +96,11 @@ the actual file paths change from run to run.
 ### Sinks
 
 `IoSinks` works the same way for outputs. A pipeline may emit results through a
-registered sink such as `CSVSink`, or the runtime/CLI layer may export the
-final `ProcessingData` snapshot directly, for example through the shared HDF
-export path used by `write_hdf`.
+registered sink such as `CSVSink`. Sink registrations can come from pipeline
+steps such as `AppendSink`, from `modacor run --csv-sink`, or from runtime API
+session sink endpoints. The runtime/CLI layer may also export the final
+`ProcessingData` snapshot directly through the shared HDF export path used by
+`write_hdf`; this remains separate from registered `IoSinks`.
 
 ## Execution modes
 

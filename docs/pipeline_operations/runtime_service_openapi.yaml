@@ -11,6 +11,7 @@ tags:
   - name: Service
   - name: Sessions
   - name: Sources
+  - name: Sinks
   - name: Processing
   - name: Runs
 
@@ -233,6 +234,95 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/SourceRegistration"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/sinks:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    put:
+      tags: [Sinks]
+      summary: Upsert one or more sink registrations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertSinksRequest"
+      responses:
+        "200":
+          description: Sinks updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                  sinks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SinkRegistration"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/sinks/{ref}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - name: ref
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Sinks]
+      summary: Delete a sink registration
+      responses:
+        "204":
+          description: Sink removed
+        "404":
+          description: Session or sink not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{session_id}/sinks/patch:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      tags: [Sinks]
+      summary: Convenience upsert for a single sink
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SinkRegistration"
+      responses:
+        "200":
+          description: Sink updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                  sink:
+                    $ref: "#/components/schemas/SinkRegistration"
+                  sinks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SinkRegistration"
         "404":
           description: Session not found
           content:
@@ -559,6 +649,21 @@ components:
           type: object
           additionalProperties: true
 
+    SinkRegistration:
+      type: object
+      required: [ref, type, location]
+      properties:
+        ref:
+          type: string
+        type:
+          type: string
+          enum: [csv, hdf, hdf_processing, custom]
+        location:
+          type: string
+        kwargs:
+          type: object
+          additionalProperties: true
+
     UpsertSourcesRequest:
       type: object
       required: [sources]
@@ -567,6 +672,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SourceRegistration"
+
+    UpsertSinksRequest:
+      type: object
+      required: [sinks]
+      properties:
+        sinks:
+          type: array
+          items:
+            $ref: "#/components/schemas/SinkRegistration"
 
     WriteHdfRequest:
       type: object
@@ -650,6 +764,10 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/SourceRegistration"
+            sinks:
+              type: array
+              items:
+                $ref: "#/components/schemas/SinkRegistration"
             trace:
               $ref: "#/components/schemas/TraceConfig"
             last_run:

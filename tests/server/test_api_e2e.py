@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from modacor import ureg
@@ -229,6 +230,142 @@ def test_api_sources_patch_upserts_single_source():
     assert session.sources["sample"]["location"] == "/tmp/sample2.nxs"
 
 
+def test_api_sinks_patch_upserts_and_deletes_single_sink(tmp_path: Path):
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "sess-sinks",
+            "pipeline": {"yaml_text": "name: sinks\nsteps: {}\n"},
+        },
+    )
+
+    out_file = tmp_path / "export.csv"
+    patched = _post_json(
+        client,
+        "/v1/sessions/sess-sinks/sinks/patch",
+        {
+            "ref": "export_csv",
+            "type": "csv",
+            "location": str(out_file),
+            "kwargs": {"delimiter": ","},
+        },
+    )
+    assert patched["session_id"] == "sess-sinks"
+    assert patched["sink"]["ref"] == "export_csv"
+    assert patched["sink"]["location"] == str(out_file)
+
+    status = client.get("/v1/sessions/sess-sinks")
+    assert status.status_code == 200
+    assert status.json()["sinks"][0]["ref"] == "export_csv"
+
+    delete_response = client.delete("/v1/sessions/sess-sinks/sinks/export_csv")
+    assert delete_response.status_code == 204
+    assert manager.get_session("sess-sinks").sinks == {}
+
+
+def test_api_process_passes_configured_sinks_to_runner(monkeypatch, tmp_path: Path):
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "sess-runner-sinks",
+            "pipeline": {"yaml_text": "name: runner_sinks\nsteps: {}\n"},
+        },
+    )
+    manager.upsert_sinks(
+        "sess-runner-sinks",
+        [{"ref": "export_csv", "type": "csv", "location": str(tmp_path / "out.csv")}],
+    )
+    captured = {}
+
+    def fake_run_pipeline_job(pipeline, **kwargs):
+        captured["sinks"] = kwargs["sinks"]
+        return RunResult(
+            processing_data=ProcessingData(),
+            pipeline=pipeline,
+            tracer=None,
+            step_durations={},
+            executed_steps=[],
+            stopped_after_step=None,
+        )
+
+    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+
+    result = _post_json(client, "/v1/sessions/sess-runner-sinks/process", {"mode": "full"})
+
+    assert result["status"] == "succeeded"
+    assert captured["sinks"].get_sink("export_csv").resource_location == tmp_path / "out.csv"
+
+
+def test_api_process_with_api_registered_csv_sink_writes_output(tmp_path: Path):
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    pipeline_yaml = """
+name: api_sink_write
+steps:
+  export:
+    module: SinkProcessingData
+    requires_steps: []
+    configuration:
+      target: "export_csv::"
+      data_paths:
+        - /sample/Q/signal
+        - /sample/signal/signal
+"""
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "sess-csv-sink",
+            "pipeline": {"yaml_text": pipeline_yaml},
+        },
+    )
+
+    out_file = tmp_path / "export.csv"
+    _post_json(
+        client,
+        "/v1/sessions/sess-csv-sink/sinks/patch",
+        {
+            "ref": "export_csv",
+            "type": "csv",
+            "location": str(out_file),
+            "kwargs": {"delimiter": ","},
+        },
+    )
+
+    session = manager.get_session("sess-csv-sink")
+    assert session is not None
+    processing_data = ProcessingData()
+    bundle = DataBundle()
+    bundle["Q"] = BaseData(signal=np.linspace(0.1, 1.0, 5), units=ureg.Unit("1/nm"))
+    bundle["signal"] = BaseData(signal=np.array([10, 11, 12, 13, 14], dtype=float), units=ureg.dimensionless)
+    processing_data["sample"] = bundle
+    session.processing_data = processing_data
+
+    result = _post_json(
+        client,
+        "/v1/sessions/sess-csv-sink/process",
+        {"mode": "partial", "changed_keys": ["sample.signal"]},
+    )
+
+    assert result["status"] == "succeeded"
+    assert out_file.is_file()
+    lines = out_file.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "sample/Q/signal,sample/signal/signal"
+    assert len(lines) == 7
+
+
 def test_api_source_templates_and_profile_validation():
     manager = SessionManager()
     app = create_app(session_manager=manager)
@@ -369,7 +506,7 @@ steps:
     assert "sample" in plan["missing_required_sources"]
 
 
-def test_api_process_auto_fallback_after_partial_failure(monkeypatch):
+def test_api_process_auto_fallback_after_partial_failure(monkeypatch, tmp_path: Path):
     manager = SessionManager()
     app = create_app(session_manager=manager)
     client = TestClient(app)
@@ -397,11 +534,17 @@ steps:
     session = manager.get_session("sess-auto")
     assert session is not None
     session.processing_data = ProcessingData()  # ensure auto starts with partial attempt
+    manager.upsert_sinks(
+        "sess-auto",
+        [{"ref": "export_csv", "type": "csv", "location": str(tmp_path / "auto.csv")}],
+    )
 
     call_count = {"n": 0}
+    seen_sink_locations = []
 
     def fake_run_pipeline_job(*args, **kwargs):
         call_count["n"] += 1
+        seen_sink_locations.append(kwargs["sinks"].get_sink("export_csv").resource_location)
         if call_count["n"] == 1:
             raise RuntimeError("synthetic partial failure")
         return RunResult(
@@ -429,3 +572,4 @@ steps:
     assert result["recovered_from_run_id"].startswith("run-")
     assert "fallback_reason" in result
     assert call_count["n"] == 2
+    assert seen_sink_locations == [tmp_path / "auto.csv", tmp_path / "auto.csv"]

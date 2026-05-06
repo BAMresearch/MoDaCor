@@ -16,7 +16,7 @@ The first structural refactor tranche between `U6` and `U8` is now in place:
 - `src/modacor/server/api.py` is a thin FastAPI binding layer.
 - `src/modacor/server/runtime_service.py` owns session orchestration and run lifecycle behavior.
 - `src/modacor/server/planning.py` owns dry-run planning and dirty-step calculations.
-- `src/modacor/server/io_utils.py` adapts session source registrations into runtime IO objects.
+- `src/modacor/server/io_utils.py` adapts session source/sink registrations into runtime IO objects.
 - `src/modacor/server/errors.py` defines framework-neutral service exceptions.
 - `src/modacor/io/runtime_support.py` provides shared source/sink builders and HDF export handling for both the CLI and runtime service.
 
@@ -59,6 +59,20 @@ Sources are dynamic and unbounded in count:
 - optional constructor kwargs
 
 This preserves flexibility for pipelines with 2 to 6+ source files.
+
+## Sink registry model
+
+Sinks are dynamic output targets bound to stable refs:
+
+- `sink_ref` (e.g. `export_csv`, `export_hdf`)
+- `type` (e.g. `csv`, `hdf`, `hdf_processing`, `custom`)
+- `resource_location` (path/URI)
+- optional constructor kwargs
+
+Pipeline steps can write through targets such as `export_csv::` while the
+runtime API controls the concrete destination path. API-registered HDF sinks can
+opt into available runtime metadata via sink kwargs, but metadata-rich final HDF
+artifacts remain the responsibility of the process-level `write_hdf` shortcut.
 
 ## Reset modes
 
@@ -187,7 +201,7 @@ List sessions and summary status.
 
 ### `GET /sessions/{session_id}`
 
-Get full session metadata, current sources, state, and last run summary.
+Get full session metadata, current sources/sinks, state, and last run summary.
 
 ### `GET /sessions/{session_id}/errors/latest`
 
@@ -293,6 +307,63 @@ Request:
 ### `DELETE /sessions/{session_id}/sources/{ref}`
 
 Remove one source registration.
+
+## Sinks
+
+### `PUT /sessions/{session_id}/sinks`
+
+Upsert one or more sinks.
+
+Request:
+
+```json
+{
+  "sinks": [
+    {"ref": "export_csv", "type": "csv", "location": "/data/out/current.csv", "kwargs": {"delimiter": ","}},
+    {"ref": "export_hdf", "type": "hdf", "location": "/data/out/current.h5"}
+  ]
+}
+```
+
+Response includes accepted refs and the current sink map.
+
+### `POST /sessions/{session_id}/sinks/patch`
+
+Convenience endpoint to upsert a single sink.
+
+Request:
+
+```json
+{
+  "ref": "export_csv",
+  "type": "csv",
+  "location": "/data/out/current.csv",
+  "kwargs": {"delimiter": ","}
+}
+```
+
+Equivalent to `PUT /sinks` with a single-item `sinks` list.
+
+For HDF sinks, runtime metadata is opt-in:
+
+```json
+{
+  "ref": "export_hdf",
+  "type": "hdf",
+  "location": "/data/out/current.h5",
+  "kwargs": {
+    "include_runtime_metadata": {
+      "pipeline_yaml": true,
+      "pipeline_spec": true,
+      "trace_events": false
+    }
+  }
+}
+```
+
+### `DELETE /sessions/{session_id}/sinks/{ref}`
+
+Remove one sink registration.
 
 ## Processing
 
@@ -498,7 +569,8 @@ A first API scaffold is available under:
 - `src/modacor/server/api.py`
 
 It provides route skeletons and an in-memory session manager aligned with this contract.
-`/process` is now wired to execute MoDaCor runs with registered sources and optional HDF output writing.
+`/process` is now wired to execute MoDaCor runs with registered sources,
+registered sinks, and optional HDF output writing.
 The scaffold now includes dirty-step detection by changed source references and executes selected subgraphs for
 `partial` mode when prior `ProcessingData` exists. `auto` mode attempts partial first and falls back to full rerun on
 partial failure.
@@ -558,7 +630,19 @@ curl -X PUT "http://127.0.0.1:8000/v1/sessions/mouse-main/sources" \
   }'
 ```
 
-3. Trigger a partial run using changed keys, and write a full HDF artifact:
+3. Register/update sinks used by sink-aware pipeline steps:
+
+```bash
+curl -X PUT "http://127.0.0.1:8000/v1/sessions/mouse-main/sinks" \
+  -H "content-type: application/json" \
+  -d '{
+    "sinks": [
+      {"ref": "export_csv", "type": "csv", "location": "/tmp/mouse_latest.csv", "kwargs": {"delimiter": ","}}
+    ]
+  }'
+```
+
+4. Trigger a partial run using changed keys, and write a full HDF artifact:
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/v1/sessions/mouse-main/process" \
@@ -575,7 +659,7 @@ curl -X POST "http://127.0.0.1:8000/v1/sessions/mouse-main/process" \
   }'
 ```
 
-4. Use auto mode to attempt partial first and fallback to full on failure:
+5. Use auto mode to attempt partial first and fallback to full on failure:
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/v1/sessions/mouse-main/process" \
@@ -587,7 +671,7 @@ curl -X POST "http://127.0.0.1:8000/v1/sessions/mouse-main/process" \
   }'
 ```
 
-5. If needed, force a complete reset without processing:
+6. If needed, force a complete reset without processing:
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/v1/sessions/mouse-main/reset" \

@@ -213,6 +213,17 @@ def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.Argument
         help="JSON object with extra source kwargs (default '{}').",
     )
 
+    set_sink_parser = session_subparsers.add_parser("set-sink", help="Upsert one sink registration.")
+    set_sink_parser.add_argument("--session-id", required=True)
+    set_sink_parser.add_argument("--ref", required=True)
+    set_sink_parser.add_argument("--type", required=True, dest="sink_type")
+    set_sink_parser.add_argument("--location", required=True, type=Path)
+    set_sink_parser.add_argument(
+        "--kwargs-json",
+        default="{}",
+        help="JSON object with extra sink kwargs (default '{}').",
+    )
+
     set_sample_parser = session_subparsers.add_parser(
         "set-sample",
         help="Shortcut to upsert the 'sample' source reference.",
@@ -229,6 +240,10 @@ def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     del_source_parser = session_subparsers.add_parser("delete-source", help="Delete one source registration.")
     del_source_parser.add_argument("--session-id", required=True)
     del_source_parser.add_argument("--ref", required=True)
+
+    del_sink_parser = session_subparsers.add_parser("delete-sink", help="Delete one sink registration.")
+    del_sink_parser.add_argument("--session-id", required=True)
+    del_sink_parser.add_argument("--ref", required=True)
 
     process_parser = session_subparsers.add_parser("process", help="Trigger processing.")
     process_parser.add_argument("--session-id", required=True)
@@ -378,6 +393,28 @@ def _session_set_source(base_url: str, args: argparse.Namespace) -> int:
     return 0
 
 
+def _session_set_sink(base_url: str, args: argparse.Namespace) -> int:
+    try:
+        kwargs_obj = json.loads(args.kwargs_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid --kwargs-json payload: {exc}") from exc
+    if not isinstance(kwargs_obj, dict):
+        raise ValueError("--kwargs-json must decode to an object/dict.")
+
+    payload = {
+        "sinks": [
+            {
+                "ref": args.ref,
+                "type": args.sink_type,
+                "location": str(args.location),
+                "kwargs": kwargs_obj,
+            }
+        ]
+    }
+    _print_json(_http_request_json(base_url, "PUT", f"/v1/sessions/{args.session_id}/sinks", payload))
+    return 0
+
+
 def _session_set_sample(base_url: str, args: argparse.Namespace) -> int:
     try:
         kwargs_obj = json.loads(args.kwargs_json)
@@ -398,6 +435,12 @@ def _session_set_sample(base_url: str, args: argparse.Namespace) -> int:
 def _session_delete_source(base_url: str, args: argparse.Namespace) -> int:
     _http_request_json(base_url, "DELETE", f"/v1/sessions/{args.session_id}/sources/{args.ref}")
     print(f"Deleted source '{args.ref}' from session '{args.session_id}'.")
+    return 0
+
+
+def _session_delete_sink(base_url: str, args: argparse.Namespace) -> int:
+    _http_request_json(base_url, "DELETE", f"/v1/sessions/{args.session_id}/sinks/{args.ref}")
+    print(f"Deleted sink '{args.ref}' from session '{args.session_id}'.")
     return 0
 
 
@@ -460,8 +503,10 @@ def _session_command(args: argparse.Namespace) -> int:
         "status": _session_status,
         "last-error": _session_last_error,
         "set-source": _session_set_source,
+        "set-sink": _session_set_sink,
         "set-sample": _session_set_sample,
         "delete-source": _session_delete_source,
+        "delete-sink": _session_delete_sink,
         "process": _session_process,
         "dry-run": _session_dry_run,
         "reset": _session_reset,

@@ -229,3 +229,60 @@ def test_cli_session_set_sample_calls_shortcut_endpoint(monkeypatch, tmp_path: P
     assert captured["path"] == "/v1/sessions/s1/sample"
     assert captured["payload"]["location"] == str(loc)
     assert captured["payload"]["type"] == "hdf"
+
+
+def test_cli_session_set_sink_calls_api(monkeypatch, tmp_path: Path):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = payload
+        return {"sink": {"ref": "export_csv"}}
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    out_path = tmp_path / "export.csv"
+    rc = main(
+        [
+            "session",
+            "set-sink",
+            "--session-id",
+            "s1",
+            "--ref",
+            "export_csv",
+            "--type",
+            "csv",
+            "--location",
+            str(out_path),
+            "--kwargs-json",
+            '{"delimiter": ","}',
+        ]
+    )
+    assert rc == 0
+    assert captured["method"] == "PUT"
+    assert captured["path"] == "/v1/sessions/s1/sinks"
+    assert captured["payload"]["sinks"] == [
+        {
+            "ref": "export_csv",
+            "type": "csv",
+            "location": str(out_path),
+            "kwargs": {"delimiter": ","},
+        }
+    ]
+
+
+def test_cli_session_delete_sink_calls_api(monkeypatch):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = payload
+        return None
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    rc = main(["session", "delete-sink", "--session-id", "s1", "--ref", "export_csv"])
+    assert rc == 0
+    assert captured["method"] == "DELETE"
+    assert captured["path"] == "/v1/sessions/s1/sinks/export_csv"
+    assert captured["payload"] is None

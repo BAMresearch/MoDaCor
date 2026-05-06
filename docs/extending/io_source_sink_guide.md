@@ -59,10 +59,27 @@ There are three supported ways to add sources or sinks:
 The shared CLI/runtime builder currently supports:
 
 - source types: `hdf`, `yaml`, `csv`, and `custom`
-- sink types: `csv`
+- sink types: `csv`, `hdf`, `hdf_processing`, and `custom`
 
-For `custom` sources, the runtime spec must include `kwargs.class_path` with
-the fully qualified class import path.
+For `custom` sources or sinks, the runtime spec must include
+`kwargs.class_path` with the fully qualified class import path.
+
+Runtime-service sink registrations use the same normalized shape as source
+registrations:
+
+```json
+{
+  "ref": "export_csv",
+  "type": "csv",
+  "location": "/data/out/current.csv",
+  "kwargs": {"delimiter": ","}
+}
+```
+
+HDF sink registrations may opt into available runtime metadata with
+`kwargs.include_runtime_metadata`, but this is not enabled by default. The
+process-level `write_hdf` path remains the main metadata-rich HDF artifact
+export.
 
 ## Runtime-service profiles
 

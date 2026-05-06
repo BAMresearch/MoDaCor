@@ -17,6 +17,36 @@ def _utc_now_iso() -> str:
     return datetime.now(tz=timezone.utc).isoformat()
 
 
+def _normalize_io_registration(registration: dict[str, Any], *, kind: str) -> dict[str, Any]:
+    if not isinstance(registration, dict):
+        raise ValueError(f"{kind} registration must be an object.")
+
+    missing = [key for key in ("ref", "type", "location") if key not in registration]
+    if missing:
+        raise ValueError(f"{kind} registration missing required field(s): {', '.join(missing)}.")
+
+    ref = str(registration["ref"]).strip()
+    reg_type = str(registration["type"]).strip()
+    location = str(registration["location"]).strip()
+    kwargs = registration.get("kwargs", {}) or {}
+
+    if not ref:
+        raise ValueError(f"{kind} registration ref must be non-empty.")
+    if not reg_type:
+        raise ValueError(f"{kind} registration type must be non-empty.")
+    if not location:
+        raise ValueError(f"{kind} registration location must be non-empty.")
+    if not isinstance(kwargs, dict):
+        raise ValueError(f"{kind} registration kwargs must be an object when provided.")
+
+    return {
+        "ref": ref,
+        "type": reg_type,
+        "location": location,
+        "kwargs": dict(kwargs),
+    }
+
+
 @dataclass(slots=True)
 class PipelineSession:
     session_id: str
@@ -26,6 +56,7 @@ class PipelineSession:
     trace_watch: dict[str, list[str]] = field(default_factory=dict)
     auto_full_reset_on_partial_error: bool = True
     sources: dict[str, dict[str, Any]] = field(default_factory=dict)
+    sinks: dict[str, dict[str, Any]] = field(default_factory=dict)
     state: str = "idle"
     active_run_id: str | None = None
     updated_utc: str = field(default_factory=_utc_now_iso)
@@ -89,13 +120,19 @@ class SessionManager:
             if session is None:
                 raise KeyError(f"Session '{session_id}' not found.")
             for source in sources:
-                ref = str(source["ref"])
-                session.sources[ref] = {
-                    "ref": ref,
-                    "type": str(source["type"]),
-                    "location": str(source["location"]),
-                    "kwargs": dict(source.get("kwargs", {})),
-                }
+                normalized = _normalize_io_registration(source, kind="Source")
+                session.sources[normalized["ref"]] = normalized
+            session.updated_utc = _utc_now_iso()
+            return session
+
+    def upsert_sinks(self, session_id: str, sinks: list[dict[str, Any]]) -> PipelineSession:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise KeyError(f"Session '{session_id}' not found.")
+            for sink in sinks:
+                normalized = _normalize_io_registration(sink, kind="Sink")
+                session.sinks[normalized["ref"]] = normalized
             session.updated_utc = _utc_now_iso()
             return session
 
@@ -106,6 +143,16 @@ class SessionManager:
                 raise KeyError(f"Session '{session_id}' not found.")
             existed = ref in session.sources
             session.sources.pop(ref, None)
+            session.updated_utc = _utc_now_iso()
+            return existed
+
+    def delete_sink(self, session_id: str, ref: str) -> bool:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise KeyError(f"Session '{session_id}' not found.")
+            existed = ref in session.sinks
+            session.sinks.pop(ref, None)
             session.updated_utc = _utc_now_iso()
             return existed
 
