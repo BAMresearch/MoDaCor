@@ -72,21 +72,38 @@ def build_sinks_from_specs(specs: Iterable[Mapping[str, Any]]) -> IoSinks:
     """
     Build an :class:`IoSinks` registry from normalized sink specifications.
 
-    The current shared CLI/runtime path only supports CSV sinks, which keeps the
-    builder intentionally narrow until more sink types are needed.
+    Each spec must provide `ref`, `type`, and `location`. Optional `kwargs`
+    are passed through as `iosink_method_kwargs`, except for `custom` sinks
+    where `kwargs.class_path` selects the sink class.
     """
 
+    type_map: dict[str, Any] = {
+        "csv": CSVSink,
+        "hdf": HDFProcessingSink,
+        "hdf_processing": HDFProcessingSink,
+    }
     sinks = IoSinks()
     for spec in specs:
         ref = str(spec["ref"]).strip()
         sink_type = str(spec["type"]).strip().lower()
-        if sink_type != "csv":
-            raise ValueError(f"Unsupported sink type '{sink_type}' for ref '{ref}'.")
+        location = Path(str(spec["location"]))
+        kwargs = dict(spec.get("kwargs", {}) or {})
 
-        sink = CSVSink(
+        if sink_type == "custom":
+            class_path = kwargs.pop("class_path", None)
+            if not class_path:
+                raise ValueError(f"Custom sink '{ref}' requires kwargs.class_path.")
+            sink_cls = _load_custom_class(str(class_path))
+        else:
+            try:
+                sink_cls = type_map[sink_type]
+            except KeyError as exc:
+                raise ValueError(f"Unsupported sink type '{sink_type}' for ref '{ref}'.") from exc
+
+        sink = sink_cls(
             sink_reference=ref,
-            resource_location=Path(str(spec["location"])),
-            iosink_method_kwargs=dict(spec.get("kwargs", {}) or {}),
+            resource_location=location,
+            iosink_method_kwargs=kwargs.get("iosink_method_kwargs", kwargs),
         )
         sinks.register_sink(sink)
 

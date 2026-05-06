@@ -12,6 +12,7 @@ from time import perf_counter
 from typing import Any
 
 from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.runner import run_pipeline_job
 from modacor.runner.pipeline import Pipeline
@@ -19,7 +20,7 @@ from modacor.runner.pipeline_runner import RunResult
 
 from .errors import ApiError
 from .execution import find_dirty_step_ids
-from .io_utils import build_sources_from_session, write_hdf_output
+from .io_utils import build_sinks_from_session, build_sources_from_session, write_hdf_output
 from .planning import build_dry_run_plan, missing_required_source_refs, ordered_step_ids, resolve_effective_mode
 from .session_manager import PipelineSession, SessionManager
 from .source_profiles import get_source_profile, list_source_profiles
@@ -115,6 +116,7 @@ class RuntimeService:
         out.update(
             {
                 "sources": list(session.sources.values()),
+                "sinks": list(session.sinks.values()),
                 "trace": {
                     "enabled": session.trace_enabled,
                     "watch": session.trace_watch,
@@ -193,7 +195,21 @@ class RuntimeService:
             session = self.manager.upsert_sources(session_id, sources=sources)
         except KeyError as exc:
             raise ApiError(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
         return {"session_id": session.session_id, "sources": list(session.sources.values())}
+
+    def upsert_sinks(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        sinks = payload.get("sinks", [])
+        if not isinstance(sinks, list):
+            raise ApiError(status_code=422, detail="'sinks' must be a list.")
+        try:
+            session = self.manager.upsert_sinks(session_id, sinks=sinks)
+        except KeyError as exc:
+            raise ApiError(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+        return {"session_id": session.session_id, "sinks": list(session.sinks.values())}
 
     def patch_source(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         ref = str(payload.get("ref", "")).strip()
@@ -217,11 +233,44 @@ class RuntimeService:
             )
         except KeyError as exc:
             raise ApiError(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
 
         return {
             "session_id": session.session_id,
             "source": session.sources.get(ref),
             "sources": list(session.sources.values()),
+        }
+
+    def patch_sink(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        ref = str(payload.get("ref", "")).strip()
+        sink_type = str(payload.get("type", "")).strip()
+        location = str(payload.get("location", "")).strip()
+        kwargs = payload.get("kwargs", {}) or {}
+
+        if not ref:
+            raise ApiError(status_code=422, detail="'ref' is required.")
+        if not sink_type:
+            raise ApiError(status_code=422, detail="'type' is required.")
+        if not location:
+            raise ApiError(status_code=422, detail="'location' is required.")
+        if not isinstance(kwargs, dict):
+            raise ApiError(status_code=422, detail="'kwargs' must be an object when provided.")
+
+        try:
+            session = self.manager.upsert_sinks(
+                session_id,
+                sinks=[{"ref": ref, "type": sink_type, "location": location, "kwargs": kwargs}],
+            )
+        except KeyError as exc:
+            raise ApiError(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "session_id": session.session_id,
+            "sink": session.sinks.get(ref),
+            "sinks": list(session.sinks.values()),
         }
 
     def set_sample_source(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -243,6 +292,8 @@ class RuntimeService:
             )
         except KeyError as exc:
             raise ApiError(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
 
         return {
             "session_id": session.session_id,
@@ -257,6 +308,14 @@ class RuntimeService:
             raise ApiError(status_code=404, detail=str(exc)) from exc
         if not existed:
             raise ApiError(status_code=404, detail=f"Source '{ref}' not found.")
+
+    def delete_sink(self, session_id: str, ref: str) -> None:
+        try:
+            existed = self.manager.delete_sink(session_id, ref)
+        except KeyError as exc:
+            raise ApiError(status_code=404, detail=str(exc)) from exc
+        if not existed:
+            raise ApiError(status_code=404, detail=f"Sink '{ref}' not found.")
 
     def process(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = self._parse_process_request(payload)
@@ -273,9 +332,11 @@ class RuntimeService:
 
         preparation = ProcessPreparation()
         sources: IoSources | None = None
+        sinks: IoSinks | None = None
         try:
             pipeline = Pipeline.from_yaml(session.pipeline_yaml or "")
             sources = build_sources_from_session(session)
+            sinks = build_sinks_from_session(session, pipeline=pipeline)
             preparation = self._prepare_process_execution(
                 session_id=session_id,
                 run_id=run_id,
@@ -291,6 +352,7 @@ class RuntimeService:
                 session=session,
                 pipeline=pipeline,
                 sources=sources,
+                sinks=sinks,
                 effective_mode=effective_mode,
                 preparation=preparation,
             )
@@ -315,6 +377,7 @@ class RuntimeService:
                 run_id=run_id,
                 preparation=preparation,
                 sources=sources,
+                sinks=sinks,
                 exc=exc,
             )
 
@@ -550,6 +613,7 @@ class RuntimeService:
         session: PipelineSession,
         pipeline: Pipeline,
         sources: IoSources,
+        sinks: IoSinks,
         effective_mode: str,
         preparation: ProcessPreparation,
     ) -> tuple[RunResult, float]:
@@ -558,6 +622,7 @@ class RuntimeService:
         result = run_pipeline_job(
             pipeline,
             sources=sources,
+            sinks=sinks,
             processing_data=session.processing_data if reuse_processing_data else None,
             trace=session.trace_enabled,
             trace_watch=session.trace_watch,
@@ -631,6 +696,7 @@ class RuntimeService:
         run_id: str,
         preparation: ProcessPreparation,
         sources: IoSources | None,
+        sinks: IoSinks | None,
         exc: Exception,
     ) -> dict[str, Any]:
         if effective_mode == "partial" and preparation.snapshot_before_partial is not None:
@@ -647,12 +713,13 @@ class RuntimeService:
                 "traceback": traceback.format_exc(),
             },
         )
-        if request.mode == "auto" and effective_mode == "partial" and sources is not None:
+        if request.mode == "auto" and effective_mode == "partial" and sources is not None and sinks is not None:
             return self._run_auto_fallback(
                 session=session,
                 session_id=session_id,
                 request=request,
                 sources=sources,
+                sinks=sinks,
                 recovered_from_run_id=run_id,
                 fallback_reason=exc,
             )
@@ -672,6 +739,7 @@ class RuntimeService:
         session_id: str,
         request: ProcessRequest,
         sources: IoSources,
+        sinks: IoSinks,
         recovered_from_run_id: str,
         fallback_reason: Exception,
     ) -> dict[str, Any]:
@@ -688,6 +756,7 @@ class RuntimeService:
             fallback_result = run_pipeline_job(
                 fallback_pipeline,
                 sources=sources,
+                sinks=sinks,
                 processing_data=None,
                 trace=session.trace_enabled,
                 trace_watch=session.trace_watch,

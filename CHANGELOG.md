@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v1.3.0 (2026-05-06)
+
+### Enh
+
+* enh: adding IoSinks to API and CLI ([`eae6031`](https://github.com/BAMresearch/MoDaCor/commit/eae6031f020eae109978aa2c43e775cd3ad159c3))
+
 ## v1.2.2 (2026-05-05)
 
 ### Bug fixes

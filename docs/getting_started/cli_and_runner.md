@@ -43,6 +43,26 @@ Supported source/sink registration flags:
 - `--yaml-source REF=PATH` (repeatable)
 - `--csv-sink REF=PATH` (repeatable)
 
+The session API wrapper exposes the same idea for long-lived runtime sessions:
+
+```bash
+modacor session set-source \
+  --session-id mouse-main \
+  --ref sample \
+  --type hdf \
+  --location /data/MOUSE_sample.nxs
+
+modacor session set-sink \
+  --session-id mouse-main \
+  --ref export_csv \
+  --type csv \
+  --location /data/out/current.csv \
+  --kwargs-json '{"delimiter": ","}'
+```
+
+Use `modacor session delete-sink --session-id mouse-main --ref export_csv` to
+remove a registered runtime sink.
+
 ### Tracing and step control
 
 ```bash

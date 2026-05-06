@@ -35,3 +35,31 @@ def test_session_manager_full_reset_clears_processing_data():
     session = manager.get_session("s2")
     assert session is not None
     assert session.processing_data is None
+
+
+def test_session_manager_sink_lifecycle_does_not_disturb_sources():
+    manager = SessionManager()
+    manager.create_session(session_id="s3", pipeline_yaml="name: p\nsteps: {}\n")
+
+    manager.upsert_sources("s3", [{"ref": "sample", "type": "hdf", "location": "/tmp/sample.nxs"}])
+    manager.upsert_sinks(
+        "s3",
+        [
+            {
+                "ref": "export_csv",
+                "type": "csv",
+                "location": "/tmp/export.csv",
+                "kwargs": {"delimiter": ","},
+            }
+        ],
+    )
+
+    session = manager.get_session("s3")
+    assert session is not None
+    assert session.sources["sample"]["type"] == "hdf"
+    assert session.sinks["export_csv"]["kwargs"] == {"delimiter": ","}
+
+    assert manager.delete_sink("s3", "export_csv") is True
+    assert manager.delete_sink("s3", "export_csv") is False
+    assert "sample" in session.sources
+    assert session.sinks == {}

@@ -82,6 +82,14 @@ def create_app(  # noqa: C901
     def patch_source(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return _call(service.patch_source, session_id, payload)
 
+    @app.put("/v1/sessions/{session_id}/sinks")
+    def upsert_sinks(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return _call(service.upsert_sinks, session_id, payload)
+
+    @app.post("/v1/sessions/{session_id}/sinks/patch")
+    def patch_sink(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return _call(service.patch_sink, session_id, payload)
+
     @app.post("/v1/sessions/{session_id}/sample")
     def set_sample_source(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return _call(service.set_sample_source, session_id, payload)
@@ -89,6 +97,10 @@ def create_app(  # noqa: C901
     @app.delete("/v1/sessions/{session_id}/sources/{ref}", status_code=204)
     def delete_source(session_id: str, ref: str) -> None:
         _call(service.delete_source, session_id, ref)
+
+    @app.delete("/v1/sessions/{session_id}/sinks/{ref}", status_code=204)
+    def delete_sink(session_id: str, ref: str) -> None:
+        _call(service.delete_sink, session_id, ref)
 
     @app.post("/v1/sessions/{session_id}/process")
     def process(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
