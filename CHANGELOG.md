@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v1.3.2 (2026-05-07)
+
+### Bug fixes
+
+* fix: fixing the documentation for clarity ([`c940aca`](https://github.com/BAMresearch/MoDaCor/commit/c940acacdc82a531756a1a2e42b0acf257645a8a))
+
+### Unknown Scope
+
+* adding the option to add processingData snapshots to the trace ([`5635e33`](https://github.com/BAMresearch/MoDaCor/commit/5635e337a3d2a0c34668784c23e2d2c79ef9d18d))
+
 ## v1.3.1 (2026-05-07)
 
 ### Bug fixes
