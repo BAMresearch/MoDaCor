@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v1.3.3 (2026-05-07)
+
+### Bug fixes
+
+* fix: update compression ([`694e63f`](https://github.com/BAMresearch/MoDaCor/commit/694e63f61ba251c11e835fcd3c878b57a5795b2e))
+
+### Unknown Scope
+
+* changing compression on the tracer processingData arrays ([`581235d`](https://github.com/BAMresearch/MoDaCor/commit/581235d15c6788b17c23699fdc0564355d86f81e))
+
 ## v1.3.2 (2026-05-07)
 
 ### Bug fixes

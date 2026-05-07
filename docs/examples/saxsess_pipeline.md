@@ -15,9 +15,8 @@ this page as the current reference for source conventions and correction order.
 
 The `saxsess` profile currently expects:
 
-- required: `sample`, `sample_background`, `defaults`
-- optional: `intensity_calibration`,
-  `intensity_calibration_background`, `gc_calibration`
+`sample`, `sample_background`, `defaults`, `intensity_calibration`,
+  `intensity_calibration_background`, `i_cal_reference`
 
 This matches the common freestanding-solids flow where instrument defaults come
 from YAML, measurements come from HDF, and an optional glassy-carbon reference

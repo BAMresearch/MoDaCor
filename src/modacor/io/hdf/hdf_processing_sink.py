@@ -42,6 +42,14 @@ def _recreate_group(parent: h5py.Group | h5py.File, name: str) -> h5py.Group:
     return parent.create_group(name)
 
 
+def _compression_for_data(data: Any, compression: str | None) -> str | None:
+    if compression is None:
+        return None
+    if np.asarray(data).shape == ():
+        return None
+    return compression
+
+
 def _as_hdf_str_list(values: Sequence[str]) -> np.ndarray:
     return np.asarray([str(value) for value in values], dtype=h5py.string_dtype(encoding="utf-8"))
 
@@ -102,7 +110,7 @@ def _write_basedata(
     signal_dataset = group.create_dataset(
         "signal",
         data=basedata.signal,
-        compression=compression,
+        compression=_compression_for_data(basedata.signal, compression),
     )
     signal_dataset.attrs["units"] = str(basedata.units)
     signal_dataset.attrs["rank_of_data"] = int(basedata.rank_of_data)
@@ -119,7 +127,11 @@ def _write_basedata(
     # Weights: store only if non-scalar or not equal to 1.0
     weights_array = basedata.weights
     if weights_array.size > 1:
-        group.create_dataset("weights", data=weights_array, compression=compression)
+        group.create_dataset(
+            "weights",
+            data=weights_array,
+            compression=_compression_for_data(weights_array, compression),
+        )
     else:
         group.attrs["weight_scalar"] = float(weights_array.ravel()[0])
 
@@ -127,7 +139,11 @@ def _write_basedata(
     if basedata.uncertainties:
         unc_group = group.create_group("uncertainties")
         for key, values in basedata.uncertainties.items():
-            dset = unc_group.create_dataset(key, data=values, compression=compression)
+            dset = unc_group.create_dataset(
+                key,
+                data=values,
+                compression=_compression_for_data(values, compression),
+            )
             dset.attrs["units"] = str(basedata.units)
 
 
@@ -507,6 +523,10 @@ class HDFProcessingSink(IoSink):
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
         compression = self.iosink_method_kwargs.get("compression")
+        snapshot_compression = self.iosink_method_kwargs.get(
+            "tracer_processing_data_compression",
+            self.iosink_method_kwargs.get("processing_data_snapshot_compression", "lzf"),
+        )
         resolved_pipeline_spec = (
             pipeline_spec if pipeline_spec is not None else self.iosink_method_kwargs.get("pipeline_spec")
         )
@@ -563,7 +583,7 @@ class HDFProcessingSink(IoSink):
                 _write_processing_data_snapshots(
                     tracer_run_group,
                     normalised_processing_data_snapshots,
-                    compression=compression,
+                    compression=snapshot_compression,
                 )
 
         self.logger.info(f"Wrote processing results to {out_path} (run={run_name}).")
