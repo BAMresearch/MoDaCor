@@ -28,3 +28,5 @@ every executed step. HDF exports store snapshots at:
 
 The final result remains under `/processing/result/<run>`, and the file-level
 NeXus `default` chain points there rather than to an intermediate snapshot.
+Snapshot arrays are compressed with HDF5 `lzf` by default; set
+`tracer_processing_data_compression` in the HDF sink kwargs to override this.

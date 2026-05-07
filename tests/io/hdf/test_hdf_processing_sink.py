@@ -254,8 +254,39 @@ def test_hdf_processing_sink_writes_processing_data_snapshots(
         assert snapshot_group["sample"].attrs["default"] == "signal"
         signal_group = snapshot_group["sample/signal"]
         assert signal_group.attrs["canSAS_class"] == "SASdata"
+        assert h5["processing/result/run_snap/sample/signal/signal"].compression is None
+        assert signal_group["signal"].compression == "lzf"
+        assert snapshot_group["sample/Q/signal"].compression == "lzf"
         np.testing.assert_allclose(
             signal_group["signal"],
             processing_data_with_uncertainties["sample"]["signal"].signal,
         )
         assert "sample/Q/signal" in snapshot_group
+
+
+def test_hdf_processing_sink_snapshot_lzf_skips_scalar_datasets(tmp_path: Path):
+    out_file = tmp_path / "out_scalar_snapshot.h5"
+    sink = HDFProcessingSink(resource_location=out_file)
+
+    processing_data = ProcessingData()
+    bundle = DataBundle()
+    bundle["signal"] = BaseData(signal=np.array(1.0), units=ureg.Unit("count"))
+    processing_data["sample"] = bundle
+
+    sink.write(
+        "run_scalar",
+        processing_data,
+        data_paths=["/sample/signal/signal"],
+        processing_data_snapshots=[
+            {
+                "step_id": "DC_bg",
+                "module": "Example",
+                "processing_data": processing_data,
+            }
+        ],
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        scalar_dataset = h5["processing/tracer/run_scalar/steps/0001_DC_bg/processing_data/sample/signal/signal"]
+        assert scalar_dataset.shape == ()
+        assert scalar_dataset.compression is None

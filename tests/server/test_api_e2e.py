@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import h5py
 import numpy as np
 import pytest
 
@@ -304,6 +305,58 @@ def test_api_process_passes_configured_sinks_to_runner(monkeypatch, tmp_path: Pa
 
     assert result["status"] == "succeeded"
     assert captured["sinks"].get_sink("export_csv").resource_location == tmp_path / "out.csv"
+
+
+def test_api_process_write_hdf_closes_file_for_immediate_reopen(monkeypatch, tmp_path: Path):
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    pipeline_yaml = "name: write_hdf_close\nsteps: {}\n"
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "sess-hdf-close",
+            "pipeline": {"yaml_text": pipeline_yaml},
+        },
+    )
+
+    processing_data = ProcessingData()
+    bundle = DataBundle()
+    bundle["signal"] = BaseData(signal=np.array([1.0, 2.0]), units=ureg.Unit("count"))
+    processing_data["sample"] = bundle
+
+    def fake_run_pipeline_job(pipeline, **kwargs):  # noqa: ARG001
+        return RunResult(
+            processing_data=processing_data,
+            pipeline=pipeline,
+            tracer=None,
+            step_durations={},
+            executed_steps=[],
+            stopped_after_step=None,
+        )
+
+    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    out_file = tmp_path / "server-output.h5"
+
+    result = _post_json(
+        client,
+        "/v1/sessions/sess-hdf-close/process",
+        {
+            "mode": "full",
+            "write_hdf": {
+                "path": str(out_file),
+                "data_paths": ["/sample/signal/signal"],
+            },
+        },
+    )
+
+    assert result["status"] == "succeeded"
+    with h5py.File(out_file, "r+") as h5:
+        signal_path = f"processing/result/{result['run_id']}/sample/signal/signal"
+        np.testing.assert_allclose(h5[signal_path], [1.0, 2.0])
+        h5.attrs["reopened_after_api_run"] = "yes"
 
 
 def test_api_process_with_api_registered_csv_sink_writes_output(tmp_path: Path):
