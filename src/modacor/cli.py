@@ -113,6 +113,18 @@ def _add_run_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPars
         help="Tracer watch spec (repeatable), for example 'sample:signal,Q'.",
     )
     run_parser.add_argument(
+        "--trace-snapshot-processing-data",
+        action="store_true",
+        help="Capture full ProcessingData snapshots after traced steps for HDF output.",
+    )
+    run_parser.add_argument(
+        "--trace-snapshot-step",
+        action="append",
+        default=[],
+        metavar="STEP_ID",
+        help="Limit ProcessingData trace snapshots to this step id (repeatable).",
+    )
+    run_parser.add_argument(
         "--stop-after",
         default=None,
         metavar="STEP_ID",
@@ -186,6 +198,18 @@ def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.Argument
         default=[],
         metavar="BUNDLE:KEY[,KEY...]",
         help="Tracer watch spec (repeatable).",
+    )
+    create_parser.add_argument(
+        "--trace-snapshot-processing-data",
+        action="store_true",
+        help="Capture full ProcessingData snapshots after traced steps for HDF output.",
+    )
+    create_parser.add_argument(
+        "--trace-snapshot-step",
+        action="append",
+        default=[],
+        metavar="STEP_ID",
+        help="Limit ProcessingData trace snapshots to this step id (repeatable).",
     )
     create_parser.add_argument(
         "--no-auto-full-reset-on-partial-error",
@@ -276,13 +300,18 @@ def _run_command(args: argparse.Namespace) -> int:
     trace_watch = _parse_trace_watch(args.trace_watch)
     sources = _build_sources(hdf_sources=args.hdf_source, yaml_sources=args.yaml_source)
     sinks = _build_sinks(csv_sinks=args.csv_sink)
+    snapshot_processing_data = bool(args.trace_snapshot_processing_data or args.trace_snapshot_step)
 
     result = run_pipeline_job(
         args.pipeline,
         sources=sources,
         sinks=sinks,
-        trace=args.trace,
+        trace=bool(args.trace or snapshot_processing_data),
         trace_watch=trace_watch,
+        tracer_kwargs={
+            "snapshot_processing_data": snapshot_processing_data,
+            "snapshot_step_ids": set(args.trace_snapshot_step),
+        },
         stop_after=args.stop_after,
     )
 
@@ -338,14 +367,17 @@ def _session_create(base_url: str, args: argparse.Namespace) -> int:
     else:
         pipeline_payload = {"yaml_text": str(args.pipeline_yaml_text)}
 
+    snapshot_processing_data = bool(args.trace_snapshot_processing_data or args.trace_snapshot_step)
     payload = {
         "session_id": args.session_id,
         "name": args.name,
         "pipeline": pipeline_payload,
         "trace": {
-            "enabled": bool(args.trace),
+            "enabled": bool(args.trace or snapshot_processing_data),
             "watch": _parse_trace_watch(args.trace_watch),
             "record_only_on_change": True,
+            "snapshot_processing_data": snapshot_processing_data,
+            "snapshot_step_ids": list(args.trace_snapshot_step),
         },
         "auto_full_reset_on_partial_error": not bool(args.no_auto_full_reset_on_partial_error),
     }

@@ -615,6 +615,15 @@ components:
         record_only_on_change:
           type: boolean
           default: true
+        snapshot_processing_data:
+          type: boolean
+          default: false
+          description: Capture full ProcessingData snapshots after traced steps for HDF export.
+        snapshot_step_ids:
+          type: array
+          description: Optional step ids to snapshot. Empty means every executed step when snapshot_processing_data is true.
+          items:
+            type: string
 
     CreateSessionRequest:
       type: object

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import h5py
+import numpy as np
 from attrs import define, field, validators
 
 from modacor.dataclasses.basedata import BaseData
@@ -41,7 +42,63 @@ def _recreate_group(parent: h5py.Group | h5py.File, name: str) -> h5py.Group:
     return parent.create_group(name)
 
 
-def _write_basedata(group: h5py.Group, basedata: BaseData, *, compression: str | None = None) -> None:
+def _as_hdf_str_list(values: Sequence[str]) -> np.ndarray:
+    return np.asarray([str(value) for value in values], dtype=h5py.string_dtype(encoding="utf-8"))
+
+
+def _find_basedata_name(databundle: Any, axis: BaseData | None) -> str | None:
+    if axis is None:
+        return None
+    for name, candidate in databundle.items():
+        if candidate is axis:
+            return str(name)
+    return None
+
+
+def _infer_axis_names(databundle: Any, basedata: BaseData) -> list[str]:
+    ndim = int(np.asarray(basedata.signal).ndim)
+    if ndim == 0:
+        return []
+
+    axis_names: list[str] = []
+    if basedata.axes:
+        for idx, axis in enumerate(basedata.axes[:ndim]):
+            axis_names.append(_find_basedata_name(databundle, axis) or f"axis_{idx}")
+
+    if not axis_names and "Q" in databundle and isinstance(databundle["Q"], BaseData):
+        axis_names = ["Q"] * ndim
+
+    if len(axis_names) < ndim:
+        axis_names.extend(["."] * (ndim - len(axis_names)))
+    return axis_names[:ndim]
+
+
+def _q_indices_for_axes(axis_names: Sequence[str]) -> np.ndarray:
+    q_indices = [
+        idx
+        for idx, name in enumerate(axis_names)
+        if str(name).casefold() in {"q", "qx", "qy", "qz"} or str(name).casefold().startswith("q_")
+    ]
+    return np.asarray(q_indices, dtype=np.int64)
+
+
+def _is_default_plot(databundle: Any, basedata_name: str) -> bool:
+    default_plot = getattr(databundle, "default_plot", None)
+    if default_plot:
+        return str(default_plot) == basedata_name
+    return basedata_name == "signal"
+
+
+def _write_basedata(
+    group: h5py.Group,
+    basedata: BaseData,
+    *,
+    databundle: Any | None = None,
+    basedata_name: str | None = None,
+    compression: str | None = None,
+) -> None:
+    group.attrs["default"] = "signal"
+
     signal_dataset = group.create_dataset(
         "signal",
         data=basedata.signal,
@@ -49,6 +106,15 @@ def _write_basedata(group: h5py.Group, basedata: BaseData, *, compression: str |
     )
     signal_dataset.attrs["units"] = str(basedata.units)
     signal_dataset.attrs["rank_of_data"] = int(basedata.rank_of_data)
+
+    if databundle is not None and basedata_name is not None and _is_default_plot(databundle, basedata_name):
+        axis_names = _infer_axis_names(databundle, basedata)
+        group.attrs["NX_class"] = "NXdata"
+        group.attrs["canSAS_class"] = "SASdata"
+        group.attrs["signal"] = "signal"
+        group.attrs["axes"] = _as_hdf_str_list(axis_names)
+        group.attrs["I_axes"] = _as_hdf_str_list(axis_names)
+        group.attrs["Q_indices"] = _q_indices_for_axes(axis_names)
 
     # Weights: store only if non-scalar or not equal to 1.0
     weights_array = basedata.weights
@@ -110,6 +176,23 @@ def _normalise_trace_events(trace_events: Any | None) -> list[dict[str, Any]]:
                 normalised.append(event_dict)
         return normalised
     return []
+
+
+def _normalise_processing_data_snapshots(snapshots: Any | None) -> list[dict[str, Any]]:
+    if snapshots is None:
+        return []
+    if not isinstance(snapshots, list):
+        return []
+
+    normalised: list[dict[str, Any]] = []
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict):
+            continue
+        processing_data = snapshot.get("processing_data")
+        if not isinstance(processing_data, ProcessingData):
+            continue
+        normalised.append(snapshot)
+    return normalised
 
 
 def _safe_hdf_key(value: str) -> str:
@@ -184,6 +267,66 @@ def _write_trace_indexed(parent: h5py.Group, trace_events: list[dict[str, Any]])
     index_group.create_dataset("any_change", data=any_change, dtype=bool)
 
 
+def _step_groups_by_step_id(parent: h5py.Group) -> dict[str, h5py.Group]:
+    if "steps" not in parent or not isinstance(parent["steps"], h5py.Group):
+        return {}
+
+    steps_group = parent["steps"]
+    out: dict[str, h5py.Group] = {}
+    for key in sorted(steps_group.keys()):
+        step_group = steps_group[key]
+        if not isinstance(step_group, h5py.Group):
+            continue
+        step_id = str(step_group.attrs.get("step_id", key))
+        out.setdefault(step_id, step_group)
+    return out
+
+
+def _write_processing_data_snapshots(
+    parent: h5py.Group,
+    snapshots: list[dict[str, Any]],
+    *,
+    compression: str | None = None,
+) -> None:
+    if not snapshots:
+        return
+
+    parent.attrs["processing_data_snapshot_count"] = len(snapshots)
+    steps_group = parent.require_group("steps")
+    existing_step_groups = _step_groups_by_step_id(parent)
+
+    for idx, snapshot in enumerate(snapshots, start=1):
+        step_id = str(snapshot.get("step_id", "unknown"))
+        step_group = existing_step_groups.get(step_id)
+        if step_group is None:
+            step_key = f"{idx:04d}_{_safe_hdf_key(step_id)}"
+            step_group = steps_group.require_group(step_key)
+            step_group.attrs["step_id"] = step_id
+            step_group.attrs["module"] = str(snapshot.get("module", ""))
+            step_group.attrs["label"] = str(snapshot.get("name", ""))
+            existing_step_groups[step_id] = step_group
+
+        duration_raw = snapshot.get("duration_s")
+        if isinstance(duration_raw, (int, float)):
+            step_group.attrs["duration_s"] = float(duration_raw)
+
+        processing_data = snapshot["processing_data"]
+        snapshot_group = _recreate_group(step_group, "processing_data")
+        snapshot_group.attrs["snapshot_kind"] = "full_processing_data"
+        snapshot_group.attrs["step_id"] = step_id
+        default_path = _write_processing_data_tree(
+            snapshot_group,
+            processing_data,
+            data_paths=None,
+            write_all_processing_data=True,
+            compression=compression,
+        )
+        if default_path is not None:
+            bundle_key, basedata_name = default_path
+            snapshot_group.attrs["default_path"] = f"{bundle_key}/{basedata_name}/signal"
+            step_group.attrs["default_processing_data"] = "processing_data"
+
+
 def _collect_all_basedata_paths(processing_data: ProcessingData) -> list[str]:
     paths: list[str] = []
     for bundle_key in sorted(processing_data.keys()):
@@ -192,6 +335,140 @@ def _collect_all_basedata_paths(processing_data: ProcessingData) -> list[str]:
             if isinstance(databundle[basedata_name], BaseData):
                 paths.append(f"/{bundle_key}/{basedata_name}")
     return paths
+
+
+def _resolve_basedata_paths(
+    processing_data: ProcessingData,
+    data_paths: Sequence[str] | str | None,
+    *,
+    write_all_processing_data: bool = False,
+) -> list[str]:
+    resolved_data_paths: list[str] = []
+    if isinstance(data_paths, str):
+        resolved_data_paths = [data_paths]
+    elif data_paths is not None:
+        resolved_data_paths = [str(path) for path in data_paths]
+
+    if write_all_processing_data:
+        resolved_data_paths.extend(_collect_all_basedata_paths(processing_data))
+
+    return list(dict.fromkeys(resolved_data_paths))
+
+
+def _default_basedata_path(
+    processing_data: ProcessingData,
+    written_basedata_paths: Sequence[tuple[str, str]],
+) -> tuple[str, str] | None:
+    written = list(written_basedata_paths)
+    if not written:
+        return None
+    written_set = set(written)
+
+    for bundle_key in sorted(processing_data.keys()):
+        databundle = processing_data[bundle_key]
+        default_plot = getattr(databundle, "default_plot", None)
+        if default_plot is not None and (bundle_key, str(default_plot)) in written_set:
+            return (bundle_key, str(default_plot))
+
+    for bundle_key, basedata_name in written:
+        if basedata_name == "signal":
+            return (bundle_key, basedata_name)
+
+    return written[0]
+
+
+def _set_processing_tree_defaults(root_group: h5py.Group, default_path: tuple[str, str] | None) -> None:
+    if default_path is None:
+        return
+
+    bundle_key, basedata_name = default_path
+    root_group.attrs["default"] = bundle_key
+    if bundle_key in root_group:
+        bundle_group = root_group[bundle_key]
+        if isinstance(bundle_group, h5py.Group):
+            bundle_group.attrs["default"] = basedata_name
+            if basedata_name in bundle_group and isinstance(bundle_group[basedata_name], h5py.Group):
+                bundle_group[basedata_name].attrs["default"] = "signal"
+
+
+def _write_processing_data_tree(
+    root_group: h5py.Group,
+    processing_data: ProcessingData,
+    data_paths: Sequence[str] | str | None,
+    *,
+    write_all_processing_data: bool = False,
+    compression: str | None = None,
+) -> tuple[str, str] | None:
+    resolved_data_paths = _resolve_basedata_paths(
+        processing_data,
+        data_paths,
+        write_all_processing_data=write_all_processing_data,
+    )
+
+    written_basedata_paths: list[tuple[str, str]] = []
+    seen_basedata_paths: set[tuple[str, str]] = set()
+    for path in resolved_data_paths:
+        parsed = parse_processing_path(path)
+        bundle_key = parsed.databundle_key
+        basedata_name = parsed.basedata_name
+        if bundle_key is None or basedata_name is None:
+            raise ValueError(f"Processing path '{path}' does not reference a BaseData entry.")
+
+        basedata_key = (bundle_key, basedata_name)
+        if basedata_key in seen_basedata_paths:
+            continue
+        seen_basedata_paths.add(basedata_key)
+
+        try:
+            databundle = processing_data[bundle_key]
+        except KeyError as exc:  # pragma: no cover - defensive
+            raise KeyError(f"ProcessingData missing bundle '{bundle_key}'.") from exc
+
+        try:
+            basedata = databundle[basedata_name]
+        except KeyError as exc:  # pragma: no cover - defensive
+            raise KeyError(f"DataBundle '{bundle_key}' missing BaseData '{basedata_name}'.") from exc
+
+        if not isinstance(basedata, BaseData):
+            raise TypeError(
+                f"Processing path '{path}' did not resolve to a BaseData instance (got" f" {type(basedata).__name__})."
+            )
+
+        bundle_group = root_group.require_group(bundle_key)
+        basedata_group = _recreate_group(bundle_group, basedata_name)
+        _write_basedata(
+            basedata_group,
+            basedata,
+            databundle=databundle,
+            basedata_name=basedata_name,
+            compression=compression,
+        )
+        written_basedata_paths.append(basedata_key)
+
+    default_path = _default_basedata_path(processing_data, written_basedata_paths)
+    _set_processing_tree_defaults(root_group, default_path)
+    return default_path
+
+
+def _set_file_default_chain(
+    h5: h5py.File,
+    *,
+    run_name: str,
+    default_path: tuple[str, str] | None,
+) -> None:
+    if default_path is None:
+        return
+
+    bundle_key, basedata_name = default_path
+    h5.attrs["default"] = "processing"
+    processing_group = h5["processing"]
+    processing_group.attrs["default"] = "result"
+    result_root = processing_group["result"]
+    result_root.attrs["default"] = run_name
+    run_result_group = result_root[run_name]
+    run_result_group.attrs["default"] = bundle_key
+    run_result_group[bundle_key].attrs["default"] = basedata_name
+    run_result_group[bundle_key][basedata_name].attrs["default"] = "signal"
 
 
 @define(kw_only=True)
@@ -215,19 +492,14 @@ class HDFProcessingSink(IoSink):
         pipeline_spec: dict[str, Any] | None = None,
         pipeline_yaml: str | None = None,
         trace_events: Any | None = None,
+        processing_data_snapshots: Any | None = None,
         override_resource_location: Path | None = None,
     ) -> Path:
-        resolved_data_paths: list[str] = []
-        if isinstance(data_paths, str):
-            resolved_data_paths = [data_paths]
-        elif data_paths is not None:
-            resolved_data_paths = [str(path) for path in data_paths]
-
-        if write_all_processing_data:
-            resolved_data_paths.extend(_collect_all_basedata_paths(processing_data))
-
-        # Stable order + de-duplication
-        resolved_data_paths = list(dict.fromkeys(resolved_data_paths))
+        resolved_data_paths = _resolve_basedata_paths(
+            processing_data,
+            data_paths,
+            write_all_processing_data=write_all_processing_data,
+        )
         if not resolved_data_paths:
             raise ValueError("HDFProcessingSink.write requires one or more data_paths.")
 
@@ -244,6 +516,12 @@ class HDFProcessingSink(IoSink):
         resolved_trace_events = (
             trace_events if trace_events is not None else self.iosink_method_kwargs.get("trace_events")
         )
+        resolved_processing_data_snapshots = (
+            processing_data_snapshots
+            if processing_data_snapshots is not None
+            else self.iosink_method_kwargs.get("processing_data_snapshots")
+        )
+        normalised_processing_data_snapshots = _normalise_processing_data_snapshots(resolved_processing_data_snapshots)
 
         run_name = _normalise_subpath(subpath)
 
@@ -252,33 +530,13 @@ class HDFProcessingSink(IoSink):
 
             result_root = processing_group.require_group("result")
             run_result_group = _recreate_group(result_root, run_name)
-
-            for path in resolved_data_paths:
-                parsed = parse_processing_path(path)
-                bundle_key = parsed.databundle_key
-                basedata_name = parsed.basedata_name
-                if bundle_key is None or basedata_name is None:
-                    raise ValueError(f"Processing path '{path}' does not reference a BaseData entry.")
-
-                try:
-                    databundle = processing_data[bundle_key]
-                except KeyError as exc:  # pragma: no cover - defensive
-                    raise KeyError(f"ProcessingData missing bundle '{bundle_key}'.") from exc
-
-                try:
-                    basedata = databundle[basedata_name]
-                except KeyError as exc:  # pragma: no cover - defensive
-                    raise KeyError(f"DataBundle '{bundle_key}' missing BaseData '{basedata_name}'.") from exc
-
-                if not isinstance(basedata, BaseData):
-                    raise TypeError(
-                        f"Processing path '{path}' did not resolve to a BaseData instance (got"
-                        f" {type(basedata).__name__})."
-                    )
-
-                bundle_group = run_result_group.require_group(bundle_key)
-                basedata_group = _recreate_group(bundle_group, basedata_name)
-                _write_basedata(basedata_group, basedata, compression=compression)
+            default_path = _write_processing_data_tree(
+                run_result_group,
+                processing_data,
+                resolved_data_paths,
+                compression=compression,
+            )
+            _set_file_default_chain(h5, run_name=run_name, default_path=default_path)
 
             # Pipeline specification (stored as JSON string)
             pipeline_group = processing_group.require_group("pipeline")
@@ -294,11 +552,19 @@ class HDFProcessingSink(IoSink):
             # Trace events: keep raw JSON + indexed structure for querying
             tracer_group = processing_group.require_group("tracer")
             tracer_run_group = _recreate_group(tracer_group, run_name)
-            if resolved_trace_events is None:
+            if resolved_trace_events is None and not normalised_processing_data_snapshots:
                 tracer_run_group.attrs["empty"] = True
             else:
-                tracer_run_group.create_dataset("events", data=_json_dumps_bytes(resolved_trace_events))
-                _write_trace_indexed(tracer_run_group, _normalise_trace_events(resolved_trace_events))
+                if resolved_trace_events is not None:
+                    tracer_run_group.create_dataset("events", data=_json_dumps_bytes(resolved_trace_events))
+                    _write_trace_indexed(tracer_run_group, _normalise_trace_events(resolved_trace_events))
+                else:
+                    tracer_run_group.attrs["schema_version"] = "1.1"
+                _write_processing_data_snapshots(
+                    tracer_run_group,
+                    normalised_processing_data_snapshots,
+                    compression=compression,
+                )
 
         self.logger.info(f"Wrote processing results to {out_path} (run={run_name}).")
         return out_path

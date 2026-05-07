@@ -166,5 +166,6 @@ def write_processing_data_hdf(
         pipeline_spec=result.pipeline.to_spec(),
         pipeline_yaml=pipeline_yaml,
         trace_events=_flatten_pipeline_trace_events(result.pipeline),
+        processing_data_snapshots=getattr(result.tracer, "processing_data_snapshots", None),
     )
     return str(out_path)

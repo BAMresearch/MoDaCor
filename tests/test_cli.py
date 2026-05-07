@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -39,6 +40,37 @@ def test_cli_write_hdf_requires_write_path(tmp_path: Path):
                 str(output_path),
             ]
         )
+
+
+def test_cli_run_snapshot_flags_enable_tracer(monkeypatch, tmp_path: Path):
+    pipeline_path = tmp_path / "pipeline.yml"
+    _write_empty_pipeline(pipeline_path)
+    captured = {}
+
+    def fake_run_pipeline_job(*args, **kwargs):  # noqa: ARG001
+        captured.update(kwargs)
+        return SimpleNamespace(
+            executed_steps=[],
+            stopped_after_step=None,
+            tracer=None,
+        )
+
+    monkeypatch.setattr("modacor.cli.run_pipeline_job", fake_run_pipeline_job)
+
+    rc = main(
+        [
+            "run",
+            "--pipeline",
+            str(pipeline_path),
+            "--trace-snapshot-step",
+            "S1",
+        ]
+    )
+
+    assert rc == 0
+    assert captured["trace"] is True
+    assert captured["tracer_kwargs"]["snapshot_processing_data"] is True
+    assert captured["tracer_kwargs"]["snapshot_step_ids"] == {"S1"}
 
 
 def test_cli_serve_parser_accepts_host_port():
@@ -105,6 +137,33 @@ def test_cli_session_create_with_source_template(monkeypatch):
     )
     assert rc == 0
     assert captured["payload"]["source_profile"] == "mouse"
+
+
+def test_cli_session_create_snapshot_flags(monkeypatch):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):  # noqa: ARG001
+        captured["payload"] = payload
+        return {"session_id": "s3"}
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    rc = main(
+        [
+            "session",
+            "create",
+            "--session-id",
+            "s3",
+            "--pipeline-yaml-text",
+            "name: demo\nsteps: {}\n",
+            "--trace-snapshot-step",
+            "S1",
+        ]
+    )
+
+    assert rc == 0
+    assert captured["payload"]["trace"]["enabled"] is True
+    assert captured["payload"]["trace"]["snapshot_processing_data"] is True
+    assert captured["payload"]["trace"]["snapshot_step_ids"] == ["S1"]
 
 
 def test_cli_session_last_error_calls_api(monkeypatch):
