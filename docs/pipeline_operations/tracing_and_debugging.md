@@ -14,7 +14,7 @@ modacor run \
   --trace \
   --trace-watch sample:signal,Q \
   --trace-snapshot-processing-data \
-  --trace-snapshot-step S00617 \
+  --trace-snapshot-step DC_bg \
   --write-hdf debug.h5 \
   --write-all-processing-data
 ```
