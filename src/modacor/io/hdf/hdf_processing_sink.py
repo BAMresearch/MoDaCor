@@ -50,100 +50,12 @@ def _compression_for_data(data: Any, compression: str | None) -> str | None:
     return compression
 
 
-def _as_hdf_str_list(values: Sequence[str]) -> np.ndarray:
-    return np.asarray([str(value) for value in values], dtype=h5py.string_dtype(encoding="utf-8"))
-
-
-def _find_basedata_name(databundle: Any, axis: BaseData | None) -> str | None:
-    if axis is None:
-        return None
-    for name, candidate in databundle.items():
-        if candidate is axis:
-            return str(name)
-    return None
-
-
-def _infer_axis_names(databundle: Any, basedata: BaseData) -> list[str]:
-    ndim = int(np.asarray(basedata.signal).ndim)
-    if ndim == 0:
-        return []
-
-    axis_names: list[str] = []
-    if basedata.axes:
-        for idx, axis in enumerate(basedata.axes[:ndim]):
-            axis_names.append(_find_basedata_name(databundle, axis) or f"axis_{idx}")
-
-    if not axis_names and "Q" in databundle and isinstance(databundle["Q"], BaseData):
-        axis_names = ["Q"] * ndim
-
-    if len(axis_names) < ndim:
-        axis_names.extend(["."] * (ndim - len(axis_names)))
-    return axis_names[:ndim]
-
-
-def _axis_basedata_by_name(databundle: Any, basedata: BaseData, axis_name: str, axis_index: int) -> BaseData | None:
-    if axis_name == ".":
-        return None
-    if basedata.axes and axis_index < len(basedata.axes) and isinstance(basedata.axes[axis_index], BaseData):
-        return basedata.axes[axis_index]
-    candidate = databundle.get(axis_name) if hasattr(databundle, "get") else None
-    return candidate if isinstance(candidate, BaseData) else None
-
-
-def _q_indices_for_axes(axis_names: Sequence[str]) -> np.ndarray:
-    q_indices = [
-        idx
-        for idx, name in enumerate(axis_names)
-        if str(name).casefold() in {"q", "qx", "qy", "qz"} or str(name).casefold().startswith("q_")
-    ]
-    return np.asarray(q_indices, dtype=np.int64)
-
-
-def _is_default_plot(databundle: Any, basedata_name: str) -> bool:
-    default_plot = getattr(databundle, "default_plot", None)
-    if default_plot:
-        return str(default_plot) == basedata_name
-    return basedata_name == "signal"
-
-
-def _write_axis_datasets(
-    group: h5py.Group,
-    databundle: Any,
-    basedata: BaseData,
-    axis_names: Sequence[str],
-    *,
-    compression: str | None = None,
-) -> None:
-    written_axis_names: set[str] = set()
-    for axis_index, axis_name in enumerate(axis_names):
-        axis_name = str(axis_name)
-        if axis_name in written_axis_names or axis_name in {".", "signal", "weights", "uncertainties"}:
-            continue
-        axis_basedata = _axis_basedata_by_name(databundle, basedata, axis_name, axis_index)
-        if axis_basedata is None:
-            continue
-        if axis_name in group:
-            del group[axis_name]
-        axis_dataset = group.create_dataset(
-            axis_name,
-            data=axis_basedata.signal,
-            compression=_compression_for_data(axis_basedata.signal, compression),
-        )
-        axis_dataset.attrs["units"] = str(axis_basedata.units)
-        axis_dataset.attrs["rank_of_data"] = int(axis_basedata.rank_of_data)
-        written_axis_names.add(axis_name)
-
-
 def _write_basedata(
     group: h5py.Group,
     basedata: BaseData,
     *,
-    databundle: Any | None = None,
-    basedata_name: str | None = None,
     compression: str | None = None,
 ) -> None:
-    group.attrs["default"] = np.bytes_("signal")
-
     signal_dataset = group.create_dataset(
         "signal",
         data=basedata.signal,
@@ -151,16 +63,6 @@ def _write_basedata(
     )
     signal_dataset.attrs["units"] = str(basedata.units)
     signal_dataset.attrs["rank_of_data"] = int(basedata.rank_of_data)
-
-    if databundle is not None and basedata_name is not None and _is_default_plot(databundle, basedata_name):
-        axis_names = _infer_axis_names(databundle, basedata)
-        group.attrs["NX_class"] = "NXdata"
-        group.attrs["canSAS_class"] = "SASdata"
-        group.attrs["signal"] = "signal"
-        group.attrs["axes"] = _as_hdf_str_list(axis_names)
-        group.attrs["I_axes"] = _as_hdf_str_list(axis_names)
-        group.attrs["Q_indices"] = _q_indices_for_axes(axis_names)
-        _write_axis_datasets(group, databundle, basedata, axis_names, compression=compression)
 
     # Weights: store only if non-scalar or not equal to 1.0
     weights_array = basedata.weights
@@ -368,17 +270,13 @@ def _write_processing_data_snapshots(
         snapshot_group = _recreate_group(step_group, "processing_data")
         snapshot_group.attrs["snapshot_kind"] = "full_processing_data"
         snapshot_group.attrs["step_id"] = step_id
-        default_path = _write_processing_data_tree(
+        _write_processing_data_tree(
             snapshot_group,
             processing_data,
             data_paths=None,
             write_all_processing_data=True,
             compression=compression,
         )
-        if default_path is not None:
-            bundle_key, basedata_name = default_path
-            snapshot_group.attrs["default_path"] = f"{bundle_key}/{basedata_name}/signal"
-            step_group.attrs["default_processing_data"] = "processing_data"
 
 
 def _collect_all_basedata_paths(processing_data: ProcessingData) -> list[str]:
@@ -409,42 +307,6 @@ def _resolve_basedata_paths(
     return list(dict.fromkeys(resolved_data_paths))
 
 
-def _default_basedata_path(
-    processing_data: ProcessingData,
-    written_basedata_paths: Sequence[tuple[str, str]],
-) -> tuple[str, str] | None:
-    written = list(written_basedata_paths)
-    if not written:
-        return None
-    written_set = set(written)
-
-    for bundle_key in sorted(processing_data.keys()):
-        databundle = processing_data[bundle_key]
-        default_plot = getattr(databundle, "default_plot", None)
-        if default_plot is not None and (bundle_key, str(default_plot)) in written_set:
-            return (bundle_key, str(default_plot))
-
-    for bundle_key, basedata_name in written:
-        if basedata_name == "signal":
-            return (bundle_key, basedata_name)
-
-    return written[0]
-
-
-def _set_processing_tree_defaults(root_group: h5py.Group, default_path: tuple[str, str] | None) -> None:
-    if default_path is None:
-        return
-
-    bundle_key, basedata_name = default_path
-    root_group.attrs["default"] = np.bytes_(bundle_key)
-    if bundle_key in root_group:
-        bundle_group = root_group[bundle_key]
-        if isinstance(bundle_group, h5py.Group):
-            bundle_group.attrs["default"] = np.bytes_(basedata_name)
-            if basedata_name in bundle_group and isinstance(bundle_group[basedata_name], h5py.Group):
-                bundle_group[basedata_name].attrs["default"] = np.bytes_("signal")
-
-
 def _write_processing_data_tree(
     root_group: h5py.Group,
     processing_data: ProcessingData,
@@ -452,14 +314,13 @@ def _write_processing_data_tree(
     *,
     write_all_processing_data: bool = False,
     compression: str | None = None,
-) -> tuple[str, str] | None:
+) -> None:
     resolved_data_paths = _resolve_basedata_paths(
         processing_data,
         data_paths,
         write_all_processing_data=write_all_processing_data,
     )
 
-    written_basedata_paths: list[tuple[str, str]] = []
     seen_basedata_paths: set[tuple[str, str]] = set()
     for path in resolved_data_paths:
         parsed = parse_processing_path(path)
@@ -493,36 +354,8 @@ def _write_processing_data_tree(
         _write_basedata(
             basedata_group,
             basedata,
-            databundle=databundle,
-            basedata_name=basedata_name,
             compression=compression,
         )
-        written_basedata_paths.append(basedata_key)
-
-    default_path = _default_basedata_path(processing_data, written_basedata_paths)
-    _set_processing_tree_defaults(root_group, default_path)
-    return default_path
-
-
-def _set_file_default_chain(
-    h5: h5py.File,
-    *,
-    run_name: str,
-    default_path: tuple[str, str] | None,
-) -> None:
-    if default_path is None:
-        return
-
-    bundle_key, basedata_name = default_path
-    h5.attrs["default"] = np.bytes_("processing")
-    processing_group = h5["processing"]
-    processing_group.attrs["default"] = np.bytes_("result")
-    result_root = processing_group["result"]
-    result_root.attrs["default"] = np.bytes_(run_name)
-    run_result_group = result_root[run_name]
-    run_result_group.attrs["default"] = np.bytes_(bundle_key)
-    run_result_group[bundle_key].attrs["default"] = np.bytes_(basedata_name)
-    run_result_group[bundle_key][basedata_name].attrs["default"] = np.bytes_("signal")
 
 
 @define(kw_only=True)
@@ -588,13 +421,12 @@ class HDFProcessingSink(IoSink):
 
             result_root = processing_group.require_group("result")
             run_result_group = _recreate_group(result_root, run_name)
-            default_path = _write_processing_data_tree(
+            _write_processing_data_tree(
                 run_result_group,
                 processing_data,
                 resolved_data_paths,
                 compression=compression,
             )
-            _set_file_default_chain(h5, run_name=run_name, default_path=default_path)
 
             # Pipeline specification (stored as JSON string)
             pipeline_group = processing_group.require_group("pipeline")
