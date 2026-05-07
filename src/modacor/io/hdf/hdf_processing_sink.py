@@ -142,7 +142,7 @@ def _write_basedata(
     basedata_name: str | None = None,
     compression: str | None = None,
 ) -> None:
-    group.attrs["default"] = "signal"
+    group.attrs["default"] = np.bytes_("signal")
 
     signal_dataset = group.create_dataset(
         "signal",
@@ -436,13 +436,13 @@ def _set_processing_tree_defaults(root_group: h5py.Group, default_path: tuple[st
         return
 
     bundle_key, basedata_name = default_path
-    root_group.attrs["default"] = bundle_key
+    root_group.attrs["default"] = np.bytes_(bundle_key)
     if bundle_key in root_group:
         bundle_group = root_group[bundle_key]
         if isinstance(bundle_group, h5py.Group):
-            bundle_group.attrs["default"] = basedata_name
+            bundle_group.attrs["default"] = np.bytes_(basedata_name)
             if basedata_name in bundle_group and isinstance(bundle_group[basedata_name], h5py.Group):
-                bundle_group[basedata_name].attrs["default"] = "signal"
+                bundle_group[basedata_name].attrs["default"] = np.bytes_("signal")
 
 
 def _write_processing_data_tree(
@@ -514,15 +514,15 @@ def _set_file_default_chain(
         return
 
     bundle_key, basedata_name = default_path
-    h5.attrs["default"] = "processing"
+    h5.attrs["default"] = np.bytes_("processing")
     processing_group = h5["processing"]
-    processing_group.attrs["default"] = "result"
+    processing_group.attrs["default"] = np.bytes_("result")
     result_root = processing_group["result"]
-    result_root.attrs["default"] = run_name
+    result_root.attrs["default"] = np.bytes_(run_name)
     run_result_group = result_root[run_name]
-    run_result_group.attrs["default"] = bundle_key
-    run_result_group[bundle_key].attrs["default"] = basedata_name
-    run_result_group[bundle_key][basedata_name].attrs["default"] = "signal"
+    run_result_group.attrs["default"] = np.bytes_(bundle_key)
+    run_result_group[bundle_key].attrs["default"] = np.bytes_(basedata_name)
+    run_result_group[bundle_key][basedata_name].attrs["default"] = np.bytes_("signal")
 
 
 @define(kw_only=True)
