@@ -110,6 +110,29 @@ def build_sinks_from_specs(specs: Iterable[Mapping[str, Any]]) -> IoSinks:
     return sinks
 
 
+def _flatten_pipeline_trace_events(pipeline: Any) -> list[dict[str, Any]] | None:
+    """
+    Flatten Pipeline.trace_events (dict[step_id, list[TraceEvent]]) into an
+    ordered list of dicts via TraceEvent.to_dict().
+
+    These include 'config', 'config_hash', 'module_path', 'version', 'messages',
+    and 'datasets' (diff probes), which are absent from the raw PipelineTracer
+    event dicts produced by PipelineTracer.after_step().
+    """
+    trace_events = getattr(pipeline, "trace_events", None)
+    if not isinstance(trace_events, dict) or not trace_events:
+        return None
+    flattened: list[dict[str, Any]] = []
+    for step_events in trace_events.values():
+        if isinstance(step_events, list):
+            for ev in step_events:
+                if hasattr(ev, "to_dict"):
+                    flattened.append(ev.to_dict())
+                elif isinstance(ev, dict):
+                    flattened.append(ev)
+    return flattened or None
+
+
 def write_processing_data_hdf(
     write_hdf: dict[str, Any] | None,
     *,
@@ -142,6 +165,6 @@ def write_processing_data_hdf(
         write_all_processing_data=write_all,
         pipeline_spec=result.pipeline.to_spec(),
         pipeline_yaml=pipeline_yaml,
-        trace_events=result.tracer.events if result.tracer is not None else None,
+        trace_events=_flatten_pipeline_trace_events(result.pipeline),
     )
     return str(out_path)
