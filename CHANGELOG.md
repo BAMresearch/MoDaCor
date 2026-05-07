@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v1.3.1 (2026-05-07)
+
+### Bug fixes
+
+* fix: fix the information in the pipeline trace by adding the step config ([`80b7154`](https://github.com/BAMresearch/MoDaCor/commit/80b7154209e608140706bebfc0001519a3629dd4))
+
 ## v1.3.0 (2026-05-06)
 
 ### Enh
