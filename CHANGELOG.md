@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v1.3.4 (2026-05-07)
+
+### Bug fixes
+
+* fix: ensure the axis dataset exists ([`9cd5c56`](https://github.com/BAMresearch/MoDaCor/commit/9cd5c56daeedcbdb1ee4b715b41268a522c5c068))
+
 ## v1.3.3 (2026-05-07)
 
 ### Bug fixes

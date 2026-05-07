@@ -127,6 +127,9 @@ def test_hdf_processing_sink_writes_result_and_metadata(
         assert _read_str_attr_list(signal_group.attrs["axes"]) == ["Q"]
         assert _read_str_attr_list(signal_group.attrs["I_axes"]) == ["Q"]
         np.testing.assert_array_equal(signal_group.attrs["Q_indices"], np.array([0], dtype=np.int64))
+        assert "Q" in signal_group
+        np.testing.assert_allclose(signal_group["Q"], processing_data_with_uncertainties["sample"]["Q"].signal)
+        assert signal_group["Q"].attrs["units"] == "1/nm"
 
         np.testing.assert_allclose(
             signal_group["signal"], processing_data_with_uncertainties["sample"]["signal"].signal
@@ -255,7 +258,9 @@ def test_hdf_processing_sink_writes_processing_data_snapshots(
         signal_group = snapshot_group["sample/signal"]
         assert signal_group.attrs["canSAS_class"] == "SASdata"
         assert h5["processing/result/run_snap/sample/signal/signal"].compression is None
+        assert h5["processing/result/run_snap/sample/signal/Q"].compression is None
         assert signal_group["signal"].compression == "lzf"
+        assert signal_group["Q"].compression == "lzf"
         assert snapshot_group["sample/Q/signal"].compression == "lzf"
         np.testing.assert_allclose(
             signal_group["signal"],

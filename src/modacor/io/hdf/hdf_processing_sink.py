@@ -81,6 +81,15 @@ def _infer_axis_names(databundle: Any, basedata: BaseData) -> list[str]:
     return axis_names[:ndim]
 
 
+def _axis_basedata_by_name(databundle: Any, basedata: BaseData, axis_name: str, axis_index: int) -> BaseData | None:
+    if axis_name == ".":
+        return None
+    if basedata.axes and axis_index < len(basedata.axes) and isinstance(basedata.axes[axis_index], BaseData):
+        return basedata.axes[axis_index]
+    candidate = databundle.get(axis_name) if hasattr(databundle, "get") else None
+    return candidate if isinstance(candidate, BaseData) else None
+
+
 def _q_indices_for_axes(axis_names: Sequence[str]) -> np.ndarray:
     q_indices = [
         idx
@@ -95,6 +104,34 @@ def _is_default_plot(databundle: Any, basedata_name: str) -> bool:
     if default_plot:
         return str(default_plot) == basedata_name
     return basedata_name == "signal"
+
+
+def _write_axis_datasets(
+    group: h5py.Group,
+    databundle: Any,
+    basedata: BaseData,
+    axis_names: Sequence[str],
+    *,
+    compression: str | None = None,
+) -> None:
+    written_axis_names: set[str] = set()
+    for axis_index, axis_name in enumerate(axis_names):
+        axis_name = str(axis_name)
+        if axis_name in written_axis_names or axis_name in {".", "signal", "weights", "uncertainties"}:
+            continue
+        axis_basedata = _axis_basedata_by_name(databundle, basedata, axis_name, axis_index)
+        if axis_basedata is None:
+            continue
+        if axis_name in group:
+            del group[axis_name]
+        axis_dataset = group.create_dataset(
+            axis_name,
+            data=axis_basedata.signal,
+            compression=_compression_for_data(axis_basedata.signal, compression),
+        )
+        axis_dataset.attrs["units"] = str(axis_basedata.units)
+        axis_dataset.attrs["rank_of_data"] = int(axis_basedata.rank_of_data)
+        written_axis_names.add(axis_name)
 
 
 def _write_basedata(
@@ -123,6 +160,7 @@ def _write_basedata(
         group.attrs["axes"] = _as_hdf_str_list(axis_names)
         group.attrs["I_axes"] = _as_hdf_str_list(axis_names)
         group.attrs["Q_indices"] = _q_indices_for_axes(axis_names)
+        _write_axis_datasets(group, databundle, basedata, axis_names, compression=compression)
 
     # Weights: store only if non-scalar or not equal to 1.0
     weights_array = basedata.weights
