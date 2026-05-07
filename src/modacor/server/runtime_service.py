@@ -121,6 +121,8 @@ class RuntimeService:
                     "enabled": session.trace_enabled,
                     "watch": session.trace_watch,
                     "record_only_on_change": True,
+                    "snapshot_processing_data": session.trace_snapshot_processing_data,
+                    "snapshot_step_ids": list(session.trace_snapshot_step_ids),
                 },
                 "last_run": session.run_history[-1] if session.run_history else None,
                 "source_profile": session.source_profile,
@@ -165,13 +167,17 @@ class RuntimeService:
             required_source_refs = [str(item["ref"]) for item in profile.get("required_sources", [])]
 
         trace = payload.get("trace", {}) or {}
+        trace_snapshot_step_ids = [str(step_id) for step_id in trace.get("snapshot_step_ids", []) or []]
+        trace_snapshot_processing_data = bool(trace.get("snapshot_processing_data", False) or trace_snapshot_step_ids)
         try:
             session = self.manager.create_session(
                 session_id=session_id,
                 name=payload.get("name"),
                 pipeline_yaml=pipeline_yaml,
-                trace_enabled=bool(trace.get("enabled", False)),
+                trace_enabled=bool(trace.get("enabled", False) or trace_snapshot_processing_data),
                 trace_watch=dict(trace.get("watch", {}) or {}),
+                trace_snapshot_processing_data=trace_snapshot_processing_data,
+                trace_snapshot_step_ids=trace_snapshot_step_ids,
                 auto_full_reset_on_partial_error=bool(payload.get("auto_full_reset_on_partial_error", True)),
                 source_profile=normalized_profile,
                 required_source_refs=required_source_refs,
@@ -626,6 +632,10 @@ class RuntimeService:
             processing_data=session.processing_data if reuse_processing_data else None,
             trace=session.trace_enabled,
             trace_watch=session.trace_watch,
+            tracer_kwargs={
+                "snapshot_processing_data": session.trace_snapshot_processing_data,
+                "snapshot_step_ids": set(session.trace_snapshot_step_ids),
+            },
             selected_step_ids=preparation.selected_step_ids,
         )
         elapsed_s = perf_counter() - run_t0
@@ -760,6 +770,10 @@ class RuntimeService:
                 processing_data=None,
                 trace=session.trace_enabled,
                 trace_watch=session.trace_watch,
+                tracer_kwargs={
+                    "snapshot_processing_data": session.trace_snapshot_processing_data,
+                    "snapshot_step_ids": set(session.trace_snapshot_step_ids),
+                },
             )
             fallback_elapsed = perf_counter() - fallback_t0
             session.processing_data = fallback_result.processing_data

@@ -30,14 +30,23 @@ def processing_data_with_uncertainties() -> ProcessingData:
     pd = ProcessingData()
     bundle = DataBundle()
 
-    signal = np.arange(6, dtype=float).reshape(2, 3)
+    q = BaseData(
+        signal=np.array([0.01, 0.02, 0.03], dtype=float),
+        units=ureg.Unit("1/nm"),
+        rank_of_data=1,
+    )
+    signal = np.arange(3, dtype=float)
     poisson = np.full_like(signal, 0.1, dtype=float)
 
+    bundle["Q"] = q
     bundle["signal"] = BaseData(
         signal=signal,
         units=ureg.Unit("count"),
         uncertainties={"poisson": poisson},
+        axes=[q],
+        rank_of_data=1,
     )
+    bundle.default_plot = "signal"
     pd["sample"] = bundle
     return pd
 
@@ -62,6 +71,10 @@ def _read_str_value(value: str | bytes) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8")
     return str(value)
+
+
+def _read_str_attr_list(value) -> list[str]:
+    return [_read_str_value(item) for item in list(value)]
 
 
 def test_hdf_processing_sink_writes_result_and_metadata(
@@ -100,7 +113,21 @@ def test_hdf_processing_sink_writes_result_and_metadata(
     assert out_file.exists()
 
     with h5py.File(out_file, "r") as h5:
+        assert h5.attrs["default"] == "processing"
+        assert h5["processing"].attrs["default"] == "result"
+        assert h5["processing/result"].attrs["default"] == "run1"
+        assert h5["processing/result/run1"].attrs["default"] == "sample"
+        assert h5["processing/result/run1/sample"].attrs["default"] == "signal"
+
         signal_group = h5["processing/result/run1/sample/signal"]
+        assert signal_group.attrs["default"] == "signal"
+        assert signal_group.attrs["NX_class"] == "NXdata"
+        assert signal_group.attrs["canSAS_class"] == "SASdata"
+        assert signal_group.attrs["signal"] == "signal"
+        assert _read_str_attr_list(signal_group.attrs["axes"]) == ["Q"]
+        assert _read_str_attr_list(signal_group.attrs["I_axes"]) == ["Q"]
+        np.testing.assert_array_equal(signal_group.attrs["Q_indices"], np.array([0], dtype=np.int64))
+
         np.testing.assert_allclose(
             signal_group["signal"], processing_data_with_uncertainties["sample"]["signal"].signal
         )
@@ -184,3 +211,51 @@ def test_hdf_processing_sink_can_write_all_processing_data(tmp_path: Path):
         assert "processing/result/run_all/sample/signal/signal" in h5
         assert "processing/result/run_all/sample/Q/signal" in h5
         assert "processing/result/run_all/sample/note" not in h5
+
+
+def test_hdf_processing_sink_writes_processing_data_snapshots(
+    tmp_path: Path, processing_data_with_uncertainties: ProcessingData
+):
+    out_file = tmp_path / "out_snapshots.h5"
+    sink = HDFProcessingSink(resource_location=out_file)
+
+    trace_events = [
+        {
+            "step_id": "S1",
+            "module": "Example",
+            "duration_s": 0.1,
+            "datasets": {},
+        }
+    ]
+    snapshots = [
+        {
+            "step_id": "S1",
+            "module": "Example",
+            "name": "example",
+            "duration_s": 0.1,
+            "processing_data": processing_data_with_uncertainties,
+        }
+    ]
+
+    sink.write(
+        "run_snap",
+        processing_data_with_uncertainties,
+        data_paths=["/sample/signal/signal"],
+        trace_events=trace_events,
+        processing_data_snapshots=snapshots,
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        tracer_group = h5["processing/tracer/run_snap"]
+        assert tracer_group.attrs["processing_data_snapshot_count"] == 1
+        snapshot_group = tracer_group["steps/0001_S1/processing_data"]
+        assert snapshot_group.attrs["snapshot_kind"] == "full_processing_data"
+        assert snapshot_group.attrs["default"] == "sample"
+        assert snapshot_group["sample"].attrs["default"] == "signal"
+        signal_group = snapshot_group["sample/signal"]
+        assert signal_group.attrs["canSAS_class"] == "SASdata"
+        np.testing.assert_allclose(
+            signal_group["signal"],
+            processing_data_with_uncertainties["sample"]["signal"].signal,
+        )
+        assert "sample/Q/signal" in snapshot_group

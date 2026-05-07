@@ -13,6 +13,11 @@ __status__ = "Development"  # "Development", "Production"
 
 from pathlib import Path
 
+import numpy as np
+
+from modacor import ureg
+from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.dataclasses.processing_data import ProcessingData
@@ -186,3 +191,28 @@ def test_attach_tracer_event_copies_duration():
 
     ev = pipeline.attach_tracer_event(step, tracer)
     assert ev.duration_s == 0.0123
+
+
+def test_tracer_can_capture_processing_data_snapshot_for_selected_step():
+    step_a = DummyStep(io_sources=None, step_id="A")
+    step_b = DummyStep(io_sources=None, step_id="B")
+    processing_data = ProcessingData()
+    bundle = DataBundle()
+    bundle["signal"] = BaseData(signal=np.array([1.0, 2.0]), units=ureg.Unit("count"))
+    processing_data["sample"] = bundle
+
+    tracer = PipelineTracer(
+        watch={"sample": ["signal"]},
+        record_only_on_change=False,
+        snapshot_processing_data=True,
+        snapshot_step_ids={"A"},
+    )
+
+    tracer.after_step(step_a, processing_data)
+    processing_data["sample"]["signal"].signal[0] = 99.0
+    tracer.after_step(step_b, processing_data)
+
+    assert len(tracer.processing_data_snapshots) == 1
+    snapshot = tracer.processing_data_snapshots[0]
+    assert snapshot["step_id"] == "A"
+    np.testing.assert_allclose(snapshot["processing_data"]["sample"]["signal"].signal, np.array([1.0, 2.0]))

@@ -183,7 +183,9 @@ Request:
   "trace": {
     "enabled": true,
     "watch": {"sample": ["signal"]},
-    "record_only_on_change": true
+    "record_only_on_change": true,
+    "snapshot_processing_data": false,
+    "snapshot_step_ids": []
   },
   "auto_full_reset_on_partial_error": true
 }
@@ -398,6 +400,9 @@ Notes:
 - `changed_sources` or `changed_keys` is required for `partial`; both are optional for `auto`.
 - `changed_keys` enables key-aware invalidation (e.g. `sample.signal`, `sample.Q`) for tighter partial reruns.
 - `write_hdf` is optional; if provided, pipeline spec/yaml and trace are persisted.
+- Full per-step `ProcessingData` snapshots are opt-in through the session trace
+  config. When enabled, the HDF export stores them under
+  `/processing/tracer/<run>/steps/<step>/processing_data`.
 
 ### `POST /sessions/{session_id}/process/dry-run`
 
@@ -611,7 +616,9 @@ curl -X POST "http://127.0.0.1:8000/v1/sessions" \
     "trace": {
       "enabled": true,
       "watch": {"sample": ["signal"], "background": ["signal"]},
-      "record_only_on_change": true
+      "record_only_on_change": true,
+      "snapshot_processing_data": false,
+      "snapshot_step_ids": []
     },
     "auto_full_reset_on_partial_error": true
   }'

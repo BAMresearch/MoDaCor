@@ -54,6 +54,8 @@ class PipelineSession:
     pipeline_yaml: str | None = None
     trace_enabled: bool = False
     trace_watch: dict[str, list[str]] = field(default_factory=dict)
+    trace_snapshot_processing_data: bool = False
+    trace_snapshot_step_ids: list[str] = field(default_factory=list)
     auto_full_reset_on_partial_error: bool = True
     sources: dict[str, dict[str, Any]] = field(default_factory=dict)
     sinks: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -90,6 +92,8 @@ class SessionManager:
         pipeline_yaml: str | None = None,
         trace_enabled: bool = False,
         trace_watch: dict[str, list[str]] | None = None,
+        trace_snapshot_processing_data: bool = False,
+        trace_snapshot_step_ids: list[str] | None = None,
         auto_full_reset_on_partial_error: bool = True,
         source_profile: str | None = None,
         required_source_refs: list[str] | None = None,
@@ -103,6 +107,8 @@ class SessionManager:
                 pipeline_yaml=pipeline_yaml,
                 trace_enabled=trace_enabled,
                 trace_watch=trace_watch or {},
+                trace_snapshot_processing_data=trace_snapshot_processing_data,
+                trace_snapshot_step_ids=list(trace_snapshot_step_ids or []),
                 auto_full_reset_on_partial_error=auto_full_reset_on_partial_error,
                 source_profile=source_profile,
                 required_source_refs=list(required_source_refs or []),

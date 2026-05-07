@@ -5,14 +5,21 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
+import h5py
+import numpy as np
 import pytest
 from attrs import define, field, validators
 
+from modacor import ureg
+from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.csv.csv_sink import CSVSink
 from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 from modacor.io.io_sink import IoSink
-from modacor.io.runtime_support import build_sinks_from_specs
+from modacor.io.runtime_support import build_sinks_from_specs, write_processing_data_hdf
 
 
 @define(kw_only=True)
@@ -97,6 +104,41 @@ def test_build_sinks_from_specs_rejects_unsupported_type(tmp_path: Path):
                 }
             ]
         )
+
+
+def test_write_processing_data_hdf_persists_tracer_snapshots(tmp_path: Path):
+    processing_data = ProcessingData()
+    bundle = DataBundle()
+    bundle["signal"] = BaseData(signal=np.array([1.0, 2.0]), units=ureg.Unit("count"))
+    processing_data["sample"] = bundle
+
+    out_file = tmp_path / "snapshot_export.h5"
+    result = SimpleNamespace(
+        processing_data=processing_data,
+        pipeline=SimpleNamespace(to_spec=lambda: {"name": "demo"}),
+        tracer=SimpleNamespace(
+            processing_data_snapshots=[
+                {
+                    "step_id": "S1",
+                    "module": "Example",
+                    "processing_data": processing_data,
+                }
+            ]
+        ),
+    )
+
+    write_processing_data_hdf(
+        {
+            "path": str(out_file),
+            "data_paths": ["/sample/signal/signal"],
+        },
+        run_name="run1",
+        result=result,
+        pipeline_yaml="name: demo\nsteps: {}\n",
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        assert "processing/tracer/run1/steps/0001_S1/processing_data/sample/signal/signal" in h5
 
 
 def test_build_sinks_from_specs_requires_custom_class_path(tmp_path: Path):
