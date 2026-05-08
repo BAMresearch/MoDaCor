@@ -97,6 +97,44 @@ def _is_plot_basedata(databundle: Any, basedata_name: str) -> bool:
     return basedata_name == "signal"
 
 
+def _axis_basedata_by_name(databundle: Any, basedata: BaseData, axis_name: str, axis_index: int) -> BaseData | None:
+    if axis_name == ".":
+        return None
+    if basedata.axes and axis_index < len(basedata.axes) and isinstance(basedata.axes[axis_index], BaseData):
+        return basedata.axes[axis_index]
+    candidate = databundle.get(axis_name) if hasattr(databundle, "get") else None
+    return candidate if isinstance(candidate, BaseData) else None
+
+
+def _write_axis_fields(
+    group: h5py.Group,
+    databundle: Any,
+    basedata: BaseData,
+    axis_names: Sequence[str],
+    *,
+    compression: str | None = None,
+) -> None:
+    written_axis_names: set[str] = set()
+    reserved_names = {"I", "signal", "weights", "uncertainties"}
+    for axis_index, axis_name in enumerate(axis_names):
+        axis_name = str(axis_name)
+        if axis_name in written_axis_names or axis_name in reserved_names or axis_name == ".":
+            continue
+
+        axis_basedata = _axis_basedata_by_name(databundle, basedata, axis_name, axis_index)
+        if axis_basedata is None:
+            continue
+
+        axis_dataset = group.create_dataset(
+            axis_name,
+            data=axis_basedata.signal,
+            compression=_compression_for_data(axis_basedata.signal, compression),
+        )
+        axis_dataset.attrs["units"] = str(axis_basedata.units)
+        axis_dataset.attrs["rank_of_data"] = int(axis_basedata.rank_of_data)
+        written_axis_names.add(axis_name)
+
+
 def _write_basedata(
     group: h5py.Group,
     basedata: BaseData,
@@ -115,11 +153,14 @@ def _write_basedata(
 
     if databundle is not None and basedata_name is not None and _is_plot_basedata(databundle, basedata_name):
         axis_names = _infer_axis_names(databundle, basedata)
+        group["I"] = signal_dataset
         group.attrs["NX_class"] = "NXdata"
         group.attrs["canSAS_class"] = "SASdata"
+        group.attrs["signal"] = "I"
         group.attrs["axes"] = _as_hdf_str_list(axis_names)
         group.attrs["I_axes"] = _as_hdf_str_list(axis_names)
         group.attrs["Q_indices"] = _q_indices_for_axes(axis_names)
+        _write_axis_fields(group, databundle, basedata, axis_names, compression=compression)
 
     # Weights: store only if non-scalar or not equal to 1.0
     weights_array = basedata.weights
