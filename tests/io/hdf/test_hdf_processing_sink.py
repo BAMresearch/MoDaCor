@@ -73,6 +73,16 @@ def _read_str_value(value: str | bytes) -> str:
     return str(value)
 
 
+def _read_str_attr_list(value) -> list[str]:
+    return [_read_str_value(item) for item in list(value)]
+
+
+def _assert_utf8_string_attr(group: h5py.Group, attr_name: str) -> None:
+    attr_type = group.attrs.get_id(attr_name).get_type()
+    assert attr_type.get_class() == h5py.h5t.STRING
+    assert attr_type.get_cset() == h5py.h5t.CSET_UTF8
+
+
 def test_hdf_processing_sink_writes_result_and_metadata(
     tmp_path: Path, processing_data_with_uncertainties: ProcessingData
 ):
@@ -117,12 +127,16 @@ def test_hdf_processing_sink_writes_result_and_metadata(
 
         signal_group = h5["processing/result/run1/sample/signal"]
         assert "default" not in signal_group.attrs
-        assert "NX_class" not in signal_group.attrs
-        assert "canSAS_class" not in signal_group.attrs
+        assert signal_group.attrs["NX_class"] == "NXdata"
+        assert signal_group.attrs["canSAS_class"] == "SASdata"
         assert "signal" not in signal_group.attrs
-        assert "axes" not in signal_group.attrs
-        assert "I_axes" not in signal_group.attrs
-        assert "Q_indices" not in signal_group.attrs
+        assert _read_str_attr_list(signal_group.attrs["axes"]) == ["Q"]
+        assert _read_str_attr_list(signal_group.attrs["I_axes"]) == ["Q"]
+        np.testing.assert_array_equal(signal_group.attrs["Q_indices"], np.array([0], dtype=np.int64))
+        _assert_utf8_string_attr(signal_group, "NX_class")
+        _assert_utf8_string_attr(signal_group, "canSAS_class")
+        _assert_utf8_string_attr(signal_group, "axes")
+        _assert_utf8_string_attr(signal_group, "I_axes")
         assert "Q" not in signal_group
 
         np.testing.assert_allclose(
@@ -252,7 +266,11 @@ def test_hdf_processing_sink_writes_processing_data_snapshots(
         assert "default" not in snapshot_group.attrs
         assert "default" not in snapshot_group["sample"].attrs
         signal_group = snapshot_group["sample/signal"]
-        assert "canSAS_class" not in signal_group.attrs
+        assert signal_group.attrs["canSAS_class"] == "SASdata"
+        assert _read_str_attr_list(signal_group.attrs["axes"]) == ["Q"]
+        assert _read_str_attr_list(signal_group.attrs["I_axes"]) == ["Q"]
+        np.testing.assert_array_equal(signal_group.attrs["Q_indices"], np.array([0], dtype=np.int64))
+        assert "canSAS_class" not in snapshot_group["sample/Q"].attrs
         assert h5["processing/result/run_snap/sample/signal/signal"].compression is None
         assert signal_group["signal"].compression == "lzf"
         assert snapshot_group["sample/Q/signal"].compression == "lzf"

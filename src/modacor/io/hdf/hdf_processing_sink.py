@@ -50,10 +50,59 @@ def _compression_for_data(data: Any, compression: str | None) -> str | None:
     return compression
 
 
+def _as_hdf_str_list(values: Sequence[str]) -> np.ndarray:
+    return np.asarray([str(value) for value in values], dtype=h5py.string_dtype(encoding="utf-8"))
+
+
+def _find_basedata_name(databundle: Any, axis: BaseData | None) -> str | None:
+    if axis is None:
+        return None
+    for name, candidate in databundle.items():
+        if candidate is axis:
+            return str(name)
+    return None
+
+
+def _infer_axis_names(databundle: Any, basedata: BaseData) -> list[str]:
+    ndim = int(np.asarray(basedata.signal).ndim)
+    if ndim == 0:
+        return []
+
+    axis_names: list[str] = []
+    if basedata.axes:
+        for idx, axis in enumerate(basedata.axes[:ndim]):
+            axis_names.append(_find_basedata_name(databundle, axis) or f"axis_{idx}")
+
+    if not axis_names and "Q" in databundle and isinstance(databundle["Q"], BaseData):
+        axis_names = ["Q"] * ndim
+
+    if len(axis_names) < ndim:
+        axis_names.extend(["."] * (ndim - len(axis_names)))
+    return axis_names[:ndim]
+
+
+def _q_indices_for_axes(axis_names: Sequence[str]) -> np.ndarray:
+    q_indices = [
+        idx
+        for idx, name in enumerate(axis_names)
+        if str(name).casefold() in {"q", "qx", "qy", "qz"} or str(name).casefold().startswith("q_")
+    ]
+    return np.asarray(q_indices, dtype=np.int64)
+
+
+def _is_plot_basedata(databundle: Any, basedata_name: str) -> bool:
+    default_plot = getattr(databundle, "default_plot", None)
+    if default_plot is not None:
+        return str(default_plot) == basedata_name
+    return basedata_name == "signal"
+
+
 def _write_basedata(
     group: h5py.Group,
     basedata: BaseData,
     *,
+    databundle: Any | None = None,
+    basedata_name: str | None = None,
     compression: str | None = None,
 ) -> None:
     signal_dataset = group.create_dataset(
@@ -63,6 +112,14 @@ def _write_basedata(
     )
     signal_dataset.attrs["units"] = str(basedata.units)
     signal_dataset.attrs["rank_of_data"] = int(basedata.rank_of_data)
+
+    if databundle is not None and basedata_name is not None and _is_plot_basedata(databundle, basedata_name):
+        axis_names = _infer_axis_names(databundle, basedata)
+        group.attrs["NX_class"] = "NXdata"
+        group.attrs["canSAS_class"] = "SASdata"
+        group.attrs["axes"] = _as_hdf_str_list(axis_names)
+        group.attrs["I_axes"] = _as_hdf_str_list(axis_names)
+        group.attrs["Q_indices"] = _q_indices_for_axes(axis_names)
 
     # Weights: store only if non-scalar or not equal to 1.0
     weights_array = basedata.weights
@@ -354,6 +411,8 @@ def _write_processing_data_tree(
         _write_basedata(
             basedata_group,
             basedata,
+            databundle=databundle,
+            basedata_name=basedata_name,
             compression=compression,
         )
 
