@@ -219,6 +219,12 @@ def _write_text_dataset(group: h5py.Group, name: str, text: str) -> None:
     group.create_dataset(name, data=str(text).encode("utf-8"))
 
 
+def _write_text_field(group: h5py.Group, name: str, text: str) -> None:
+    if name in group:
+        del group[name]
+    group.create_dataset(name, data=str(text), dtype=h5py.string_dtype(encoding="utf-8"))
+
+
 def _normalise_trace_events(trace_events: Any | None) -> list[dict[str, Any]]:
     if trace_events is None:
         return []
@@ -405,6 +411,28 @@ def _resolve_basedata_paths(
     return list(dict.fromkeys(resolved_data_paths))
 
 
+def _default_basedata_path(
+    processing_data: ProcessingData,
+    written_basedata_paths: Sequence[tuple[str, str]],
+) -> tuple[str, str] | None:
+    written = list(written_basedata_paths)
+    if not written:
+        return None
+    written_set = set(written)
+
+    for bundle_key in sorted(processing_data.keys()):
+        databundle = processing_data[bundle_key]
+        default_plot = getattr(databundle, "default_plot", None)
+        if default_plot is not None and (bundle_key, str(default_plot)) in written_set:
+            return (bundle_key, str(default_plot))
+
+    for bundle_key, basedata_name in written:
+        if basedata_name == "signal":
+            return (bundle_key, basedata_name)
+
+    return written[0]
+
+
 def _write_processing_data_tree(
     root_group: h5py.Group,
     processing_data: ProcessingData,
@@ -412,13 +440,14 @@ def _write_processing_data_tree(
     *,
     write_all_processing_data: bool = False,
     compression: str | None = None,
-) -> None:
+) -> tuple[str, str] | None:
     resolved_data_paths = _resolve_basedata_paths(
         processing_data,
         data_paths,
         write_all_processing_data=write_all_processing_data,
     )
 
+    written_basedata_paths: list[tuple[str, str]] = []
     seen_basedata_paths: set[tuple[str, str]] = set()
     for path in resolved_data_paths:
         parsed = parse_processing_path(path)
@@ -456,6 +485,52 @@ def _write_processing_data_tree(
             basedata_name=basedata_name,
             compression=compression,
         )
+        written_basedata_paths.append(basedata_key)
+
+    return _default_basedata_path(processing_data, written_basedata_paths)
+
+
+def _set_root_attr_if_absent(h5: h5py.File, name: str, value: str) -> None:
+    if name not in h5.attrs:
+        h5.attrs[name] = value
+
+
+def _set_nxcanSAS_default_chain(
+    h5: h5py.File,
+    *,
+    run_name: str,
+    default_path: tuple[str, str] | None,
+) -> None:
+    if default_path is None:
+        return
+
+    bundle_key, basedata_name = default_path
+    _set_root_attr_if_absent(h5, "NX_class", "NXroot")
+    h5.attrs["default"] = "processing"
+    _set_root_attr_if_absent(h5, "creator", "MoDaCor")
+    _set_root_attr_if_absent(h5, "HDF5_Version", h5py.version.hdf5_version)
+    _set_root_attr_if_absent(h5, "h5py_version", h5py.__version__)
+
+    processing_group = h5["processing"]
+    processing_group.attrs["NX_class"] = "NXentry"
+    processing_group.attrs["canSAS_class"] = "SASentry"
+    processing_group.attrs["version"] = "1.1"
+    processing_group.attrs["default"] = "result"
+    _write_text_field(processing_group, "definition", "NXcanSAS")
+    _write_text_field(processing_group, "run", run_name)
+    _write_text_field(processing_group, "title", f"MoDaCor processing result {run_name}")
+
+    result_root = processing_group["result"]
+    result_root.attrs["NX_class"] = "NXcollection"
+    result_root.attrs["default"] = run_name
+
+    run_result_group = result_root[run_name]
+    run_result_group.attrs["NX_class"] = "NXcollection"
+    run_result_group.attrs["default"] = bundle_key
+
+    bundle_group = run_result_group[bundle_key]
+    bundle_group.attrs["NX_class"] = "NXcollection"
+    bundle_group.attrs["default"] = basedata_name
 
 
 @define(kw_only=True)
@@ -521,12 +596,13 @@ class HDFProcessingSink(IoSink):
 
             result_root = processing_group.require_group("result")
             run_result_group = _recreate_group(result_root, run_name)
-            _write_processing_data_tree(
+            default_path = _write_processing_data_tree(
                 run_result_group,
                 processing_data,
                 resolved_data_paths,
                 compression=compression,
             )
+            _set_nxcanSAS_default_chain(h5, run_name=run_name, default_path=default_path)
 
             # Pipeline specification (stored as JSON string)
             pipeline_group = processing_group.require_group("pipeline")
