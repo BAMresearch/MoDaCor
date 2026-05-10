@@ -83,6 +83,13 @@ def _assert_utf8_string_attr(group: h5py.Group, attr_name: str) -> None:
     assert attr_type.get_cset() == h5py.h5t.CSET_UTF8
 
 
+def _resolve_default_nxdata(h5: h5py.File) -> h5py.Group:
+    current = h5[h5.attrs["default"]]
+    while isinstance(current, h5py.Group) and current.attrs.get("NX_class") != "NXdata":
+        current = current[current.attrs["default"]]
+    return current
+
+
 def test_hdf_processing_sink_writes_result_and_metadata(
     tmp_path: Path, processing_data_with_uncertainties: ProcessingData
 ):
@@ -119,35 +126,47 @@ def test_hdf_processing_sink_writes_result_and_metadata(
     assert out_file.exists()
 
     with h5py.File(out_file, "r") as h5:
-        assert "default" not in h5.attrs
-        assert "default" not in h5["processing"].attrs
-        assert "default" not in h5["processing/result"].attrs
-        assert "default" not in h5["processing/result/run1"].attrs
-        assert "default" not in h5["processing/result/run1/sample"].attrs
+        assert h5.attrs["NX_class"] == "NXroot"
+        assert h5.attrs["default"] == "processing"
+        assert h5["processing"].attrs["NX_class"] == "NXentry"
+        assert "canSAS_class" not in h5["processing"].attrs
+        assert "version" not in h5["processing"].attrs
+        assert h5["processing"].attrs["default"] == "result"
+        assert h5["processing/result"].attrs["NX_class"] == "NXcollection"
+        assert h5["processing/result"].attrs["default"] == "run1"
+        assert h5["processing/result/run1"].attrs["NX_class"] == "NXcollection"
+        assert h5["processing/result/run1"].attrs["default"] == "sample"
+        assert h5["processing/result/run1/sample"].attrs["NX_class"] == "NXcollection"
+        assert h5["processing/result/run1/sample"].attrs["default"] == "signal"
+        assert "definition" not in h5["processing"]
+        assert _read_text_dataset(h5["processing"], "run") == "run1"
+        assert _read_text_dataset(h5["processing"], "title") == "MoDaCor processing result run1"
+        assert _read_text_dataset(h5["processing"], "program_name") == "MoDaCor"
+        assert _resolve_default_nxdata(h5).name == "/processing/result/run1/sample/signal"
+        assert _resolve_default_nxdata(h5).attrs["signal"] == "signal"
+        _assert_utf8_string_attr(h5, "default")
+        _assert_utf8_string_attr(h5["processing"], "default")
+        _assert_utf8_string_attr(h5["processing/result"], "default")
 
         signal_group = h5["processing/result/run1/sample/signal"]
         assert "default" not in signal_group.attrs
         assert signal_group.attrs["NX_class"] == "NXdata"
-        assert signal_group.attrs["canSAS_class"] == "SASdata"
-        assert signal_group.attrs["signal"] == "I"
+        assert "canSAS_class" not in signal_group.attrs
+        assert signal_group.attrs["signal"] == "signal"
         assert _read_str_attr_list(signal_group.attrs["axes"]) == ["Q"]
-        assert _read_str_attr_list(signal_group.attrs["I_axes"]) == ["Q"]
-        np.testing.assert_array_equal(signal_group.attrs["Q_indices"], np.array([0], dtype=np.int64))
+        assert "I_axes" not in signal_group.attrs
+        assert "Q_indices" not in signal_group.attrs
         _assert_utf8_string_attr(signal_group, "NX_class")
-        _assert_utf8_string_attr(signal_group, "canSAS_class")
         _assert_utf8_string_attr(signal_group, "signal")
         _assert_utf8_string_attr(signal_group, "axes")
-        _assert_utf8_string_attr(signal_group, "I_axes")
-        assert "I" in signal_group
+        assert "I" not in signal_group
         assert "Q" in signal_group
 
         np.testing.assert_allclose(
             signal_group["signal"], processing_data_with_uncertainties["sample"]["signal"].signal
         )
-        np.testing.assert_allclose(signal_group["I"], processing_data_with_uncertainties["sample"]["signal"].signal)
         np.testing.assert_allclose(signal_group["Q"], processing_data_with_uncertainties["sample"]["Q"].signal)
         assert signal_group["signal"].attrs["units"] == "count"
-        assert signal_group["I"].attrs["units"] == "count"
         assert signal_group["Q"].attrs["units"] == "1/nm"
 
         np.testing.assert_allclose(
@@ -188,6 +207,36 @@ def test_hdf_processing_sink_defaults_to_run_default(
         assert "processing/result/default/sample/signal/signal" in h5
         assert bool(h5["processing/pipeline/default"].attrs["empty"]) is True
         assert bool(h5["processing/tracer/default"].attrs["empty"]) is True
+
+
+def test_hdf_processing_sink_sets_processing_default_when_raw_entry_exists(
+    tmp_path: Path, processing_data_with_uncertainties: ProcessingData
+):
+    out_file = tmp_path / "out_with_raw_entry.h5"
+    with h5py.File(out_file, "w") as h5:
+        h5.attrs["NX_class"] = "NXroot"
+        h5.attrs["default"] = "entry"
+        raw_entry = h5.create_group("entry")
+        raw_entry.attrs["NX_class"] = "NXentry"
+        raw_entry.attrs["default"] = "data"
+        raw_data = raw_entry.create_group("data")
+        raw_data.attrs["NX_class"] = "NXdata"
+        raw_data.attrs["signal"] = "counts"
+        raw_data.create_dataset("counts", data=np.array([10.0, 11.0]))
+
+    sink = HDFProcessingSink(resource_location=out_file)
+    sink.write(
+        "run_raw",
+        processing_data_with_uncertainties,
+        data_paths=["/sample/signal/signal"],
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        assert "entry/data/counts" in h5
+        assert h5.attrs["default"] == "processing"
+        assert h5["entry"].attrs["default"] == "data"
+        assert h5["processing"].attrs["default"] == "result"
+        assert _resolve_default_nxdata(h5).name == "/processing/result/run_raw/sample/signal"
 
 
 def test_hdf_processing_sink_accepts_string_data_path(
@@ -269,20 +318,17 @@ def test_hdf_processing_sink_writes_processing_data_snapshots(
         snapshot_group = tracer_group["steps/0001_S1/processing_data"]
         assert snapshot_group.attrs["snapshot_kind"] == "full_processing_data"
         assert "default_path" not in snapshot_group.attrs
-        assert "default" not in snapshot_group.attrs
-        assert "default" not in snapshot_group["sample"].attrs
         signal_group = snapshot_group["sample/signal"]
-        assert signal_group.attrs["canSAS_class"] == "SASdata"
-        assert signal_group.attrs["signal"] == "I"
+        assert signal_group.attrs["NX_class"] == "NXdata"
+        assert "canSAS_class" not in signal_group.attrs
+        assert signal_group.attrs["signal"] == "signal"
         assert _read_str_attr_list(signal_group.attrs["axes"]) == ["Q"]
-        assert _read_str_attr_list(signal_group.attrs["I_axes"]) == ["Q"]
-        np.testing.assert_array_equal(signal_group.attrs["Q_indices"], np.array([0], dtype=np.int64))
-        assert "canSAS_class" not in snapshot_group["sample/Q"].attrs
+        assert "I_axes" not in signal_group.attrs
+        assert "Q_indices" not in signal_group.attrs
+        assert "NX_class" not in snapshot_group["sample/Q"].attrs
         assert h5["processing/result/run_snap/sample/signal/signal"].compression is None
-        assert h5["processing/result/run_snap/sample/signal/I"].compression is None
         assert h5["processing/result/run_snap/sample/signal/Q"].compression is None
         assert signal_group["signal"].compression == "lzf"
-        assert signal_group["I"].compression == "lzf"
         assert signal_group["Q"].compression == "lzf"
         assert snapshot_group["sample/Q/signal"].compression == "lzf"
         np.testing.assert_allclose(
