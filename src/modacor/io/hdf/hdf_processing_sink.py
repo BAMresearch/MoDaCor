@@ -81,15 +81,6 @@ def _infer_axis_names(databundle: Any, basedata: BaseData) -> list[str]:
     return axis_names[:ndim]
 
 
-def _q_indices_for_axes(axis_names: Sequence[str]) -> np.ndarray:
-    q_indices = [
-        idx
-        for idx, name in enumerate(axis_names)
-        if str(name).casefold() in {"q", "qx", "qy", "qz"} or str(name).casefold().startswith("q_")
-    ]
-    return np.asarray(q_indices, dtype=np.int64)
-
-
 def _is_plot_basedata(databundle: Any, basedata_name: str) -> bool:
     default_plot = getattr(databundle, "default_plot", None)
     if default_plot is not None:
@@ -115,7 +106,7 @@ def _write_axis_fields(
     compression: str | None = None,
 ) -> None:
     written_axis_names: set[str] = set()
-    reserved_names = {"I", "signal", "weights", "uncertainties"}
+    reserved_names = {"signal", "weights", "uncertainties"}
     for axis_index, axis_name in enumerate(axis_names):
         axis_name = str(axis_name)
         if axis_name in written_axis_names or axis_name in reserved_names or axis_name == ".":
@@ -153,13 +144,9 @@ def _write_basedata(
 
     if databundle is not None and basedata_name is not None and _is_plot_basedata(databundle, basedata_name):
         axis_names = _infer_axis_names(databundle, basedata)
-        group["I"] = signal_dataset
         group.attrs["NX_class"] = "NXdata"
-        group.attrs["canSAS_class"] = "SASdata"
-        group.attrs["signal"] = "I"
+        group.attrs["signal"] = "signal"
         group.attrs["axes"] = _as_hdf_str_list(axis_names)
-        group.attrs["I_axes"] = _as_hdf_str_list(axis_names)
-        group.attrs["Q_indices"] = _q_indices_for_axes(axis_names)
         _write_axis_fields(group, databundle, basedata, axis_names, compression=compression)
 
     # Weights: store only if non-scalar or not equal to 1.0
@@ -495,7 +482,7 @@ def _set_root_attr_if_absent(h5: h5py.File, name: str, value: str) -> None:
         h5.attrs[name] = value
 
 
-def _set_nxcanSAS_default_chain(
+def _set_nexus_default_chain(
     h5: h5py.File,
     *,
     run_name: str,
@@ -513,12 +500,10 @@ def _set_nxcanSAS_default_chain(
 
     processing_group = h5["processing"]
     processing_group.attrs["NX_class"] = "NXentry"
-    processing_group.attrs["canSAS_class"] = "SASentry"
-    processing_group.attrs["version"] = "1.1"
     processing_group.attrs["default"] = "result"
-    _write_text_field(processing_group, "definition", "NXcanSAS")
     _write_text_field(processing_group, "run", run_name)
     _write_text_field(processing_group, "title", f"MoDaCor processing result {run_name}")
+    _write_text_field(processing_group, "program_name", "MoDaCor")
 
     result_root = processing_group["result"]
     result_root.attrs["NX_class"] = "NXcollection"
@@ -602,7 +587,7 @@ class HDFProcessingSink(IoSink):
                 resolved_data_paths,
                 compression=compression,
             )
-            _set_nxcanSAS_default_chain(h5, run_name=run_name, default_path=default_path)
+            _set_nexus_default_chain(h5, run_name=run_name, default_path=default_path)
 
             # Pipeline specification (stored as JSON string)
             pipeline_group = processing_group.require_group("pipeline")
