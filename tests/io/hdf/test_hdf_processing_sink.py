@@ -260,6 +260,11 @@ def test_hdf_processing_sink_can_write_all_processing_data(tmp_path: Path):
     sink = HDFProcessingSink(resource_location=out_file)
 
     processing_data = ProcessingData()
+    calibration_bundle = DataBundle()
+    calibration_bundle["signal"] = BaseData(signal=np.array([5.0, 6.0]), units=ureg.Unit("count"))
+    calibration_bundle.default_plot = "signal"
+    processing_data["intensity_calibration"] = calibration_bundle
+
     bundle = DataBundle()
     bundle["signal"] = BaseData(signal=np.array([1.0, 2.0]), units=ureg.Unit("count"))
     bundle["Q"] = BaseData(signal=np.array([0.1, 0.2]), units=ureg.Unit("1/nm"))
@@ -274,6 +279,9 @@ def test_hdf_processing_sink_can_write_all_processing_data(tmp_path: Path):
     )
 
     with h5py.File(out_file, "r") as h5:
+        assert h5["processing/result/run_all"].attrs["default"] == "sample"
+        assert _resolve_default_nxdata(h5).name == "/processing/result/run_all/sample/signal"
+        assert "processing/result/run_all/intensity_calibration/signal/signal" in h5
         assert "processing/result/run_all/sample/signal/signal" in h5
         assert "processing/result/run_all/sample/Q/signal" in h5
         assert "processing/result/run_all/sample/note" not in h5
