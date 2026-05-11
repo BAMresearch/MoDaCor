@@ -77,6 +77,7 @@ Built-in sink types:
 - `csv` -> `modacor.io.csv.csv_sink.CSVSink`
 - `hdf` -> `modacor.io.hdf.hdf_processing_sink.HDFProcessingSink`
 - `hdf_processing` -> `HDFProcessingSink` alias for clarity
+- `pdh` -> `modacor.io.pdh.pdh_sink.PDHSink`
 - `custom` -> class selected by `kwargs.class_path`
 
 For custom sinks, mirror custom source behavior: `kwargs.class_path` is consumed

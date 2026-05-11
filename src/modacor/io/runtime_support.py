@@ -14,6 +14,7 @@ from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 from modacor.io.hdf.hdf_source import HDFSource
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
+from modacor.io.pdh.pdh_sink import PDHSink
 from modacor.io.yaml.yaml_source import YAMLSource
 
 __all__ = ["build_sinks_from_specs", "build_sources_from_specs", "write_processing_data_hdf"]
@@ -81,6 +82,7 @@ def build_sinks_from_specs(specs: Iterable[Mapping[str, Any]]) -> IoSinks:
         "csv": CSVSink,
         "hdf": HDFProcessingSink,
         "hdf_processing": HDFProcessingSink,
+        "pdh": PDHSink,
     }
     sinks = IoSinks()
     for spec in specs:

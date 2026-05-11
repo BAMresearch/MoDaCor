@@ -666,7 +666,7 @@ components:
           type: string
         type:
           type: string
-          enum: [csv, hdf, hdf_processing, custom]
+          enum: [csv, hdf, hdf_processing, pdh, custom]
         location:
           type: string
         kwargs:

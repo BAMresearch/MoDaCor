@@ -65,7 +65,7 @@ This preserves flexibility for pipelines with 2 to 6+ source files.
 Sinks are dynamic output targets bound to stable refs:
 
 - `sink_ref` (e.g. `export_csv`, `export_hdf`)
-- `type` (e.g. `csv`, `hdf`, `hdf_processing`, `custom`)
+- `type` (e.g. `csv`, `hdf`, `hdf_processing`, `pdh`, `custom`)
 - `resource_location` (path/URI)
 - optional constructor kwargs
 

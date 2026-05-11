@@ -43,6 +43,7 @@ examples are:
 
 - `src/modacor/io/csv/csv_sink.py`
 - `src/modacor/io/hdf/hdf_processing_sink.py`
+- `src/modacor/io/pdh/pdh_sink.py`
 
 ## Registration paths
 
@@ -59,7 +60,7 @@ There are three supported ways to add sources or sinks:
 The shared CLI/runtime builder currently supports:
 
 - source types: `hdf`, `yaml`, `csv`, and `custom`
-- sink types: `csv`, `hdf`, `hdf_processing`, and `custom`
+- sink types: `csv`, `hdf`, `hdf_processing`, `pdh`, and `custom`
 
 For `custom` sources or sinks, the runtime spec must include
 `kwargs.class_path` with the fully qualified class import path.

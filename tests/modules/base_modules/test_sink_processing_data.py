@@ -34,7 +34,14 @@ def processing_data_1d() -> ProcessingData:
     b = DataBundle()
 
     q = BaseData(signal=np.linspace(0.1, 1.0, 5), units=ureg.Unit("1/nm"))
-    i = BaseData(signal=np.array([10, 11, 12, 13, 14], dtype=float), units=ureg.dimensionless)
+    signal = np.array([10, 11, 12, 13, 14], dtype=float)
+    i = BaseData(
+        signal=signal,
+        units=ureg.dimensionless,
+        uncertainties={"poisson": np.sqrt(signal)},
+        axes=[q],
+        rank_of_data=1,
+    )
 
     b["Q"] = q
     b["signal"] = i
@@ -54,6 +61,22 @@ def _register_csv_sink(io_sinks: IoSinks, out_file: Path) -> None:
             "iosink_module": "modacor.io.csv.csv_sink.CSVSink",
             # simplified: delimiter (and any np.savetxt kwargs) live here
             "iosink_method_kwargs": {"delimiter": ","},
+        }
+    )
+    step.calculate()
+
+
+def _register_pdh_sink(io_sinks: IoSinks, out_file: Path) -> None:
+    """
+    Register a PDHSink via AppendSink.
+    """
+    step = AppendSink(io_sources=None, io_sinks=io_sinks)
+    step.modify_config_by_dict(
+        {
+            "sink_identifier": ["export_pdh"],
+            "sink_location": [str(out_file)],
+            "iosink_module": "modacor.io.pdh.pdh_sink.PDHSink",
+            "iosink_method_kwargs": {"xml_footer": ""},
         }
     )
     step.calculate()
@@ -93,6 +116,28 @@ def test_sink_processing_data_writes_csv_numpy(tmp_path: Path, processing_data_1
         float(processing_data_1d["sample"]["Q"].signal[0]),
         float(processing_data_1d["sample"]["signal"].signal[0]),
     ]
+
+
+def test_sink_processing_data_writes_pdh(tmp_path: Path, processing_data_1d: ProcessingData):
+    out_file = tmp_path / "export.pdh"
+    io_sinks = IoSinks()
+    _register_pdh_sink(io_sinks, out_file)
+
+    data_paths = [
+        "/sample/Q/signal",
+        "/sample/signal/signal",
+        "/sample/signal/uncertainties/poisson",
+    ]
+    output = _run_sink_step(io_sinks, processing_data_1d, target="export_pdh::", data_paths=data_paths)
+
+    assert output == {}
+    assert out_file.is_file()
+
+    lines = out_file.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 5 + 5
+    assert lines[0] == "{SAXSquantDirectMeasurement}"
+    assert lines[2].split()[0] == "5"
+    assert lines[5] == "  1.000000E-01   1.000000E+01   3.162278E+00 "
 
 
 def test_sink_processing_data_rejects_csv_subpath(tmp_path: Path, processing_data_1d: ProcessingData):

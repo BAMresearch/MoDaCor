@@ -19,6 +19,7 @@ from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.csv.csv_sink import CSVSink
 from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 from modacor.io.io_sink import IoSink
+from modacor.io.pdh.pdh_sink import PDHSink
 from modacor.io.runtime_support import build_sinks_from_specs, write_processing_data_hdf
 
 
@@ -68,6 +69,26 @@ def test_build_sinks_from_specs_builds_hdf_processing_sink(tmp_path: Path):
     assert isinstance(sink, HDFProcessingSink)
     assert sink.resource_location == out_file
     assert sink.iosink_method_kwargs == {"compression": "gzip"}
+
+
+def test_build_sinks_from_specs_builds_pdh_sink(tmp_path: Path):
+    out_file = tmp_path / "out.pdh"
+
+    sinks = build_sinks_from_specs(
+        [
+            {
+                "ref": "export_pdh",
+                "type": "pdh",
+                "location": out_file,
+                "kwargs": {"xml_footer": ""},
+            }
+        ]
+    )
+
+    sink = sinks.get_sink("export_pdh")
+    assert isinstance(sink, PDHSink)
+    assert sink.resource_location == out_file
+    assert sink.iosink_method_kwargs == {"xml_footer": ""}
 
 
 def test_build_sinks_from_specs_supports_custom_sink(tmp_path: Path):
