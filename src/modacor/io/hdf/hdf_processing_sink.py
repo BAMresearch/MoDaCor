@@ -407,6 +407,14 @@ def _default_basedata_path(
         return None
     written_set = set(written)
 
+    sample_bundle = processing_data.get("sample") if hasattr(processing_data, "get") else None
+    if sample_bundle is not None:
+        sample_default_plot = getattr(sample_bundle, "default_plot", None)
+        if sample_default_plot is not None and ("sample", str(sample_default_plot)) in written_set:
+            return ("sample", str(sample_default_plot))
+        if ("sample", "signal") in written_set:
+            return ("sample", "signal")
+
     for bundle_key in sorted(processing_data.keys()):
         databundle = processing_data[bundle_key]
         default_plot = getattr(databundle, "default_plot", None)
