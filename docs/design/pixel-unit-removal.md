@@ -1,9 +1,9 @@
-# Pixel Unit Removal
+# Detector Pixel Units
 
-MoDaCor no longer treats detector pixels as physical units. Pint's built-in
-`pixel`, `pixels`, and `px` definitions are removed from the application unit
-registry during startup, and MoDaCor does not replace them with custom detector
-element units.
+MoDaCor treats detector pixels as dimensionless detector-coordinate units. Pint's
+built-in `pixel`, `pixels`, `px`, and related display/CSS pixel definitions are
+removed from the application unit registry during startup, then redefined as
+aliases of a named dimensionless detector pixel unit.
 
 ## Rationale
 
@@ -16,15 +16,20 @@ detector element. The old model also leaked into signal units such as
 The current contract keeps unit handling physical:
 
 - detector element indices and beam-center coordinates are dimensionless,
+- unit strings such as `pixel`, `pixels`, `px`, `css_pixel`, `dot`, `pel`, and
+  `picture_element` are accepted as detector-coordinate aliases,
 - detector element sizes are lengths, for example `m`, `mm`, or `um`,
 - solid angle outputs are `sr`,
 - masks, index maps, and names such as `pixel_index` remain detector-element
-  concepts but do not carry pixel units.
+  concepts and may use either `dimensionless` or a pixel alias.
+
+This deliberately replaces Pint's display/CSS interpretation of pixel-like unit
+names. In MoDaCor, `px` does not mean a CSS length.
 
 ## Migration
 
-Update metadata and pipeline inputs by removing pixel denominators from unit
-strings:
+The preferred metadata style is still to store physical quantities in physical
+units and detector indices as dimensionless values:
 
 | Old unit string | New unit string |
 | --- | --- |
@@ -37,14 +42,19 @@ The numeric values do not change for detector pitch or detector element size.
 For example, a stored pitch value of `0.172` with old units `mm/pixel` becomes
 the same value `0.172` with units `mm`.
 
-## Strict Failure Mode
+For compatibility with existing metadata, pixel denominators are also accepted
+and cancel as dimensionless factors:
 
-This is an intentional breaking change. Unit strings containing `pixel`,
-`pixels`, or `px` now fail during Pint parsing. MoDaCor does not provide a
-compatibility warning or automatic conversion path because silent normalization
-would hide stale metadata.
+- `0.172 mm/pixel` converts to `0.172 mm`,
+- `5 count/px` converts to `5 count`,
+- `10 counts/pixel/second` converts to `10 counts/second`.
 
-External pipeline repositories must update their metadata sources before running
-against this version. In particular, SAXSess and MOUSE-style pipelines that read
-detector pitch from HDF attributes or static YAML must store those pitch units as
-plain length units.
+`BaseData.is_dimensionless` checks Pint compatibility rather than exact unit
+equality, so a `BaseData` stored with `pixel` units is considered dimensionless.
+Calling `BaseData.to_dimensionless()` normalizes compatible named units such as
+`pixel` to Pint's plain `dimensionless` unit without changing the numerical
+values or uncertainties.
+
+External pipeline repositories should prefer updating SAXSess and MOUSE-style
+metadata sources to plain length units for detector pitch, but stale
+`mm/pixel`-style metadata remains parseable.

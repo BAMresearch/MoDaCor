@@ -303,6 +303,22 @@ def test_to_units_same_units_is_noop(simple_basedata):
     assert bd.units == ureg.dimensionless
 
 
+def test_pixel_units_are_dimensionless_and_can_normalize():
+    bd = BaseData(
+        signal=np.array([1.0, 2.0]),
+        uncertainties={"pixel_index": np.array([0.5, 0.5])},
+        units=ureg.pixel,
+    )
+
+    assert bd.is_dimensionless
+
+    bd.to_dimensionless()
+
+    assert bd.units == ureg.dimensionless
+    np.testing.assert_allclose(bd.signal, [1.0, 2.0])
+    np.testing.assert_allclose(bd.uncertainties["pixel_index"], [0.5, 0.5])
+
+
 def test_to_units_incompatible_units_raises(simple_basedata):
     bd = simple_basedata
     # dimensionless vs. time is not compatible

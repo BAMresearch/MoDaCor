@@ -51,7 +51,8 @@ class CanonicalDetectorFrame:
     - det_coord_x: lab-frame x-coordinate of the detector origin. This indicates the offset of the detector origin to the beam center in the lab frame. units of length.
     - det_coord_y: lab-frame y-coordinate of the detector origin. This indicates the offset of the detector origin to the beam center in the lab frame. units of length.
     - e_fast/e_slow/e_normal: unit vectors in lab frame (shape (3,)), defining detector orientation.
-    - pixel_pitch_{slow,fast}: scalar detector-element size in length units
+    - pixel_pitch_{slow,fast}: scalar detector-element size in length units;
+      legacy forms such as mm/pixel are accepted because pixel is dimensionless
 
     Notes:
     Tilt support will be integrated when needed following the NeXus pitch, yaw, roll for rotations around x, y, z.
@@ -167,7 +168,7 @@ class PixelCoordinates3D(ProcessStep):
             "pixel_pitch_slow_units_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "IoSources key for slow-axis detector element size units.",
+                "doc": "IoSources key for slow-axis detector element size units; prefer length units such as m or mm.",
             },
             "pixel_pitch_slow_uncertainties_sources": {
                 "type": dict,
@@ -183,7 +184,7 @@ class PixelCoordinates3D(ProcessStep):
             "pixel_pitch_fast_units_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "IoSources key for fast-axis detector element size units.",
+                "doc": "IoSources key for fast-axis detector element size units; prefer length units such as m or mm.",
             },
             "pixel_pitch_fast_uncertainties_sources": {
                 "type": dict,

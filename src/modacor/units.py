@@ -84,20 +84,26 @@ def remove_pixel_units(ureg) -> None:
     """
     Remove Pint's display-pixel unit definitions from a registry.
 
-    MoDaCor treats detector element indices as dimensionless array coordinates,
-    not as physical units. After this cleanup, unit strings such as ``pixel``,
-    ``px``, ``mm/pixel`` and ``count/px`` fail during Pint parsing.
+    This is a low-level cleanup helper used before MoDaCor installs its own
+    dimensionless detector-coordinate pixel aliases.
     """
     # Pint's pixel-related aliases vary by version, so delete a small superset.
     _delete_unit_names(ureg, names=PIXEL_UNIT_NAMES)
 
 
+_DETECTOR_PIXEL_DEFINITION = "pixel = 1 = px = pixels"
+_DETECTOR_PIXEL_ALIASES = "@alias pixel = css_pixel = dot = pel = picture_element"
+
+
 def configure_detector_pixel_units(ureg) -> None:
     """
-    Backwards-compatible entry point for registry setup.
+    Configure detector element pixel names as dimensionless units.
 
-    Historically this function redefined ``pixel``/``px`` as detector-element
-    units. The current contract is stricter: detector indices are dimensionless,
-    and pixel unit strings are removed so stale metadata fails fast.
+    Pint ships display/CSS pixel definitions with physical display semantics.
+    MoDaCor detector element indices are array coordinates instead, so we first
+    remove Pint's defaults and then redefine common pixel spellings as aliases
+    of a named unit with scale factor 1.
     """
     remove_pixel_units(ureg)
+    ureg.define(_DETECTOR_PIXEL_DEFINITION)
+    ureg.define(_DETECTOR_PIXEL_ALIASES)

@@ -69,6 +69,42 @@ correction work:
 This is why MoDaCor can run a correction step and still explain what happened to
 units and propagated uncertainties at each stage.
 
+#### Array casting and broadcasting
+
+When a `BaseData` object is created, scalar values and list-like values supplied
+for `signal`, `uncertainties`, or `weights` are converted to NumPy arrays with a
+floating dtype. Existing `np.ndarray` inputs are kept as arrays and are not
+forcibly recast at construction time.
+
+The `signal` shape defines the stored data shape. Uncertainty arrays and weights
+must be compatible with that shape:
+
+- scalar arrays are accepted for any `signal` shape,
+- arrays that broadcast to exactly `signal.shape` are accepted,
+- arrays that cannot broadcast to `signal.shape`, or would broadcast to a larger
+  shape, are rejected.
+
+For example, for a signal with shape `(4, 5)`, uncertainty shapes `()`, `(5,)`,
+`(1, 5)`, `(4, 1)`, and `(4, 5)` are valid. A shape such as `(6,)` is invalid,
+and so is any shape that would require expanding the signal dimensions.
+
+`rank_of_data` describes how many trailing dimensions are data dimensions, for
+example `2` for detector images. It must be between `0` and `3`, and it cannot
+exceed `signal.ndim`.
+
+#### Detector pixel units
+
+Detector element coordinates are detector indices, not physical display pixels.
+MoDaCor configures Pint so `pixel`, `pixels`, `px`, `css_pixel`, `dot`, `pel`,
+and `picture_element` are accepted as dimensionless detector-coordinate aliases.
+This means beam centers and index maps may use either `dimensionless` or one of
+those aliases.
+
+Detector element sizes remain physical lengths. Prefer storing pitch metadata as
+plain length units such as `m`, `mm`, or `um`. Legacy strings such as
+`mm/pixel`, `count/px`, or `counts/pixel/second` are accepted; the pixel factor
+is dimensionless and cancels during conversion.
+
 ## Sources and sinks
 
 MoDaCor separates external I/O from the pipeline graph itself.
