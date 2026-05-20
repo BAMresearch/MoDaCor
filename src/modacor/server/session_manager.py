@@ -10,6 +10,8 @@ from threading import RLock
 from typing import Any
 from uuid import uuid4
 
+from modacor.io.buffer.runtime_buffer_store import RuntimeBufferStore
+
 __all__ = ["PipelineSession", "SessionManager"]
 
 
@@ -75,6 +77,7 @@ class SessionManager:
     def __init__(self) -> None:
         self._sessions: dict[str, PipelineSession] = {}
         self._lock = RLock()
+        self.buffer_store = RuntimeBufferStore()
 
     def list_sessions(self) -> list[PipelineSession]:
         with self._lock:
@@ -118,7 +121,10 @@ class SessionManager:
 
     def delete_session(self, session_id: str) -> bool:
         with self._lock:
-            return self._sessions.pop(session_id, None) is not None
+            deleted = self._sessions.pop(session_id, None) is not None
+            if deleted:
+                self.buffer_store.clear(session_id)
+            return deleted
 
     def upsert_sources(self, session_id: str, sources: list[dict[str, Any]]) -> PipelineSession:
         with self._lock:

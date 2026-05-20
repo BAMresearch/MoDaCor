@@ -8,6 +8,9 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from modacor.io.buffer.buffer_sink import BufferSink
+from modacor.io.buffer.buffer_source import BufferSource
+from modacor.io.buffer.runtime_buffer_store import RuntimeBufferStore
 from modacor.io.csv.csv_sink import CSVSink
 from modacor.io.csv.csv_source import CSVSource
 from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
@@ -25,7 +28,12 @@ def _load_custom_class(class_path: str):
     return getattr(module, class_name)
 
 
-def build_sources_from_specs(specs: Iterable[Mapping[str, Any]]) -> IoSources:
+def build_sources_from_specs(
+    specs: Iterable[Mapping[str, Any]],
+    *,
+    buffer_store: RuntimeBufferStore | None = None,
+    session_id: str | None = None,
+) -> IoSources:
     """
     Build an :class:`IoSources` registry from normalized source specifications.
 
@@ -35,6 +43,7 @@ def build_sources_from_specs(specs: Iterable[Mapping[str, Any]]) -> IoSources:
     """
 
     type_map: dict[str, Any] = {
+        "buffer": BufferSource,
         "csv": CSVSource,
         "hdf": HDFSource,
         "yaml": YAMLSource,
@@ -58,17 +67,33 @@ def build_sources_from_specs(specs: Iterable[Mapping[str, Any]]) -> IoSources:
             except KeyError as exc:
                 raise ValueError(f"Unsupported source type '{source_type}' for ref '{ref}'.") from exc
 
-        source = source_cls(
-            source_reference=ref,
-            resource_location=location,
-            iosource_method_kwargs=kwargs.get("iosource_method_kwargs", kwargs),
-        )
+        if source_cls is BufferSource:
+            if buffer_store is None or session_id is None:
+                raise ValueError(f"Buffer source '{ref}' requires runtime buffer_store and session_id.")
+            source = source_cls(
+                source_reference=ref,
+                resource_location=str(spec["location"]),
+                iosource_method_kwargs=kwargs.get("iosource_method_kwargs", kwargs),
+                buffer_store=buffer_store,
+                session_id=str(session_id),
+            )
+        else:
+            source = source_cls(
+                source_reference=ref,
+                resource_location=location,
+                iosource_method_kwargs=kwargs.get("iosource_method_kwargs", kwargs),
+            )
         sources.register_source(source)
 
     return sources
 
 
-def build_sinks_from_specs(specs: Iterable[Mapping[str, Any]]) -> IoSinks:
+def build_sinks_from_specs(
+    specs: Iterable[Mapping[str, Any]],
+    *,
+    buffer_store: RuntimeBufferStore | None = None,
+    session_id: str | None = None,
+) -> IoSinks:
     """
     Build an :class:`IoSinks` registry from normalized sink specifications.
 
@@ -78,6 +103,7 @@ def build_sinks_from_specs(specs: Iterable[Mapping[str, Any]]) -> IoSinks:
     """
 
     type_map: dict[str, Any] = {
+        "buffer": BufferSink,
         "csv": CSVSink,
         "hdf": HDFProcessingSink,
         "hdf_processing": HDFProcessingSink,
@@ -100,11 +126,22 @@ def build_sinks_from_specs(specs: Iterable[Mapping[str, Any]]) -> IoSinks:
             except KeyError as exc:
                 raise ValueError(f"Unsupported sink type '{sink_type}' for ref '{ref}'.") from exc
 
-        sink = sink_cls(
-            sink_reference=ref,
-            resource_location=location,
-            iosink_method_kwargs=kwargs.get("iosink_method_kwargs", kwargs),
-        )
+        if sink_cls is BufferSink:
+            if buffer_store is None or session_id is None:
+                raise ValueError(f"Buffer sink '{ref}' requires runtime buffer_store and session_id.")
+            sink = sink_cls(
+                sink_reference=ref,
+                resource_location=str(spec["location"]),
+                iosink_method_kwargs=kwargs.get("iosink_method_kwargs", kwargs),
+                buffer_store=buffer_store,
+                session_id=str(session_id),
+            )
+        else:
+            sink = sink_cls(
+                sink_reference=ref,
+                resource_location=location,
+                iosink_method_kwargs=kwargs.get("iosink_method_kwargs", kwargs),
+            )
         sinks.register_sink(sink)
 
     return sinks

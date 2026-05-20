@@ -16,10 +16,11 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.buffer import BufferSink, BufferSource, RuntimeBufferStore
 from modacor.io.csv.csv_sink import CSVSink
 from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 from modacor.io.io_sink import IoSink
-from modacor.io.runtime_support import build_sinks_from_specs, write_processing_data_hdf
+from modacor.io.runtime_support import build_sinks_from_specs, build_sources_from_specs, write_processing_data_hdf
 
 
 @define(kw_only=True)
@@ -68,6 +69,32 @@ def test_build_sinks_from_specs_builds_hdf_processing_sink(tmp_path: Path):
     assert isinstance(sink, HDFProcessingSink)
     assert sink.resource_location == out_file
     assert sink.iosink_method_kwargs == {"compression": "gzip"}
+
+
+def test_build_sources_and_sinks_from_specs_support_buffer_type():
+    store = RuntimeBufferStore()
+
+    sources = build_sources_from_specs(
+        [{"ref": "chunk_input", "type": "buffer", "location": "buffer://session"}],
+        buffer_store=store,
+        session_id="s1",
+    )
+    sinks = build_sinks_from_specs(
+        [{"ref": "chunk_output", "type": "buffer", "location": "buffer://session"}],
+        buffer_store=store,
+        session_id="s1",
+    )
+
+    assert isinstance(sources.get_source("chunk_input"), BufferSource)
+    assert isinstance(sinks.get_sink("chunk_output"), BufferSink)
+
+
+def test_build_buffer_specs_require_runtime_context():
+    with pytest.raises(ValueError, match="requires runtime buffer_store"):
+        build_sources_from_specs([{"ref": "chunk_input", "type": "buffer", "location": "buffer://session"}])
+
+    with pytest.raises(ValueError, match="requires runtime buffer_store"):
+        build_sinks_from_specs([{"ref": "chunk_output", "type": "buffer", "location": "buffer://session"}])
 
 
 def test_build_sinks_from_specs_supports_custom_sink(tmp_path: Path):

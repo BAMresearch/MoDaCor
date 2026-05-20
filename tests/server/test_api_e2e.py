@@ -14,6 +14,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.buffer import decode_npy, encode_npy
 from modacor.runner.pipeline import Pipeline
 from modacor.runner.pipeline_runner import RunResult
 from modacor.server.api import create_app
@@ -27,6 +28,12 @@ TestClient = testclient_mod.TestClient
 def _post_json(client: TestClient, url: str, payload: dict):
     response = client.post(url, json=payload)
     assert response.status_code in {200, 201, 202}, response.text
+    return response.json()
+
+
+def _put_npy(client: TestClient, url: str, array: np.ndarray):
+    response = client.put(url, content=encode_npy(array), headers={"content-type": "application/x-npy"})
+    assert response.status_code == 200, response.text
     return response.json()
 
 
@@ -184,6 +191,63 @@ steps:
     assert "step_durations_s" in run_meta
     assert "elapsed_s" in run_meta
     assert "dirty_steps" in run_meta
+
+
+def test_api_process_rollback_snapshot_flag_controls_partial_snapshot(monkeypatch):
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    pipeline_yaml = """
+name: rollback_flag
+steps:
+  p:
+    module: PoissonUncertainties
+    requires_steps: []
+    configuration:
+      with_processing_keys:
+        - sample
+"""
+    for session_id, rollback_snapshot in (("sess-rollback-on", True), ("sess-rollback-off", False)):
+        _post_json(
+            client,
+            "/v1/sessions",
+            {
+                "session_id": session_id,
+                "pipeline": {"yaml_text": pipeline_yaml},
+            },
+        )
+        session = manager.get_session(session_id)
+        processing_data = ProcessingData()
+        bundle = DataBundle()
+        bundle["signal"] = BaseData(signal=np.array([1.0, 2.0]), units=ureg.Unit("count"))
+        processing_data["sample"] = bundle
+        session.processing_data = processing_data
+
+    calls = {"count": 0}
+
+    def fake_deepcopy(value):
+        calls["count"] += 1
+        return value
+
+    monkeypatch.setattr("modacor.server.runtime_service.deepcopy", fake_deepcopy)
+
+    _post_json(
+        client,
+        "/v1/sessions/sess-rollback-on/process",
+        {"mode": "partial", "changed_keys": ["sample.signal"]},
+    )
+    _post_json(
+        client,
+        "/v1/sessions/sess-rollback-off/process",
+        {"mode": "partial", "changed_keys": ["sample.signal"], "rollback_snapshot": False},
+    )
+
+    assert calls["count"] == 1
+    on_meta = manager.get_session("sess-rollback-on").run_history[-1]
+    off_meta = manager.get_session("sess-rollback-off").run_history[-1]
+    assert on_meta["rollback_snapshot"] is True
+    assert off_meta["rollback_snapshot"] is False
 
 
 def test_api_sources_patch_upserts_single_source():
@@ -417,6 +481,122 @@ steps:
     lines = out_file.read_text(encoding="utf-8").splitlines()
     assert lines[0] == "sample/Q/signal,sample/signal/signal"
     assert len(lines) == 7
+
+
+def test_api_buffer_source_sink_processes_keyed_chunk_data():
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    pipeline_yaml = """
+name: api_buffer_chunk
+steps:
+  load_signal:
+    module: AppendProcessingData
+    requires_steps: []
+    configuration:
+      processing_key: sample
+      databundle_output_key: signal
+      signal_location: "chunk_input::sample/signal/signal"
+      units_location: "chunk_input::sample/signal/signal@units"
+      weights_location: "chunk_input::sample/signal/weights"
+      uncertainties_sources:
+        poisson: "chunk_input::sample/signal/uncertainties/poisson"
+      rank_of_data: 2
+  load_mask:
+    module: AppendProcessingData
+    requires_steps: []
+    configuration:
+      processing_key: sample
+      databundle_output_key: mask
+      signal_location: "chunk_input::sample/mask/signal"
+      units_override: dimensionless
+      rank_of_data: 2
+  export:
+    module: SinkProcessingData
+    requires_steps:
+      - load_signal
+      - load_mask
+    configuration:
+      target: "chunk_output::current"
+      data_paths:
+        - /sample/signal
+        - /sample/mask
+"""
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "sess-buffer",
+            "pipeline": {"yaml_text": pipeline_yaml},
+        },
+    )
+    _post_json(
+        client,
+        "/v1/sessions/sess-buffer/sources/patch",
+        {"ref": "chunk_input", "type": "buffer", "location": "buffer://session"},
+    )
+    _post_json(
+        client,
+        "/v1/sessions/sess-buffer/sinks/patch",
+        {"ref": "chunk_output", "type": "buffer", "location": "buffer://session"},
+    )
+
+    signal = np.arange(12, dtype=np.float32).reshape(1, 3, 4)
+    weights = np.full(signal.shape, 0.25, dtype=np.float32)
+    poisson = np.ones(signal.shape, dtype=np.float32)
+    mask = np.zeros(signal.shape, dtype=np.int16)
+    mask[:, 1, 2] = -1
+
+    _put_npy(client, "/v1/sessions/sess-buffer/buffers/sources/chunk_input/arrays/sample/signal/signal", signal)
+    _put_npy(client, "/v1/sessions/sess-buffer/buffers/sources/chunk_input/arrays/sample/signal/weights", weights)
+    _put_npy(
+        client,
+        "/v1/sessions/sess-buffer/buffers/sources/chunk_input/arrays/sample/signal/uncertainties/poisson",
+        poisson,
+    )
+    _put_npy(client, "/v1/sessions/sess-buffer/buffers/sources/chunk_input/arrays/sample/mask/signal", mask)
+
+    attrs_response = client.put(
+        "/v1/sessions/sess-buffer/buffers/sources/chunk_input/attrs/sample/signal/signal",
+        json={"units": "count"},
+    )
+    assert attrs_response.status_code == 200, attrs_response.text
+
+    result = _post_json(
+        client,
+        "/v1/sessions/sess-buffer/process",
+        {"mode": "full", "rollback_snapshot": False},
+    )
+    assert result["status"] == "succeeded"
+
+    signal_response = client.get(
+        "/v1/sessions/sess-buffer/buffers/sinks/chunk_output/arrays/current/sample/signal/signal"
+    )
+    assert signal_response.status_code == 200, signal_response.text
+    roundtrip_signal = decode_npy(signal_response.content)
+    assert roundtrip_signal.dtype == np.dtype("float32")
+    np.testing.assert_array_equal(roundtrip_signal, signal)
+
+    mask_response = client.get("/v1/sessions/sess-buffer/buffers/sinks/chunk_output/arrays/current/sample/mask/signal")
+    assert mask_response.status_code == 200, mask_response.text
+    roundtrip_mask = decode_npy(mask_response.content)
+    assert roundtrip_mask.dtype == np.dtype("int16")
+    np.testing.assert_array_equal(roundtrip_mask, mask)
+
+    manifest = client.get("/v1/sessions/sess-buffer/buffers/sinks/chunk_output/manifest")
+    assert manifest.status_code == 200, manifest.text
+    assert "current/sample/signal/uncertainties/poisson" in manifest.json()["arrays"]
+
+    clear_one = client.delete("/v1/sessions/sess-buffer/buffers/sinks/chunk_output/arrays/current/sample/mask/signal")
+    assert clear_one.status_code == 200, clear_one.text
+    assert clear_one.json()["removed"] >= 1
+    missing_mask = client.get("/v1/sessions/sess-buffer/buffers/sinks/chunk_output/arrays/current/sample/mask/signal")
+    assert missing_mask.status_code == 404
+
+    clear_sink = client.delete("/v1/sessions/sess-buffer/buffers/sinks/chunk_output")
+    assert clear_sink.status_code == 200, clear_sink.text
+    assert clear_sink.json()["removed"] >= 1
 
 
 def test_api_source_templates_and_profile_validation():

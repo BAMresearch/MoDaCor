@@ -43,16 +43,17 @@ class AppendProcessingData(ProcessStep):
        - ``units_location`` via :meth:`IoSources.get_static_metadata`, or
        - ``units_override`` as a direct units string, or
        - defaults to dimensionless if neither is provided.
-    3. Optionally loads uncertainty arrays from ``uncertainties_sources``.
-    4. Wraps everything in a :class:`BaseData` instance.
-    5. Sets ``BaseData.rank_of_data`` based on the configured ``rank_of_data``:
+    3. Optionally loads weights from ``weights_location``.
+    4. Optionally loads uncertainty arrays from ``uncertainties_sources``.
+    5. Wraps everything in a :class:`BaseData` instance.
+    6. Sets ``BaseData.rank_of_data`` based on the configured ``rank_of_data``:
        - If it is an ``int``, it is used directly.
        - If it is a ``str``, it is interpreted as an IoSources metadata reference
          (``'<io_source_id>::<dataset_path>'``) and read via
          :meth:`IoSources.get_static_metadata`, then converted to ``int``.
        - Validation and bounds checking are handled by :func:`validate_rank_of_data`
          inside :class:`BaseData`.
-    6. Stores the resulting :class:`BaseData` under the configured
+    7. Stores the resulting :class:`BaseData` under the configured
        ``databundle_output_key`` (default: ``"signal"``) in a
        :class:`DataBundle` at ``self.processing_data[processing_key]``. If that
        DataBundle already exists, it is updated: existing entries are preserved
@@ -101,6 +102,11 @@ class AppendProcessingData(ProcessStep):
                 "type": (str, type(None)),
                 "default": None,
                 "doc": "Optional unit string that overrides loaded units.",
+            },
+            "weights_location": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Optional IoSources reference for BaseData weights.",
             },
             "uncertainties_sources": {
                 "type": dict,
@@ -180,6 +186,7 @@ class AppendProcessingData(ProcessStep):
             - databundle_output_key (str)
             - units_location (str | None)
             - units_override (str | None)
+            - weights_location (str | None)
             - uncertainties_sources (dict[str, str])
         """
         cfg = self.configuration
@@ -209,6 +216,10 @@ class AppendProcessingData(ProcessStep):
         if units_override is not None and not isinstance(units_override, str):
             raise TypeError("'units_override' must be a units string if provided.")
 
+        weights_location = cfg.get("weights_location")
+        if weights_location is not None and not isinstance(weights_location, str):
+            raise TypeError("'weights_location' must be a string '<source_ref>::<dataset_path>' or None.")
+
         uncertainties_sources: dict[str, str] = cfg.get("uncertainties_sources", {}) or {}
         if not isinstance(uncertainties_sources, dict):
             raise TypeError(
@@ -222,6 +233,7 @@ class AppendProcessingData(ProcessStep):
             "databundle_output_key": databundle_output_key,
             "units_location": units_location,
             "units_override": units_override,
+            "weights_location": weights_location,
             "uncertainties_sources": uncertainties_sources,
         }
 
@@ -275,6 +287,7 @@ class AppendProcessingData(ProcessStep):
         databundle_output_key: str = cfg["databundle_output_key"]
         units_location = cfg["units_location"]
         units_override = cfg["units_override"]
+        weights_location = cfg["weights_location"]
         uncertainties_sources: dict[str, str] = cfg["uncertainties_sources"]
 
         io_sources: IoSources = self.io_sources
@@ -292,6 +305,7 @@ class AppendProcessingData(ProcessStep):
             signal_source=signal_location,
             units_source=units_location,
             uncertainty_sources=uncertainties_sources,
+            weights_source=weights_location,
         )
 
         # Override units if requested
