@@ -38,6 +38,7 @@ tests = [
     "pytest",
     "pytest-cov",
     "pre-commit",
+    "httpx",
 ]
 lint = [
     "check-manifest",
