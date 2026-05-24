@@ -38,7 +38,8 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
     Inputs from configuration sources:
       - sample_z: scalar length (sample is at (0,0,sample_z))
       - wavelength: scalar length
-      - pixel_pitch_fast, pixel_pitch_slow: scalar detector element size in length units (for Omega)
+      - pixel_pitch_fast, pixel_pitch_slow: scalar detector element size in length units (for Omega);
+        legacy forms such as mm/pixel are accepted because pixel is dimensionless
 
     Outputs:
       - Q0, Q1, Q2, Q, Psi, TwoTheta, Omega
@@ -92,7 +93,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
             "pixel_pitch_slow_units_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "IoSources key for slow-axis detector element size units.",
+                "doc": "IoSources key for slow-axis detector element size units; prefer length units such as m or mm.",
             },
             "pixel_pitch_slow_uncertainties_sources": {
                 "type": dict,
@@ -108,7 +109,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
             "pixel_pitch_fast_units_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "IoSources key for fast-axis detector element size units.",
+                "doc": "IoSources key for fast-axis detector element size units; prefer length units such as m or mm.",
             },
             "pixel_pitch_fast_uncertainties_sources": {
                 "type": dict,

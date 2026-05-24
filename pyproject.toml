@@ -29,6 +29,7 @@ dependencies = [
     "numpy",
     "h5py",
     "pint",
+    "pyyaml",
     "scipy",
 ]
 
@@ -38,6 +39,7 @@ tests = [
     "pytest",
     "pytest-cov",
     "pre-commit",
+    "httpx",
 ]
 lint = [
     "check-manifest",
@@ -55,7 +57,6 @@ docs = [
 server = [
     "fastapi>=0.110",
     "uvicorn>=0.27",
-    "pyyaml"
 ]
 ci = [
     "tox",

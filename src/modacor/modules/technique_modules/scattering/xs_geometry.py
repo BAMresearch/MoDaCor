@@ -41,8 +41,10 @@ class XSGeometry(ProcessStep):
     --------------
     * The last `rank_of_data` dimensions of `signal` are the detector dimensions,
     ordered as (..., y, x) for 2D and (..., y) for 1D.
-    * `beam_center.signal` is given in [y, x] dimensionless detector index coordinates for 2D,
-    and [y] for 1D.
+    * `beam_center.signal` is given in [y, x] detector index coordinates for 2D,
+    and [y] for 1D. These coordinates are dimensionless; pixel aliases such as
+    `pixel`, `pixels`, and `px` are accepted as dimensionless detector-coordinate
+    units.
     * `pixel_size.signal` is [pixel_size_y, pixel_size_x] in length units.
     * `pixel_size` is a BaseData vector of length 2 or 3 (length units):
         - first component = pixel size along the "Q0" axis,
@@ -85,7 +87,7 @@ class XSGeometry(ProcessStep):
             "pixel_size_units_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "IoSources key for detector element size units.",
+                "doc": "IoSources key for detector element size units; prefer length units such as m or mm.",
             },
             "pixel_size_uncertainties_sources": {
                 "type": dict,
@@ -101,7 +103,7 @@ class XSGeometry(ProcessStep):
             "beam_center_units_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "IoSources key for beam center units.",
+                "doc": "IoSources key for beam center units; dimensionless or detector pixel aliases are accepted.",
             },
             "beam_center_uncertainties_sources": {
                 "type": dict,
