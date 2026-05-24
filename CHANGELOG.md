@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## v1.3.5 (2026-05-24)
+
+### Bug fixes
+
+* fix: adjust tthe default path to point at signal. ([`12ed1f6`](https://github.com/BAMresearch/MoDaCor/commit/12ed1f63b9ef784d676f48e5246cf22f4658e6ac))
+
+* fix: removing nxcanSAS support as MoDaCor is a generic data correction library ([`fdbcd74`](https://github.com/BAMresearch/MoDaCor/commit/fdbcd74d5c552a8831a7c0f33461df159c463545))
+
+* fix: adding NeXus and nxcanSAS compatibility attributes to the output. ([`e7f0d80`](https://github.com/BAMresearch/MoDaCor/commit/e7f0d8049a28007a0d84f7cebf0df99b6eb217d2))
+
+* fix: HDF5 file again not loading in DAWN (but fine in myHDF5 and h5py), trying to improve canSAS adherence ([`c2e5b8f`](https://github.com/BAMresearch/MoDaCor/commit/c2e5b8f1323c301d304590ec16dd2edf3d22ce58))
+
+* fix: working HDF5 file again, now trying to add the NXcanSAS attributes to plot ([`1101707`](https://github.com/BAMresearch/MoDaCor/commit/1101707eb569e8e7721c3bd8748633a22dd40222))
+
+* fix: trying to remove the bits that are the most likely source of trouble: the canSAS attributes and the NX default attributes ([`ef2ab25`](https://github.com/BAMresearch/MoDaCor/commit/ef2ab25737aca08be1f0483b264ed2f18576ba25))
+
+* fix: could it be the encoding of the default attribute? ([`06029a3`](https://github.com/BAMresearch/MoDaCor/commit/06029a35ef83c07cda17fc846859c997a560231f))
+
+### Continuous integration
+
+* ci: reorganizing ([`3d59880`](https://github.com/BAMresearch/MoDaCor/commit/3d59880b7d7aa01b82403da3795be15ce19ed689))
+
+* ci: fixing test dependencies ([`a4a3aac`](https://github.com/BAMresearch/MoDaCor/commit/a4a3aaca2122894de935074fa41a7bc70a8e0925))
+
+### Unknown Scope
+
+* adj: Now accepting pixel units as dimensionless - will not be treated ([`2bfa193`](https://github.com/BAMresearch/MoDaCor/commit/2bfa193c38b607609f181c5b53482f7d4b538c3f))
+
 ## v1.3.4 (2026-05-07)
 
 ### Bug fixes
