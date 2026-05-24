@@ -16,7 +16,6 @@ from typing import Any
 import numpy as np
 import pytest
 from attrs import define, field
-from pint.errors import UndefinedUnitError
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
@@ -220,7 +219,7 @@ def test_append_processing_data_adds_uncertainties(io_sources, signal_array):
     np.testing.assert_array_equal(bd.uncertainties["sigma"], np.ones_like(signal_array))
 
 
-def test_append_processing_data_rejects_legacy_pixel_unit_metadata(io_sources):
+def test_append_processing_data_accepts_dimensionless_pixel_unit_metadata(io_sources, signal_array):
     source = io_sources.get_source("sample")
     source.metadata["entry/instrument/detector/data@units"] = "mm/pixel"
 
@@ -236,5 +235,9 @@ def test_append_processing_data_rejects_legacy_pixel_unit_metadata(io_sources):
         }
     )
 
-    with pytest.raises(UndefinedUnitError):
-        step.calculate()
+    output = step.calculate()
+    bd = output["sample"]["signal"]
+
+    assert bd.units.is_compatible_with(ureg.millimeter)
+    assert (1.0 * bd.units).to(ureg.millimeter).magnitude == pytest.approx(1.0)
+    np.testing.assert_array_equal(bd.signal, signal_array)

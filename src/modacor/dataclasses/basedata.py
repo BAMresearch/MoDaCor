@@ -531,7 +531,7 @@ class BaseData(UncertaintyOpsMixin):
     to_base_units(): Converts internal signal and uncertainties to the base units implied by current units.
     to_dimensionless(): Converts internal signal and uncertainties to dimensionless units if possible.
     is_dimensionless() -> bool:
-        Returns True if `units` is dimensionless, False otherwise.
+        Returns True if `units` is compatible with dimensionless, False otherwise.
     """
 
     # required:
@@ -636,7 +636,7 @@ class BaseData(UncertaintyOpsMixin):
         """
         Convert the signal and uncertainties to dimensionless units if possible.
         """
-        if not self.is_dimensionless:
+        if self.units != ureg.dimensionless:
             self.to_units(ureg.dimensionless)
 
     @property
@@ -647,9 +647,9 @@ class BaseData(UncertaintyOpsMixin):
         Returns
         -------
         bool :
-            True if the units are dimensionless, False otherwise.
+            True if the units are compatible with dimensionless, False otherwise.
         """
-        return self.units == ureg.dimensionless
+        return self.units.is_compatible_with(ureg.dimensionless)
 
     def to_base_units(self, *, multiplicative_conversion: bool = True) -> None:
         """
@@ -687,11 +687,9 @@ class BaseData(UncertaintyOpsMixin):
             raise TypeError(f"new_units must be a pint.Unit, got {type(new_units)}.")
 
         if not self.units.is_compatible_with(new_units):
-            raise ValueError(
-                f"""
+            raise ValueError(f"""
               Cannot convert from {self.units} to {new_units}. Units are not compatible.
-            """
-            )
+            """)
 
         # If the units are the same, no conversion is needed
         if self.units == new_units:
