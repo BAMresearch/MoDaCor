@@ -87,6 +87,7 @@ def discover_reshape_plan(
     *,
     data_path: str = DEFAULT_DATA_PATH,
     metadata_paths: Sequence[str] | None = None,
+    exclude_metadata_paths: Sequence[str] | None = None,
     include_non_numeric: bool = False,
 ) -> list[ReshapePlan]:
     """Find metadata datasets that should gain trailing singleton dimensions."""
@@ -100,6 +101,7 @@ def discover_reshape_plan(
     plans: list[ReshapePlan] = []
 
     explicit_paths = bool(metadata_paths)
+    excluded_paths = {_clean_hdf_path(path) for path in exclude_metadata_paths or ()}
 
     def maybe_add(path: str, dataset: h5py.Dataset) -> None:
         if path == data_path:
@@ -123,6 +125,8 @@ def discover_reshape_plan(
     else:
 
         def visitor(path: str, obj: object) -> None:
+            if path in excluded_paths:
+                return
             if isinstance(obj, h5py.Dataset):
                 maybe_add(path, obj)
 
@@ -177,6 +181,7 @@ def convert_file(
     *,
     data_path: str = DEFAULT_DATA_PATH,
     metadata_paths: Sequence[str] | None = None,
+    exclude_metadata_paths: Sequence[str] | None = None,
     include_non_numeric: bool = False,
     dry_run: bool = False,
     overwrite: bool = False,
@@ -198,6 +203,7 @@ def convert_file(
             h5,
             data_path=data_path,
             metadata_paths=metadata_paths,
+            exclude_metadata_paths=exclude_metadata_paths,
             include_non_numeric=include_non_numeric,
         )
         if dry_run:
@@ -253,6 +259,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--exclude-metadata-path",
+        action="append",
+        dest="exclude_metadata_paths",
+        help=("Metadata dataset to leave untouched during automatic discovery. " "Repeat to exclude several paths."),
+    )
+    parser.add_argument(
         "--include-non-numeric",
         action="store_true",
         help="Also reshape non-numeric datasets during automatic discovery.",
@@ -272,6 +284,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         output_path,
         data_path=args.data_path,
         metadata_paths=args.metadata_paths,
+        exclude_metadata_paths=args.exclude_metadata_paths,
         include_non_numeric=args.include_non_numeric,
         dry_run=args.dry_run,
         overwrite=args.overwrite,

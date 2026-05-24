@@ -94,3 +94,22 @@ def test_metadata_paths_can_restrict_conversion(tmp_path: Path) -> None:
         assert h5["entry1/sample/transmission"].shape == (3, 1, 1, 1)
         assert h5["entry1/sample/beam/flux"].shape == (3, 1, 1, 1)
         assert h5["entry1/instrument/detector00/frame_exposure_time"].shape == (3, 1)
+
+
+def test_exclude_metadata_paths_skips_automatic_discovery(tmp_path: Path) -> None:
+    source = tmp_path / "source.nxs"
+    output = tmp_path / "output.nxs"
+    _create_stacked_file(source)
+    with h5py.File(source, "a") as h5:
+        h5["entry1/sample"].create_dataset("thickness", data=np.array([[1.0], [1.1], [1.2]]))
+
+    plans = reshape_mod.convert_file(
+        source,
+        output,
+        exclude_metadata_paths=["/entry1/sample/thickness"],
+    )
+
+    assert "entry1/sample/thickness" not in {plan.path for plan in plans}
+    with h5py.File(output, "r") as h5:
+        assert h5["entry1/sample/thickness"].shape == (3, 1)
+        assert h5["entry1/sample/transmission"].shape == (3, 1, 1, 1)
