@@ -16,7 +16,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.buffer import decode_npy, encode_npy
 from modacor.runner.pipeline import Pipeline
-from modacor.runner.pipeline_runner import RunResult
+from modacor.runner.pipeline_runner import PipelineRunError, RunResult
 from modacor.server.api import create_app
 from modacor.server.session_manager import SessionManager
 
@@ -369,6 +369,95 @@ def test_api_process_passes_configured_sinks_to_runner(monkeypatch, tmp_path: Pa
 
     assert result["status"] == "succeeded"
     assert captured["sinks"].get_sink("export_csv").resource_location == tmp_path / "out.csv"
+
+
+def test_api_process_stores_trace_report_in_run_metadata(monkeypatch):
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "sess-trace-report",
+            "pipeline": {"yaml_text": "name: trace_report\nsteps: {}\n"},
+            "trace": {"enabled": True},
+        },
+    )
+    captured = {}
+
+    class FakeTracer:
+        def last_report(self, n: int, *, renderer=None) -> str:
+            captured["n"] = n
+            captured["renderer"] = type(renderer).__name__
+            return "trace report\nshape: [1065, 1030]"
+
+    def fake_run_pipeline_job(pipeline, **kwargs):  # noqa: ARG001
+        return RunResult(
+            processing_data=ProcessingData(),
+            pipeline=pipeline,
+            tracer=FakeTracer(),
+            step_durations={},
+            executed_steps=[],
+            stopped_after_step=None,
+        )
+
+    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+
+    result = _post_json(client, "/v1/sessions/sess-trace-report/process", {"mode": "full"})
+    runs = client.get("/v1/sessions/sess-trace-report/runs")
+
+    assert result["status"] == "succeeded"
+    assert runs.status_code == 200
+    assert runs.json()["runs"][-1]["trace_report"] == "trace report\nshape: [1065, 1030]"
+    assert captured == {"n": 500, "renderer": "PlainUnicodeRenderer"}
+
+
+def test_api_process_failure_stores_partial_trace_report(monkeypatch):
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "sess-failed-trace-report",
+            "pipeline": {"yaml_text": "name: failed_trace_report\nsteps: {}\n"},
+            "trace": {"enabled": True},
+        },
+    )
+
+    class FakeTracer:
+        def last_report(self, n: int, *, renderer=None) -> str:  # noqa: ARG002
+            return "partial trace report\nshape: [1, 1065, 1030]"
+
+    def fake_run_pipeline_job(pipeline, **kwargs):  # noqa: ARG001
+        partial_result = RunResult(
+            processing_data=ProcessingData(),
+            pipeline=pipeline,
+            tracer=FakeTracer(),
+            step_durations={},
+            executed_steps=["PD_sample"],
+            stopped_after_step=None,
+        )
+        raise PipelineRunError(
+            "synthetic failure",
+            result=partial_result,
+            original_exception=ValueError("synthetic failure"),
+            failed_step_id="FA",
+        )
+
+    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+
+    response = client.post("/v1/sessions/sess-failed-trace-report/process", json={"mode": "full"})
+    latest_error = client.get("/v1/sessions/sess-failed-trace-report/errors/latest").json()
+
+    assert response.status_code == 500
+    details = latest_error["latest_error"]["details"]
+    assert details["failed_step_id"] == "FA"
+    assert details["trace_report"] == "partial trace report\nshape: [1, 1065, 1030]"
 
 
 def test_api_process_write_hdf_closes_file_for_immediate_reopen(monkeypatch, tmp_path: Path):

@@ -12,12 +12,13 @@ from time import perf_counter
 from typing import Any
 
 from modacor.dataclasses.processing_data import ProcessingData
+from modacor.debug.pipeline_tracer import PlainUnicodeRenderer
 from modacor.io.buffer.codec import decode_npy, encode_npy
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.runner import run_pipeline_job
 from modacor.runner.pipeline import Pipeline
-from modacor.runner.pipeline_runner import RunResult
+from modacor.runner.pipeline_runner import PipelineRunError, RunResult
 
 from .errors import ApiError
 from .execution import find_dirty_step_ids
@@ -27,6 +28,8 @@ from .session_manager import PipelineSession, SessionManager
 from .source_profiles import get_source_profile, list_source_profiles
 
 __all__ = ["RuntimeService"]
+
+TRACE_REPORT_LINES = 500
 
 
 @dataclass(slots=True)
@@ -740,6 +743,7 @@ class RuntimeService:
                 "snapshot_step_ids": set(session.trace_snapshot_step_ids),
             },
             selected_step_ids=preparation.selected_step_ids,
+            capture_partial_on_error=True,
         )
         elapsed_s = perf_counter() - run_t0
         session.processing_data = result.processing_data
@@ -788,6 +792,9 @@ class RuntimeService:
             details["checkpoint_boundary_step"] = preparation.boundary_step_id
         if hdf_out_path is not None:
             details["hdf_output"] = hdf_out_path
+        trace_report = self._trace_report(result)
+        if trace_report is not None:
+            details["trace_report"] = trace_report
 
         run_meta = self.manager.mark_run_succeeded(session_id, run_id, details=details)
         return {
@@ -816,16 +823,25 @@ class RuntimeService:
         if effective_mode == "partial" and preparation.snapshot_before_partial is not None:
             session.processing_data = preparation.snapshot_before_partial
 
+        original_exception = exc.original_exception if isinstance(exc, PipelineRunError) else exc
         error_code = "PARTIAL_RUN_FAILED" if effective_mode == "partial" else "RUN_FAILED"
+        error_details: dict[str, Any] = {
+            "exception_type": type(original_exception).__name__,
+            "traceback": traceback.format_exc(),
+        }
+        if isinstance(exc, PipelineRunError):
+            if exc.failed_step_id is not None:
+                error_details["failed_step_id"] = exc.failed_step_id
+            trace_report = self._trace_report(exc.result)
+            if trace_report is not None:
+                error_details["trace_report"] = trace_report
+
         self.manager.mark_run_failed(
             session_id,
             run_id,
             code=error_code,
             message=str(exc),
-            details={
-                "exception_type": type(exc).__name__,
-                "traceback": traceback.format_exc(),
-            },
+            details=error_details,
         )
         if request.mode == "auto" and effective_mode == "partial" and sources is not None and sinks is not None:
             return self._run_auto_fallback(
@@ -878,6 +894,7 @@ class RuntimeService:
                     "snapshot_processing_data": session.trace_snapshot_processing_data,
                     "snapshot_step_ids": set(session.trace_snapshot_step_ids),
                 },
+                capture_partial_on_error=True,
             )
             fallback_elapsed = perf_counter() - fallback_t0
             session.processing_data = fallback_result.processing_data
@@ -892,23 +909,29 @@ class RuntimeService:
             fallback_topo_ids = ordered_step_ids(fallback_result.pipeline)
             fallback_executed_set = set(fallback_result.executed_steps)
             fallback_skipped = [step_id for step_id in fallback_topo_ids if step_id not in fallback_executed_set]
+            trace_report = self._trace_report(fallback_result)
+            details: dict[str, Any] = {
+                "status": "succeeded",
+                "executed_steps": fallback_result.executed_steps,
+                "num_steps": len(fallback_result.executed_steps),
+                "note": "Auto fallback succeeded after partial failure.",
+                "recovered_from_run_id": recovered_from_run_id,
+                "fallback_reason": str(fallback_reason),
+                "changed_sources": request.changed_sources,
+                "changed_keys": request.changed_keys,
+                "skipped_steps": fallback_skipped,
+                "step_durations_s": fallback_result.step_durations,
+                "elapsed_s": fallback_elapsed,
+            }
+            if trace_report is not None:
+                details["trace_report"] = trace_report
+            if hdf_out_path:
+                details["hdf_output"] = hdf_out_path
+
             done = self.manager.mark_run_succeeded(
                 session_id,
                 fallback_id,
-                details={
-                    "status": "succeeded",
-                    "executed_steps": fallback_result.executed_steps,
-                    "num_steps": len(fallback_result.executed_steps),
-                    "note": "Auto fallback succeeded after partial failure.",
-                    "recovered_from_run_id": recovered_from_run_id,
-                    "fallback_reason": str(fallback_reason),
-                    "changed_sources": request.changed_sources,
-                    "changed_keys": request.changed_keys,
-                    "skipped_steps": fallback_skipped,
-                    "step_durations_s": fallback_result.step_durations,
-                    "elapsed_s": fallback_elapsed,
-                    **({"hdf_output": hdf_out_path} if hdf_out_path else {}),
-                },
+                details=details,
             )
             return {
                 "session_id": session_id,
@@ -922,16 +945,27 @@ class RuntimeService:
                 "hdf_output": done.get("hdf_output"),
             }
         except Exception as fallback_exc:
+            original_exception = (
+                fallback_exc.original_exception if isinstance(fallback_exc, PipelineRunError) else fallback_exc
+            )
+            error_details: dict[str, Any] = {
+                "exception_type": type(original_exception).__name__,
+                "traceback": traceback.format_exc(),
+                "recovered_from_run_id": recovered_from_run_id,
+            }
+            if isinstance(fallback_exc, PipelineRunError):
+                if fallback_exc.failed_step_id is not None:
+                    error_details["failed_step_id"] = fallback_exc.failed_step_id
+                trace_report = self._trace_report(fallback_exc.result)
+                if trace_report is not None:
+                    error_details["trace_report"] = trace_report
+
             self.manager.mark_run_failed(
                 session_id,
                 fallback_id,
                 code="FULL_RUN_FAILED",
                 message=str(fallback_exc),
-                details={
-                    "exception_type": type(fallback_exc).__name__,
-                    "traceback": traceback.format_exc(),
-                    "recovered_from_run_id": recovered_from_run_id,
-                },
+                details=error_details,
             )
             raise ApiError(
                 status_code=500,
@@ -941,3 +975,11 @@ class RuntimeService:
                     "details": {"session_id": session_id, "run_id": fallback_id},
                 },
             ) from fallback_exc
+
+    def _trace_report(self, result: RunResult) -> str | None:
+        if result.tracer is None:
+            return None
+        return result.tracer.last_report(
+            TRACE_REPORT_LINES,
+            renderer=PlainUnicodeRenderer(wrap_in_markdown_codeblock=False),
+        )

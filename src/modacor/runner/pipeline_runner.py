@@ -15,7 +15,7 @@ from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.runner.pipeline import Pipeline
 
-__all__ = ["RunResult", "run_pipeline_job"]
+__all__ = ["PipelineRunError", "RunResult", "run_pipeline_job"]
 
 
 @dataclass(slots=True)
@@ -28,6 +28,23 @@ class RunResult:
     step_durations: dict[str, float]
     executed_steps: list[str]
     stopped_after_step: str | None
+
+
+class PipelineRunError(RuntimeError):
+    """Raised when a pipeline run fails after collecting partial run context."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        result: RunResult,
+        original_exception: Exception,
+        failed_step_id: str | None,
+    ) -> None:
+        super().__init__(message)
+        self.result = result
+        self.original_exception = original_exception
+        self.failed_step_id = failed_step_id
 
 
 def _ensure_pipeline(pipeline: Pipeline | Path | str) -> Pipeline:
@@ -47,6 +64,7 @@ def run_pipeline_job(
     tracer_kwargs: dict[str, Any] | None = None,
     stop_after: str | None = None,
     selected_step_ids: set[str] | list[str] | tuple[str, ...] | None = None,
+    capture_partial_on_error: bool = False,
 ) -> RunResult:
     """
     Execute a pipeline end-to-end.
@@ -76,42 +94,62 @@ def run_pipeline_job(
     step_durations: dict[str, float] = {}
     executed_steps: list[str] = []
     stopped_after_step: str | None = None
+    current_step_id: str | None = None
 
-    while pipeline_obj.is_active():
-        should_stop = False
-        for node in pipeline_obj.get_ready():
-            node.processing_data = processing_data_obj
-            node.io_sources = sources_obj
-            node.io_sinks = sinks_obj
+    try:
+        while pipeline_obj.is_active():
+            should_stop = False
+            for node in pipeline_obj.get_ready():
+                node.processing_data = processing_data_obj
+                node.io_sources = sources_obj
+                node.io_sinks = sinks_obj
 
-            step_id = str(node.step_id)
-            if selected_steps is None or step_id in selected_steps:
-                t0 = perf_counter()
-                node.execute(processing_data_obj)
-                duration = perf_counter() - t0
+                step_id = str(node.step_id)
+                current_step_id = step_id
+                if selected_steps is None or step_id in selected_steps:
+                    t0 = perf_counter()
+                    node.execute(processing_data_obj)
+                    duration = perf_counter() - t0
 
-                step_durations[step_id] = duration
-                executed_steps.append(step_id)
+                    step_durations[step_id] = duration
+                    executed_steps.append(step_id)
 
-                if tracer is not None:
-                    tracer.after_step(node, processing_data_obj, duration_s=duration)
-                    pipeline_obj.attach_tracer_event(
-                        node,
-                        tracer,
-                        include_rendered_trace=True,
-                        include_rendered_config=True,
-                        rendered_format="text/html",
-                    )
+                    if tracer is not None:
+                        tracer.after_step(node, processing_data_obj, duration_s=duration)
+                        pipeline_obj.attach_tracer_event(
+                            node,
+                            tracer,
+                            include_rendered_trace=True,
+                            include_rendered_config=True,
+                            rendered_format="text/html",
+                        )
 
-            pipeline_obj.done(node)
+                pipeline_obj.done(node)
 
-            if stop_token is not None and step_id == stop_token:
-                stopped_after_step = step_id
-                should_stop = True
+                if stop_token is not None and step_id == stop_token:
+                    stopped_after_step = step_id
+                    should_stop = True
+                    break
+
+            if should_stop:
                 break
-
-        if should_stop:
-            break
+    except Exception as exc:
+        if not capture_partial_on_error:
+            raise
+        partial_result = RunResult(
+            processing_data=processing_data_obj,
+            pipeline=pipeline_obj,
+            tracer=tracer,
+            step_durations=step_durations,
+            executed_steps=executed_steps,
+            stopped_after_step=stopped_after_step,
+        )
+        raise PipelineRunError(
+            str(exc),
+            result=partial_result,
+            original_exception=exc,
+            failed_step_id=current_step_id,
+        ) from exc
 
     return RunResult(
         processing_data=processing_data_obj,
