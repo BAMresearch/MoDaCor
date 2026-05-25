@@ -181,6 +181,7 @@ The runtime API wraps pipeline execution in a `PipelineSession`. A session keeps
 - tracing configuration
 - the latest `ProcessingData`
 - run history and error state
+- a small session-local cache of unchanged HDF source objects
 
 That session state is what enables:
 
@@ -209,6 +210,9 @@ special alternative pipeline definition.
 - Use `changed_keys` when only a specific product changed and the dirty set can
   be narrowed further.
 - Keep source registration external when file locations change frequently.
+- Stable HDF sources such as backgrounds are cached within a session when their
+  registration and file size/modification time do not change. Frequently updated
+  refs such as `sample` are rebuilt after each source update.
 - Use dry-run before automating partial reruns against new instruments or new
   pipeline structures.
 

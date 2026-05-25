@@ -69,6 +69,7 @@ class PipelineSession:
     last_error: dict[str, Any] | None = None
     source_profile: str | None = None
     required_source_refs: list[str] = field(default_factory=list)
+    source_cache: dict[str, dict[str, Any]] = field(default_factory=dict, repr=False)
 
 
 class SessionManager:
@@ -133,6 +134,9 @@ class SessionManager:
                 raise KeyError(f"Session '{session_id}' not found.")
             for source in sources:
                 normalized = _normalize_io_registration(source, kind="Source")
+                existing = session.sources.get(normalized["ref"])
+                if existing != normalized:
+                    session.source_cache.pop(normalized["ref"], None)
                 session.sources[normalized["ref"]] = normalized
             session.updated_utc = _utc_now_iso()
             return session
@@ -155,6 +159,7 @@ class SessionManager:
                 raise KeyError(f"Session '{session_id}' not found.")
             existed = ref in session.sources
             session.sources.pop(ref, None)
+            session.source_cache.pop(ref, None)
             session.updated_utc = _utc_now_iso()
             return existed
 

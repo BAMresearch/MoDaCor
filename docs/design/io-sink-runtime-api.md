@@ -7,14 +7,15 @@ Implementation status: implemented in this branch.
 
 ## Pre-Implementation State
 
-The runtime API stores source registrations on each session and rebuilds an
-`IoSources` registry when processing starts. The flow is:
+The runtime API stores source registrations on each session and builds an
+`IoSources` registry when processing starts. Stable HDF source objects may be
+reused from the session-local source cache. The flow is:
 
 - `PipelineSession.sources` stores normalized registration dictionaries.
 - `RuntimeService.upsert_sources(...)` and `patch_source(...)` expose the HTTP
   behavior through FastAPI routes.
-- `build_sources_from_session(...)` adapts session state to
-  `build_sources_from_specs(...)`.
+- `build_sources_from_session(...)` adapts session state to source-builder
+  helpers and reuses unchanged HDF sources when possible.
 - `run_pipeline_job(...)` receives the resulting `IoSources` registry.
 
 The sink infrastructure already exists but is only partially connected to the
@@ -88,7 +89,8 @@ sink method kwargs.
 At process start, build sources and sinks from the current session snapshot:
 
 1. Parse the pipeline YAML.
-2. Build `IoSources` from `session.sources`.
+2. Build `IoSources` from `session.sources`, reusing cached unchanged HDF
+   sources when possible.
 3. Build `IoSinks` from `session.sinks`.
 4. Call `run_pipeline_job(..., sources=sources, sinks=sinks, ...)`.
 
