@@ -7,8 +7,8 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "reshape_stacked_nexus_metadata.py"
-SPEC = importlib.util.spec_from_file_location("reshape_stacked_nexus_metadata", SCRIPT_PATH)
+SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "reshape_nexus_metadata.py"
+SPEC = importlib.util.spec_from_file_location("reshape_nexus_metadata", SCRIPT_PATH)
 reshape_mod = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 sys.modules[SPEC.name] = reshape_mod
@@ -32,6 +32,16 @@ def _create_stacked_file(path: Path) -> None:
 
         sample.create_dataset("sample_name", data=np.array([b"a", b"b", b"c"]))
         h5.create_dataset("entry1/pixel_map", data=np.ones((4, 5)))
+
+
+def _create_unstacked_file(path: Path) -> None:
+    with h5py.File(path, "w") as h5:
+        detector = h5.create_group("entry1/instrument/detector00")
+        detector.create_dataset("data", data=np.zeros((1, 4, 5), dtype=np.float32))
+
+        sample = h5.create_group("entry1/sample")
+        sample.create_dataset("thickness", data=np.array([1.2]))
+        sample.create_dataset("transmission", data=np.array([0.9]))
 
 
 def test_convert_file_appends_trailing_singleton_dimensions(tmp_path: Path) -> None:
@@ -113,3 +123,16 @@ def test_exclude_metadata_paths_skips_automatic_discovery(tmp_path: Path) -> Non
     with h5py.File(output, "r") as h5:
         assert h5["entry1/sample/thickness"].shape == (3, 1)
         assert h5["entry1/sample/transmission"].shape == (3, 1, 1, 1)
+
+
+def test_size_one_metadata_is_not_expanded(tmp_path: Path) -> None:
+    source = tmp_path / "source.nxs"
+    output = tmp_path / "output.nxs"
+    _create_unstacked_file(source)
+
+    plans = reshape_mod.convert_file(source, output)
+
+    assert plans == []
+    with h5py.File(output, "r") as h5:
+        assert h5["entry1/sample/thickness"].shape == (1,)
+        assert h5["entry1/sample/transmission"].shape == (1,)

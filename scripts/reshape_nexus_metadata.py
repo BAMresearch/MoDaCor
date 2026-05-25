@@ -4,13 +4,14 @@
 
 from __future__ import annotations
 
-"""Make stacked NeXus metadata arrays broadcast cleanly with MoDaCor data arrays.
+"""Make NeXus metadata arrays broadcast cleanly with MoDaCor data arrays.
 
 Standard stacked NeXus files often store per-stack metadata as ``(N,)`` or ``(N, 1)``
 while the main detector data is shaped like ``(N, 1, Y, X)``. NumPy aligns
 broadcasting from the right, so those metadata arrays do not broadcast to the data
 shape. This script appends trailing singleton dimensions, e.g. ``(N, 1)`` becomes
-``(N, 1, 1, 1)``.
+``(N, 1, 1, 1)``. Size-one metadata arrays are left unchanged because they already
+broadcast to the data shape.
 """
 
 import argparse
@@ -74,6 +75,8 @@ def _planned_shape(
     data_shape: tuple[int, ...],
 ) -> tuple[int, ...] | None:
     if not dataset_shape or len(dataset_shape) >= len(data_shape):
+        return None
+    if all(dim == 1 for dim in dataset_shape):
         return None
     if data_shape[: len(dataset_shape)] != dataset_shape:
         return None
@@ -218,7 +221,7 @@ def _default_output_path(input_path: Path) -> Path:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Append trailing singleton dimensions to stacked NeXus metadata arrays so they "
+            "Append trailing singleton dimensions to NeXus metadata arrays so they "
             "broadcast against MoDaCor's main detector data."
         )
     )
