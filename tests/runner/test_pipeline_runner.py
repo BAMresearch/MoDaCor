@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
@@ -12,7 +13,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.runner.pipeline import Pipeline
-from modacor.runner.pipeline_runner import run_pipeline_job
+from modacor.runner.pipeline_runner import PipelineRunError, run_pipeline_job
 
 
 class SeedSignal(ProcessStep):
@@ -30,6 +31,11 @@ class AddOne(ProcessStep):
         return {"sample": out}
 
 
+class FailStep(ProcessStep):
+    def calculate(self) -> dict[str, DataBundle]:
+        raise ValueError("synthetic failure")
+
+
 def test_run_pipeline_job_executes_and_traces():
     s1 = SeedSignal(step_id="s1")
     s2 = AddOne(step_id="s2")
@@ -44,6 +50,36 @@ def test_run_pipeline_job_executes_and_traces():
     assert result.tracer is not None
     assert "s1" in result.pipeline.trace_events
     assert "s2" in result.pipeline.trace_events
+
+
+def test_run_pipeline_job_error_keeps_partial_trace_context():
+    s1 = SeedSignal(step_id="seed")
+    s2 = FailStep(step_id="fail")
+    pipeline = Pipeline.from_dict({s1: set(), s2: {s1}}, name="unit-test-fail")
+
+    with pytest.raises(PipelineRunError) as excinfo:
+        run_pipeline_job(
+            pipeline,
+            trace=True,
+            trace_watch={"sample": ["signal"]},
+            capture_partial_on_error=True,
+        )
+
+    err = excinfo.value
+    assert err.failed_step_id == "fail"
+    assert isinstance(err.original_exception, ValueError)
+    assert err.result.executed_steps == ["seed"]
+    assert err.result.tracer is not None
+    assert "seed" in err.result.tracer.last_report(10)
+
+
+def test_run_pipeline_job_raises_original_error_by_default():
+    s1 = SeedSignal(step_id="seed")
+    s2 = FailStep(step_id="fail")
+    pipeline = Pipeline.from_dict({s1: set(), s2: {s1}}, name="unit-test-fail-default")
+
+    with pytest.raises(ValueError, match="synthetic failure"):
+        run_pipeline_job(pipeline)
 
 
 def test_run_pipeline_job_can_stop_after_step():

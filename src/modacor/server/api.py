@@ -23,7 +23,7 @@ def create_app(  # noqa: C901
     dependencies in non-server environments.
     """
     try:
-        from fastapi import FastAPI, HTTPException, WebSocket
+        from fastapi import Body, FastAPI, HTTPException, Response, WebSocket
     except ImportError as exc:  # pragma: no cover - runtime-only dependency
         raise RuntimeError(
             "FastAPI is not installed. Install server extras, e.g. 'pip install modacor[server]'."
@@ -101,6 +101,59 @@ def create_app(  # noqa: C901
     @app.delete("/v1/sessions/{session_id}/sinks/{ref}", status_code=204)
     def delete_sink(session_id: str, ref: str) -> None:
         _call(service.delete_sink, session_id, ref)
+
+    @app.put("/v1/sessions/{session_id}/buffers/sources/{source_ref}/arrays/{data_key:path}")
+    def put_buffer_source_array(
+        session_id: str,
+        source_ref: str,
+        data_key: str,
+        payload: bytes = Body(...),
+    ) -> dict[str, Any]:
+        return _call(service.put_buffer_source_array, session_id, source_ref, data_key, payload)
+
+    @app.put("/v1/sessions/{session_id}/buffers/sources/{source_ref}/attrs/{data_key:path}")
+    def put_buffer_source_attrs(
+        session_id: str,
+        source_ref: str,
+        data_key: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        return _call(service.put_buffer_source_attrs, session_id, source_ref, data_key, payload)
+
+    @app.put("/v1/sessions/{session_id}/buffers/sources/{source_ref}/metadata/{data_key:path}")
+    def put_buffer_source_metadata(
+        session_id: str,
+        source_ref: str,
+        data_key: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        return _call(service.put_buffer_source_metadata, session_id, source_ref, data_key, payload)
+
+    @app.get("/v1/sessions/{session_id}/buffers/sinks/{sink_ref}/arrays/{data_key:path}")
+    def get_buffer_sink_array(session_id: str, sink_ref: str, data_key: str) -> Response:
+        payload = _call(service.get_buffer_sink_array, session_id, sink_ref, data_key)
+        return Response(content=payload, media_type="application/x-npy")
+
+    @app.get("/v1/sessions/{session_id}/buffers/{kind}/{ref}/manifest")
+    def get_buffer_manifest(session_id: str, kind: str, ref: str) -> dict[str, Any]:
+        return _call(service.get_buffer_manifest, session_id, kind, ref)
+
+    @app.delete("/v1/sessions/{session_id}/buffers/sinks/{sink_ref}")
+    def clear_buffer_sink(session_id: str, sink_ref: str) -> dict[str, Any]:
+        return _call(service.clear_buffer_sink, session_id, sink_ref)
+
+    @app.delete("/v1/sessions/{session_id}/buffers/sinks/{sink_ref}/arrays/{data_key:path}")
+    def clear_buffer_sink_array(session_id: str, sink_ref: str, data_key: str) -> dict[str, Any]:
+        return _call(service.clear_buffer_sink_array, session_id, sink_ref, data_key)
+
+    @app.delete("/v1/sessions/{session_id}/buffers")
+    def clear_buffers(
+        session_id: str,
+        kind: str | None = None,
+        ref: str | None = None,
+        data_key: str | None = None,
+    ) -> dict[str, Any]:
+        return _call(service.clear_buffers, session_id, kind=kind, ref=ref, data_key=data_key)
 
     @app.post("/v1/sessions/{session_id}/process")
     def process(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:

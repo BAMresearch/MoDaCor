@@ -74,6 +74,8 @@ def io_sources(signal_array) -> IoSources:
         data={
             "entry/instrument/detector/data": signal_array,
             "entry/instrument/detector/sigma": np.ones_like(signal_array),
+            "entry/instrument/detector/weights": np.full_like(signal_array, 0.5, dtype=float),
+            "entry/instrument/detector/mask": np.ones_like(signal_array, dtype=np.int16),
         },
         metadata={
             "config/rank": 1,
@@ -217,6 +219,63 @@ def test_append_processing_data_adds_uncertainties(io_sources, signal_array):
 
     assert "sigma" in bd.uncertainties
     np.testing.assert_array_equal(bd.uncertainties["sigma"], np.ones_like(signal_array))
+
+
+def test_append_processing_data_adds_weights(io_sources, signal_array):
+    step = _make_step(io_sources)
+
+    step.modify_config_by_dict(
+        {
+            "processing_key": "sample",
+            "signal_location": "sample::entry/instrument/detector/data",
+            "rank_of_data": 2,
+            "units_location": None,
+            "units_override": None,
+            "weights_location": "sample::entry/instrument/detector/weights",
+            "uncertainties_sources": {},
+        }
+    )
+
+    output = step.calculate()
+    bd = output["sample"]["signal"]
+
+    np.testing.assert_array_equal(bd.weights, np.full_like(signal_array, 0.5, dtype=float))
+
+
+def test_append_processing_data_loads_mask_as_separate_basedata_entry(io_sources, signal_array):
+    processing_data = ProcessingData()
+    step_signal = _make_step(io_sources, processing_data=processing_data)
+    step_mask = _make_step(io_sources, processing_data=processing_data)
+
+    step_signal.modify_config_by_dict(
+        {
+            "processing_key": "sample",
+            "signal_location": "sample::entry/instrument/detector/data",
+            "rank_of_data": 2,
+            "units_location": None,
+            "units_override": None,
+            "uncertainties_sources": {},
+        }
+    )
+    step_signal.calculate()
+
+    step_mask.modify_config_by_dict(
+        {
+            "processing_key": "sample",
+            "databundle_output_key": "mask",
+            "signal_location": "sample::entry/instrument/detector/mask",
+            "rank_of_data": 2,
+            "units_location": None,
+            "units_override": "dimensionless",
+            "uncertainties_sources": {},
+        }
+    )
+    step_mask.calculate()
+
+    bundle = processing_data["sample"]
+    assert set(bundle.keys()) == {"signal", "mask"}
+    assert bundle["mask"].signal.dtype == np.dtype("int16")
+    np.testing.assert_array_equal(bundle["mask"].signal, np.ones_like(signal_array, dtype=np.int16))
 
 
 def test_append_processing_data_accepts_dimensionless_pixel_unit_metadata(io_sources, signal_array):

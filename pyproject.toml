@@ -67,6 +67,26 @@ ci = [
     # generated within tox environments
     "pytest-cov"
 ]
+all = [
+    "build",
+    "check-manifest",
+    "fastapi>=0.110",
+    "flake8",
+    "httpx",
+    "isort",
+    "linkify-it-py",
+    "myst-parser>=2.0",
+    "pre-commit",
+    "pydata-sphinx-theme>=0.14",
+    "pytest",
+    "pytest-cov",
+    "python-semantic-release",
+    "sphinx>=6.2",
+    "sphinxcontrib-mermaid",
+    "toml",
+    "tox",
+    "uvicorn>=0.27",
+]
 
 [[project.authors]]
 name = "Ingo Breßler"

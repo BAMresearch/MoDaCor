@@ -23,6 +23,7 @@ def basedata_from_sources(
     signal_source: str,
     units_source: str | None = None,
     uncertainty_sources: dict[str, str] = {},
+    weights_source: str | None = None,
 ) -> BaseData:
     """Helper function to build a BaseData object from IoSources
 
@@ -38,8 +39,13 @@ def basedata_from_sources(
         In that case, it can be specified by 'key to the dataset@[units_attribute_name]'
     uncertainty_sources : dict[str, str], optional
         A dictionary mapping uncertainty names to their source keys, by default an empty dictionary.
+    weights_source : str | None, optional
+        Optional source key for BaseData weights, by default None.
     """
     signal = io_sources.get_data(signal_source)
     units = ureg.Unit(io_sources.get_static_metadata(units_source)) if units_source is not None else ureg.dimensionless
     uncertainties = {name: io_sources.get_data(source) for name, source in uncertainty_sources.items()}
-    return BaseData(signal=signal, units=units, uncertainties=uncertainties)
+    kwargs = {"signal": signal, "units": units, "uncertainties": uncertainties}
+    if weights_source is not None:
+        kwargs["weights"] = io_sources.get_data(weights_source)
+    return BaseData(**kwargs)

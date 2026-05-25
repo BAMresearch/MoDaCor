@@ -63,3 +63,12 @@ def test_session_manager_sink_lifecycle_does_not_disturb_sources():
     assert manager.delete_sink("s3", "export_csv") is False
     assert "sample" in session.sources
     assert session.sinks == {}
+
+
+def test_session_manager_delete_clears_buffer_store():
+    manager = SessionManager()
+    manager.create_session(session_id="s-buffer", pipeline_yaml="name: p\nsteps: {}\n")
+    manager.buffer_store.put_array("s-buffer", "source", "chunk", "data", [1, 2, 3])
+
+    assert manager.delete_session("s-buffer") is True
+    assert manager.buffer_store.manifest("s-buffer", "source", "chunk")["arrays"] == []

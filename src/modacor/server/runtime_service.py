@@ -12,11 +12,13 @@ from time import perf_counter
 from typing import Any
 
 from modacor.dataclasses.processing_data import ProcessingData
+from modacor.debug.pipeline_tracer import PlainUnicodeRenderer
+from modacor.io.buffer.codec import decode_npy, encode_npy
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.runner import run_pipeline_job
 from modacor.runner.pipeline import Pipeline
-from modacor.runner.pipeline_runner import RunResult
+from modacor.runner.pipeline_runner import PipelineRunError, RunResult
 
 from .errors import ApiError
 from .execution import find_dirty_step_ids
@@ -26,6 +28,8 @@ from .session_manager import PipelineSession, SessionManager
 from .source_profiles import get_source_profile, list_source_profiles
 
 __all__ = ["RuntimeService"]
+
+TRACE_REPORT_LINES = 500
 
 
 @dataclass(slots=True)
@@ -37,6 +41,7 @@ class ProcessRequest:
     changed_keys: list[str]
     write_hdf: dict[str, Any] | None = None
     run_name: str | None = None
+    rollback_snapshot: bool = True
 
 
 @dataclass(slots=True)
@@ -323,6 +328,102 @@ class RuntimeService:
         if not existed:
             raise ApiError(status_code=404, detail=f"Sink '{ref}' not found.")
 
+    def put_buffer_source_array(
+        self,
+        session_id: str,
+        source_ref: str,
+        data_key: str,
+        payload: bytes,
+    ) -> dict[str, Any]:
+        self._require_session(session_id)
+        try:
+            array = decode_npy(payload)
+            self.manager.buffer_store.put_array(session_id, "source", source_ref, data_key, array)
+        except Exception as exc:
+            raise ApiError(status_code=422, detail=f"Invalid .npy buffer payload: {exc}") from exc
+        return {
+            "session_id": session_id,
+            "kind": "source",
+            "ref": source_ref,
+            "data_key": data_key.strip("/"),
+            "shape": list(array.shape),
+            "dtype": str(array.dtype),
+        }
+
+    def put_buffer_source_attrs(
+        self,
+        session_id: str,
+        source_ref: str,
+        data_key: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        self._require_session(session_id)
+        if not isinstance(payload, dict):
+            raise ApiError(status_code=422, detail="Buffer attrs payload must be an object.")
+        self.manager.buffer_store.put_attrs(session_id, "source", source_ref, data_key, payload)
+        return {
+            "session_id": session_id,
+            "kind": "source",
+            "ref": source_ref,
+            "data_key": data_key.strip("/"),
+            "attrs": dict(payload),
+        }
+
+    def put_buffer_source_metadata(
+        self,
+        session_id: str,
+        source_ref: str,
+        data_key: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        self._require_session(session_id)
+        if not isinstance(payload, dict) or "value" not in payload:
+            raise ApiError(status_code=422, detail="Buffer metadata payload must be an object containing 'value'.")
+        self.manager.buffer_store.put_metadata(session_id, "source", source_ref, data_key, payload["value"])
+        return {
+            "session_id": session_id,
+            "kind": "source",
+            "ref": source_ref,
+            "data_key": data_key.strip("/"),
+            "value": payload["value"],
+        }
+
+    def get_buffer_sink_array(self, session_id: str, sink_ref: str, data_key: str) -> bytes:
+        self._require_session(session_id)
+        try:
+            array = self.manager.buffer_store.get_array(session_id, "sink", sink_ref, data_key)
+        except KeyError as exc:
+            raise ApiError(status_code=404, detail=str(exc)) from exc
+        return encode_npy(array)
+
+    def get_buffer_manifest(self, session_id: str, kind: str, ref: str) -> dict[str, Any]:
+        self._require_session(session_id)
+        try:
+            return self.manager.buffer_store.manifest(session_id, kind, ref)
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+
+    def clear_buffers(
+        self,
+        session_id: str,
+        *,
+        kind: str | None = None,
+        ref: str | None = None,
+        data_key: str | None = None,
+    ) -> dict[str, Any]:
+        self._require_session(session_id)
+        try:
+            removed = self.manager.buffer_store.clear(session_id, kind=kind, ref=ref, data_key=data_key)
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+        return {"session_id": session_id, "removed": removed}
+
+    def clear_buffer_sink(self, session_id: str, sink_ref: str) -> dict[str, Any]:
+        return self.clear_buffers(session_id, kind="sink", ref=sink_ref)
+
+    def clear_buffer_sink_array(self, session_id: str, sink_ref: str, data_key: str) -> dict[str, Any]:
+        return self.clear_buffers(session_id, kind="sink", ref=sink_ref, data_key=data_key)
+
     def process(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = self._parse_process_request(payload)
         session = self._require_session(session_id)
@@ -341,8 +442,8 @@ class RuntimeService:
         sinks: IoSinks | None = None
         try:
             pipeline = Pipeline.from_yaml(session.pipeline_yaml or "")
-            sources = build_sources_from_session(session)
-            sinks = build_sinks_from_session(session, pipeline=pipeline)
+            sources = build_sources_from_session(session, buffer_store=self.manager.buffer_store)
+            sinks = build_sinks_from_session(session, pipeline=pipeline, buffer_store=self.manager.buffer_store)
             preparation = self._prepare_process_execution(
                 session_id=session_id,
                 run_id=run_id,
@@ -508,6 +609,7 @@ class RuntimeService:
             changed_keys=changed_keys,
             write_hdf=write_hdf,
             run_name=run_name,
+            rollback_snapshot=bool(payload.get("rollback_snapshot", True)),
         )
 
     def _resolve_process_mode(self, session: PipelineSession, request: ProcessRequest) -> tuple[str, str | None]:
@@ -573,7 +675,11 @@ class RuntimeService:
                 )
             )
 
-        snapshot_before_partial = deepcopy(session.processing_data) if session.processing_data is not None else None
+        snapshot_before_partial = (
+            deepcopy(session.processing_data)
+            if request.rollback_snapshot and session.processing_data is not None
+            else None
+        )
         return ProcessPreparation(
             selected_step_ids=selected_step_ids,
             snapshot_before_partial=snapshot_before_partial,
@@ -637,6 +743,7 @@ class RuntimeService:
                 "snapshot_step_ids": set(session.trace_snapshot_step_ids),
             },
             selected_step_ids=preparation.selected_step_ids,
+            capture_partial_on_error=True,
         )
         elapsed_s = perf_counter() - run_t0
         session.processing_data = result.processing_data
@@ -675,6 +782,7 @@ class RuntimeService:
             "skipped_steps": skipped_steps,
             "step_durations_s": result.step_durations,
             "elapsed_s": elapsed_s,
+            "rollback_snapshot": request.rollback_snapshot,
         }
         if mode_note:
             details["note"] = mode_note
@@ -684,6 +792,9 @@ class RuntimeService:
             details["checkpoint_boundary_step"] = preparation.boundary_step_id
         if hdf_out_path is not None:
             details["hdf_output"] = hdf_out_path
+        trace_report = self._trace_report(result)
+        if trace_report is not None:
+            details["trace_report"] = trace_report
 
         run_meta = self.manager.mark_run_succeeded(session_id, run_id, details=details)
         return {
@@ -712,16 +823,25 @@ class RuntimeService:
         if effective_mode == "partial" and preparation.snapshot_before_partial is not None:
             session.processing_data = preparation.snapshot_before_partial
 
+        original_exception = exc.original_exception if isinstance(exc, PipelineRunError) else exc
         error_code = "PARTIAL_RUN_FAILED" if effective_mode == "partial" else "RUN_FAILED"
+        error_details: dict[str, Any] = {
+            "exception_type": type(original_exception).__name__,
+            "traceback": traceback.format_exc(),
+        }
+        if isinstance(exc, PipelineRunError):
+            if exc.failed_step_id is not None:
+                error_details["failed_step_id"] = exc.failed_step_id
+            trace_report = self._trace_report(exc.result)
+            if trace_report is not None:
+                error_details["trace_report"] = trace_report
+
         self.manager.mark_run_failed(
             session_id,
             run_id,
             code=error_code,
             message=str(exc),
-            details={
-                "exception_type": type(exc).__name__,
-                "traceback": traceback.format_exc(),
-            },
+            details=error_details,
         )
         if request.mode == "auto" and effective_mode == "partial" and sources is not None and sinks is not None:
             return self._run_auto_fallback(
@@ -774,6 +894,7 @@ class RuntimeService:
                     "snapshot_processing_data": session.trace_snapshot_processing_data,
                     "snapshot_step_ids": set(session.trace_snapshot_step_ids),
                 },
+                capture_partial_on_error=True,
             )
             fallback_elapsed = perf_counter() - fallback_t0
             session.processing_data = fallback_result.processing_data
@@ -788,23 +909,29 @@ class RuntimeService:
             fallback_topo_ids = ordered_step_ids(fallback_result.pipeline)
             fallback_executed_set = set(fallback_result.executed_steps)
             fallback_skipped = [step_id for step_id in fallback_topo_ids if step_id not in fallback_executed_set]
+            trace_report = self._trace_report(fallback_result)
+            details: dict[str, Any] = {
+                "status": "succeeded",
+                "executed_steps": fallback_result.executed_steps,
+                "num_steps": len(fallback_result.executed_steps),
+                "note": "Auto fallback succeeded after partial failure.",
+                "recovered_from_run_id": recovered_from_run_id,
+                "fallback_reason": str(fallback_reason),
+                "changed_sources": request.changed_sources,
+                "changed_keys": request.changed_keys,
+                "skipped_steps": fallback_skipped,
+                "step_durations_s": fallback_result.step_durations,
+                "elapsed_s": fallback_elapsed,
+            }
+            if trace_report is not None:
+                details["trace_report"] = trace_report
+            if hdf_out_path:
+                details["hdf_output"] = hdf_out_path
+
             done = self.manager.mark_run_succeeded(
                 session_id,
                 fallback_id,
-                details={
-                    "status": "succeeded",
-                    "executed_steps": fallback_result.executed_steps,
-                    "num_steps": len(fallback_result.executed_steps),
-                    "note": "Auto fallback succeeded after partial failure.",
-                    "recovered_from_run_id": recovered_from_run_id,
-                    "fallback_reason": str(fallback_reason),
-                    "changed_sources": request.changed_sources,
-                    "changed_keys": request.changed_keys,
-                    "skipped_steps": fallback_skipped,
-                    "step_durations_s": fallback_result.step_durations,
-                    "elapsed_s": fallback_elapsed,
-                    **({"hdf_output": hdf_out_path} if hdf_out_path else {}),
-                },
+                details=details,
             )
             return {
                 "session_id": session_id,
@@ -818,16 +945,27 @@ class RuntimeService:
                 "hdf_output": done.get("hdf_output"),
             }
         except Exception as fallback_exc:
+            original_exception = (
+                fallback_exc.original_exception if isinstance(fallback_exc, PipelineRunError) else fallback_exc
+            )
+            error_details: dict[str, Any] = {
+                "exception_type": type(original_exception).__name__,
+                "traceback": traceback.format_exc(),
+                "recovered_from_run_id": recovered_from_run_id,
+            }
+            if isinstance(fallback_exc, PipelineRunError):
+                if fallback_exc.failed_step_id is not None:
+                    error_details["failed_step_id"] = fallback_exc.failed_step_id
+                trace_report = self._trace_report(fallback_exc.result)
+                if trace_report is not None:
+                    error_details["trace_report"] = trace_report
+
             self.manager.mark_run_failed(
                 session_id,
                 fallback_id,
                 code="FULL_RUN_FAILED",
                 message=str(fallback_exc),
-                details={
-                    "exception_type": type(fallback_exc).__name__,
-                    "traceback": traceback.format_exc(),
-                    "recovered_from_run_id": recovered_from_run_id,
-                },
+                details=error_details,
             )
             raise ApiError(
                 status_code=500,
@@ -837,3 +975,11 @@ class RuntimeService:
                     "details": {"session_id": session_id, "run_id": fallback_id},
                 },
             ) from fallback_exc
+
+    def _trace_report(self, result: RunResult) -> str | None:
+        if result.tracer is None:
+            return None
+        return result.tracer.last_report(
+            TRACE_REPORT_LINES,
+            renderer=PlainUnicodeRenderer(wrap_in_markdown_codeblock=False),
+        )

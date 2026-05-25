@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from modacor.io.buffer.runtime_buffer_store import RuntimeBufferStore
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.io.runtime_support import build_sinks_from_specs, build_sources_from_specs, write_processing_data_hdf
@@ -66,7 +67,11 @@ def _sink_kwargs_with_runtime_metadata(
     return method_kwargs
 
 
-def build_sources_from_session(session: PipelineSession) -> IoSources:
+def build_sources_from_session(
+    session: PipelineSession,
+    *,
+    buffer_store: RuntimeBufferStore | None = None,
+) -> IoSources:
     specs: list[dict[str, Any]] = []
     for ref in sorted(session.sources.keys()):
         reg = session.sources[ref]
@@ -78,10 +83,15 @@ def build_sources_from_session(session: PipelineSession) -> IoSources:
                 "kwargs": dict(reg.get("kwargs", {}) or {}),
             }
         )
-    return build_sources_from_specs(specs)
+    return build_sources_from_specs(specs, buffer_store=buffer_store, session_id=session.session_id)
 
 
-def build_sinks_from_session(session: PipelineSession, *, pipeline: Any | None = None) -> IoSinks:
+def build_sinks_from_session(
+    session: PipelineSession,
+    *,
+    pipeline: Any | None = None,
+    buffer_store: RuntimeBufferStore | None = None,
+) -> IoSinks:
     specs: list[dict[str, Any]] = []
     for ref in sorted(session.sinks.keys()):
         reg = session.sinks[ref]
@@ -101,7 +111,7 @@ def build_sinks_from_session(session: PipelineSession, *, pipeline: Any | None =
                 "kwargs": kwargs,
             }
         )
-    return build_sinks_from_specs(specs)
+    return build_sinks_from_specs(specs, buffer_store=buffer_store, session_id=session.session_id)
 
 
 def write_hdf_output(
