@@ -18,6 +18,7 @@ from modacor.modules.base_modules.append_source import AppendSource
 from modacor.modules.base_modules.bitwise_or_masks import BitwiseOrMasks
 from modacor.modules.base_modules.combine_uncertainties import CombineUncertainties
 from modacor.modules.base_modules.combine_uncertainties_max import CombineUncertaintiesMax
+from modacor.modules.base_modules.copy_databundle_keys import CopyDataBundleKeys
 from modacor.modules.base_modules.divide import Divide
 from modacor.modules.base_modules.find_scale_factor1d import FindScaleFactor1D
 from modacor.modules.base_modules.multiply import Multiply
@@ -44,6 +45,7 @@ __all__ = [
     "BitwiseOrMasks",
     "CombineUncertainties",
     "CombineUncertaintiesMax",
+    "CopyDataBundleKeys",
     "Divide",
     "IndexPixels",
     "IndexedAverager",
