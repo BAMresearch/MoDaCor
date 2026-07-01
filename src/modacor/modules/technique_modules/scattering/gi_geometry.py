@@ -57,7 +57,7 @@ class GIGeometry(ProcessStep):
 
     documentation = ProcessStepDescriber(
         calling_name="Add Q, Psi, TwoTheta, Omega",  # Omega is Solid Angle
-        calling_id="XSGeometry",
+        calling_id="GIGeometry",
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],  # list of databundle keys required by the process
@@ -126,6 +126,23 @@ class GIGeometry(ProcessStep):
                 "default": {},
                 "doc": "Uncertainty sources for wavelength.",
             },
+            "incident_angle_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "default": None,
+                "doc": "IoSources key for incident angle signal.",
+            },
+            "incident_angle_units_source": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "IoSources key for incident angle units.",
+            },
+            "incident_angle_uncertainties_sources": {
+                "type": dict,
+                "default": {},
+                "doc": "Uncertainty sources for incident angle.",
+            },
+
         },
         modifies={
             "Q": ["signal", "uncertainties"],
@@ -166,10 +183,10 @@ class GIGeometry(ProcessStep):
         for each their *_source / *_units_source / *_uncertainties_sources.
         """
         geom: Dict[str, BaseData] = {}
-        required_keys = ["detector_distance", "pixel_size", "beam_center", "wavelength"]
+        required_keys = ["detector_distance", "pixel_size", "beam_center", "wavelength", "incident_angle"]
 
         logger.debug(
-            f"XSGeometry: loading geometry for keys {required_keys} "
+            f"GIGeometry: loading geometry for keys {required_keys} "
             f"from configuration for processing keys={self.configuration.get('with_processing_keys')}"
         )
 
@@ -327,30 +344,30 @@ class GIGeometry(ProcessStep):
 
     def _compute_angles(
         self,
-        r_perp_bd: BaseData,
-        detector_distance_bd: BaseData,
-    ) -> Tuple[BaseData, BaseData, BaseData]:
+            x0_bd: BaseData,
+            x1_bd: BaseData,
+            incident_angle_bd: BaseData,
+            detector_distance_bd: BaseData,
+    ) -> Tuple[BaseData, BaseData]:
         """
-        Compute 2θ, θ, and sin(θ) as BaseData.
+        Compute alpha_f and psi as BaseData.
         """
-        ratio_bd = r_perp_bd / detector_distance_bd  # dimensionless
-        two_theta_bd = ratio_bd.arctan()  # radians
-        theta_bd = 0.5 * two_theta_bd  # radians
-        sin_theta_bd = theta_bd.sin()  # dimensionless
+        alphaif_bd = (x0_bd / detector_distance_bd).arctan()
+        alphaf_bd = alphaif_bd - incident_angle_bd
+        psi_bd = (x1_bd / detector_distance_bd).arctan() 
 
         logger.debug(
-            f"XSGeometry: computed angles; two_theta.units={two_theta_bd.units}, theta.units={theta_bd.units}"  # noqa: E702
+            f"GIGeometry: computed angles; alphaf.units={alphaf_bd.units}, psi.units={psi_bd.units}"  # noqa: E702
         )
 
-        return two_theta_bd, theta_bd, sin_theta_bd
+        return alphaf_bd, psi_bd
 
     def _compute_Q_and_components(
         self,
-        sin_theta_bd: BaseData,
         wavelength_bd: BaseData,
-        x0_bd: BaseData,
-        x1_bd: BaseData,
-        r_perp_bd: BaseData,
+            incident_angle_bd: BaseData,
+            alphaf_bd: BaseData,
+            psi_bd: BaseData
     ) -> Tuple[BaseData, BaseData, BaseData, BaseData]:
         """
         Compute Q magnitude and components Q0, Q1, Q2.
@@ -362,30 +379,16 @@ class GIGeometry(ProcessStep):
         Q2 is nominally zero for a flat detector but we keep the same
         uncertainty structure as Q to avoid empty/NaN uncertainty fields.
         """
-        four_pi = 4.0 * np.pi
+        two_pi_wl = 2.0 * np.pi / wavelength_bd
 
-        # Q magnitude: (4π / λ) * sin θ
-        Q_bd = (four_pi * sin_theta_bd) / wavelength_bd  # BaseData op → uncertainty propagation
-
-        # Build a "safe" r_perp copy where zeros in the signal are replaced by 1.0,
-        # but keep the original uncertainties so division still propagates correctly.
-        safe_signal = np.where(r_perp_bd.signal == 0.0, 1.0, r_perp_bd.signal)
-
-        r_perp_safe_bd = r_perp_bd.copy()
-        r_perp_safe_bd.signal = safe_signal
-
-        # Direction cosines (Psi components)
-        dir0_bd = x0_bd / r_perp_safe_bd
-        dir1_bd = x1_bd / r_perp_safe_bd
 
         # Components of Q
-        Q0_bd = Q_bd * dir0_bd
-        Q1_bd = Q_bd * dir1_bd
+        Q0_bd = two_pi_wl * (incident_angle_bd.sin() + alphaf_bd.sin()) # qz 
+        Q1_bd = two_pi_wl * alphaf_bd.cos() * psi_bd.sin() # qy
+        Q2_bd = two_pi_wl * (alphaf_bd.cos()*psi_bd.cos() - incident_angle_bd.cos())
 
-        # Flat detector: Q2 ≡ 0 but keep same uncertainties as Q
-        Q2_bd = Q_bd.copy()
-        Q2_bd.signal = np.zeros_like(Q_bd.signal)
-
+        Q_bd = (Q0_bd**2 + Q1_bd**2 + Q2_bd**2).sqrt()
+        
         logger.debug(
             f"XSGeometry: computed Q and components; Q.shape={Q_bd.signal.shape}, Q.units={Q_bd.units}"  # noqa: E702
         )  # noqa: E702
@@ -463,6 +466,20 @@ class GIGeometry(ProcessStep):
         pixel_size_bd = geom["pixel_size"]
         beam_center_bd = geom["beam_center"]
         wavelength_bd = geom["wavelength"]
+        incident_angle_deg = geom["incident_angle"]
+        # convert to radians
+        new_uncertainties = {k: np.deg2rad(v) for k, v in incident_angle_deg.uncertainties.items()}
+        incident_angle_bd = BaseData(signal = np.deg2rad(incident_angle_deg.signal),
+                                     units = "radians",
+                                     uncertainties = new_uncertainties,
+                                     weights = incident_angle_deg.weights,
+                                     axes=list(incident_angle_deg.axes),
+                                     rank_of_data=incident_angle_deg.rank_of_data,
+                                     )
+
+        print(wavelength_bd)
+        print(wavelength_bd.units)
+
 
         # 3. Extract detector element sizes along Q0/Q1
         pitch0_bd = pixel_size_bd.indexed(0, rank_of_data=0)
@@ -478,20 +495,22 @@ class GIGeometry(ProcessStep):
             detector_distance_bd=detector_distance_bd,
         )
 
-        # 5. Angles: 2θ, θ, sin θ
-        two_theta_bd, theta_bd, sin_theta_bd = self._compute_angles(
-            r_perp_bd=r_perp_bd,
+        # 5. Angles: alpha_f, psi
+        alphaf_bd, psi_bd = self._compute_angles(
+            x0_bd = x0_bd,
+            x1_bd = x1_bd,
+            incident_angle_bd=incident_angle_bd,
             detector_distance_bd=detector_distance_bd,
         )
 
         # 6. Q magnitude and 7. components
         Q_bd, Q0_bd, Q1_bd, Q2_bd = self._compute_Q_and_components(
-            sin_theta_bd=sin_theta_bd,
             wavelength_bd=wavelength_bd,
-            x0_bd=x0_bd,
-            x1_bd=x1_bd,
-            r_perp_bd=r_perp_bd,
+            incident_angle_bd=incident_angle_bd,
+            alphaf_bd=alphaf_bd,
+            psi_bd=psi_bd,
         )
+        print(Q0_bd)
 
         # 8. Psi
         Psi_bd = self._compute_psi(
@@ -508,7 +527,7 @@ class GIGeometry(ProcessStep):
         )
 
         # 10. Set rank_of_data on outputs and stash in prepared_data
-        for bd in (Q_bd, Q0_bd, Q1_bd, Q2_bd, Psi_bd, two_theta_bd, Omega_bd):
+        for bd in (Q_bd, Q0_bd, Q1_bd, Q2_bd, Psi_bd, Omega_bd):
             bd.rank_of_data = RoD
 
         self._prepared_data = {
@@ -517,7 +536,7 @@ class GIGeometry(ProcessStep):
             "Q1": Q1_bd,
             "Q2": Q2_bd,
             "Psi": Psi_bd,
-            "TwoTheta": two_theta_bd,
+            #"TwoTheta": two_theta_bd,
             "Omega": Omega_bd,
         }
 
