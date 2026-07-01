@@ -300,7 +300,7 @@ class GIGeometry(ProcessStep):
             idx0_bd = self._make_index_basedata(shape=(n0, n1), axis=0)
             idx1_bd = self._make_index_basedata(shape=(n0, n1), axis=1)
 
-            rel_idx0_bd = idx0_bd - beam_center_bd.indexed(0, rank_of_data=0)
+            rel_idx0_bd = -(idx0_bd - beam_center_bd.indexed(0, rank_of_data=0))
             rel_idx1_bd = idx1_bd - beam_center_bd.indexed(1, rank_of_data=0)
 
             x0_bd = rel_idx0_bd * pitch0_bd
