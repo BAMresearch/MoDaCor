@@ -202,7 +202,7 @@ class GIGeometry(ProcessStep):
             )
 
         logger.debug(
-            "XSGeometry: loaded geometry BaseData objects: "
+            "GIGeometry: loaded geometry BaseData objects: "
             + ", ".join(f"{k}: shape={v.signal.shape}, units={v.units}" for k, v in geom.items())
         )
 
@@ -221,7 +221,7 @@ class GIGeometry(ProcessStep):
         pixel_size_bd = geom["pixel_size"]
 
         if RoD not in (0, 1, 2):
-            raise NotImplementedError(f"XSGeometry supports RoD 0, 1, or 2; got RoD={RoD}.")  # noqa: E702
+            raise NotImplementedError(f"GIGeometry supports RoD 0, 1, or 2; got RoD={RoD}.")  # noqa: E702
 
         # Beam center: for RoD>0, we expect a vector of length RoD.
         if RoD > 0:
@@ -248,7 +248,7 @@ class GIGeometry(ProcessStep):
             raise ValueError(f"Pixel size units must be length units such as m or mm, got {pixel_size_bd.units}.")
 
         logger.debug(
-            f"XSGeometry: validated geometry for RoD={RoD}, spatial_shape={spatial_shape}, "
+            f"GIGeometry: validated geometry for RoD={RoD}, spatial_shape={spatial_shape}, "
             f"beam_center.size={beam_center_bd.signal.size}, pixel_size.shape={pixel_size_bd.shape}"
         )
 
@@ -293,7 +293,7 @@ class GIGeometry(ProcessStep):
             x1_bd = BaseData(signal=np.array(0.0), units=pitch1_bd.units)
             r_perp_bd = BaseData(signal=np.array(0.0), units=pitch0_bd.units)
             R_bd = detector_distance_bd
-            logger.debug("XSGeometry: RoD=0, using detector distance directly for R.")
+            logger.debug("GIGeometry: RoD=0, using detector distance directly for R.")
             return x0_bd, x1_bd, r_perp_bd, R_bd
 
         if RoD == 1:
@@ -307,7 +307,7 @@ class GIGeometry(ProcessStep):
                 units=x0_bd.units,
             )
             logger.debug(
-                f"XSGeometry: computed 1D coordinates for shape={spatial_shape}, x0.units={x0_bd.units}, x1 is zero."
+                f"GIGeometry: computed 1D coordinates for shape={spatial_shape}, x0.units={x0_bd.units}, x1 is zero."
             )
 
         else:  # RoD == 2
@@ -324,7 +324,7 @@ class GIGeometry(ProcessStep):
             x1_bd = rel_idx1_bd * pitch1_bd
 
             logger.debug(
-                f"XSGeometry: computed 2D coordinates for spatial_shape={spatial_shape}, "
+                f"GIGeometry: computed 2D coordinates for spatial_shape={spatial_shape}, "
                 f"x0.shape={x0_bd.signal.shape}, x1.shape={x1_bd.signal.shape}"
             )
 
@@ -333,7 +333,7 @@ class GIGeometry(ProcessStep):
         R_bd = ((r_perp_bd**2) + (detector_distance_bd**2)).sqrt()
 
         logger.debug(
-            f"XSGeometry: computed r_perp and R; r_perp.shape={r_perp_bd.signal.shape}, R.shape={R_bd.signal.shape}"  # noqa: E702
+            f"GIGeometry: computed r_perp and R; r_perp.shape={r_perp_bd.signal.shape}, R.shape={R_bd.signal.shape}"  # noqa: E702
         )
 
         return x0_bd, x1_bd, r_perp_bd, R_bd
@@ -390,7 +390,7 @@ class GIGeometry(ProcessStep):
         Q_bd = (Q0_bd**2 + Q1_bd**2 + Q2_bd**2).sqrt()
         
         logger.debug(
-            f"XSGeometry: computed Q and components; Q.shape={Q_bd.signal.shape}, Q.units={Q_bd.units}"  # noqa: E702
+            f"GIGeometry: computed Q and components; Q.shape={Q_bd.signal.shape}, Q.units={Q_bd.units}"  # noqa: E702
         )  # noqa: E702
         return Q_bd, Q0_bd, Q1_bd, Q2_bd
 
@@ -409,7 +409,7 @@ class GIGeometry(ProcessStep):
             signal=psi_signal,
             units=ureg.radian,
         )
-        logger.debug(f"XSGeometry: computed Psi; shape={psi_bd.signal.shape}, units={psi_bd.units}")  # noqa: E702
+        logger.debug(f"GIGeometry: computed Psi; shape={psi_bd.signal.shape}, units={psi_bd.units}")  # noqa: E702
         return psi_bd
 
     def _compute_solid_angle(
@@ -433,7 +433,7 @@ class GIGeometry(ProcessStep):
         Omega_bd.units = ureg.steradian
 
         logger.debug(
-            f"XSGeometry: computed solid angle; Omega.shape={Omega_bd.signal.shape}, Omega.units={Omega_bd.units}"  # noqa: E702
+            f"GIGeometry: computed solid angle; Omega.shape={Omega_bd.signal.shape}, Omega.units={Omega_bd.units}"  # noqa: E702
         )
 
         return Omega_bd
@@ -451,12 +451,12 @@ class GIGeometry(ProcessStep):
 
         pkey = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
         if not pkey:
-            raise ValueError("XSGeometry: configuration.with_processing_keys is empty.")
+            raise ValueError("GIGeometry: configuration.with_processing_keys is empty.")
         signal_bd: BaseData = self.processing_data[pkey[0]]["signal"]
         RoD = signal_bd.rank_of_data
         spatial_shape: tuple[int, ...] = signal_bd.shape[-RoD:] if RoD > 0 else ()
 
-        logger.info(f"XSGeometry: preparing execution for keys={pkey}, RoD={RoD}, spatial_shape={spatial_shape}")
+        logger.info(f"GIGeometry: preparing execution for keys={pkey}, RoD={RoD}, spatial_shape={spatial_shape}")
 
         # 2. Load and validate geometry
         geom = self._load_geometry()
@@ -540,7 +540,7 @@ class GIGeometry(ProcessStep):
             "Omega": Omega_bd,
         }
 
-        logger.info(f"XSGeometry: prepared geometry outputs for keys={pkey}: Q, Q0, Q1, Q2, Psi, TwoTheta, Omega.")
+        logger.info(f"GIGeometry: prepared geometry outputs for keys={pkey}: Q, Q0, Q1, Q2, Psi, TwoTheta, Omega.")
 
     def calculate(self):
         """
@@ -550,17 +550,17 @@ class GIGeometry(ProcessStep):
         data = self.processing_data
         with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
         if not with_keys:
-            logger.warning("XSGeometry: no with_processing_keys specified; nothing to calculate.")
+            logger.warning("GIGeometry: no with_processing_keys specified; nothing to calculate.")
         else:
-            logger.info(f"XSGeometry: adding geometry outputs to keys={with_keys}")
+            logger.info(f"GIGeometry: adding geometry outputs to keys={with_keys}")
         output = attach_prepared_data(
             data,
             with_keys,
             self._prepared_data,
             logger=logger,
-            module_name="XSGeometry",
+            module_name="GIGeometry",
         )
 
-        logger.info(f"XSGeometry: geometry outputs attached for {len(output)} keys.")
+        logger.info(f"GIGeometry: geometry outputs attached for {len(output)} keys.")
 
         return output
