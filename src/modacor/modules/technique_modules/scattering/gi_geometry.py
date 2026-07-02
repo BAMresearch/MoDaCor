@@ -152,6 +152,7 @@ class GIGeometry(ProcessStep):
             "Psi": ["signal", "uncertainties"],
             "TwoTheta": ["signal", "uncertainties"],
             "Omega": ["signal", "uncertainties"],
+            "signal": ["signal", "uncertainties"],
         },
         step_keywords=[
             "geometry",
@@ -438,6 +439,31 @@ class GIGeometry(ProcessStep):
 
         return Omega_bd
 
+    def _mask_missing_wedge(
+            self,
+            Q0_bd: BaseData,
+            Q1_bd: BaseData,
+            Q2_bd: BaseData,
+            incident_angle_bd: BaseData,
+            wavelength_bd: BaseData,
+            signal_bd: BaseData,
+            ) -> BaseData:
+        """
+        Mask the inaccessible area in q space with zeros
+        """
+
+        qpar = np.where(Q1_bd.signal > 0, np.sqrt(Q1_bd.signal**2 + Q2_bd.signal**2), -np.sqrt(Q1_bd.signal**2 + Q2_bd.signal**2))
+        # it seems q_par in dawn is continuous, so we need to find a row where it is and map
+        # the other rows to those values (with binning)
+        qpar_row = np.where((Q0_bd.signal - 2*np.pi / wavelength_bd.signal * 2*np.sin(incident_angle_bd.signal))**2 < 1e-3)
+        q_par = qpar[qpar_row]
+
+        for i in range(qpar.shape[0]):
+            digitized = np.digitize(qpar[i].astype(float), q_par.astype(float))
+            bin_means = [signal_bd.signal[i][digitized == j].mean() for j in range(0, len(q_par))]
+            signal_bd.signal[i] = np.array(bin_means)
+        return signal_bd
+
     # ------------------------------------------------------------------
     # Main execution methods
     # ------------------------------------------------------------------
@@ -529,6 +555,16 @@ class GIGeometry(ProcessStep):
         # 10. Set rank_of_data on outputs and stash in prepared_data
         for bd in (Q_bd, Q0_bd, Q1_bd, Q2_bd, Psi_bd, Omega_bd):
             bd.rank_of_data = RoD
+
+        signal = self._mask_missing_wedge(
+            Q0_bd = Q0_bd,
+            Q1_bd = Q1_bd,
+            Q2_bd = Q2_bd,
+            incident_angle_bd = incident_angle_bd,
+            wavelength_bd = wavelength_bd, 
+            signal_bd = signal_bd)
+
+        print(signal)
 
         self._prepared_data = {
             "Q": Q_bd,
