@@ -153,6 +153,8 @@ class GIGeometry(ProcessStep):
             "TwoTheta": ["signal", "uncertainties"],
             "Omega": ["signal", "uncertainties"],
             "signal": ["signal", "uncertainties"],
+            "Qpar": ["signal", "uncertainties"],
+            "Qper": ["signal", "uncertainties"],
         },
         step_keywords=[
             "geometry",
@@ -462,7 +464,10 @@ class GIGeometry(ProcessStep):
             digitized = np.digitize(qpar[i].astype(float), q_par.astype(float))
             bin_means = [signal_bd.signal[i][digitized == j].mean() for j in range(0, len(q_par))]
             signal_bd.signal[i] = np.array(bin_means)
-        return signal_bd
+
+        Qpar_bd = BaseData(signal = q_par, units = "1/nm", rank_of_data = 1)
+        Qper_bd = BaseData(signal = Q0_bd.signal.mean(axis = 1), units = "1/nm", rank_of_data = 1)
+        return signal_bd, Qpar_bd, Qper_bd
 
     # ------------------------------------------------------------------
     # Main execution methods
@@ -554,13 +559,15 @@ class GIGeometry(ProcessStep):
         for bd in (Q_bd, Q0_bd, Q1_bd, Q2_bd, Psi_bd, Omega_bd):
             bd.rank_of_data = RoD
 
-        signal = self._mask_missing_wedge(
+        signal, Qpar_bd, Qper_bd = self._mask_missing_wedge(
             Q0_bd = Q0_bd,
             Q1_bd = Q1_bd,
             Q2_bd = Q2_bd,
             incident_angle_bd = incident_angle_bd,
             wavelength_bd = wavelength_bd, 
             signal_bd = signal_bd)
+
+        signal.axes = [Qper_bd, Qpar_bd]
 
         print(signal)
 
@@ -569,6 +576,8 @@ class GIGeometry(ProcessStep):
             "Q0": Q0_bd,
             "Q1": Q1_bd,
             "Q2": Q2_bd,
+            "Qper": Qper_bd,
+            "Qpar": Qpar_bd,
             "Psi": Psi_bd,
             #"TwoTheta": two_theta_bd,
             "Omega": Omega_bd,
