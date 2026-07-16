@@ -503,8 +503,7 @@ class GIGeometry(ProcessStep):
                                      rank_of_data=incident_angle_deg.rank_of_data,
                                      )
 
-        print(wavelength_bd)
-        print(wavelength_bd.units)
+
 
 
         # 3. Extract detector element sizes along Q0/Q1
@@ -536,7 +535,6 @@ class GIGeometry(ProcessStep):
             alphaf_bd=alphaf_bd,
             psi_bd=psi_bd,
         )
-        print(Q0_bd)
 
         # 8. Psi
         Psi_bd = self._compute_psi(
