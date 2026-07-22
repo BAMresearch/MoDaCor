@@ -227,21 +227,17 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
         """
 
         qpar = np.where(Q0_bd.signal > 0, np.sqrt(Q0_bd.signal**2 + Q2_bd.signal**2), -np.sqrt(Q0_bd.signal**2 + Q2_bd.signal**2))
-        # it seems q_par in dawn is continuous, so we need to find a row where it is and map
+        # it seems q_par and q_per in dawn are continuous, so we need to find a row where they are and map
         # the other rows to those values (with binning)
-        qpar_row = np.where((Q1_bd.signal)**2 < 1e-3)
-        q_par = qpar[qpar_row]
+        qpar_row = np.where((Q1_bd.signal)**2 == np.abs(Q1_bd.signal).min()**2)[0]
+        q_par = qpar[qpar_row].flatten()
+        q_par = np.linspace(qpar.max(), qpar.min(), q_par.shape[0])
+        # switch q_par direction to match DAWN results
+        Qpar_bd = BaseData(signal = -1*q_par, units = "1/nm", rank_of_data = 1)
         
-        #hist, q_par = np.histogram(q_par, bins = q_par.shape[0] - 1)
-        q_par = np.linspace(q_par.min(), q_par.max(), q_par.shape[0])
-        print(qpar_row, q_par.shape)
-
-        
-        Qpar_bd = BaseData(signal = -1*q_par[::-1], units = "1/nm", rank_of_data = 1)
         qper_col = np.where(Q0_bd.signal**2 == np.abs(Q0_bd.signal).min()**2)
         qper = np.where(Q1_bd.signal > 0, np.sqrt(Q_bd.signal**2 - qpar**2), -np.sqrt(Q_bd.signal**2 - qpar**2))
         q_per = qper[:,qper_col[1]].flatten()
-        #hist, q_per = np.histogram(q_per, bins = q_per.shape[0] - 1)
         q_per = np.linspace(q_per.min(), q_per.max(), q_per.shape[0])
         
         for i in range(qpar.shape[0]):  # to do: modify binning - both directions (histogram2d?)
