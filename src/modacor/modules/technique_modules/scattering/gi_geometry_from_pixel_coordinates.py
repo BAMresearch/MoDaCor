@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, Tuple
 
 import numpy as np
+import scipy.sparse as sp
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
@@ -239,17 +240,22 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
         qper = np.where(Q1_bd.signal > 0, np.sqrt(Q_bd.signal**2 - qpar**2), -np.sqrt(Q_bd.signal**2 - qpar**2))
         q_per = qper[:,qper_col[1]].flatten()
         q_per = np.linspace(q_per.min(), q_per.max(), q_per.shape[0])
-        
-        for i in range(qpar.shape[0]):  # to do: modify binning - both directions (histogram2d?)
-            digitized = np.digitize(qpar[i].astype(float), q_par[::-1].astype(float), right = True)
-            bin_means = [signal_bd.signal[i][digitized == j].mean() for j in range(0, len(q_par))]
-            signal_bd.signal[i] = np.array(bin_means)
-        
-        for i in range(qper.shape[1]):
-            digitized_y = np.digitize(qper[:,i].astype(float), q_per.astype(float), right = True)
-            bin_means_y = [signal_bd.signal[:,i][digitized_y == j].mean() for j in range(0, len(q_per))]
-            signal_bd.signal[:,i] = np.array(bin_means_y)
-            
+
+        ind_par = np.digitize(qpar, q_par[:-1])
+        ind_per = np.digitize(qper, q_per[:-1])
+
+        # fill sparse arrays by indicating data and which row and column it should be remapped to
+        csr = sp.csr_array((signal_bd.signal.flatten(), (ind_per.flatten(), ind_par.flatten())))
+        ones = np.ones(signal_bd.signal.shape)
+        norm = sp.csr_array((ones.flatten(), (ind_per.flatten(), ind_par.flatten())))
+
+        # sum duplicates prepares calculation of the mean for each pixel.
+        # this would be done automatically when converting to a dense array, but it is left here
+        # for human readability.
+        csr.sum_duplicates()
+        norm.sum_duplicates()
+        out = csr.todense()/norm.todense()
+        signal_bd.signal = out
         
         Qper_bd = BaseData(signal = q_per, units = "1/nm", rank_of_data = 1)
         return signal_bd, Qpar_bd, Qper_bd
