@@ -224,6 +224,25 @@ class LevelHorizon(PixelCoordinatesWithRoll):
         )  # convert to cm
         right = ref_signal.signal[y_max.min() :, condition_right].mean(axis=1)
 
+        # bin data if noisy
+        if (left[:50].mean() - left[-50:].mean()) < left.std():
+            logger.info(
+                "LevelHorizon: data has no discernible step, do not perform roll optimization"
+            )
+            return 1e6
+        if left[:50].std() / left[:50].mean() > 0.1:
+            logger.info("LevelHorizon: binning data for edge detection")
+            bins_y = np.linspace(left_y.min(), left_y.max(), left.shape[0] // 5)
+            ind_left = np.digitize(left_y, bins_y)
+
+            norm = np.bincount(ind_left, weights=np.ones(left.shape))
+            left = np.bincount(ind_left, weights=left) / norm
+            left_y = np.bincount(ind_left, weights=left_y) / norm
+            right = np.bincount(ind_left, weights=right) / norm
+            right_y = np.bincount(ind_left, weights=right_y) / norm
+        else:
+            logger.info("LevelHorizon: data is not too noisy, using unbinned")
+
         # detect edge via maximum change over two datapoints
         edge_left = left_y[2:][
             np.abs(left[2:] - left[:-2]) == np.nanmax(np.abs(left[2:] - left[:-2]))
