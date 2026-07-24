@@ -226,17 +226,17 @@ class LevelHorizon(PixelCoordinatesWithRoll):
 
         edge_left = left_y[1:][np.diff(left) == np.min(np.diff(left))]
         edge_right = right_y[1:][np.diff(right) == np.min(np.diff(right))]
+        # plot for debugging - output should go into the databundle
+        plt.axvline(edge_left, color="r", label="left")
+        plt.axvline(edge_right, label="right")
+        plt.plot(left_y, left, ".", label="left")
+        plt.plot(right_y, right, ".", label="right")
 
-        
-        plt.plot(left_y, left, ".", label = "left")
-        plt.plot(right_y, right, ".", label = "right")
-        plt.axvline(edge_left, label = "left")
-        plt.axvline(edge_right, label = "right")
+        plt.legend()
+
         plt.savefig("edge_detection_horizon_levelling.png")
         plt.close()
-        print(edge_left, edge_right)
-        return np.sum((edge_left - edge_right)**2)
-        
+        return np.sum((edge_left - edge_right) ** 2)
 
     # ----------------------------
     # ProcessStep lifecycle
