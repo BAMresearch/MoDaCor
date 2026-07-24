@@ -39,9 +39,11 @@ from modacor.modules.technique_modules.scattering.geometry_helpers import (
     require_scalar,
     unit_vec3,
 )
-from modacor.modules.technique_modules.grazing_incidence.pixel_coordinates_with_roll import PixelCoordinatesWithRoll
-logger = MessageHandler(name=__name__)
+from modacor.modules.technique_modules.grazing_incidence.pixel_coordinates_with_roll import (
+    PixelCoordinatesWithRoll,
+)
 
+logger = MessageHandler(name=__name__)
 
 
 class LevelHorizon(PixelCoordinatesWithRoll):
@@ -166,7 +168,6 @@ class LevelHorizon(PixelCoordinatesWithRoll):
                 "default": 0.0,
                 "doc": "Roll angle of the sample, translated to a detector roll to compensate.",
             },
-
         },
         modifies={
             "coord_x": ["signal", "uncertainties"],
@@ -178,31 +179,50 @@ class LevelHorizon(PixelCoordinatesWithRoll):
     )
 
     def to_min(self, sample_roll):
-        self.configuration["sample_roll"] = sample_roll#.flatten()[0]
-        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
+        self.configuration["sample_roll"] = sample_roll
+        with_keys = (
+            normalize_str_list(self.configuration.get("with_processing_keys", None))
+            or []
+        )
         if not with_keys:
-            raise ValueError("LevelHorizon: configuration.with_processing_keys is empty.")
+            raise ValueError(
+                "LevelHorizon: configuration.with_processing_keys is empty."
+            )
         ref_signal: BaseData = self.processing_data[with_keys[0]]["signal"]
         RoD = ref_signal.rank_of_data
         detector_shape = self._detector_shape(ref_signal, RoD)
 
-        frame = self._load_canonical_frame(RoD=RoD, detector_shape=detector_shape, reference_signal=ref_signal)
-        outputs = self._compute_pixel_positions(RoD=RoD, detector_shape=detector_shape, frame=frame)
+        frame = self._load_canonical_frame(
+            RoD=RoD, detector_shape=detector_shape, reference_signal=ref_signal
+        )
+        outputs = self._compute_pixel_positions(
+            RoD=RoD, detector_shape=detector_shape, frame=frame
+        )
 
         coord_x = outputs["coord_x"]
         coord_y = outputs["coord_y"]
 
         # take two vertical cuts near the edge to determine the location of the horizon
         x_cut = np.quantile(np.abs(coord_x.signal), 0.75)
-        y_max = np.where(coord_y.signal < np.quantile(np.abs(coord_y.signal), 0.3))[0] # below the masked gap
+        y_max = np.where(coord_y.signal < np.quantile(np.abs(coord_y.signal), 0.3))[
+            0
+        ]  # below the masked gap
 
-        condition_left = np.where((coord_x.signal > -1.1*x_cut) & (coord_x.signal < -0.9*x_cut))[1] 
-        condition_right = np.where((coord_x.signal < 1.1*x_cut) & (coord_x.signal > 0.9*x_cut))[1]
+        condition_left = np.where(
+            (coord_x.signal > -1.1 * x_cut) & (coord_x.signal < -0.9 * x_cut)
+        )[1]
+        condition_right = np.where(
+            (coord_x.signal < 1.1 * x_cut) & (coord_x.signal > 0.9 * x_cut)
+        )[1]
 
-        left = ref_signal.signal[y_max.min():,condition_left].mean(axis = 1)
-        left_y = coord_y.signal[y_max.min():,condition_left].mean(axis = 1)*100 # convert to cm
-        right_y = coord_y.signal[y_max.min():,condition_right].mean(axis = 1)*100 # convert to cm
-        right = ref_signal.signal[y_max.min():,condition_right].mean(axis = 1)
+        left = ref_signal.signal[y_max.min() :, condition_left].mean(axis=1)
+        left_y = (
+            coord_y.signal[y_max.min() :, condition_left].mean(axis=1) * 100
+        )  # convert to cm
+        right_y = (
+            coord_y.signal[y_max.min() :, condition_right].mean(axis=1) * 100
+        )  # convert to cm
+        right = ref_signal.signal[y_max.min() :, condition_right].mean(axis=1)
 
         edge_left = left_y[1:][np.diff(left) == np.min(np.diff(left))]
         edge_right = right_y[1:][np.diff(right) == np.min(np.diff(right))]
@@ -225,9 +245,14 @@ class LevelHorizon(PixelCoordinatesWithRoll):
     def prepare_execution(self):
         super().prepare_execution()
 
-        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
+        with_keys = (
+            normalize_str_list(self.configuration.get("with_processing_keys", None))
+            or []
+        )
         if not with_keys:
-            raise ValueError("LevelHorizon: configuration.with_processing_keys is empty.")
+            raise ValueError(
+                "LevelHorizon: configuration.with_processing_keys is empty."
+            )
 
         ref_signal: BaseData = self.processing_data[with_keys[0]]["signal"]
 
@@ -245,9 +270,12 @@ class LevelHorizon(PixelCoordinatesWithRoll):
         self.configuration["sample_roll"] = res.x#.flatten()[0]
         print("found optimal roll angle:", res.x)
 
-        
-        frame = self._load_canonical_frame(RoD=RoD, detector_shape=detector_shape, reference_signal=ref_signal)
-        outputs = self._compute_pixel_positions(RoD=RoD, detector_shape=detector_shape, frame=frame)
+        frame = self._load_canonical_frame(
+            RoD=RoD, detector_shape=detector_shape, reference_signal=ref_signal
+        )
+        outputs = self._compute_pixel_positions(
+            RoD=RoD, detector_shape=detector_shape, frame=frame
+        )
 
         for bd in outputs.values():
             bd.rank_of_data = min(RoD, int(np.ndim(bd.signal)))
@@ -255,9 +283,14 @@ class LevelHorizon(PixelCoordinatesWithRoll):
         self._prepared_data = {k: outputs[k] for k in ("coord_x", "coord_y", "coord_z")}
 
     def calculate(self):
-        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
+        with_keys = (
+            normalize_str_list(self.configuration.get("with_processing_keys", None))
+            or []
+        )
         if not with_keys:
-            logger.warning("LevelHorizon: no with_processing_keys specified; nothing to do.")
+            logger.warning(
+                "LevelHorizon: no with_processing_keys specified; nothing to do."
+            )
             return {}
 
         return attach_prepared_data(
