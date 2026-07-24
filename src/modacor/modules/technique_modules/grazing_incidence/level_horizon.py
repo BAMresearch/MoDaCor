@@ -21,7 +21,8 @@ __all__ = ["LevelHorizon"]
 from typing import Dict, Tuple
 
 import numpy as np
-from scipy.optimize import minimize_scalar, dual_annealing, Bounds
+from scipy.optimize import minimize_scalar, dual_annealing, Bounds, direct
+import matplotlib.pyplot as plt
 
 
 # import pint
@@ -177,7 +178,7 @@ class LevelHorizon(PixelCoordinatesWithRoll):
     )
 
     def to_min(self, sample_roll):
-        self.configuration["sample_roll"] = sample_roll.flatten()[0]
+        self.configuration["sample_roll"] = sample_roll#.flatten()[0]
         with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
         if not with_keys:
             raise ValueError("LevelHorizon: configuration.with_processing_keys is empty.")
@@ -193,35 +194,28 @@ class LevelHorizon(PixelCoordinatesWithRoll):
 
         # take two vertical cuts near the edge to determine the location of the horizon
         x_cut = np.quantile(np.abs(coord_x.signal), 0.75)
+        y_max = np.where(coord_y.signal < np.quantile(np.abs(coord_y.signal), 0.3))[0] # below the masked gap
 
         condition_left = np.where((coord_x.signal > -1.1*x_cut) & (coord_x.signal < -0.9*x_cut))[1] 
         condition_right = np.where((coord_x.signal < 1.1*x_cut) & (coord_x.signal > 0.9*x_cut))[1]
 
-        left = ref_signal.signal[500:,condition_left].mean(axis = 1)
-        left_y = coord_y.signal[500:,condition_left].mean(axis = 1)
-        right_y = coord_y.signal[500:,condition_right].mean(axis = 1)
-        right = ref_signal.signal[500:,condition_right].mean(axis = 1)
+        left = ref_signal.signal[y_max.min():,condition_left].mean(axis = 1)
+        left_y = coord_y.signal[y_max.min():,condition_left].mean(axis = 1)*100 # convert to cm
+        right_y = coord_y.signal[y_max.min():,condition_right].mean(axis = 1)*100 # convert to cm
+        right = ref_signal.signal[y_max.min():,condition_right].mean(axis = 1)
 
-        def step(x, loc, level_low, level_high):
-            return (level_high - level_low) * 0.5 * (np.sign(x - loc) + 1)
+        edge_left = left_y[1:][np.diff(left) == np.min(np.diff(left))]
+        edge_right = right_y[1:][np.diff(right) == np.min(np.diff(right))]
 
-        def edge_to_min(loc, x, data, level_high, level_low):
-            functionvalues = step(x, loc = loc, level_high = level_high, level_low = level_low)
-            return np.sum((data - functionvalues)**2)
-
-        edge_res_l = minimize_scalar(edge_to_min, bounds = [-0.01, 0.03],
-                                     args = (left_y, left, np.nanmax(left), np.nanmin(left)),
-                                     )
-        edge_res_r = minimize_scalar(edge_to_min, bounds = [-0.01, 0.03],
-                                     args = (right_y, right, np.nanmax(right), np.nanmin(right)),
-                                     )
-        edge_left = edge_res_l.x
-        edge_right = edge_res_r.x
+        
+        plt.plot(left_y, left, ".", label = "left")
+        plt.plot(right_y, right, ".", label = "right")
+        plt.axvline(edge_left, label = "left")
+        plt.axvline(edge_right, label = "right")
+        plt.savefig("edge_detection_horizon_levelling.png")
+        plt.close()
+        print(edge_left, edge_right)
         return np.sum((edge_left - edge_right)**2)
-
-        average_left = ref_signal.signal[(coord_x.signal < 0) & (coord_y.signal > 0) & (coord_y.signal < 0.005)].mean()
-        average_right = ref_signal.signal[(coord_x.signal > 0) & (coord_y.signal > 0) & (coord_y.signal < 0.005)].mean()
-        return (average_left - average_right)**2
         
 
     # ----------------------------
@@ -245,9 +239,10 @@ class LevelHorizon(PixelCoordinatesWithRoll):
 
         detector_shape = self._detector_shape(ref_signal, RoD)
 
-        #res = minimize_scalar(lambda x: self.to_min(x), bounds = [-1.0, 1.0],                                     tol = 75e-6,)
-        res = dual_annealing(lambda x: self.to_min(x), bounds = Bounds(lb = -1, ub = 1))
-        self.configuration["sample_roll"] = res.x.flatten()[0]
+        res = minimize_scalar(lambda x: self.to_min(x), bounds = [-1.0, 1.0], options = {"xatol": 75e-6})
+        #res = dual_annealing(lambda x: self.to_min(x), bounds = Bounds(lb = -1, ub = 1))
+        #res = direct(lambda x: self.to_min(x), bounds = Bounds(lb = -1, ub = 1))
+        self.configuration["sample_roll"] = res.x#.flatten()[0]
         print("found optimal roll angle:", res.x)
 
         
