@@ -289,11 +289,11 @@ class LevelHorizon(PixelCoordinatesWithRoll):
 
         detector_shape = self._detector_shape(ref_signal, RoD)
 
-        res = minimize_scalar(lambda x: self.to_min(x), bounds = [-1.0, 1.0], options = {"xatol": 75e-6})
-        #res = dual_annealing(lambda x: self.to_min(x), bounds = Bounds(lb = -1, ub = 1))
-        #res = direct(lambda x: self.to_min(x), bounds = Bounds(lb = -1, ub = 1))
-        self.configuration["sample_roll"] = res.x#.flatten()[0]
-        print("found optimal roll angle:", res.x)
+        res = minimize_scalar(
+            lambda x: self.to_min(x), bounds=[-1.0, 1.0], options={"xatol": 75e-6}
+        )
+        self.configuration["sample_roll"] = res.x
+        logger.info(f"LevelHorizon: found optimal roll angle: {res.x}")
 
         frame = self._load_canonical_frame(
             RoD=RoD, detector_shape=detector_shape, reference_signal=ref_signal
