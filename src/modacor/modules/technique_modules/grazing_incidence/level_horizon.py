@@ -224,8 +224,14 @@ class LevelHorizon(PixelCoordinatesWithRoll):
         )  # convert to cm
         right = ref_signal.signal[y_max.min() :, condition_right].mean(axis=1)
 
-        edge_left = left_y[1:][np.diff(left) == np.min(np.diff(left))]
-        edge_right = right_y[1:][np.diff(right) == np.min(np.diff(right))]
+        # detect edge via maximum change over two datapoints
+        edge_left = left_y[2:][
+            np.abs(left[2:] - left[:-2]) == np.nanmax(np.abs(left[2:] - left[:-2]))
+        ].mean()
+        edge_right = right_y[2:][
+            np.abs(right[2:] - right[:-2]) == np.nanmax(np.abs(right[2:] - right[:-2]))
+        ].mean()
+
         # plot for debugging - output should go into the databundle
         plt.axvline(edge_left, color="r", label="left")
         plt.axvline(edge_right, label="right")
