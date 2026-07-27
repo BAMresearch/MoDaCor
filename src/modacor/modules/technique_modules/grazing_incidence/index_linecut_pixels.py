@@ -313,13 +313,7 @@ class IndexLinecutPixels(ProcessStep):
             if q_min_cfg is not None:
                 q_min_val = (float(q_min_cfg) * q_unit).to(qpar_bd.units).magnitude
             else:
-                if bin_type == "log":
-                    positive = finite_q[finite_q > 0.0]
-                    if positive.size == 0:
-                        raise ValueError("IndexPixels: cannot determine positive q_min for log binning.")
-                    q_min_val = float(np.nanmin(positive))
-                else:
-                    q_min_val = data_q_min
+                q_min_val = data_q_min
 
             if q_max_cfg is not None:
                 q_max_val = (float(q_max_cfg) * q_unit).to(qpar_bd.units).magnitude
@@ -387,8 +381,15 @@ class IndexLinecutPixels(ProcessStep):
         coord_flat = q_flat
         if bin_type == "log":
             if q_min_val <= 0.0:
-                raise ValueError("IndexPixels: q_min must be > 0 for log binning.")
-            bin_edges = np.geomspace(q_min_val, q_max_val, num=n_bins + 1, dtype=float)
+                # use log-spaced indices for positive and negative values
+                q_min_log = np.nanmin(np.abs(q_flat))
+                n_bins_left = n_bins // 2
+                n_bins_right = n_bins - n_bins_left
+                bin_edges = np.geomspace(q_min_log, q_max_val, num=n_bins_right, dtype=float)
+                bin_edges_negative = -1*np.geomspace(q_min_log, q_max_val, num=n_bins_left + 1, dtype=float)
+                bin_edges = np.concatenate((bin_edges_negative[::-1], bin_edges))
+            else:
+                bin_edges = np.geomspace(q_min_val, q_max_val, num=n_bins + 1, dtype=float)
         elif bin_type == "linear":
             bin_edges = np.linspace(q_min_val, q_max_val, num=n_bins + 1, dtype=float)
         else:
