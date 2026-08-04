@@ -33,7 +33,7 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
     def setUp(self):
         self.test_processing_data = ProcessingData()
 
-        signal = np.array([[0,1,4e9],[2,3,7e5]], dtype=np.uint32)
+        signal = np.array([[0, 1, 4e9], [2, 3, 7e5]], dtype=np.uint32)
 
         db = DataBundle(
             signal=BaseData(signal=signal, units=ureg.dimensionless, uncertainties={}),
@@ -65,7 +65,7 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
         step.calculate()
         out = step.processing_data["sample"]["threshold_mask"].signal
 
-        expected = np.array([[0,0,1],[0,0,0]], dtype=np.uint32)
+        expected = np.array([[0, 0, 1], [0, 0, 0]], dtype=np.uint32)
         np.testing.assert_array_equal(out, expected)
 
     def test_threshold_mask_ndim_signal(self):
@@ -75,8 +75,8 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
         """
         self.test_processing_data = ProcessingData()
 
-        signal = np.array([[[0,1,4e9],[2,3,7e5]],
-                           [[0,1,4e9],[2,3,7e5]]], dtype=np.uint32)
+        signal = np.array([[[0, 1, 4e9], [2, 3, 7e5]],
+                           [[0, 1, 4e9], [2, 3, 7e5]]], dtype=np.uint32)
 
         db = DataBundle(
             signal=BaseData(signal=signal, units=ureg.dimensionless, uncertainties={}),
