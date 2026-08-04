@@ -12,6 +12,7 @@ import scipy.sparse as sp
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
@@ -137,7 +138,8 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
         step_doc="Compute Q-vector components and angles from lab-frame pixel coordinates.",
     )
 
-    output_keys: Tuple[str, ...] = ("Q0", "Q1", "Q2", "Q", "Qpar", "Qper", "signal", "Psi", "TwoTheta", "Omega")
+    output_keys: Tuple[str, ...] = ("Q0", "Q1", "Q2", "Q", "Qpar", "Qper", "signal", "Psi", "TwoTheta", "Omega",
+                                    "signal_pretty", "Qpar_pretty", "Qper_pretty")
 
     # ----------------------------
     # loading helpers
@@ -222,6 +224,7 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
             Q_bd: BaseData,
             wavelength_bd: BaseData,
             signal_bd: BaseData,
+            linear_q: bool,
             ) -> BaseData:
         """
         Mask the inaccessible area in q space with zeros
@@ -232,14 +235,20 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
         # the other rows to those values (with binning)
         qpar_row = np.where((Q1_bd.signal)**2 == np.abs(Q1_bd.signal).min()**2)[0]
         q_par = qpar[qpar_row].flatten()
-        q_par = np.linspace(qpar.max(), qpar.min(), q_par.shape[0])
+
+        if linear_q:
+            q_par = np.linspace(qpar.max(), qpar.min(), q_par.shape[0])
         # switch q_par direction to match DAWN results
         Qpar_bd = BaseData(signal = -1*q_par, units = "1/nm", rank_of_data = 1)
         
         qper_col = np.where(Q0_bd.signal**2 == np.abs(Q0_bd.signal).min()**2)
         qper = np.where(Q1_bd.signal > 0, np.sqrt(Q_bd.signal**2 - qpar**2), -np.sqrt(Q_bd.signal**2 - qpar**2))
         q_per = qper[:,qper_col[1]].flatten()
-        q_per = np.linspace(q_per.min(), q_per.max(), q_per.shape[0])
+        if linear_q:
+            q_per = np.linspace(q_per.min(), q_per.max(), q_per.shape[0])
+        else:
+            # invert array to match linearized orientation
+            q_per = q_per[::-1]
 
         ind_par = np.digitize(qpar, q_par[:-1])
         ind_per = np.digitize(qper, q_per[:-1])
@@ -319,19 +328,37 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
             detector_normal=detector_normal,
         )
 
+        # copy signal basedata for second remapping
+        signal_bd_copy = signal_bd.copy()
         
+        # data remapped with linear q (comparable to DAWN)
         signal, Qpar_bd, Qper_bd = self._mask_missing_wedge(
             Q0_bd = out["Q0"],
             Q1_bd = out["Q1"],
             Q2_bd = out["Q2"],
             Q_bd = out["Q"],
             wavelength_bd = wavelength, 
-            signal_bd = signal_bd)
-
+            signal_bd = signal_bd,
+            linear_q = True)
         signal.axes = [Qper_bd, Qpar_bd]
         out["signal"] = signal
         out["Qpar"] = Qpar_bd
         out["Qper"] = Qper_bd
+
+        # data remapped with nonlinear q but fewer NaNs
+        signal_pretty, Qpar_bd_pretty, Qper_bd_pretty = self._mask_missing_wedge(
+            Q0_bd = out["Q0"],
+            Q1_bd = out["Q1"],
+            Q2_bd = out["Q2"],
+            Q_bd = out["Q"],
+            wavelength_bd = wavelength,
+            signal_bd = signal_bd_copy,
+            linear_q = False)
+
+        signal_pretty.axes = [Qper_bd_pretty, Qpar_bd_pretty]
+        out["signal_pretty"] = signal_pretty
+        out["Qpar_pretty"] = Qpar_bd_pretty
+        out["Qper_pretty"] = Qper_bd_pretty
 
 
 
@@ -346,10 +373,33 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
             logger.warning("GIGeometryFromPixelCoordinates: no with_processing_keys specified; nothing to do.")
             return {}
 
-        return attach_prepared_data(
+        output: Dict[str, DataBundle] = {}
+
+        pretty_databundles = {}
+        for key in with_keys:
+            pretty_key = f"{key}_pretty"
+            db_pretty = DataBundle(
+                {
+                    "signal": self._prepared_data["signal_pretty"],
+                    "Qpar": self._prepared_data["Qpar_pretty"],
+                    "Qper": self._prepared_data["Qper_pretty"],
+                    "Omega": self._prepared_data["Omega"],
+                    }
+                )
+            pretty_databundles[pretty_key] = db_pretty
+            for outkey in ["signal_pretty", "Qpar_pretty", "Qper_pretty"]:
+                self._prepared_data.pop(outkey)
+
+        output = attach_prepared_data(
             self.processing_data,
             with_keys,
             self._prepared_data,
             logger=logger,
             module_name="GIGeometryFromPixelCoordinates",
         )
+
+        for key in pretty_databundles:
+            output[key] = pretty_databundles[key]
+
+
+        return output
