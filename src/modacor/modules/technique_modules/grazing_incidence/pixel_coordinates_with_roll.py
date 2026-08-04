@@ -41,8 +41,6 @@ from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import Pi
 logger = MessageHandler(name=__name__)
 
 
-
-
 class PixelCoordinatesWithRoll(PixelCoordinates3D):
     """
     Primary arrays module: compute 3D detector element center coordinates in lab-frame NeXus-like axes.
@@ -175,7 +173,6 @@ class PixelCoordinatesWithRoll(PixelCoordinates3D):
         step_doc="Computes 3D detector element center coordinates in lab-frame axes.",
     )
 
-
     def _load_canonical_frame(
         self,
         *,
@@ -215,9 +212,9 @@ class PixelCoordinatesWithRoll(PixelCoordinates3D):
         rot_matrix = np.array([[np.cos(detector_roll), -np.sin(detector_roll), 0],
                               [np.sin(detector_roll), np.cos(detector_roll), 0],
                               [0, 0, 1],
-                              ])
-        e_fast = np.dot(rot_matrix,e_fast)
-        e_slow = np.dot(rot_matrix,e_slow)
+                               ])
+        e_fast = np.dot(rot_matrix, e_fast)
+        e_slow = np.dot(rot_matrix, e_slow)
 
         # rotate the beam center
         rotated_coordinate = np.dot(rot_matrix, np.array([det_coord_x, det_coord_y, det_coord_z])
@@ -236,4 +233,3 @@ class PixelCoordinatesWithRoll(PixelCoordinates3D):
             pixel_pitch_slow=pitch_slow,
             pixel_pitch_fast=pitch_fast,
         )
-

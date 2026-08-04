@@ -215,14 +215,14 @@ class LevelHorizon(PixelCoordinatesWithRoll):
             (coord_x.signal < 1.1 * x_cut) & (coord_x.signal > 0.9 * x_cut)
         )[1]
 
-        left = ref_signal.signal[y_max.min() :, condition_left].mean(axis=1)
+        left = ref_signal.signal[y_max.min():, condition_left].mean(axis=1)
         left_y = (
-            coord_y.signal[y_max.min() :, condition_left].mean(axis=1) * 100
+            coord_y.signal[y_max.min():, condition_left].mean(axis=1) * 100
         )  # convert to cm
         right_y = (
-            coord_y.signal[y_max.min() :, condition_right].mean(axis=1) * 100
+            coord_y.signal[y_max.min():, condition_right].mean(axis=1) * 100
         )  # convert to cm
-        right = ref_signal.signal[y_max.min() :, condition_right].mean(axis=1)
+        right = ref_signal.signal[y_max.min():, condition_right].mean(axis=1)
 
         # bin data if noisy
         if (left[:50].mean() - left[-50:].mean()) < left.std():

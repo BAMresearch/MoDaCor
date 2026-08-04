@@ -225,12 +225,13 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
             wavelength_bd: BaseData,
             signal_bd: BaseData,
             linear_q: bool,
-            ) -> BaseData:
+    ) -> BaseData:
         """
         Mask the inaccessible area in q space with zeros
         """
 
-        qpar = np.where(Q0_bd.signal > 0, np.sqrt(Q0_bd.signal**2 + Q2_bd.signal**2), -np.sqrt(Q0_bd.signal**2 + Q2_bd.signal**2))
+        qpar = np.where(Q0_bd.signal > 0, np.sqrt(Q0_bd.signal**2 + Q2_bd.signal**2),
+                        - np.sqrt(Q0_bd.signal**2 + Q2_bd.signal**2))
         # it seems q_par and q_per in dawn are continuous, so we need to find a row where they are and map
         # the other rows to those values (with binning)
         qpar_row = np.where((Q1_bd.signal)**2 == np.abs(Q1_bd.signal).min()**2)[0]
@@ -239,11 +240,11 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
         if linear_q:
             q_par = np.linspace(qpar.max(), qpar.min(), q_par.shape[0])
         # switch q_par direction to match DAWN results
-        Qpar_bd = BaseData(signal = -1*q_par, units = "1/nm", rank_of_data = 1)
-        
+        Qpar_bd = BaseData(signal=-1 * q_par, units="1/nm", rank_of_data=1)
+
         qper_col = np.where(Q0_bd.signal**2 == np.abs(Q0_bd.signal).min()**2)
         qper = np.where(Q1_bd.signal > 0, np.sqrt(Q_bd.signal**2 - qpar**2), -np.sqrt(Q_bd.signal**2 - qpar**2))
-        q_per = qper[:,qper_col[1]].flatten()
+        q_per = qper[:, qper_col[1]].flatten()
         if linear_q:
             q_per = np.linspace(q_per.min(), q_per.max(), q_per.shape[0])
         else:
@@ -263,12 +264,11 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
         # for human readability.
         csr.sum_duplicates()
         norm.sum_duplicates()
-        out = csr.todense()/norm.todense()
+        out = csr.todense() / norm.todense()
         signal_bd.signal = out
-        
-        Qper_bd = BaseData(signal = q_per, units = "1/nm", rank_of_data = 1)
-        return signal_bd, Qpar_bd, Qper_bd
 
+        Qper_bd = BaseData(signal=q_per, units="1/nm", rank_of_data=1)
+        return signal_bd, Qpar_bd, Qper_bd
 
     # ----------------------------
     # ProcessStep lifecycle
@@ -286,7 +286,7 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
         coord_x: BaseData = ref["coord_x"]
         coord_y: BaseData = ref["coord_y"]
         coord_z: BaseData = ref["coord_z"]
-        signal_bd : BaseData = ref["signal"]
+        signal_bd: BaseData = ref["signal"]
 
         RoD = int(
             getattr(coord_x, "rank_of_data", ref["signal"].rank_of_data if "signal" in ref else np.ndim(coord_x.signal))
@@ -330,16 +330,16 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
 
         # copy signal basedata for second remapping
         signal_bd_copy = signal_bd.copy()
-        
+
         # data remapped with linear q (comparable to DAWN)
         signal, Qpar_bd, Qper_bd = self._mask_missing_wedge(
-            Q0_bd = out["Q0"],
-            Q1_bd = out["Q1"],
-            Q2_bd = out["Q2"],
-            Q_bd = out["Q"],
-            wavelength_bd = wavelength, 
-            signal_bd = signal_bd,
-            linear_q = True)
+            Q0_bd=out["Q0"],
+            Q1_bd=out["Q1"],
+            Q2_bd=out["Q2"],
+            Q_bd=out["Q"],
+            wavelength_bd=wavelength,
+            signal_bd=signal_bd,
+            linear_q=True)
         signal.axes = [Qper_bd, Qpar_bd]
         out["signal"] = signal
         out["Qpar"] = Qpar_bd
@@ -347,20 +347,18 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
 
         # data remapped with nonlinear q but fewer NaNs
         signal_pretty, Qpar_bd_pretty, Qper_bd_pretty = self._mask_missing_wedge(
-            Q0_bd = out["Q0"],
-            Q1_bd = out["Q1"],
-            Q2_bd = out["Q2"],
-            Q_bd = out["Q"],
-            wavelength_bd = wavelength,
-            signal_bd = signal_bd_copy,
-            linear_q = False)
+            Q0_bd=out["Q0"],
+            Q1_bd=out["Q1"],
+            Q2_bd=out["Q2"],
+            Q_bd=out["Q"],
+            wavelength_bd=wavelength,
+            signal_bd=signal_bd_copy,
+            linear_q=False)
 
         signal_pretty.axes = [Qper_bd_pretty, Qpar_bd_pretty]
         out["signal_pretty"] = signal_pretty
         out["Qpar_pretty"] = Qpar_bd_pretty
         out["Qper_pretty"] = Qper_bd_pretty
-
-
 
         for bd in out.values():
             bd.rank_of_data = min(RoD, int(np.ndim(bd.signal)))
@@ -384,8 +382,8 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
                     "Qpar": self._prepared_data["Qpar_pretty"],
                     "Qper": self._prepared_data["Qper_pretty"],
                     "Omega": self._prepared_data["Omega"],
-                    }
-                )
+                }
+            )
             pretty_databundles[pretty_key] = db_pretty
             for outkey in ["signal_pretty", "Qpar_pretty", "Qper_pretty"]:
                 self._prepared_data.pop(outkey)
@@ -400,6 +398,5 @@ class GIGeometryFromPixelCoordinates(ProcessStep):
 
         for key in pretty_databundles:
             output[key] = pretty_databundles[key]
-
 
         return output

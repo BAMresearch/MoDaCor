@@ -34,7 +34,7 @@ class IndexLinecutPixels(ProcessStep):
 
     Depending on `averaging_direction`, this step can prepare indices for:
       - linecut parallel to the surface (bin along Q_par, to compare with 1D X-ray scattering curves).
-      - linecut perpendicular to the surface (bin along Q_per, for example to identify the Yoneda). 
+      - linecut perpendicular to the surface (bin along Q_per, for example to identify the Yoneda).
 
     This step:
       - Interprets Qpar/Qper limits in user-specified units (q_limits_unit).
@@ -67,7 +67,7 @@ class IndexLinecutPixels(ProcessStep):
         If omitted:
           - For "radial" + "log" binning: q_min = smallest positive finite Q;
           - Otherwise: q_min = min(Q), q_max = max(Q).
-        q_min may be negative if not using "log" binning. 
+        q_min may be negative if not using "log" binning.
 
     q_unit : str or pint.Unit, optional
         Units in which q_min/q_max and q_slice_width are defined, e.g. "1/nm".
@@ -81,7 +81,7 @@ class IndexLinecutPixels(ProcessStep):
         - "linear" uses np.linspace.
 
     q_slice_loc : float
-        Location of the center of the linecut expressed in q_unit. 
+        Location of the center of the linecut expressed in q_unit.
 
     q_slice_width : float, optional
         Width of the linecut expressed in q_unit.
@@ -275,12 +275,13 @@ class IndexLinecutPixels(ProcessStep):
         # Direction of averaging: "radial" or "azimuthal"
         direction = str(self.configuration.get("averaging_direction", "parallel")).lower()
         if direction not in ("parallel", "perpendicular"):
-            raise ValueError(f"IndexPixels: averaging_direction must be 'parallel' or 'perpendicular', got {direction!r}.")
+            raise ValueError(
+                f"IndexPixels: averaging_direction must be 'parallel' or 'perpendicular', got {direction!r}.")
 
         # ------------------------------------------------------------------
         # 1. Resolve Q limits (mask +, for radial, binning)
         # ------------------------------------------------------------------
-        qpar, qper = np.meshgrid(qpar_bd.signal, qper_bd.signal) # convert to 2d
+        qpar, qper = np.meshgrid(qpar_bd.signal, qper_bd.signal)  # convert to 2d
         q_min_cfg = self.configuration.get("q_min", None)
         q_max_cfg = self.configuration.get("q_max", None)
         n_bins = int(self.configuration.get("n_bins", 100))
@@ -291,13 +292,13 @@ class IndexLinecutPixels(ProcessStep):
 
         q_unit_cfg = self.configuration.get("q_unit", None)
         if q_unit_cfg is None:
-            q_unit = qpar_bd.units # assume Q units are the same in both directions
+            q_unit = qpar_bd.units  # assume Q units are the same in both directions
         else:
             q_unit = ureg.Unit(q_unit_cfg)
 
         if direction == "parallel":
             # q_min/q_max define both mask and bin range
-            
+
             try:
                 q_flat = qpar.ravel()
             except Exception as exc:  # noqa: BLE001
@@ -323,11 +324,11 @@ class IndexLinecutPixels(ProcessStep):
             q_width = qper.ravel()
             q_loc_cfg = self.configuration.get("q_slice_loc", 0)
             q_width_cfg = self.configuration.get("q_slice_width", 0.1)
-            q_width_min_val = ((float(q_loc_cfg) - float(q_width_cfg)/2.)* q_unit).to(qper_bd.units).magnitude
-            q_width_max_val = ((float(q_loc_cfg) + float(q_width_cfg)/2.)* q_unit).to(qper_bd.units).magnitude
+            q_width_min_val = ((float(q_loc_cfg) - float(q_width_cfg) / 2.) * q_unit).to(qper_bd.units).magnitude
+            q_width_max_val = ((float(q_loc_cfg) + float(q_width_cfg) / 2.) * q_unit).to(qper_bd.units).magnitude
         else:
             # radial: q_min/q_max are optional ROI only; ignore bin_type here
-                        
+
             try:
                 q_flat = qper.ravel()
             except Exception as exc:  # noqa: BLE001
@@ -350,13 +351,11 @@ class IndexLinecutPixels(ProcessStep):
             else:
                 q_max_val = data_q_max
 
-            
             q_width = qpar.ravel()
             q_loc_cfg = self.configuration.get("q_slice_loc", 0)
             q_width_cfg = self.configuration.get("q_slice_width", 0.1)
-            q_width_min_val = ((float(q_loc_cfg) - float(q_width_cfg)/2.)* q_unit).to(qpar_bd.units).magnitude
-            q_width_max_val = ((float(q_loc_cfg) + float(q_width_cfg)/2.)* q_unit).to(qpar_bd.units).magnitude
-
+            q_width_min_val = ((float(q_loc_cfg) - float(q_width_cfg) / 2.) * q_unit).to(qpar_bd.units).magnitude
+            q_width_max_val = ((float(q_loc_cfg) + float(q_width_cfg) / 2.) * q_unit).to(qpar_bd.units).magnitude
 
         if q_max_val <= q_min_val or not np.isfinite(q_min_val) or not np.isfinite(q_max_val):
             raise ValueError(f"IndexPixels: invalid Q range q_min={q_min_val}, q_max={q_max_val}.")
@@ -377,17 +376,17 @@ class IndexLinecutPixels(ProcessStep):
         # ------------------------------------------------------------------
         # 4. Build bin edges and assign indices
         # ------------------------------------------------------------------
-        
+
         coord_flat = q_flat
         if bin_type == "log":
             if q_min_val <= 0.0:
                 # use log-spaced indices for positive and negative values
                 q_min_log = np.nanmin(np.abs(q_flat))
-                n_bins_left = np.floor(abs(q_min_val)/(q_max_val - q_min_val) * n_bins).astype(int)
+                n_bins_left = np.floor(abs(q_min_val) / (q_max_val - q_min_val) * n_bins).astype(int)
                 n_bins_right = n_bins - n_bins_left
                 print(n_bins_left, n_bins_right)
                 bin_edges = np.geomspace(q_min_log, q_max_val, num=n_bins_right, dtype=float)
-                bin_edges_negative = -1*np.geomspace(q_min_log, np.abs(q_min_val), num=n_bins_left + 1, dtype=float)
+                bin_edges_negative = -1 * np.geomspace(q_min_log, np.abs(q_min_val), num=n_bins_left + 1, dtype=float)
                 bin_edges = np.concatenate((bin_edges_negative[::-1], bin_edges))
             else:
                 bin_edges = np.geomspace(q_min_val, q_max_val, num=n_bins + 1, dtype=float)
@@ -397,7 +396,6 @@ class IndexLinecutPixels(ProcessStep):
             raise ValueError(
                 f"IndexPixels: unknown bin_type {bin_type!r} for radial averaging. Expected 'log' or 'linear'."
             )
-        
 
         bin_idx = np.searchsorted(bin_edges, coord_flat, side="right") - 1
         out_of_range = (bin_idx < 0) | (bin_idx >= n_bins)

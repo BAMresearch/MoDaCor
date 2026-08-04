@@ -164,8 +164,8 @@ class LinecutAverager(ProcessStep):
         },
         modifies={
             # We overwrite 'signal', 'Qpar', 'Qper' with their 1D binned versions.
-            #"signal": ["signal", "uncertainties"],
-            #"Qpar": ["signal", "uncertainties"],
+            # "signal": ["signal", "uncertainties"],
+            # "Qpar": ["signal", "uncertainties"],
             # "Qper": ["signal", "uncertainties"],
         },
         step_keywords=[
@@ -252,7 +252,7 @@ class LinecutAverager(ProcessStep):
 
         # Flatten arrays
         sig_full = signal_bd.signal.ravel()
-        qpar, qper = np.meshgrid(qpar_bd.signal, qper_bd.signal) # convert to 2d
+        qpar, qper = np.meshgrid(qpar_bd.signal, qper_bd.signal)  # convert to 2d
         qpar_full = qpar.ravel()
         qper_full = qper.ravel()
 
@@ -367,37 +367,7 @@ class LinecutAverager(ProcessStep):
             mean_qper[positive] = sum_wqper[positive] / sum_w[positive]
 
         # ------------------------------------------------------------------
-        # 3. Weighted circular mean for Qper
-        # ------------------------------------------------------------------
-        qper_unit = qper_bd.units
-
-        # Convert Qper to radians for trigonometric operations
-        # cf_to_rad = ureg.radian.m_from(qper_unit)
-        # qper_rad_valid = qper_valid * cf_to_rad
-
-        # cos_qper = np.cos(qper_rad_valid)
-        # sin_qper = np.sin(qper_rad_valid)
-
-        # sum_wcos = np.bincount(bin_idx, weights=w_valid * cos_qper, minlength=n_bins)
-        # sum_wsin = np.bincount(bin_idx, weights=w_valid * sin_qper, minlength=n_bins)
-
-        # with np.errstate(divide="ignore", invalid="ignore"):
-        #     mean_cos = np.full(n_bins, np.nan, dtype=float)
-        #     mean_sin = np.full(n_bins, np.nan, dtype=float)
-        #     mean_qper_rad = np.full(n_bins, np.nan, dtype=float)
-
-        #     positive = sum_w > 0.0
-        #     mean_cos[positive] = sum_wcos[positive] / sum_w[positive]
-        #     mean_sin[positive] = sum_wsin[positive] / sum_w[positive]
-
-        #     mean_qper_rad[positive] = np.arctan2(mean_sin[positive], mean_cos[positive])
-
-        # # Convert back to original Qper units
-        # cf_from_rad = qper_unit.m_from(ureg.radian)
-        # mean_qper = mean_qper_rad * cf_from_rad
-
-        # ------------------------------------------------------------------
-        # 4. Propagate uncertainties on signal, Qpar, Qper
+        # 3. Propagate uncertainties on signal, Qpar, Qper
         # ------------------------------------------------------------------
         sig_unc_binned: Dict[str, np.ndarray] = {}
         qpar_unc_binned: Dict[str, np.ndarray] = {}
@@ -436,7 +406,7 @@ class LinecutAverager(ProcessStep):
             qper_unc_binned.update(_propagate_uncertainties(qper_bd.uncertainties, qper_bd))
 
         # ------------------------------------------------------------------
-        # 5. SEM/STD from scatter of selected outputs
+        # 4. SEM/STD from scatter of selected outputs
         # ------------------------------------------------------------------
         if stats_keys is None:
             stats_keys = ["signal", "Qpar", "Qper"]
@@ -486,7 +456,7 @@ class LinecutAverager(ProcessStep):
             qper_unc_binned["STD"] = std_qper
 
         # ------------------------------------------------------------------
-        # 6. Build output BaseData objects
+        # 5. Build output BaseData objects
         # ------------------------------------------------------------------
         # 1D signal
         signal_1d = BaseData(
@@ -594,27 +564,26 @@ class LinecutAverager(ProcessStep):
 
             # Attach axis: Qpar for azimuthal, Qper for radial (convention)
 
-            
             if direction == "parallel":
-                Qpar_parallel = Qpar_1d.copy(with_axes = True)
+                Qpar_parallel = Qpar_1d.copy(with_axes=True)
                 signal_1d.axes = [Qpar_parallel]
                 db_out = DataBundle(
                     {
                         "signal": signal_1d,
                         "Qpar": Qpar_parallel,
                         "Qper": Qper_1d,
-                        }
+                    }
                 )
-                
+
             else:  # "perpendicular"
-                Qper_perpendicular = Qper_1d.copy(with_axes = True)
+                Qper_perpendicular = Qper_1d.copy(with_axes=True)
                 signal_1d.axes = [Qper_perpendicular]
                 db_out = DataBundle(
                     {
                         "signal": signal_1d,
                         "Qpar": Qpar_1d,
                         "Qper": Qper_perpendicular,
-                        }
+                    }
                 )
             output[f"{key}_{direction}"] = db_out
 
