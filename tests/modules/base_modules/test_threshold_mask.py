@@ -22,7 +22,7 @@ from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 
 # module under test
-from modacor.modules.base_modules.apply_mask import ApplyMask
+from modacor.modules.base_modules.threshold_mask import ThresholdMask
 
 TEST_IO_SOURCES = IoSources()
 
@@ -33,21 +33,19 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
     def setUp(self):
         self.test_processing_data = ProcessingData()
 
-        tgt = np.ones((2, 3), dtype=np.uint32)
-        mask = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.uint32)
+        signal = np.array([[0,1,4e9],[2,3,7e5]], dtype=np.uint32)
 
         db = DataBundle(
-            mask=BaseData(signal=mask, units=ureg.dimensionless, uncertainties={}),
-            signal=BaseData(signal=tgt, units=ureg.dimensionless, uncertainties={}),
+            signal=BaseData(signal=signal, units=ureg.dimensionless, uncertainties={}),
         )
         self.test_processing_data["sample"] = db
 
-    def _make_step(self, *, mask="mask", sources=None) -> BitwiseOrMasks:
-        step = ApplyMask(io_sources=TEST_IO_SOURCES)
+    def _make_step(self, *, mask="threshold_mask", sources=None) -> BitwiseOrMasks:
+        step = ThresholdMask(io_sources=TEST_IO_SOURCES)
         step.configuration = {
             "with_processing_keys": ["sample"],
-            "mask_key": mask,
-            "basedata_to_mask": ["signal"],
+            "target_mask_key": mask,
+            "threshold": 1e9,
         }
         step.processing_data = self.test_processing_data
         return step
@@ -56,7 +54,7 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
     # Actual tests
     # ------------------------------------------------------------------ #
 
-    def test_apply_mask_expected_signal(self):
+    def test_threshold_mask_expected_mask(self):
         "Test that the right pixels are masked on a small array"
 
         self.setUp()
@@ -65,36 +63,31 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
 
         step.processing_data = self.test_processing_data
         step.calculate()
-        out = step.processing_data["sample"]["signal"].signal
+        out = step.processing_data["sample"]["threshold_mask"].signal
 
-        expected = np.array([[0, 1, 1], [1, 0, 1]])
+        expected = np.array([[0,0,1],[0,0,0]], dtype=np.uint32)
         np.testing.assert_array_equal(out, expected)
 
-    def test_target_non_uint32_is_upcast_to_uint32_once(self):
+    def test_threshold_mask_ndim_signal(self):
         """
-        If the mask isn't uint32 (e.g. int64), the step should convert it to uint32
-        (one-time allocation) and then OR into that.
+        If the signal isn't of rank 2 the step should
+        average the frames before determining the mask.
         """
         self.test_processing_data = ProcessingData()
 
-        mask_i64 = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.int64)
-        tgt = np.ones((2, 3), dtype=np.uint32)
+        signal = np.array([[[0,1,4e9],[2,3,7e5]],
+                           [[0,1,4e9],[2,3,7e5]]], dtype=np.uint32)
 
         db = DataBundle(
-            mask=BaseData(signal=mask_i64, units=ureg.dimensionless, uncertainties={}),
-            signal=BaseData(signal=tgt, units=ureg.dimensionless, uncertainties={}),
+            signal=BaseData(signal=signal, units=ureg.dimensionless, uncertainties={}),
         )
         self.test_processing_data["sample"] = db
 
         step = self._make_step()
         step.processing_data = self.test_processing_data
 
-        before_id = id(self.test_processing_data["sample"]["mask"].signal)
         step.calculate()
 
-        out = self.test_processing_data["sample"]["mask"].signal
+        out = self.test_processing_data["sample"]["threshold_mask"].signal
         self.assertEqual(out.dtype, np.uint32)
-        self.assertNotEqual(id(out), before_id)  # replacement happened due to upcast
-
-        expected = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.uint32)
-        np.testing.assert_array_equal(out, expected)
+        self.assertEqual(out.ndim, 2)
