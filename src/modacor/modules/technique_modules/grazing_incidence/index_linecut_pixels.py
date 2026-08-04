@@ -383,10 +383,11 @@ class IndexLinecutPixels(ProcessStep):
             if q_min_val <= 0.0:
                 # use log-spaced indices for positive and negative values
                 q_min_log = np.nanmin(np.abs(q_flat))
-                n_bins_left = n_bins // 2
+                n_bins_left = np.floor(abs(q_min_val)/(q_max_val - q_min_val) * n_bins).astype(int)
                 n_bins_right = n_bins - n_bins_left
+                print(n_bins_left, n_bins_right)
                 bin_edges = np.geomspace(q_min_log, q_max_val, num=n_bins_right, dtype=float)
-                bin_edges_negative = -1*np.geomspace(q_min_log, q_max_val, num=n_bins_left + 1, dtype=float)
+                bin_edges_negative = -1*np.geomspace(q_min_log, np.abs(q_min_val), num=n_bins_left + 1, dtype=float)
                 bin_edges = np.concatenate((bin_edges_negative[::-1], bin_edges))
             else:
                 bin_edges = np.geomspace(q_min_val, q_max_val, num=n_bins + 1, dtype=float)
