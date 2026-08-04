@@ -22,7 +22,6 @@ from typing import Dict, Tuple
 
 import numpy as np
 from scipy.optimize import minimize_scalar, dual_annealing, Bounds, direct
-import matplotlib.pyplot as plt
 
 
 # import pint
@@ -252,15 +251,15 @@ class LevelHorizon(PixelCoordinatesWithRoll):
         ].mean()
 
         # plot for debugging - output should go into the databundle
-        plt.axvline(edge_left, color="r", label="left")
-        plt.axvline(edge_right, label="right")
-        plt.plot(left_y, left, ".", label="left")
-        plt.plot(right_y, right, ".", label="right")
+        # plt.axvline(edge_left, color="r", label="left")
+        # plt.axvline(edge_right, label="right")
+        # plt.plot(left_y, left, ".", label="left")
+        # plt.plot(right_y, right, ".", label="right")
 
-        plt.legend()
+        # plt.legend()
 
-        plt.savefig("edge_detection_horizon_levelling.png")
-        plt.close()
+        # plt.savefig("edge_detection_horizon_levelling.png")
+        # plt.close()
         return np.sum((edge_left - edge_right) ** 2)
 
     # ----------------------------
