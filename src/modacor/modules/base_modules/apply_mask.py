@@ -105,7 +105,7 @@ class ApplyMask(ProcessStep):
         # Canonicalize target to uint32 once (needed for NeXus-style 32-bit bitfields)
         if mask.dtype != np.uint32:
             mask = mask.astype(np.uint32, copy=True)  # one-time allocation
-            target_bd.signal = tgt
+            mask_bd.signal = mask
 
         for sk in source_keys:
             src_bd: BaseData = bundle[sk]
