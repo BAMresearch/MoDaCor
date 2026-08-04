@@ -15,6 +15,7 @@ __status__ = "Development"  # "Development", "Production"
 from modacor.modules.base_modules.append_processing_data import AppendProcessingData
 from modacor.modules.base_modules.append_sink import AppendSink
 from modacor.modules.base_modules.append_source import AppendSource
+from modacor.modules.base_modules.apply_mask import ApplyMask
 from modacor.modules.base_modules.bitwise_or_masks import BitwiseOrMasks
 from modacor.modules.base_modules.combine_uncertainties import CombineUncertainties
 from modacor.modules.base_modules.combine_uncertainties_max import CombineUncertaintiesMax
@@ -28,6 +29,7 @@ from modacor.modules.base_modules.reduce_dimensionality import ReduceDimensional
 from modacor.modules.base_modules.sink_processing_data import SinkProcessingData
 from modacor.modules.base_modules.subtract import Subtract
 from modacor.modules.base_modules.subtract_databundles import SubtractDatabundles
+from modacor.modules.base_modules.threshold_mask import ThresholdMask
 from modacor.modules.base_modules.units_label_update import UnitsLabelUpdate
 from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
 from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
@@ -42,6 +44,7 @@ __all__ = [
     "AppendProcessingData",
     "AppendSink",
     "AppendSource",
+    "ApplyMask",
     "BitwiseOrMasks",
     "CombineUncertainties",
     "CombineUncertaintiesMax",
@@ -59,6 +62,7 @@ __all__ = [
     "SolidAngleCorrection",
     "SubtractDatabundles",
     "Subtract",
+    "ThresholdMask",
     "UnitsLabelUpdate",
     "XSGeometry",
     "XSGeometryFromPixelCoordinates",
