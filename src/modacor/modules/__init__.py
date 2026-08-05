@@ -31,6 +31,11 @@ from modacor.modules.base_modules.subtract import Subtract
 from modacor.modules.base_modules.subtract_databundles import SubtractDatabundles
 from modacor.modules.base_modules.threshold_mask import ThresholdMask
 from modacor.modules.base_modules.units_label_update import UnitsLabelUpdate
+from modacor.modules.technique_modules.grazing_incidence.gi_geometry_from_pixel_coordinates import GIGeometryFromPixelCoordinates
+from modacor.modules.technique_modules.grazing_incidence.index_linecut_pixels import IndexLinecutPixels
+from modacor.modules.technique_modules.grazing_incidence.level_horizon import LevelHorizon
+from modacor.modules.technique_modules.grazing_incidence.linecut_averager import LinecutAverager
+from modacor.modules.technique_modules.grazing_incidence.pixel_coordinates_with_roll import PixelCoordinatesWithRoll
 from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
 from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
@@ -50,12 +55,17 @@ __all__ = [
     "CombineUncertaintiesMax",
     "CopyDataBundleKeys",
     "Divide",
+    "GIGeometryFromPixelCoordinates",
+    "IndexLinecutPixels",
     "IndexPixels",
     "IndexedAverager",
     "FindScaleFactor1D",
+    "LevelHorizon",
+    "LinecutAverager",
     "Multiply",
     "MultiplyDatabundles",
     "PixelCoordinates3D",
+    "PixelCoordinatesWithRoll",
     "PoissonUncertainties",
     "ReduceDimensionality",
     "SinkProcessingData",
