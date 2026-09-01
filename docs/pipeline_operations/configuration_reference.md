@@ -86,6 +86,51 @@ alias when `upper_bound` is not configured. The created mask keeps the same
 array shape as the `source_basedata_key`; leading image or frame axes are not
 collapsed before thresholding.
 
+The same step can create geometry masks from `Q` or `Psi` BaseData entries. For
+example, this masks pixels outside a radial Q range and outside an azimuthal Psi
+range, combines those masks, and applies the combined mask to the sample
+signal:
+
+```yaml
+steps:
+  q_range_mask:
+    module: ThresholdMask
+    configuration:
+      with_processing_keys: [sample]
+      source_basedata_key: Q
+      target_mask_key: q_mask
+      lower_bound: 0.05
+      upper_bound: 3.0
+      mask_mode: outside
+  psi_range_mask:
+    module: ThresholdMask
+    configuration:
+      with_processing_keys: [sample]
+      source_basedata_key: Psi
+      target_mask_key: psi_mask
+      lower_bound: -0.7853981633974483
+      upper_bound: 0.7853981633974483
+      mask_mode: outside
+  combine_geometry_masks:
+    module: BitwiseOrMasks
+    requires_steps: [q_range_mask, psi_range_mask]
+    configuration:
+      with_processing_keys: [sample]
+      target_mask_key: mask
+      source_mask_keys: [q_mask, psi_mask]
+  apply_geometry_mask:
+    module: ApplyMask
+    requires_steps: [combine_geometry_masks]
+    configuration:
+      with_processing_keys: [sample]
+      mask_key: mask
+      basedata_to_mask: [signal]
+```
+
+Use `mask_mode: inside` for the inverse region of interest, for example to mask
+only a beamstop band or a known bad azimuthal sector while leaving the rest of
+the detector unmasked.
+
 When a pipeline is loaded through a runtime service using the restricted
 runtime policy, the `module` name must resolve through the service's curated or
 explicit `ProcessStepRegistry`. Filesystem discovery of unregistered module
