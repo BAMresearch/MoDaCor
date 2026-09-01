@@ -18,6 +18,7 @@ import numpy as np
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 
@@ -42,13 +43,15 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
         )
         self.test_processing_data["sample"] = db
 
-    def _make_step(self, *, mask="mask", sources=None) -> BitwiseOrMasks:
+    def _make_step(self, *, mask="mask", sources=None) -> ApplyMask:
         step = ApplyMask(io_sources=TEST_IO_SOURCES)
-        step.configuration = {
-            "with_processing_keys": ["sample"],
-            "mask_key": mask,
-            "basedata_to_mask": ["signal"],
-        }
+        step.modify_config_by_dict(
+            {
+                "with_processing_keys": ["sample"],
+                "mask_key": mask,
+                "basedata_to_mask": list(sources or ["signal"]),
+            }
+        )
         step.processing_data = self.test_processing_data
         return step
 
@@ -69,6 +72,48 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
 
         expected = np.array([[0, 1, 1], [1, 0, 1]])
         np.testing.assert_array_equal(out, expected)
+
+    def test_apply_mask_treats_any_nonzero_bit_as_masked(self):
+        self.test_processing_data = ProcessingData()
+
+        tgt = np.ones((2, 3), dtype=np.uint32)
+        mask = np.array([[4, 0, 0], [0, 32, 0]], dtype=np.uint32)
+
+        db = DataBundle(
+            mask=BaseData(signal=mask, units=ureg.dimensionless, uncertainties={}),
+            signal=BaseData(signal=tgt, units=ureg.dimensionless, uncertainties={}),
+        )
+        self.test_processing_data["sample"] = db
+
+        step = self._make_step()
+        step.calculate()
+
+        expected = np.array([[0, 1, 1], [1, 0, 1]], dtype=np.uint32)
+        np.testing.assert_array_equal(self.test_processing_data["sample"]["signal"].signal, expected)
+
+    def test_apply_mask_broadcasts_detector_mask_over_frame_axis(self):
+        self.test_processing_data = ProcessingData()
+
+        tgt = np.ones((2, 2, 3), dtype=np.uint32)
+        mask = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.uint32)
+
+        db = DataBundle(
+            mask=BaseData(signal=mask, units=ureg.dimensionless, uncertainties={}),
+            signal=BaseData(signal=tgt, units=ureg.dimensionless, uncertainties={}, rank_of_data=2),
+        )
+        self.test_processing_data["sample"] = db
+
+        step = self._make_step()
+        step.calculate()
+
+        expected = np.array(
+            [
+                [[0, 1, 1], [1, 0, 1]],
+                [[0, 1, 1], [1, 0, 1]],
+            ],
+            dtype=np.uint32,
+        )
+        np.testing.assert_array_equal(self.test_processing_data["sample"]["signal"].signal, expected)
 
     def test_target_non_uint32_is_upcast_to_uint32_once(self):
         """
@@ -98,3 +143,21 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
 
         expected = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.uint32)
         np.testing.assert_array_equal(out, expected)
+
+    def test_apply_mask_dependency_contract_is_exact(self):
+        self.test_processing_data["sample"]["variance"] = BaseData(
+            signal=np.ones((2, 3), dtype=np.uint32),
+            units=ureg.dimensionless,
+            uncertainties={},
+        )
+        step = self._make_step(sources=["signal", "variance"])
+
+        contract = step.dependency_contract()
+
+        self.assertIsInstance(contract, ProcessStepDependencies)
+        self.assertEqual(contract.source_refs, frozenset())
+        self.assertEqual(
+            contract.processing_reads,
+            frozenset({"sample.mask", "sample.signal", "sample.variance"}),
+        )
+        self.assertEqual(contract.processing_writes, frozenset({"sample.signal", "sample.variance"}))

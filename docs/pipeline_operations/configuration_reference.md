@@ -49,6 +49,43 @@ code still performs semantic checks for values that need runtime context, such
 as missing sources, non-empty required strings, mutually exclusive options, or
 nested dictionary contents.
 
+## Threshold masks
+
+`ThresholdMask` creates a uint32 mask from any `BaseData` entry in a selected
+`DataBundle`, not only from `signal`. This is useful when a correction map
+stored with the measurement should define invalid detector pixels. For example,
+to mask pixels whose flatfield correction matrix falls outside an acceptable
+range:
+
+```yaml
+steps:
+  load_flatfield:
+    module: AppendProcessingData
+    configuration:
+      processing_key: sample
+      signal_location: sample::entry/instrument/detector/flatfield
+      rank_of_data: 2
+      databundle_output_key: flatfield
+      units_override: dimensionless
+  flatfield_mask:
+    module: ThresholdMask
+    requires_steps: [load_flatfield]
+    configuration:
+      with_processing_keys: [sample]
+      source_basedata_key: flatfield
+      target_mask_key: flatfield_mask
+      lower_bound: 0.8
+      upper_bound: 1.2
+      mask_mode: outside
+```
+
+Use `mask_mode: outside` to mask values below `lower_bound` or above
+`upper_bound`. Use `mask_mode: inside` to mask values within the inclusive
+range instead. The older `threshold` option is still accepted as an upper-bound
+alias when `upper_bound` is not configured. The created mask keeps the same
+array shape as the `source_basedata_key`; leading image or frame axes are not
+collapsed before thresholding.
+
 When a pipeline is loaded through a runtime service using the restricted
 runtime policy, the `module` name must resolve through the service's curated or
 explicit `ProcessStepRegistry`. Filesystem discovery of unregistered module

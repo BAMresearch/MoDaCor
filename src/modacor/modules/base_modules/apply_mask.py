@@ -23,13 +23,13 @@ import numpy as np
 
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
 class ApplyMask(ProcessStep):
     """
-    Mask the data using the 'mask' BaseData entry. Data is set to zero where the mask is 1.
+    Mask data using a mask BaseData entry. Data is set to zero where the mask is nonzero.
 
     MoDaCor's Masks are 32-bit integer bitfields (NeXus convention). This step updates the
     signal in-place by masking invalid pixels according to the mask.
@@ -62,7 +62,7 @@ class ApplyMask(ProcessStep):
             },
         },
         step_keywords=["mask", "signal", "apply", "databundle"],
-        step_doc="Combine multiple mask arrays stored as different BaseData keys in the same DataBundle.",
+        step_doc="Apply a uint32 bitfield mask to one or more BaseData signal arrays in the same DataBundle.",
         step_reference="NeXus mask bit-field convention (NXdata/NXdetector masks)",
         step_note="""
             Configuration:
@@ -71,30 +71,44 @@ class ApplyMask(ProcessStep):
               basedata_to_mask: [signal, ...]    # optional, default: [signal]
 
             Performs:
-              basedata[mask] = 0  (in-place, for each source)
+              basedata[mask != 0] = 0  (in-place, for each source)
         """,
     )
 
     @staticmethod
     def _require_int(arr: np.ndarray, name: str) -> None:
-        assert np.issubdtype(arr.dtype, np.integer), (
-            f"{name} must be an integer mask, got {arr.dtype}."
+        assert np.issubdtype(arr.dtype, np.integer), f"{name} must be an integer mask, got {arr.dtype}."
+
+    def dependency_contract(self) -> ProcessStepDependencies:
+        cfg = self.configuration or {}
+        keys = cfg.get("with_processing_keys")
+        mask_key = cfg.get("mask_key", "mask")
+        source_keys = cfg.get("basedata_to_mask", ["signal"])
+
+        reads = set(processing_key_patterns(keys, basedata_key=mask_key))
+        for source_key in source_keys:
+            reads.update(processing_key_patterns(keys, basedata_key=source_key))
+
+        writes = set()
+        for source_key in source_keys:
+            writes.update(processing_key_patterns(keys, basedata_key=source_key))
+
+        return ProcessStepDependencies(
+            source_refs=(),
+            processing_reads=reads,
+            processing_writes=writes,
         )
 
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration
 
         keys = self._normalised_processing_keys()
-        assert len(keys) == 1, (
-            "BitwiseOrMasks requires a single databundle processing key."
-        )
+        assert len(keys) == 1, "ApplyMask requires a single databundle processing key."
         processing_key = keys[0]
         mask_key = cfg.get("mask_key", "mask")
         source_keys = cfg.get("basedata_to_mask", ["signal"])
 
-        assert isinstance(source_keys, list) and source_keys, (
-            "basedata_to_mask must be a non-empty list."
-        )
+        assert isinstance(source_keys, list) and source_keys, "basedata_to_mask must be a non-empty list."
 
         bundle = self.processing_data[processing_key]
         mask_bd: BaseData = bundle[mask_key]
@@ -111,6 +125,6 @@ class ApplyMask(ProcessStep):
             src_bd: BaseData = bundle[sk]
             src = src_bd.signal
 
-            src[mask == 1] = 0
+            np.copyto(src, 0, where=mask != 0)
 
         return {processing_key: bundle}
