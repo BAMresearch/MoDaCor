@@ -36,6 +36,13 @@ steps:
 execution, the scheduler visits steps in topological order and only runs a step
 once all of its declared prerequisites are complete.
 
+`Pipeline` owns the graph, not the scheduler state. Normal execution should use
+`run_pipeline_job(...)`, which creates a fresh scheduler per run. For manual
+step-by-step execution, prefer `pipeline.create_scheduler()` and then call
+`prepare()`, `get_ready()`, `done(...)`, and `is_active()` on that scheduler.
+The same method names on `Pipeline` remain as compatibility/debugging helpers,
+but they are not recommended for new execution code.
+
 ### `ProcessingData`
 
 `ProcessingData` is the in-memory workspace shared by the pipeline. Every step

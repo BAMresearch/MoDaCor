@@ -142,9 +142,10 @@ def main() -> None:
     processing_data = build_processing_data(sources)
     tracer = PipelineTracer(watch={"sample": ["signal"]})
 
-    pipeline.prepare()
-    while pipeline.is_active():
-        for node in pipeline.get_ready():
+    scheduler = pipeline.create_scheduler()
+    scheduler.prepare()
+    while scheduler.is_active():
+        for node in scheduler.get_ready():
             node.processing_data = processing_data
             node.io_sources = sources
 
@@ -152,7 +153,7 @@ def main() -> None:
             node.execute(processing_data)
             tracer.after_step(node, processing_data, duration_s=perf_counter() - start)
 
-            pipeline.done(node)
+            scheduler.done(node)
 
     sample_signal = processing_data["sample"]["signal"]
     mean_intensity = float(sample_signal.signal.mean())

@@ -147,3 +147,28 @@ print(result.processing_data.keys())
 - `step_durations`
 - `executed_steps`
 - `stopped_after_step`
+
+## Manual scheduler API
+
+For normal scripts and notebooks, prefer `run_pipeline_job(...)`. It creates a
+fresh scheduler for each run and keeps behavior aligned with the CLI.
+
+When you need manual step-by-step control for tracing, debugging, or custom
+interactive execution, create an explicit scheduler from the pipeline:
+
+```python
+pipeline = Pipeline.from_yaml_file("processing_pipelines/MOUSE_solids.yaml")
+scheduler = pipeline.create_scheduler()
+scheduler.prepare()
+
+while scheduler.is_active():
+    for node in scheduler.get_ready():
+        node.execute(processing_data)
+        scheduler.done(node)
+```
+
+`Pipeline.static_order()`, `Pipeline.add(...)`, and
+`Pipeline.create_scheduler()` are the preferred public graph utilities. The
+older `Pipeline.prepare()`, `Pipeline.get_ready()`, `Pipeline.done(...)`, and
+`Pipeline.is_active()` methods remain available for compatibility and manual
+debugging, but new code should use an explicit scheduler.
