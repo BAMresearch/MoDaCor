@@ -274,6 +274,17 @@ Request:
 
 Response includes accepted refs and current source map.
 
+Runtime sessions cache unchanged HDF source objects internally. The cache is
+transparent to API clients: if an HDF source registration has the same `ref`,
+`type`, `location`, `kwargs`, file size, and file modification time as the
+previous run, the server reuses the existing `HDFSource` object for that session.
+This avoids repeated HDF tree preloading and preserves the source object's
+internal metadata/data cache for stable sources such as backgrounds or static
+calibration files. Updating or deleting a source registration invalidates that
+source ref's cache entry. Non-HDF, buffer, and custom sources are rebuilt for
+each run. Cached HDF sources keep their internal arrays private; `get_data()`
+returns copies so pipeline steps cannot mutate cached source arrays across runs.
+
 ### `POST /sessions/{session_id}/sources/patch`
 
 Convenience endpoint to upsert a single source.

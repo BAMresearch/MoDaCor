@@ -65,6 +65,24 @@ def test_session_manager_sink_lifecycle_does_not_disturb_sources():
     assert session.sinks == {}
 
 
+def test_session_manager_source_lifecycle_invalidates_source_cache():
+    manager = SessionManager()
+    session = manager.create_session(session_id="s-source-cache", pipeline_yaml="name: p\nsteps: {}\n")
+
+    manager.upsert_sources("s-source-cache", [{"ref": "sample", "type": "hdf", "location": "/tmp/sample1.nxs"}])
+    session.source_cache["sample"] = {"fingerprint": "cached", "source": object()}
+
+    manager.upsert_sources("s-source-cache", [{"ref": "sample", "type": "hdf", "location": "/tmp/sample1.nxs"}])
+    assert "sample" in session.source_cache
+
+    manager.upsert_sources("s-source-cache", [{"ref": "sample", "type": "hdf", "location": "/tmp/sample2.nxs"}])
+    assert "sample" not in session.source_cache
+
+    session.source_cache["sample"] = {"fingerprint": "cached", "source": object()}
+    assert manager.delete_source("s-source-cache", "sample") is True
+    assert "sample" not in session.source_cache
+
+
 def test_session_manager_delete_clears_buffer_store():
     manager = SessionManager()
     manager.create_session(session_id="s-buffer", pipeline_yaml="name: p\nsteps: {}\n")
