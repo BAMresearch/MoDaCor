@@ -33,7 +33,7 @@ __all__ = ["Pipeline"]
 
 
 @define
-class Pipeline(TopologicalSorter):
+class Pipeline:
     """
     Pipeline nodes are assumed to be of type ProcessStep.
 
@@ -41,13 +41,23 @@ class Pipeline(TopologicalSorter):
     that must complete before it can run.
     """
 
-    graph: dict[ProcessStep, set[ProcessStep]] = field(factory=dict)
+    graph: dict[Any, set[Any]] = field(factory=dict)
     name: str = field(default="Unnamed Pipeline")
     # Optional trace events collected during a run (step_id -> list of events)
     trace_events: dict[str, list[TraceEvent]] = field(factory=dict, repr=False)
+    _active_sorter: TopologicalSorter | None = field(default=None, init=False, repr=False)
+    _predecessor_order: dict[Any, tuple[Any, ...]] = field(factory=dict, init=False, repr=False)
 
-    def __attrs_post_init__(self) -> None:
-        super().__init__(graph=self.graph)
+    def create_scheduler(self) -> TopologicalSorter:
+        """Create a fresh topological scheduler for the current graph."""
+
+        scheduler_graph: dict[Any, Iterable[Any]] = {}
+        for node, deps in self.graph.items():
+            ordered = [dep for dep in self._predecessor_order.get(node, ()) if dep in deps]
+            seen = set(ordered)
+            ordered.extend(dep for dep in deps if dep not in seen)
+            scheduler_graph[node] = tuple(ordered) if ordered else deps
+        return TopologicalSorter(scheduler_graph)
 
     # trace helpers, this helps to debug pipelines by storing trace events per step:
     def add_trace_event(self, event: TraceEvent) -> None:
@@ -149,7 +159,13 @@ class Pipeline(TopologicalSorter):
             except KeyError as exc:
                 raise ValueError(f"Step {step_id!r} is missing required field 'module'.") from exc
 
-            configuration = module_data.get("configuration") or {}
+            configuration = module_data.get("configuration")
+            if configuration is None:
+                configuration = {}
+            elif not isinstance(configuration, dict):
+                raise TypeError(
+                    f"Step {step_id!r} field 'configuration' must be a mapping, " f"got {type(configuration).__name__}."
+                )
             requires_raw = module_data.get("requires_steps") or []
             short_title = module_data.get("short_title")
 
@@ -160,8 +176,12 @@ class Pipeline(TopologicalSorter):
             step_cls = registry.get(module_ref)
 
             # Pass the normalized string step_id into the ProcessStep
-            step_instance: ProcessStep = step_cls(io_sources=None, io_sinks=None, step_id=step_id)
-            step_instance.modify_config_by_dict(configuration)
+            step_instance: ProcessStep = step_cls(
+                io_sources=None,
+                io_sinks=None,
+                step_id=step_id,
+                configuration=configuration,
+            )
             if short_title is not None:
                 step_instance.short_title = str(short_title)
 
@@ -239,11 +259,14 @@ class Pipeline(TopologicalSorter):
         for node in spec.get("nodes", []):
             step_id = str(node["id"])
             module_name = node["module"]
-            config = node.get("config", {}) or {}
+            config = node.get("config")
+            if config is None:
+                config = {}
+            elif not isinstance(config, dict):
+                raise TypeError(f"Node {step_id!r} field 'config' must be a mapping, got {type(config).__name__}.")
 
             step_cls = registry.get(module_name)
-            step = step_cls(io_sources=None, io_sinks=None, step_id=step_id)
-            step.modify_config_by_dict(config)
+            step = step_cls(io_sources=None, io_sinks=None, step_id=step_id, configuration=config)
 
             process_step_instances[step_id] = step
 
@@ -269,8 +292,61 @@ class Pipeline(TopologicalSorter):
     # Graph mutation helpers
     # --------------------------------------------------------------------- #
     def _reinitialize(self) -> None:
-        """Recreate the underlying TopologicalSorter with the current graph."""
-        super().__init__(graph=self.graph)
+        """Clear any compatibility scheduler state after graph changes."""
+
+        self._active_sorter = None
+
+    def add(self, node: Any, *predecessors: Any) -> None:
+        """
+        Add a node and its prerequisites to the pipeline graph.
+
+        This mirrors the commonly used ``TopologicalSorter.add`` shape while
+        keeping graph ownership inside ``Pipeline``.
+        """
+
+        if self._active_sorter is not None:
+            raise ValueError("Nodes cannot be added after a call to prepare().")
+        deps = self.graph.setdefault(node, set())
+        ordered_deps = list(self._predecessor_order.get(node, tuple(deps)))
+        seen = set(ordered_deps)
+        for predecessor in predecessors:
+            self.graph.setdefault(predecessor, set())
+            deps.add(predecessor)
+            if predecessor not in seen:
+                ordered_deps.append(predecessor)
+                seen.add(predecessor)
+        self._predecessor_order[node] = tuple(ordered_deps)
+
+    def prepare(self) -> None:
+        """Prepare a compatibility scheduler for manual step iteration."""
+
+        self._active_sorter = self.create_scheduler()
+        self._active_sorter.prepare()
+
+    def _require_active_sorter(self) -> TopologicalSorter:
+        if self._active_sorter is None:
+            raise ValueError("prepare() must be called before scheduler iteration.")
+        return self._active_sorter
+
+    def get_ready(self) -> tuple[Any, ...]:
+        """Return nodes currently ready from the compatibility scheduler."""
+
+        return self._require_active_sorter().get_ready()
+
+    def done(self, *nodes: Any) -> None:
+        """Mark nodes as complete on the compatibility scheduler."""
+
+        self._require_active_sorter().done(*nodes)
+
+    def is_active(self) -> bool:
+        """Return whether the compatibility scheduler still has active work."""
+
+        return self._require_active_sorter().is_active()
+
+    def static_order(self) -> tuple[Any, ...]:
+        """Return a static topological ordering using a fresh scheduler."""
+
+        return tuple(self.create_scheduler().static_order())
 
     def add_incoming_branch(self, branch: Self, branching_node: ProcessStep) -> Self:
         """
@@ -316,11 +392,12 @@ class Pipeline(TopologicalSorter):
 
         Any keyword arguments are passed through to `ProcessStep.execute`.
         """
-        self.prepare()
-        while self.is_active():
-            for node in self.get_ready():
+        sorter = self.create_scheduler()
+        sorter.prepare()
+        while sorter.is_active():
+            for node in sorter.get_ready():
                 node.execute(**kwargs)
-                self.done(node)
+                sorter.done(node)
 
     # --------------------------------------------------------------------- #
     # Introspection / visualization helpers

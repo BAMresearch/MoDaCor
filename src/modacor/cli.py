@@ -167,6 +167,46 @@ def _add_serve_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     serve_parser = subparsers.add_parser("serve", help="Start the MoDaCor runtime API service.")
     serve_parser.add_argument("--host", default="127.0.0.1", help="Bind host for the HTTP server.")
     serve_parser.add_argument("--port", default=8000, type=int, help="Bind port for the HTTP server.")
+    serve_parser.add_argument(
+        "--runtime-policy",
+        choices=("trusted", "restricted"),
+        default="trusted",
+        help="Runtime API trust policy. Use 'restricted' for network-facing/container deployments.",
+    )
+    serve_parser.add_argument(
+        "--read-root",
+        action="append",
+        type=Path,
+        default=[],
+        metavar="PATH",
+        help="Allowed read root for pipeline YAML paths and file-backed sources. Repeatable.",
+    )
+    serve_parser.add_argument(
+        "--write-root",
+        action="append",
+        type=Path,
+        default=[],
+        metavar="PATH",
+        help="Allowed write root for file-backed sinks and write_hdf output. Repeatable.",
+    )
+    serve_parser.add_argument(
+        "--max-sessions",
+        type=int,
+        default=None,
+        help="Maximum number of in-memory sessions accepted by this process.",
+    )
+    serve_parser.add_argument(
+        "--max-pipeline-yaml-bytes",
+        type=int,
+        default=None,
+        help="Maximum accepted pipeline YAML payload size in bytes.",
+    )
+    serve_parser.add_argument(
+        "--max-buffer-upload-bytes",
+        type=int,
+        default=None,
+        help="Maximum accepted source buffer array upload size in bytes.",
+    )
 
 
 def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -345,8 +385,22 @@ def _serve_command(args: argparse.Namespace) -> int:
         raise RuntimeError("uvicorn is not installed. Install server extras: pip install modacor[server].") from exc
 
     from modacor.server.api import create_app
+    from modacor.server.runtime_policy import RuntimePolicy
 
-    app = create_app()
+    policy_kwargs = {
+        "source_read_roots": tuple(args.read_root),
+        "pipeline_yaml_read_roots": tuple(args.read_root),
+        "sink_write_roots": tuple(args.write_root),
+        "max_sessions": args.max_sessions,
+        "max_pipeline_yaml_bytes": args.max_pipeline_yaml_bytes,
+        "max_buffer_upload_bytes": args.max_buffer_upload_bytes,
+    }
+    if args.runtime_policy == "restricted":
+        policy = RuntimePolicy.restricted(**policy_kwargs)
+    else:
+        policy = RuntimePolicy.trusted(**policy_kwargs)
+
+    app = create_app(runtime_policy=policy)
     uvicorn.run(app, host=args.host, port=args.port)
     return 0
 

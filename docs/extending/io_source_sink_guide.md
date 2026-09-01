@@ -61,8 +61,11 @@ The shared CLI/runtime builder currently supports:
 - source types: `hdf`, `yaml`, `csv`, and `custom`
 - sink types: `csv`, `hdf`, `hdf_processing`, and `custom`
 
-For `custom` sources or sinks, the runtime spec must include
-`kwargs.class_path` with the fully qualified class import path.
+For `custom` sources or sinks, trusted/local builders can use
+`kwargs.class_path` with the fully qualified class import path. Runtime services
+running with the restricted policy reject arbitrary `class_path` imports; for
+that mode, register allowed custom classes in the service process and refer to
+them with `kwargs.class_alias`.
 
 Runtime-service sink registrations use the same normalized shape as source
 registrations:

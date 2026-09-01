@@ -69,15 +69,19 @@ class PipelineSession:
     last_error: dict[str, Any] | None = None
     source_profile: str | None = None
     required_source_refs: list[str] = field(default_factory=list)
+    source_cache: dict[str, dict[str, Any]] = field(default_factory=dict, repr=False)
 
 
 class SessionManager:
     """In-memory session registry for the runtime API scaffold."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, max_sessions: int | None = None) -> None:
+        if max_sessions is not None and max_sessions < 1:
+            raise ValueError("max_sessions must be a positive integer or None.")
         self._sessions: dict[str, PipelineSession] = {}
         self._lock = RLock()
         self.buffer_store = RuntimeBufferStore()
+        self.max_sessions = max_sessions
 
     def list_sessions(self) -> list[PipelineSession]:
         with self._lock:
@@ -104,6 +108,11 @@ class SessionManager:
         with self._lock:
             if session_id in self._sessions:
                 raise ValueError(f"Session '{session_id}' already exists.")
+            if self.max_sessions is not None and len(self._sessions) >= self.max_sessions:
+                raise RuntimeError(
+                    f"Session limit reached: max_sessions={self.max_sessions}. "
+                    "Delete an existing session or raise the configured limit."
+                )
             session = PipelineSession(
                 session_id=session_id,
                 name=name,
@@ -133,6 +142,9 @@ class SessionManager:
                 raise KeyError(f"Session '{session_id}' not found.")
             for source in sources:
                 normalized = _normalize_io_registration(source, kind="Source")
+                existing = session.sources.get(normalized["ref"])
+                if existing != normalized:
+                    session.source_cache.pop(normalized["ref"], None)
                 session.sources[normalized["ref"]] = normalized
             session.updated_utc = _utc_now_iso()
             return session
@@ -155,6 +167,7 @@ class SessionManager:
                 raise KeyError(f"Session '{session_id}' not found.")
             existed = ref in session.sources
             session.sources.pop(ref, None)
+            session.source_cache.pop(ref, None)
             session.updated_utc = _utc_now_iso()
             return existed
 

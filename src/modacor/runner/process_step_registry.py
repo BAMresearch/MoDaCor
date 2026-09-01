@@ -114,6 +114,8 @@ class ProcessStepRegistry:
         self,
         modules_root: Path | None = None,
         curated_module: str | None = _DEFAULT_CURATED_MODULE_NAME,
+        *,
+        allow_filesystem_discovery: bool = True,
     ) -> None:
         """
         Parameters
@@ -125,9 +127,14 @@ class ProcessStepRegistry:
             Dotted module path for the curated/explicit process steps module.
             Defaults to "modacor.modules". Set to None to disable the curated
             lookup step.
+        allow_filesystem_discovery :
+            If true, unresolved names are discovered by searching
+            ``modules_root``. Network-facing services should set this false and
+            use the curated module or explicit ``register(...)`` calls.
         """
         self._registry: Dict[str, Type[ProcessStep]] = {}
         self._modules_root = (modules_root or _DEFAULT_MODULES_ROOT).resolve()
+        self._allow_filesystem_discovery = bool(allow_filesystem_discovery)
 
         self._curated_module_name: str | None = curated_module
         self._curated_module = None
@@ -168,8 +175,9 @@ class ProcessStepRegistry:
         2. If the curated module (e.g. modacor.modules) exposes an attribute `name`,
            validate it as a ProcessStep subclass, cache and return it.
         3. Else, convert `name` from PascalCase to snake_case and search for a
-           module named `<snake_case(name)>.py` under `modules_root/**`.
-           Import that module, fetch `name`, validate it, cache and return.
+           module named `<snake_case(name)>.py` under `modules_root/**` when
+           filesystem discovery is enabled. Import that module, fetch `name`,
+           validate it, cache and return.
         """
         # 1. Already registered?
         if name in self._registry:
@@ -189,6 +197,12 @@ class ProcessStepRegistry:
                     )
                 self._registry[name] = cls
                 return cls
+
+        if not self._allow_filesystem_discovery:
+            raise KeyError(
+                f"ProcessStep {name!r} not found in explicit registry or curated module "
+                f"{self._curated_module_name!r}; filesystem discovery is disabled by runtime policy."
+            )
 
         # 3. Filesystem-based discovery under modules_root/**/<snake_case(name)>.py
         module_name = _pascal_to_snake(name)

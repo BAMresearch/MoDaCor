@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Any
 
 from .errors import ApiError
+from .runtime_policy import RuntimePolicy
 from .runtime_service import RuntimeService
 from .session_manager import SessionManager
 
@@ -15,6 +16,7 @@ __all__ = ["create_app"]
 
 def create_app(  # noqa: C901
     session_manager: SessionManager | None = None,
+    runtime_policy: RuntimePolicy | None = None,
 ):
     """
     Build and return the FastAPI app.
@@ -29,7 +31,8 @@ def create_app(  # noqa: C901
             "FastAPI is not installed. Install server extras, e.g. 'pip install modacor[server]'."
         ) from exc
 
-    service = RuntimeService(manager=session_manager or SessionManager())
+    policy = runtime_policy or RuntimePolicy.trusted()
+    service = RuntimeService(manager=session_manager or SessionManager(max_sessions=policy.max_sessions), policy=policy)
     app = FastAPI(
         title="MoDaCor Runtime Service",
         version="0.1.0-draft",

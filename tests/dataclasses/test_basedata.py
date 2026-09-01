@@ -368,6 +368,73 @@ def test_binary_ops_preserve_rank_axes_and_weights(simple_basedata):
     np.testing.assert_allclose(res2.weights, bd.weights)
 
 
+def test_binary_ops_allow_metadata_neutral_correction_maps(simple_basedata):
+    bd = simple_basedata
+    bd.rank_of_data = 2
+    bd.axes = [None, None]
+    bd.weights = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+
+    solid_angle = BaseData(signal=np.full_like(bd.signal, 0.5), units=ureg.steradian)
+
+    res = bd / solid_angle
+
+    assert res.rank_of_data == bd.rank_of_data
+    assert res.axes == bd.axes
+    np.testing.assert_allclose(res.weights, bd.weights)
+    assert res.units == bd.units / ureg.steradian
+
+
+def test_binary_ops_inherit_metadata_from_right_when_left_is_neutral(simple_basedata):
+    bd = simple_basedata
+    bd.rank_of_data = 2
+    bd.axes = [None, None]
+
+    neutral_left = BaseData(signal=np.full_like(bd.signal, 2.0), units=ureg.dimensionless)
+
+    res = neutral_left * bd
+
+    assert res.rank_of_data == bd.rank_of_data
+    assert res.axes == bd.axes
+
+
+def test_binary_ops_reject_broadcasting_axes_metadata():
+    bd = BaseData(
+        signal=np.ones((2, 1)),
+        units=ureg.dimensionless,
+        rank_of_data=2,
+        axes=[None, None],
+    )
+    correction = BaseData(signal=np.ones((2, 3)), units=ureg.dimensionless)
+
+    with pytest.raises(ValueError, match="left BaseData axes"):
+        _ = bd + correction
+
+
+def test_binary_ops_reject_conflicting_metadata(simple_basedata):
+    bd = simple_basedata
+    bd.rank_of_data = 2
+    bd.axes = [None, None]
+
+    other = BaseData(signal=np.ones_like(bd.signal), units=bd.units, rank_of_data=1)
+    with pytest.raises(ValueError, match="rank_of_data"):
+        _ = bd + other
+
+    other = BaseData(signal=np.ones_like(bd.signal), units=bd.units, rank_of_data=2, axes=[None])
+    with pytest.raises(ValueError, match="axes lengths"):
+        _ = bd + other
+
+
+def test_binary_ops_preserve_left_weights_when_both_operands_have_weights(simple_basedata):
+    bd = simple_basedata
+    bd.weights = np.full_like(bd.signal, 2.0)
+
+    other = BaseData(signal=np.ones_like(bd.signal), units=bd.units, weights=np.full_like(bd.signal, 3.0))
+
+    res = bd * other
+
+    np.testing.assert_allclose(res.weights, bd.weights)
+
+
 def test_unary_ops_preserve_rank_axes_and_weights(simple_basedata):
     bd = simple_basedata
 

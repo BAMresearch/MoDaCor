@@ -19,7 +19,13 @@ from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.io.yaml.yaml_source import YAMLSource
 
-__all__ = ["build_sinks_from_specs", "build_sources_from_specs", "write_processing_data_hdf"]
+__all__ = [
+    "build_sink_from_spec",
+    "build_sinks_from_specs",
+    "build_source_from_spec",
+    "build_sources_from_specs",
+    "write_processing_data_hdf",
+]
 
 
 def _load_custom_class(class_path: str):
@@ -28,64 +34,175 @@ def _load_custom_class(class_path: str):
     return getattr(module, class_name)
 
 
-def build_sources_from_specs(
-    specs: Iterable[Mapping[str, Any]],
+def _resolve_custom_class(
+    *,
+    kind: str,
+    ref: str,
+    kwargs: dict[str, Any],
+    custom_classes: Mapping[str, type] | None,
+    allow_custom_class_path: bool,
+):
+    class_alias = kwargs.pop("class_alias", None)
+    if class_alias:
+        try:
+            return (custom_classes or {})[str(class_alias)]
+        except KeyError as exc:
+            raise ValueError(f"Custom {kind} '{ref}' references unknown kwargs.class_alias {class_alias!r}.") from exc
+
+    class_path = kwargs.pop("class_path", None)
+    if class_path:
+        if not allow_custom_class_path:
+            raise ValueError(
+                f"Custom {kind} '{ref}' uses kwargs.class_path, but runtime policy disables arbitrary custom "
+                f"{kind} imports. Use kwargs.class_alias or a built-in {kind} type."
+            )
+        return _load_custom_class(str(class_path))
+
+    raise ValueError(f"Custom {kind} '{ref}' requires kwargs.class_alias or kwargs.class_path.")
+
+
+def build_source_from_spec(
+    spec: Mapping[str, Any],
     *,
     buffer_store: RuntimeBufferStore | None = None,
     session_id: str | None = None,
-) -> IoSources:
+    allow_custom_class_path: bool = True,
+    custom_classes: Mapping[str, type] | None = None,
+) -> Any:
     """
-    Build an :class:`IoSources` registry from normalized source specifications.
+    Build one :class:`IoSource` from a normalized source specification.
 
-    Each spec must provide `ref`, `type`, and `location`. Optional `kwargs`
+    The spec must provide `ref`, `type`, and `location`. Optional `kwargs`
     are passed through as `iosource_method_kwargs`, except for `custom`
-    sources where `kwargs.class_path` selects the source class.
+    sources where `kwargs.class_alias` or `kwargs.class_path` selects the
+    source class.
     """
-
     type_map: dict[str, Any] = {
         "buffer": BufferSource,
         "csv": CSVSource,
         "hdf": HDFSource,
         "yaml": YAMLSource,
     }
+
+    ref = str(spec["ref"]).strip()
+    source_type = str(spec["type"]).strip().lower()
+    location = Path(str(spec["location"]))
+    kwargs = dict(spec.get("kwargs", {}) or {})
+
+    if source_type == "custom":
+        source_cls = _resolve_custom_class(
+            kind="source",
+            ref=ref,
+            kwargs=kwargs,
+            custom_classes=custom_classes,
+            allow_custom_class_path=allow_custom_class_path,
+        )
+    else:
+        try:
+            source_cls = type_map[source_type]
+        except KeyError as exc:
+            raise ValueError(f"Unsupported source type '{source_type}' for ref '{ref}'.") from exc
+
+    if source_cls is BufferSource:
+        if buffer_store is None or session_id is None:
+            raise ValueError(f"Buffer source '{ref}' requires runtime buffer_store and session_id.")
+        return source_cls(
+            source_reference=ref,
+            resource_location=str(spec["location"]),
+            iosource_method_kwargs=kwargs.get("iosource_method_kwargs", kwargs),
+            buffer_store=buffer_store,
+            session_id=str(session_id),
+        )
+    return source_cls(
+        source_reference=ref,
+        resource_location=location,
+        iosource_method_kwargs=kwargs.get("iosource_method_kwargs", kwargs),
+    )
+
+
+def build_sources_from_specs(
+    specs: Iterable[Mapping[str, Any]],
+    *,
+    buffer_store: RuntimeBufferStore | None = None,
+    session_id: str | None = None,
+    allow_custom_class_path: bool = True,
+    custom_classes: Mapping[str, type] | None = None,
+) -> IoSources:
+    """
+    Build an :class:`IoSources` registry from normalized source specifications.
+    """
+
     sources = IoSources()
 
     for spec in specs:
-        ref = str(spec["ref"]).strip()
-        source_type = str(spec["type"]).strip().lower()
-        location = Path(str(spec["location"]))
-        kwargs = dict(spec.get("kwargs", {}) or {})
-
-        if source_type == "custom":
-            class_path = kwargs.pop("class_path", None)
-            if not class_path:
-                raise ValueError(f"Custom source '{ref}' requires kwargs.class_path.")
-            source_cls = _load_custom_class(str(class_path))
-        else:
-            try:
-                source_cls = type_map[source_type]
-            except KeyError as exc:
-                raise ValueError(f"Unsupported source type '{source_type}' for ref '{ref}'.") from exc
-
-        if source_cls is BufferSource:
-            if buffer_store is None or session_id is None:
-                raise ValueError(f"Buffer source '{ref}' requires runtime buffer_store and session_id.")
-            source = source_cls(
-                source_reference=ref,
-                resource_location=str(spec["location"]),
-                iosource_method_kwargs=kwargs.get("iosource_method_kwargs", kwargs),
-                buffer_store=buffer_store,
-                session_id=str(session_id),
-            )
-        else:
-            source = source_cls(
-                source_reference=ref,
-                resource_location=location,
-                iosource_method_kwargs=kwargs.get("iosource_method_kwargs", kwargs),
-            )
+        source = build_source_from_spec(
+            spec,
+            buffer_store=buffer_store,
+            session_id=session_id,
+            allow_custom_class_path=allow_custom_class_path,
+            custom_classes=custom_classes,
+        )
         sources.register_source(source)
 
     return sources
+
+
+def build_sink_from_spec(
+    spec: Mapping[str, Any],
+    *,
+    buffer_store: RuntimeBufferStore | None = None,
+    session_id: str | None = None,
+    allow_custom_class_path: bool = True,
+    custom_classes: Mapping[str, type] | None = None,
+) -> Any:
+    """
+    Build one :class:`IoSink` from a normalized sink specification.
+
+    The spec must provide `ref`, `type`, and `location`. Optional `kwargs`
+    are passed through as `iosink_method_kwargs`, except for `custom` sinks
+    where `kwargs.class_alias` or `kwargs.class_path` selects the sink class.
+    """
+    type_map: dict[str, Any] = {
+        "buffer": BufferSink,
+        "csv": CSVSink,
+        "hdf": HDFProcessingSink,
+        "hdf_processing": HDFProcessingSink,
+    }
+
+    ref = str(spec["ref"]).strip()
+    sink_type = str(spec["type"]).strip().lower()
+    location = Path(str(spec["location"]))
+    kwargs = dict(spec.get("kwargs", {}) or {})
+
+    if sink_type == "custom":
+        sink_cls = _resolve_custom_class(
+            kind="sink",
+            ref=ref,
+            kwargs=kwargs,
+            custom_classes=custom_classes,
+            allow_custom_class_path=allow_custom_class_path,
+        )
+    else:
+        try:
+            sink_cls = type_map[sink_type]
+        except KeyError as exc:
+            raise ValueError(f"Unsupported sink type '{sink_type}' for ref '{ref}'.") from exc
+
+    if sink_cls is BufferSink:
+        if buffer_store is None or session_id is None:
+            raise ValueError(f"Buffer sink '{ref}' requires runtime buffer_store and session_id.")
+        return sink_cls(
+            sink_reference=ref,
+            resource_location=str(spec["location"]),
+            iosink_method_kwargs=kwargs.get("iosink_method_kwargs", kwargs),
+            buffer_store=buffer_store,
+            session_id=str(session_id),
+        )
+    return sink_cls(
+        sink_reference=ref,
+        resource_location=location,
+        iosink_method_kwargs=kwargs.get("iosink_method_kwargs", kwargs),
+    )
 
 
 def build_sinks_from_specs(
@@ -93,55 +210,22 @@ def build_sinks_from_specs(
     *,
     buffer_store: RuntimeBufferStore | None = None,
     session_id: str | None = None,
+    allow_custom_class_path: bool = True,
+    custom_classes: Mapping[str, type] | None = None,
 ) -> IoSinks:
     """
     Build an :class:`IoSinks` registry from normalized sink specifications.
-
-    Each spec must provide `ref`, `type`, and `location`. Optional `kwargs`
-    are passed through as `iosink_method_kwargs`, except for `custom` sinks
-    where `kwargs.class_path` selects the sink class.
     """
 
-    type_map: dict[str, Any] = {
-        "buffer": BufferSink,
-        "csv": CSVSink,
-        "hdf": HDFProcessingSink,
-        "hdf_processing": HDFProcessingSink,
-    }
     sinks = IoSinks()
     for spec in specs:
-        ref = str(spec["ref"]).strip()
-        sink_type = str(spec["type"]).strip().lower()
-        location = Path(str(spec["location"]))
-        kwargs = dict(spec.get("kwargs", {}) or {})
-
-        if sink_type == "custom":
-            class_path = kwargs.pop("class_path", None)
-            if not class_path:
-                raise ValueError(f"Custom sink '{ref}' requires kwargs.class_path.")
-            sink_cls = _load_custom_class(str(class_path))
-        else:
-            try:
-                sink_cls = type_map[sink_type]
-            except KeyError as exc:
-                raise ValueError(f"Unsupported sink type '{sink_type}' for ref '{ref}'.") from exc
-
-        if sink_cls is BufferSink:
-            if buffer_store is None or session_id is None:
-                raise ValueError(f"Buffer sink '{ref}' requires runtime buffer_store and session_id.")
-            sink = sink_cls(
-                sink_reference=ref,
-                resource_location=str(spec["location"]),
-                iosink_method_kwargs=kwargs.get("iosink_method_kwargs", kwargs),
-                buffer_store=buffer_store,
-                session_id=str(session_id),
-            )
-        else:
-            sink = sink_cls(
-                sink_reference=ref,
-                resource_location=location,
-                iosink_method_kwargs=kwargs.get("iosink_method_kwargs", kwargs),
-            )
+        sink = build_sink_from_spec(
+            spec,
+            buffer_store=buffer_store,
+            session_id=session_id,
+            allow_custom_class_path=allow_custom_class_path,
+            custom_classes=custom_classes,
+        )
         sinks.register_sink(sink)
 
     return sinks

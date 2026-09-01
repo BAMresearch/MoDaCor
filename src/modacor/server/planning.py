@@ -4,10 +4,10 @@
 
 from __future__ import annotations
 
-from graphlib import TopologicalSorter
 from typing import Any
 
 from modacor.runner.pipeline import Pipeline
+from modacor.runner.process_step_registry import ProcessStepRegistry
 
 from .execution import find_dirty_step_ids
 from .session_manager import PipelineSession
@@ -29,7 +29,7 @@ def resolve_effective_mode(requested_mode: str) -> tuple[str, str | None]:
 
 
 def ordered_step_ids(pipeline: Pipeline) -> list[str]:
-    return [str(node.step_id) for node in TopologicalSorter(pipeline.graph).static_order()]
+    return [str(node.step_id) for node in pipeline.static_order()]
 
 
 def missing_required_source_refs(session: PipelineSession) -> list[str]:
@@ -45,8 +45,9 @@ def build_dry_run_plan(
     mode: str,
     changed_sources: list[str],
     changed_keys: list[str],
+    registry: ProcessStepRegistry | None = None,
 ) -> dict[str, Any]:
-    pipeline = Pipeline.from_yaml(session.pipeline_yaml or "")
+    pipeline = Pipeline.from_yaml(session.pipeline_yaml or "", registry=registry)
     topo_ids = ordered_step_ids(pipeline)
 
     effective_mode, mode_note = resolve_effective_mode(mode)

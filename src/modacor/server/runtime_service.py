@@ -7,7 +7,6 @@ from __future__ import annotations
 import traceback
 from copy import deepcopy
 from dataclasses import dataclass, field
-from pathlib import Path
 from time import perf_counter
 from typing import Any
 
@@ -19,11 +18,13 @@ from modacor.io.io_sources import IoSources
 from modacor.runner import run_pipeline_job
 from modacor.runner.pipeline import Pipeline
 from modacor.runner.pipeline_runner import PipelineRunError, RunResult
+from modacor.runner.process_step_registry import ProcessStepRegistry
 
 from .errors import ApiError
 from .execution import find_dirty_step_ids
 from .io_utils import build_sinks_from_session, build_sources_from_session, write_hdf_output
 from .planning import build_dry_run_plan, missing_required_source_refs, ordered_step_ids, resolve_effective_mode
+from .runtime_policy import RuntimePolicy
 from .session_manager import PipelineSession, SessionManager
 from .source_profiles import get_source_profile, list_source_profiles
 
@@ -60,6 +61,11 @@ class RuntimeService:
     """Application service for the MoDaCor runtime API."""
 
     manager: SessionManager
+    policy: RuntimePolicy = field(default_factory=RuntimePolicy.trusted)
+    process_step_registry: ProcessStepRegistry = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.process_step_registry = self.policy.create_process_step_registry()
 
     def health(self) -> dict[str, str]:
         """Return a lightweight liveness payload for process health checks."""
@@ -88,7 +94,21 @@ class RuntimeService:
                 "error_session_count": len(error_session_ids),
                 "error_session_ids": error_session_ids,
                 "last_updated_utc": last_updated_utc,
+                "runtime_policy": self.policy_summary(),
             },
+        }
+
+    def policy_summary(self) -> dict[str, Any]:
+        return {
+            "allow_pipeline_yaml_path": self.policy.allow_pipeline_yaml_path,
+            "allow_process_step_filesystem_discovery": self.policy.allow_process_step_filesystem_discovery,
+            "allow_custom_io_class_path": self.policy.allow_custom_io_class_path,
+            "require_io_path_roots": self.policy.require_io_path_roots,
+            "source_read_roots": [str(path) for path in self.policy.source_read_roots],
+            "sink_write_roots": [str(path) for path in self.policy.sink_write_roots],
+            "max_sessions": self.policy.max_sessions,
+            "max_pipeline_yaml_bytes": self.policy.max_pipeline_yaml_bytes,
+            "max_buffer_upload_bytes": self.policy.max_buffer_upload_bytes,
         }
 
     def latest_error(self, session_id: str) -> dict[str, Any]:
@@ -132,6 +152,7 @@ class RuntimeService:
                 "last_run": session.run_history[-1] if session.run_history else None,
                 "source_profile": session.source_profile,
                 "required_source_refs": list(session.required_source_refs),
+                "runtime_policy": self.policy_summary(),
             }
         )
         return out
@@ -146,6 +167,11 @@ class RuntimeService:
         session_id = str(payload.get("session_id", "")).strip()
         if not session_id:
             raise ApiError(status_code=422, detail="session_id is required.")
+        if self.manager.get_session(session_id) is None:
+            try:
+                self.policy.validate_session_capacity(len(self.manager.list_sessions()))
+            except RuntimeError as exc:
+                raise ApiError(status_code=429, detail=str(exc)) from exc
 
         pipeline = payload.get("pipeline", {}) or {}
         yaml_text = pipeline.get("yaml_text")
@@ -155,11 +181,16 @@ class RuntimeService:
 
         if yaml_path:
             try:
-                pipeline_yaml = Path(str(yaml_path)).read_text(encoding="utf-8")
+                pipeline_yaml = self.policy.validate_pipeline_yaml_path(yaml_path).read_text(encoding="utf-8")
+                self.policy.validate_pipeline_yaml_text(pipeline_yaml)
             except Exception as exc:
                 raise ApiError(status_code=422, detail=f"Failed to read pipeline yaml_path: {exc}") from exc
         else:
             pipeline_yaml = str(yaml_text)
+            try:
+                self.policy.validate_pipeline_yaml_text(pipeline_yaml)
+            except ValueError as exc:
+                raise ApiError(status_code=413, detail=str(exc)) from exc
 
         source_profile_name = payload.get("source_profile")
         required_source_refs: list[str] = []
@@ -189,6 +220,8 @@ class RuntimeService:
             )
         except ValueError as exc:
             raise ApiError(status_code=409, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise ApiError(status_code=429, detail=str(exc)) from exc
         return self.session_detail(session)
 
     def get_session(self, session_id: str) -> dict[str, Any]:
@@ -203,6 +236,11 @@ class RuntimeService:
         if not isinstance(sources, list):
             raise ApiError(status_code=422, detail="'sources' must be a list.")
         try:
+            for source in sources:
+                self.policy.validate_source_registration(source)
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+        try:
             session = self.manager.upsert_sources(session_id, sources=sources)
         except KeyError as exc:
             raise ApiError(status_code=404, detail=str(exc)) from exc
@@ -214,6 +252,11 @@ class RuntimeService:
         sinks = payload.get("sinks", [])
         if not isinstance(sinks, list):
             raise ApiError(status_code=422, detail="'sinks' must be a list.")
+        try:
+            for sink in sinks:
+                self.policy.validate_sink_registration(sink)
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
         try:
             session = self.manager.upsert_sinks(session_id, sinks=sinks)
         except KeyError as exc:
@@ -237,10 +280,16 @@ class RuntimeService:
         if not isinstance(kwargs, dict):
             raise ApiError(status_code=422, detail="'kwargs' must be an object when provided.")
 
+        source_registration = {"ref": ref, "type": source_type, "location": location, "kwargs": kwargs}
+        try:
+            self.policy.validate_source_registration(source_registration)
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+
         try:
             session = self.manager.upsert_sources(
                 session_id,
-                sources=[{"ref": ref, "type": source_type, "location": location, "kwargs": kwargs}],
+                sources=[source_registration],
             )
         except KeyError as exc:
             raise ApiError(status_code=404, detail=str(exc)) from exc
@@ -268,10 +317,16 @@ class RuntimeService:
         if not isinstance(kwargs, dict):
             raise ApiError(status_code=422, detail="'kwargs' must be an object when provided.")
 
+        sink_registration = {"ref": ref, "type": sink_type, "location": location, "kwargs": kwargs}
+        try:
+            self.policy.validate_sink_registration(sink_registration)
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+
         try:
             session = self.manager.upsert_sinks(
                 session_id,
-                sinks=[{"ref": ref, "type": sink_type, "location": location, "kwargs": kwargs}],
+                sinks=[sink_registration],
             )
         except KeyError as exc:
             raise ApiError(status_code=404, detail=str(exc)) from exc
@@ -296,10 +351,16 @@ class RuntimeService:
         if not isinstance(kwargs, dict):
             raise ApiError(status_code=422, detail="'kwargs' must be an object when provided.")
 
+        source_registration = {"ref": "sample", "type": source_type, "location": location, "kwargs": kwargs}
+        try:
+            self.policy.validate_source_registration(source_registration)
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+
         try:
             session = self.manager.upsert_sources(
                 session_id,
-                sources=[{"ref": "sample", "type": source_type, "location": location, "kwargs": kwargs}],
+                sources=[source_registration],
             )
         except KeyError as exc:
             raise ApiError(status_code=404, detail=str(exc)) from exc
@@ -336,6 +397,10 @@ class RuntimeService:
         payload: bytes,
     ) -> dict[str, Any]:
         self._require_session(session_id)
+        try:
+            self.policy.validate_buffer_upload(payload)
+        except ValueError as exc:
+            raise ApiError(status_code=413, detail=str(exc)) from exc
         try:
             array = decode_npy(payload)
             self.manager.buffer_store.put_array(session_id, "source", source_ref, data_key, array)
@@ -441,9 +506,18 @@ class RuntimeService:
         sources: IoSources | None = None
         sinks: IoSinks | None = None
         try:
-            pipeline = Pipeline.from_yaml(session.pipeline_yaml or "")
-            sources = build_sources_from_session(session, buffer_store=self.manager.buffer_store)
-            sinks = build_sinks_from_session(session, pipeline=pipeline, buffer_store=self.manager.buffer_store)
+            pipeline = Pipeline.from_yaml(session.pipeline_yaml or "", registry=self.process_step_registry)
+            sources = build_sources_from_session(
+                session,
+                buffer_store=self.manager.buffer_store,
+                runtime_policy=self.policy,
+            )
+            sinks = build_sinks_from_session(
+                session,
+                pipeline=pipeline,
+                buffer_store=self.manager.buffer_store,
+                runtime_policy=self.policy,
+            )
             preparation = self._prepare_process_execution(
                 session_id=session_id,
                 run_id=run_id,
@@ -497,6 +571,7 @@ class RuntimeService:
                 mode=request.mode,
                 changed_sources=request.changed_sources,
                 changed_keys=request.changed_keys,
+                registry=self.process_step_registry,
             )
         except Exception as exc:
             raise ApiError(
@@ -601,6 +676,11 @@ class RuntimeService:
 
         write_hdf_raw = payload.get("write_hdf")
         write_hdf = dict(write_hdf_raw) if isinstance(write_hdf_raw, dict) else None
+        if write_hdf is not None and write_hdf.get("path"):
+            try:
+                self.policy.validate_write_hdf_path(write_hdf["path"])
+            except ValueError as exc:
+                raise ApiError(status_code=422, detail=str(exc)) from exc
         run_name_raw = payload.get("run_name")
         run_name = str(run_name_raw) if run_name_raw is not None else None
         return ProcessRequest(
@@ -768,6 +848,7 @@ class RuntimeService:
             run_name=request.run_name or run_id,
             result=result,
             pipeline_yaml=session.pipeline_yaml or "",
+            runtime_policy=self.policy,
         )
 
         topo_ids = ordered_step_ids(pipeline)
@@ -881,7 +962,7 @@ class RuntimeService:
         )
         fallback_id = str(fallback_run["run_id"])
         try:
-            fallback_pipeline = Pipeline.from_yaml(session.pipeline_yaml or "")
+            fallback_pipeline = Pipeline.from_yaml(session.pipeline_yaml or "", registry=self.process_step_registry)
             fallback_t0 = perf_counter()
             fallback_result = run_pipeline_job(
                 fallback_pipeline,
@@ -904,6 +985,7 @@ class RuntimeService:
                 run_name=request.run_name or fallback_id,
                 result=fallback_result,
                 pipeline_yaml=session.pipeline_yaml or "",
+                runtime_policy=self.policy,
             )
 
             fallback_topo_ids = ordered_step_ids(fallback_result.pipeline)

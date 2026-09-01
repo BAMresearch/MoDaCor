@@ -59,12 +59,27 @@ class TestHDFSource(unittest.TestCase):
         self.assertTrue(isinstance(data_array, np.ndarray))
         self.assertEqual(self.temp_dataset_shape, data_array.shape)
 
+    def test_get_data_returns_copy_of_cached_array(self):
+        data_array = self.test_hdf_source.get_data(self.temp_dataset_name)
+        data_array[:] = 1.0
+
+        second_data_array = self.test_hdf_source.get_data(self.temp_dataset_name)
+
+        self.assertFalse(np.any(second_data_array))
+
     def test_get_data_with_slice(self):
         self.test_hdf_source._file_path = Path(self.temp_file_path)
         self.test_hdf_source._preload()
         data_array = self.test_hdf_source.get_data(self.temp_dataset_name, load_slice=(slice(0, 5), slice(None)))
         self.assertTrue(isinstance(data_array, np.ndarray))
         self.assertEqual((5, 2), data_array.shape)
+
+    def test_get_data_cache_keeps_sliced_and_full_reads_separate(self):
+        sliced = self.test_hdf_source.get_data(self.temp_dataset_name, load_slice=(slice(0, 5), slice(None)))
+        full = self.test_hdf_source.get_data(self.temp_dataset_name)
+
+        self.assertEqual((5, 2), sliced.shape)
+        self.assertEqual(self.temp_dataset_shape, full.shape)
 
     def test_get_data_shape(self):
         self.test_hdf_source._file_path = Path(self.temp_file_path)

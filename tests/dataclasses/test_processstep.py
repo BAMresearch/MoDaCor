@@ -11,6 +11,7 @@ __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
+from pathlib import Path
 from typing import Iterable
 
 import numpy as np
@@ -20,6 +21,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io import IoSources
 
@@ -87,9 +89,36 @@ class TESTProcessingStep(ProcessStep):
     def calculate(self) -> dict[str, DataBundle]:
         _data = self.processing_data.get("dummy_key", DataBundle())
         _data["new_key"] = BaseData(signal=np.arange(100).reshape(10, 10), uncertainties={"sem": 0.0}, units=ureg.meter)
+        self.processing_data["dummy_key"] = _data
         _data2 = self.processing_data.get("bundle2", DataBundle())
         _data2["new_key"] = BaseData(signal=np.zeros(20), uncertainties={"sem": 0.0}, units=ureg.meter)
+        self.processing_data["bundle2"] = _data2
         return {"dummy_key": _data, "bundle2": _data2}
+
+
+class DocumentedConfigStep(ProcessStep):
+    documentation = ProcessStepDescriber(
+        calling_name="Documented config step",
+        calling_id="DocumentedConfigStep",
+        calling_module_path=Path(__file__),
+        calling_version="0",
+        arguments={
+            "alpha": {"type": int, "default": 1},
+            "nested": {"type": dict, "default": {"values": []}},
+            "optional_label": {"type": (str, type(None)), "default": None},
+            "vector": {"type": tuple, "default": (1.0, 0.0, 0.0)},
+        },
+    )
+
+    def calculate(self) -> dict[str, DataBundle]:
+        return {}
+
+
+class ReturnOnlyStep(ProcessStep):
+    def calculate(self) -> dict[str, DataBundle]:
+        bundle = DataBundle()
+        bundle["signal"] = BaseData(signal=np.array([1.0]), units=ureg.dimensionless)
+        return {"return_only": bundle}
 
 
 @pytest.fixture
@@ -162,6 +191,44 @@ def test_instantiation_of_subclass():
     instance = TESTProcessingStep(io_sources=TEST_IO_SOURCES)
     assert all(k in instance.configuration for k in TESTProcessingStep.CONFIG_KEYS)
     assert isinstance(instance, TESTProcessingStep)
+
+
+def test_constructor_configuration_overrides_documented_defaults():
+    instance = DocumentedConfigStep(configuration={"alpha": 7, "optional_label": "sample"})
+    assert instance.configuration["alpha"] == 7
+    assert instance.configuration["optional_label"] == "sample"
+    assert instance.configuration["with_processing_keys"] is None
+
+
+def test_documented_argument_defaults_are_isolated_between_instances():
+    first = DocumentedConfigStep()
+    second = DocumentedConfigStep()
+
+    first.configuration["nested"]["values"].append("changed")
+
+    assert second.configuration["nested"]["values"] == []
+
+
+def test_documented_arguments_are_validated_on_init_and_modify():
+    with pytest.raises(TypeError, match="alpha"):
+        DocumentedConfigStep(configuration={"alpha": "bad"})
+
+    instance = DocumentedConfigStep()
+    with pytest.raises(TypeError, match="alpha"):
+        instance.modify_config_by_kwargs(alpha="bad")
+
+
+def test_documented_arguments_are_in_process_step_dict_validation():
+    assert DocumentedConfigStep.is_process_step_dict(None, None, {"alpha": 3})
+    assert not DocumentedConfigStep.is_process_step_dict(None, None, {"alpha": "bad"})
+
+
+def test_tuple_config_accepts_yaml_style_list_and_stores_tuple():
+    instance = DocumentedConfigStep(configuration={"vector": [0.0, 1.0, 0.0]})
+
+    assert instance.configuration["vector"] == (0.0, 1.0, 0.0)
+    assert isinstance(instance.configuration["vector"], tuple)
+    assert DocumentedConfigStep.is_process_step_dict(None, None, {"vector": [0.0, 1.0, 0.0]})
 
 
 def test_process_step__reset():
@@ -267,6 +334,42 @@ def test_execute(processing_data):
     assert "dummy_key" in processing_data
     assert isinstance(processing_data["bundle2"]["key2"], BaseData)
     assert isinstance(processing_data["bundle2"]["new_key"], BaseData)
+
+
+def test_execute_does_not_merge_return_only_outputs():
+    data = ProcessingData()
+    ps = ReturnOnlyStep(io_sources=TEST_IO_SOURCES)
+
+    ps.execute(data)
+
+    assert ps.executed is True
+    assert "return_only" in ps.produced_outputs
+    assert "return_only" not in data
+
+
+def test_execute_accepts_none_output_bookkeeping():
+    class NoneOutputStep(ProcessStep):
+        def calculate(self):
+            return None
+
+    data = ProcessingData()
+    ps = NoneOutputStep(io_sources=TEST_IO_SOURCES)
+
+    ps.execute(data)
+
+    assert ps.produced_outputs == {}
+
+
+def test_execute_rejects_non_dict_output_bookkeeping():
+    class BadOutputStep(ProcessStep):
+        def calculate(self):
+            return []
+
+    data = ProcessingData()
+    ps = BadOutputStep(io_sources=TEST_IO_SOURCES)
+
+    with pytest.raises(TypeError, match="must return a dict"):
+        ps.execute(data)
 
 
 def test_call(processing_data):

@@ -36,6 +36,13 @@ steps:
 execution, the scheduler visits steps in topological order and only runs a step
 once all of its declared prerequisites are complete.
 
+`Pipeline` owns the graph, not the scheduler state. Normal execution should use
+`run_pipeline_job(...)`, which creates a fresh scheduler per run. For manual
+step-by-step execution, prefer `pipeline.create_scheduler()` and then call
+`prepare()`, `get_ready()`, `done(...)`, and `is_active()` on that scheduler.
+The same method names on `Pipeline` remain as compatibility/debugging helpers,
+but they are not recommended for new execution code.
+
 ### `ProcessingData`
 
 `ProcessingData` is the in-memory workspace shared by the pipeline. Every step
@@ -54,6 +61,18 @@ In practice, a path like `/sample/signal/signal` means:
 - bundle key: `sample`
 - `BaseData` entry: `signal`
 - leaf attribute inside that `BaseData`: `signal`
+
+### `DataBundle`
+
+`DataBundle` entries are intentionally narrow: keys must be non-empty strings,
+and values must be `BaseData` instances. Construction still supports normal
+dictionary styles, for example `DataBundle({"signal": signal_bd})` and
+`DataBundle(signal=signal_bd)`.
+
+Use separate `BaseData` entries for separate physical or logical quantities,
+such as `signal`, `Q`, `Psi`, `mask`, or `solid_angle`. Do not store raw arrays
+directly in a `DataBundle`; wrap them in `BaseData` with explicit units, even
+when the units are `dimensionless`.
 
 ### `BaseData`
 
@@ -91,6 +110,37 @@ and so is any shape that would require expanding the signal dimensions.
 `rank_of_data` describes how many trailing dimensions are data dimensions, for
 example `2` for detector images. It must be between `0` and `3`, and it cannot
 exceed `signal.ndim`.
+
+#### Arithmetic metadata compatibility
+
+`BaseData` arithmetic separates numerical compatibility from structural metadata
+compatibility:
+
+- Pint handles units. Addition and subtraction require compatible units.
+  Multiplication and division follow normal unit algebra, so operations such as
+  counts-per-second divided by a solid-angle map are valid when the array shapes
+  are valid.
+- MoDaCor handles uncertainties through first-order, uncorrelated propagation.
+- MoDaCor performs only cheap structural metadata checks before carrying
+  `rank_of_data`, `axes`, and array-valued `weights` into the result.
+
+An operand is treated as metadata-neutral when it has `rank_of_data == 0`, no
+axes, and only scalar/default weights. This is how scalar factors and correction
+maps can be applied without replacing the detector metadata on the measured
+signal.
+
+When both operands carry structural metadata, the operation is rejected if either
+axes-bearing signal would have to broadcast to the result shape, the
+`rank_of_data` values differ, or both operands have axes lists with different
+lengths. MoDaCor does not compare full axis arrays during ordinary arithmetic
+because that would turn every step into a potentially expensive metadata scan.
+When both operands carry array-valued weights, the result keeps the left
+operand's weights; modules that need a different weighting rule should combine
+weights explicitly.
+
+If a module needs stricter domain rules, such as requiring identical coordinate
+axes or combining two independent weight maps, implement that check in the
+module before arithmetic and write the intended output metadata explicitly.
 
 #### Detector pixel units
 
@@ -181,6 +231,7 @@ The runtime API wraps pipeline execution in a `PipelineSession`. A session keeps
 - tracing configuration
 - the latest `ProcessingData`
 - run history and error state
+- a small session-local cache of unchanged HDF source objects
 
 That session state is what enables:
 
@@ -209,6 +260,9 @@ special alternative pipeline definition.
 - Use `changed_keys` when only a specific product changed and the dirty set can
   be narrowed further.
 - Keep source registration external when file locations change frequently.
+- Stable HDF sources such as backgrounds are cached within a session when their
+  registration and file size/modification time do not change. Frequently updated
+  refs such as `sample` are rebuilt after each source update.
 - Use dry-run before automating partial reruns against new instruments or new
   pipeline structures.
 

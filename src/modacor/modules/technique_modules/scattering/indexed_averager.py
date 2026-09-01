@@ -538,8 +538,9 @@ class IndexedAverager(ProcessStep):
     def calculate(self) -> Dict[str, DataBundle]:
         """
         For each databundle in with_processing_keys, perform the binning /
-        averaging using the precomputed pixel_index map and return updated
-        DataBundles containing 1D 'signal', 'Q', and 'Psi' BaseData.
+        averaging using the precomputed pixel_index map and replace the selected
+        ProcessingData entry in-place with a reduced DataBundle containing 1D
+        'signal', 'Q', and 'Psi' BaseData.
         """
         output: Dict[str, DataBundle] = {}
 
@@ -601,6 +602,7 @@ class IndexedAverager(ProcessStep):
                 }
             )
 
+            self.processing_data[key] = db_out
             output[key] = db_out
 
         return output
