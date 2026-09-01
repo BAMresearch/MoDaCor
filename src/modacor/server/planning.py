@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Any
 
 from modacor.runner.pipeline import Pipeline
+from modacor.runner.process_step_registry import ProcessStepRegistry
 
 from .execution import find_dirty_step_ids
 from .session_manager import PipelineSession
@@ -44,8 +45,9 @@ def build_dry_run_plan(
     mode: str,
     changed_sources: list[str],
     changed_keys: list[str],
+    registry: ProcessStepRegistry | None = None,
 ) -> dict[str, Any]:
-    pipeline = Pipeline.from_yaml(session.pipeline_yaml or "")
+    pipeline = Pipeline.from_yaml(session.pipeline_yaml or "", registry=registry)
     topo_ids = ordered_step_ids(pipeline)
 
     effective_mode, mode_note = resolve_effective_mode(mode)

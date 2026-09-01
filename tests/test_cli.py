@@ -75,10 +75,30 @@ def test_cli_run_snapshot_flags_enable_tracer(monkeypatch, tmp_path: Path):
 
 def test_cli_serve_parser_accepts_host_port():
     parser = build_parser()
-    args = parser.parse_args(["serve", "--host", "0.0.0.0", "--port", "9000"])
+    args = parser.parse_args(
+        [
+            "serve",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "9000",
+            "--runtime-policy",
+            "restricted",
+            "--read-root",
+            "/data/input",
+            "--write-root",
+            "/data/output",
+            "--max-sessions",
+            "4",
+        ]
+    )
     assert args.command == "serve"
     assert args.host == "0.0.0.0"
     assert args.port == 9000
+    assert args.runtime_policy == "restricted"
+    assert args.read_root == [Path("/data/input")]
+    assert args.write_root == [Path("/data/output")]
+    assert args.max_sessions == 4
 
 
 def test_cli_session_create_calls_api(monkeypatch):

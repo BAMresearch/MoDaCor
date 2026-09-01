@@ -168,8 +168,8 @@ def test_write_processing_data_hdf_persists_tracer_snapshots(tmp_path: Path):
         assert "processing/tracer/run1/steps/0001_S1/processing_data/sample/signal/signal" in h5
 
 
-def test_build_sinks_from_specs_requires_custom_class_path(tmp_path: Path):
-    with pytest.raises(ValueError, match="requires kwargs.class_path"):
+def test_build_sinks_from_specs_requires_custom_class_selector(tmp_path: Path):
+    with pytest.raises(ValueError, match="requires kwargs.class_alias or kwargs.class_path"):
         build_sinks_from_specs(
             [
                 {

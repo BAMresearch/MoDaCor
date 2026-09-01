@@ -90,3 +90,15 @@ def test_session_manager_delete_clears_buffer_store():
 
     assert manager.delete_session("s-buffer") is True
     assert manager.buffer_store.manifest("s-buffer", "source", "chunk")["arrays"] == []
+
+
+def test_session_manager_can_limit_session_count():
+    manager = SessionManager(max_sessions=1)
+    manager.create_session(session_id="s-one", pipeline_yaml="name: one\nsteps: {}\n")
+
+    try:
+        manager.create_session(session_id="s-two", pipeline_yaml="name: two\nsteps: {}\n")
+    except RuntimeError as exc:
+        assert "max_sessions=1" in str(exc)
+    else:
+        raise AssertionError("Expected session limit to reject second session.")

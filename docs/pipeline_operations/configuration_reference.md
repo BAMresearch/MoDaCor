@@ -48,3 +48,10 @@ The central validator catches unknown keys and top-level type mismatches. Module
 code still performs semantic checks for values that need runtime context, such
 as missing sources, non-empty required strings, mutually exclusive options, or
 nested dictionary contents.
+
+When a pipeline is loaded through a runtime service using the restricted
+runtime policy, the `module` name must resolve through the service's curated or
+explicit `ProcessStepRegistry`. Filesystem discovery of unregistered module
+files is disabled in that mode. If loading fails with `filesystem discovery is
+disabled by runtime policy`, export/register the step in the service registry or
+run a trusted local service.

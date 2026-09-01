@@ -12,6 +12,7 @@ from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.io.runtime_support import build_sink_from_spec, build_source_from_spec, write_processing_data_hdf
 
+from .runtime_policy import RuntimePolicy
 from .session_manager import PipelineSession
 
 __all__ = ["build_sinks_from_session", "build_sources_from_session", "write_hdf_output"]
@@ -119,17 +120,30 @@ def _source_from_session_cache(
     spec: dict[str, Any],
     *,
     buffer_store: RuntimeBufferStore | None = None,
+    runtime_policy: RuntimePolicy | None = None,
 ) -> Any:
+    policy = runtime_policy or RuntimePolicy.trusted()
+    policy.validate_source_registration(spec)
     ref = str(spec["ref"]).strip()
     fingerprint = _source_cache_fingerprint(spec)
     if fingerprint is None:
-        return build_source_from_spec(spec, buffer_store=buffer_store, session_id=session.session_id)
+        return build_source_from_spec(
+            spec,
+            buffer_store=buffer_store,
+            session_id=session.session_id,
+            **policy.source_builder_kwargs(),
+        )
 
     cached = session.source_cache.get(ref)
     if cached is not None and cached.get("fingerprint") == fingerprint:
         return cached["source"]
 
-    source = build_source_from_spec(spec, buffer_store=buffer_store, session_id=session.session_id)
+    source = build_source_from_spec(
+        spec,
+        buffer_store=buffer_store,
+        session_id=session.session_id,
+        **policy.source_builder_kwargs(),
+    )
     session.source_cache[ref] = {"fingerprint": fingerprint, "source": source}
     return source
 
@@ -138,6 +152,7 @@ def build_sources_from_session(
     session: PipelineSession,
     *,
     buffer_store: RuntimeBufferStore | None = None,
+    runtime_policy: RuntimePolicy | None = None,
 ) -> IoSources:
     sources = IoSources()
     for ref in sorted(session.sources.keys()):
@@ -146,6 +161,7 @@ def build_sources_from_session(
             session,
             _source_spec_from_registration(ref, reg),
             buffer_store=buffer_store,
+            runtime_policy=runtime_policy,
         )
         sources.register_source(source)
     return sources
@@ -156,10 +172,13 @@ def build_sinks_from_session(
     *,
     pipeline: Any | None = None,
     buffer_store: RuntimeBufferStore | None = None,
+    runtime_policy: RuntimePolicy | None = None,
 ) -> IoSinks:
+    policy = runtime_policy or RuntimePolicy.trusted()
     sinks = IoSinks()
     for ref in sorted(session.sinks.keys()):
         reg = session.sinks[ref]
+        policy.validate_sink_registration({"ref": ref, **reg})
         sink_type = str(reg["type"]).strip().lower()
         kwargs = dict(reg.get("kwargs", {}) or {})
         if sink_type in {"hdf", "hdf_processing"}:
@@ -177,6 +196,7 @@ def build_sinks_from_session(
             },
             buffer_store=buffer_store,
             session_id=session.session_id,
+            **policy.sink_builder_kwargs(),
         )
         sinks.register_sink(sink)
     return sinks
@@ -188,7 +208,11 @@ def write_hdf_output(
     run_name: str,
     result: Any,
     pipeline_yaml: str,
+    runtime_policy: RuntimePolicy | None = None,
 ) -> str | None:
+    policy = runtime_policy or RuntimePolicy.trusted()
+    if write_hdf and write_hdf.get("path"):
+        policy.validate_write_hdf_path(write_hdf["path"])
     return write_processing_data_hdf(
         write_hdf,
         run_name=run_name,

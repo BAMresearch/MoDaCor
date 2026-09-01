@@ -11,9 +11,6 @@ __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-import sys
-import types
-
 import pytest
 
 from modacor.dataclasses.process_step import ProcessStep
@@ -62,4 +59,11 @@ def test_get_unknown_without_base_package_raises():
     registry = ProcessStepRegistry()
 
     with pytest.raises(KeyError):
+        registry.get("DoesNotExistStep")
+
+
+def test_get_unknown_with_filesystem_discovery_disabled_raises_policy_message():
+    registry = ProcessStepRegistry(curated_module=None, allow_filesystem_discovery=False)
+
+    with pytest.raises(KeyError, match="filesystem discovery is disabled"):
         registry.get("DoesNotExistStep")

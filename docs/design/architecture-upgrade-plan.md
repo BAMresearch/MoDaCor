@@ -12,13 +12,24 @@ Status values:
 
 ## Items
 
-1. `Open` Runtime API trust boundary
+1. `Done` Runtime API trust boundary
 
    The runtime API currently accepts local filesystem paths for pipeline YAML and
    custom source/sink class import paths from client payloads. This is acceptable
    only for a trusted local helper. A network-facing service needs path
    allowlists, disabled or registry-backed custom imports, and an explicit auth
    model.
+
+   Outcome: `RuntimePolicy` now centralizes API trust-boundary settings. The
+   default `trusted` policy preserves local-helper behavior, while the
+   `restricted` policy disables `pipeline.yaml_path`, disables process-step
+   filesystem discovery outside the curated/explicit registry, and disables
+   arbitrary custom source/sink imports through `kwargs.class_path`. Optional
+   read/write roots constrain file-backed source/sink paths and `write_hdf`
+   output paths; restricted mode requires those roots for file-backed IO.
+   Lightweight limits are available for session count, pipeline YAML payload
+   size, and buffer upload size. Hard CPU/memory isolation and authentication
+   remain deployment/container responsibilities.
 
 2. `Done` Partial rerun invalidation contract
 
@@ -83,6 +94,8 @@ Status values:
 ## Update Log
 
 - 2026-09-01: Created tracker and started item 2.
+- 2026-09-01: Completed item 1 with restricted runtime policy, locked registry
+  support, IO path roots, custom IO import controls, and lightweight API limits.
 - 2026-09-01: Completed item 2. Verified with targeted `.venv-dev` pytest runs.
 - 2026-09-01: Started item 3.
 - 2026-09-01: Completed item 3. Verified with full `.venv-dev` pytest run.
