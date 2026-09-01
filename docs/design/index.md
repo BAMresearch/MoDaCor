@@ -9,4 +9,5 @@ pipeline metadata, and compatibility.
 api-buffer-source-sink
 io-sink-runtime-api
 pixel-unit-removal
+architecture-upgrade-plan
 ```

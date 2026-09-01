@@ -30,6 +30,102 @@ from .processing_data import ProcessingData
 # from .validators import is_list_of_ints
 
 
+def _as_frozen_str_set(value: Any) -> frozenset[str]:
+    if value is None:
+        return frozenset()
+    if isinstance(value, str):
+        values = [value]
+    else:
+        values = value
+    return frozenset(str(item).strip() for item in values if str(item).strip())
+
+
+@define(frozen=True, slots=True)
+class ProcessStepDependencies:
+    """Runtime dependency contract used for partial-rerun invalidation."""
+
+    source_refs: frozenset[str] = field(factory=frozenset, converter=_as_frozen_str_set)
+    processing_reads: frozenset[str] = field(factory=frozenset, converter=_as_frozen_str_set)
+    processing_writes: frozenset[str] = field(factory=frozenset, converter=_as_frozen_str_set)
+
+
+def normalize_processing_key_values(value: Any) -> list[str]:
+    """Normalize a config value into ProcessingData key names for dependency contracts."""
+
+    if value is None:
+        return []
+    if isinstance(value, str):
+        stripped = value.strip()
+        return [stripped] if stripped else []
+    try:
+        return [str(item).strip() for item in value if str(item).strip()]
+    except TypeError:
+        return []
+
+
+def processing_key_patterns(keys: Any, *, basedata_key: str | None = None) -> frozenset[str]:
+    """
+    Convert ProcessingData keys into dirty-matching patterns.
+
+    Bundle-level dependencies are represented as ``sample.*``. BaseData-level
+    dependencies are represented as ``sample.signal``.
+    """
+
+    patterns: set[str] = set()
+    clean_basedata_key = str(basedata_key).strip() if basedata_key is not None else None
+    for key in normalize_processing_key_values(keys):
+        if key == "*":
+            patterns.add("*")
+        elif clean_basedata_key:
+            patterns.add(f"{key}.{clean_basedata_key}")
+        else:
+            patterns.add(f"{key}.*")
+    return frozenset(patterns)
+
+
+def source_refs_from_references(*values: Any) -> frozenset[str]:
+    """Extract source refs from IoSources references of the form ``ref::path``."""
+
+    refs: set[str] = set()
+
+    def collect(value: Any) -> None:
+        if value is None:
+            return
+        if isinstance(value, str):
+            if "::" in value:
+                ref = value.split("::", 1)[0].strip()
+                if ref:
+                    refs.add(ref)
+            return
+        if isinstance(value, dict):
+            for item in value.values():
+                collect(item)
+            return
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                collect(item)
+
+    for value in values:
+        collect(value)
+    return frozenset(refs)
+
+
+def matches_processing_pattern(changed_key: str, patterns: Iterable[str]) -> bool:
+    changed = str(changed_key).strip()
+    if not changed:
+        return False
+    for pattern in patterns:
+        if pattern == "*":
+            return True
+        if pattern.endswith(".*"):
+            prefix = pattern[:-2]
+            if changed == prefix or changed.startswith(prefix + "."):
+                return True
+        if changed == pattern:
+            return True
+    return False
+
+
 @define(eq=False)
 class ProcessStep:
     """A base class defining a processing step"""
@@ -116,6 +212,45 @@ class ProcessStep:
         once before the process step can be executed.
         """
         pass
+
+    def dependency_contract(self) -> ProcessStepDependencies:
+        """
+        Return the runtime dependencies used for partial-rerun invalidation.
+
+        Subclasses with source/sink side effects or non-in-place outputs should
+        override this method with an exact contract. The default covers ordinary
+        in-place processing steps that use ``with_processing_keys`` and the
+        optional ``output_processing_key`` convention.
+        """
+
+        cfg = self.configuration or {}
+        source_refs = source_refs_from_references(cfg)
+        read_patterns = processing_key_patterns(cfg.get("with_processing_keys"))
+
+        output_key = cfg.get("output_processing_key")
+        if isinstance(output_key, str) and output_key.strip():
+            write_patterns = set(processing_key_patterns(output_key))
+        else:
+            write_patterns = set(read_patterns)
+
+        processing_key = cfg.get("processing_key")
+        if isinstance(processing_key, str) and processing_key.strip():
+            databundle_output_key = cfg.get("databundle_output_key")
+            if isinstance(databundle_output_key, str) and databundle_output_key.strip():
+                write_patterns.update(processing_key_patterns(processing_key, basedata_key=databundle_output_key))
+            else:
+                write_patterns.update(processing_key_patterns(processing_key))
+
+        if not source_refs and not read_patterns and not write_patterns:
+            # Generic/custom steps without a contract are treated conservatively.
+            read_patterns = frozenset({"*"})
+            write_patterns = {"*"}
+
+        return ProcessStepDependencies(
+            source_refs=source_refs,
+            processing_reads=read_patterns,
+            processing_writes=write_patterns,
+        )
 
     def _normalised_processing_keys(self, cfg_key: str = "with_processing_keys") -> list[str]:
         """
