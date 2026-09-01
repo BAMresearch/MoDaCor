@@ -83,6 +83,10 @@ step-local validation in `calculate()` or helper methods for semantic rules such
 as non-empty strings, mutually exclusive options, source-reference shape, or
 nested dictionary contents.
 
+Pipeline YAML uses YAML sequences for list-like values. If a module declares a
+configuration key with `"type": tuple`, a YAML sequence such as `[1.0, 0.0,
+0.0]` is accepted and stored as a Python `tuple` in `self.configuration`.
+
 During execution the runner injects:
 
 - `processing_data`

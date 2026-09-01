@@ -55,8 +55,9 @@ Status values:
    `ProcessStepDescriber.arguments`. Constructor-provided configuration,
    pipeline YAML/spec configuration, and manual config updates all preserve user
    values and validate unknown keys plus top-level value types through the same
-   path. `CONFIG_KEYS` remains the compatibility location for shared/base
-   options.
+   path. YAML sequences are normalized to Python tuples for configuration keys
+   that explicitly declare `tuple` as their runtime type. `CONFIG_KEYS` remains
+   the compatibility location for shared/base options.
 
 5. `Done` Explicit in-place step execution
 
@@ -87,4 +88,5 @@ Status values:
 - 2026-09-01: Completed item 3. Verified with full `.venv-dev` pytest run.
 - 2026-09-01: Started item 4.
 - 2026-09-01: Completed item 4. Verified with full `.venv-dev` pytest run.
+- 2026-09-01: Fixed item 4 YAML tuple compatibility regression.
 - 2026-09-01: Completed item 5. Verified with full `.venv-dev` pytest run.

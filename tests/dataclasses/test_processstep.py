@@ -106,6 +106,7 @@ class DocumentedConfigStep(ProcessStep):
             "alpha": {"type": int, "default": 1},
             "nested": {"type": dict, "default": {"values": []}},
             "optional_label": {"type": (str, type(None)), "default": None},
+            "vector": {"type": tuple, "default": (1.0, 0.0, 0.0)},
         },
     )
 
@@ -220,6 +221,14 @@ def test_documented_arguments_are_validated_on_init_and_modify():
 def test_documented_arguments_are_in_process_step_dict_validation():
     assert DocumentedConfigStep.is_process_step_dict(None, None, {"alpha": 3})
     assert not DocumentedConfigStep.is_process_step_dict(None, None, {"alpha": "bad"})
+
+
+def test_tuple_config_accepts_yaml_style_list_and_stores_tuple():
+    instance = DocumentedConfigStep(configuration={"vector": [0.0, 1.0, 0.0]})
+
+    assert instance.configuration["vector"] == (0.0, 1.0, 0.0)
+    assert isinstance(instance.configuration["vector"], tuple)
+    assert DocumentedConfigStep.is_process_step_dict(None, None, {"vector": [0.0, 1.0, 0.0]})
 
 
 def test_process_step__reset():

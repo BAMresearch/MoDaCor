@@ -146,6 +146,22 @@ def _config_type_label(types: tuple[type, ...] | None) -> str:
     return " or ".join(item.__name__ for item in types) if types else "None"
 
 
+def _normalize_config_value_for_spec(value: Any, config_spec: dict[str, Any]) -> Any:
+    """Normalize transport-friendly config values into their declared runtime type."""
+
+    expected_types = config_spec["type"]
+    if value is None or expected_types is None:
+        return value
+    if (
+        tuple in expected_types
+        and list not in expected_types
+        and not config_spec["allow_iterable"]
+        and isinstance(value, list)
+    ):
+        return tuple(value)
+    return value
+
+
 @define(eq=False)
 class ProcessStep:
     """A base class defining a processing step"""
@@ -392,6 +408,15 @@ class ProcessStep:
         return schema
 
     @classmethod
+    def normalize_config_value(cls, key: str, value: Any) -> Any:
+        """Normalize one configuration value against the unified schema."""
+        schema = cls.effective_config_schema()
+        if key not in schema:
+            known_keys = ", ".join(sorted(schema.keys()))
+            raise KeyError(f"Key {key} not found in configuration. Known keys: {known_keys}")  # noqa
+        return _normalize_config_value_for_spec(value, schema[key])
+
+    @classmethod
     def validate_config_value(cls, key: str, value: Any) -> None:
         """Validate one configuration value against the unified schema."""
         schema = cls.effective_config_schema()
@@ -400,6 +425,7 @@ class ProcessStep:
             raise KeyError(f"Key {key} not found in configuration. Known keys: {known_keys}")  # noqa
 
         config_spec = schema[key]
+        value = _normalize_config_value_for_spec(value, config_spec)
         if value is None:
             if config_spec["allow_none"]:
                 return
@@ -431,6 +457,7 @@ class ProcessStep:
             raise TypeError(f"Configuration update must be a dict, got {type(by_dict).__name__}.")
 
         for key, value in by_dict.items():
+            value = self.__class__.normalize_config_value(key, value)
             self.__class__.validate_config_value(key, value)
             self.configuration[key] = value
         # restart preparation after configuration change:

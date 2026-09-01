@@ -167,6 +167,24 @@ def test_pipeline_from_yaml_rejects_invalid_step_configuration():
         Pipeline.from_yaml(yaml_str)
 
 
+def test_pipeline_from_yaml_accepts_tuple_config_from_yaml_sequence():
+    yaml_str = """
+    name: tuple_config
+    steps:
+      coords:
+        module: PixelCoordinates3D
+        requires_steps: []
+        configuration:
+          basis_fast: [0.0, 1.0, 0.0]
+    """
+
+    pipeline = Pipeline.from_yaml(yaml_str)
+    ((node, _deps),) = pipeline.graph.items()
+
+    assert node.configuration["basis_fast"] == (0.0, 1.0, 0.0)
+    assert isinstance(node.configuration["basis_fast"], tuple)
+
+
 def test_pipeline_static_order_uses_fresh_scheduler_each_call(linear_pipeline):
     pipeline = Pipeline.from_dict(linear_pipeline)
 
