@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from graphlib import TopologicalSorter
 from pathlib import Path
 
 __coding__ = "utf-8"
@@ -142,12 +143,32 @@ def test_pipeline_from_yaml(yaml_one_step):
     pipeline = Pipeline.from_yaml(yaml_one_step)
     assert pipeline.name == "one_step"
     assert isinstance(pipeline, Pipeline)
+    assert not isinstance(pipeline, TopologicalSorter)
 
     # One node with no prerequisites
     assert len(pipeline.graph) == 1
     ((node, deps),) = pipeline.graph.items()
     assert isinstance(node, ProcessStep)
     assert deps == set()
+
+
+def test_pipeline_static_order_uses_fresh_scheduler_each_call(linear_pipeline):
+    pipeline = Pipeline.from_dict(linear_pipeline)
+
+    assert pipeline.static_order() == (1, 2, 3)
+    assert pipeline.static_order() == (1, 2, 3)
+
+
+def test_pipeline_manual_scheduler_is_explicit_compatibility_state(linear_pipeline):
+    pipeline = Pipeline.from_dict(linear_pipeline)
+
+    with pytest.raises(ValueError, match="prepare"):
+        pipeline.get_ready()
+
+    pipeline.prepare()
+    assert pipeline.get_ready() == (1,)
+    pipeline.done(1)
+    assert set(pipeline.get_ready()) == {2}
 
 
 def test_pipeline_from_yaml_with_custom_registry():

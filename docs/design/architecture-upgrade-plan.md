@@ -32,11 +32,16 @@ Status values:
    dirty-step detection now consumes the contract and expands matching seeds to
    downstream descendants.
 
-3. `Open` Pipeline scheduler ownership
+3. `Done` Pipeline scheduler ownership
 
    `Pipeline` currently inherits from `graphlib.TopologicalSorter`, which mixes
    graph data with one-shot scheduler state. Prefer keeping `Pipeline` as the
    graph/spec holder and creating a fresh scheduler per execution.
+
+   Outcome: `Pipeline` no longer subclasses `TopologicalSorter`. It owns the
+   graph and exposes `create_scheduler()` for fresh per-use schedulers. Existing
+   manual scheduling helpers remain as compatibility wrappers, and the shared
+   runner now uses a local scheduler per job.
 
 4. `Open` Process-step configuration schema
 
@@ -62,3 +67,5 @@ Status values:
 
 - 2026-09-01: Created tracker and started item 2.
 - 2026-09-01: Completed item 2. Verified with targeted `.venv-dev` pytest runs.
+- 2026-09-01: Started item 3.
+- 2026-09-01: Completed item 3. Verified with full `.venv-dev` pytest run.

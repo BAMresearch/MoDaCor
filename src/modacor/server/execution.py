@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from graphlib import TopologicalSorter
 from typing import Any
 
 from modacor.dataclasses.process_step import ProcessStepDependencies, matches_processing_pattern
@@ -78,6 +77,6 @@ def find_dirty_step_ids(
                 queue.append(dep)
 
     # Keep only existing ids (defensive), in topological order set form.
-    topo_nodes = list(TopologicalSorter(pipeline.graph).static_order())
+    topo_nodes = list(pipeline.static_order())
     ordered_dirty = [str(node.step_id) for node in topo_nodes if str(node.step_id) in dirty_ids]
     return set(ordered_dirty)

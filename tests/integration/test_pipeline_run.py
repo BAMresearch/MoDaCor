@@ -64,7 +64,8 @@ def test_processstep_pipeline(flat_data):
             sequence.append(node)
             node.execute(flat_data)
             pipeline.done(node)
-    assert pipeline._nfinished == len(steps)
+    assert len(sequence) == len(steps)
+    assert all(step.executed for step in steps)
 
 
 def test_actual_processstep(flat_data):

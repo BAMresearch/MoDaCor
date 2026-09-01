@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-from graphlib import TopologicalSorter
 from typing import Any
 
 from modacor.runner.pipeline import Pipeline
@@ -29,7 +28,7 @@ def resolve_effective_mode(requested_mode: str) -> tuple[str, str | None]:
 
 
 def ordered_step_ids(pipeline: Pipeline) -> list[str]:
-    return [str(node.step_id) for node in TopologicalSorter(pipeline.graph).static_order()]
+    return [str(node.step_id) for node in pipeline.static_order()]
 
 
 def missing_required_source_refs(session: PipelineSession) -> list[str]:

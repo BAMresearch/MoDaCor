@@ -52,6 +52,19 @@ def test_run_pipeline_job_executes_and_traces():
     assert "s2" in result.pipeline.trace_events
 
 
+def test_run_pipeline_job_can_reuse_pipeline_instance_without_scheduler_reset():
+    s1 = SeedSignal(step_id="s1")
+    s2 = AddOne(step_id="s2")
+    pipeline = Pipeline.from_dict({s1: set(), s2: {s1}}, name="unit-test-reuse")
+
+    first = run_pipeline_job(pipeline)
+    second = run_pipeline_job(pipeline)
+
+    assert first.executed_steps == ["s1", "s2"]
+    assert second.executed_steps == ["s1", "s2"]
+    assert np.allclose(second.processing_data["sample"]["signal"].signal, np.array([2.0]))
+
+
 def test_run_pipeline_job_error_keeps_partial_trace_context():
     s1 = SeedSignal(step_id="seed")
     s2 = FailStep(step_id="fail")
