@@ -159,7 +159,13 @@ class Pipeline:
             except KeyError as exc:
                 raise ValueError(f"Step {step_id!r} is missing required field 'module'.") from exc
 
-            configuration = module_data.get("configuration") or {}
+            configuration = module_data.get("configuration")
+            if configuration is None:
+                configuration = {}
+            elif not isinstance(configuration, dict):
+                raise TypeError(
+                    f"Step {step_id!r} field 'configuration' must be a mapping, " f"got {type(configuration).__name__}."
+                )
             requires_raw = module_data.get("requires_steps") or []
             short_title = module_data.get("short_title")
 
@@ -170,8 +176,12 @@ class Pipeline:
             step_cls = registry.get(module_ref)
 
             # Pass the normalized string step_id into the ProcessStep
-            step_instance: ProcessStep = step_cls(io_sources=None, io_sinks=None, step_id=step_id)
-            step_instance.modify_config_by_dict(configuration)
+            step_instance: ProcessStep = step_cls(
+                io_sources=None,
+                io_sinks=None,
+                step_id=step_id,
+                configuration=configuration,
+            )
             if short_title is not None:
                 step_instance.short_title = str(short_title)
 
@@ -249,11 +259,14 @@ class Pipeline:
         for node in spec.get("nodes", []):
             step_id = str(node["id"])
             module_name = node["module"]
-            config = node.get("config", {}) or {}
+            config = node.get("config")
+            if config is None:
+                config = {}
+            elif not isinstance(config, dict):
+                raise TypeError(f"Node {step_id!r} field 'config' must be a mapping, got {type(config).__name__}.")
 
             step_cls = registry.get(module_name)
-            step = step_cls(io_sources=None, io_sinks=None, step_id=step_id)
-            step.modify_config_by_dict(config)
+            step = step_cls(io_sources=None, io_sinks=None, step_id=step_id, configuration=config)
 
             process_step_instances[step_id] = step
 

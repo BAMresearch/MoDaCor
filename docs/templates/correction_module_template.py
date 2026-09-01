@@ -35,7 +35,7 @@ class YourCorrectionStep(ProcessStep):
 
     Fill in:
     - required_data_keys: BaseData keys required in each DataBundle
-    - arguments: runtime configuration defaults and documentation
+    - arguments: runtime configuration schema, defaults, and documentation
     - calculate(): core logic, returning updated DataBundles
     """
 

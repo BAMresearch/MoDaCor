@@ -11,6 +11,7 @@ __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
+from pathlib import Path
 from typing import Iterable
 
 import numpy as np
@@ -20,6 +21,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io import IoSources
 
@@ -92,6 +94,23 @@ class TESTProcessingStep(ProcessStep):
         return {"dummy_key": _data, "bundle2": _data2}
 
 
+class DocumentedConfigStep(ProcessStep):
+    documentation = ProcessStepDescriber(
+        calling_name="Documented config step",
+        calling_id="DocumentedConfigStep",
+        calling_module_path=Path(__file__),
+        calling_version="0",
+        arguments={
+            "alpha": {"type": int, "default": 1},
+            "nested": {"type": dict, "default": {"values": []}},
+            "optional_label": {"type": (str, type(None)), "default": None},
+        },
+    )
+
+    def calculate(self) -> dict[str, DataBundle]:
+        return {}
+
+
 @pytest.fixture
 def class_with_config_keys(request):
     _keys = request.param
@@ -162,6 +181,36 @@ def test_instantiation_of_subclass():
     instance = TESTProcessingStep(io_sources=TEST_IO_SOURCES)
     assert all(k in instance.configuration for k in TESTProcessingStep.CONFIG_KEYS)
     assert isinstance(instance, TESTProcessingStep)
+
+
+def test_constructor_configuration_overrides_documented_defaults():
+    instance = DocumentedConfigStep(configuration={"alpha": 7, "optional_label": "sample"})
+    assert instance.configuration["alpha"] == 7
+    assert instance.configuration["optional_label"] == "sample"
+    assert instance.configuration["with_processing_keys"] is None
+
+
+def test_documented_argument_defaults_are_isolated_between_instances():
+    first = DocumentedConfigStep()
+    second = DocumentedConfigStep()
+
+    first.configuration["nested"]["values"].append("changed")
+
+    assert second.configuration["nested"]["values"] == []
+
+
+def test_documented_arguments_are_validated_on_init_and_modify():
+    with pytest.raises(TypeError, match="alpha"):
+        DocumentedConfigStep(configuration={"alpha": "bad"})
+
+    instance = DocumentedConfigStep()
+    with pytest.raises(TypeError, match="alpha"):
+        instance.modify_config_by_kwargs(alpha="bad")
+
+
+def test_documented_arguments_are_in_process_step_dict_validation():
+    assert DocumentedConfigStep.is_process_step_dict(None, None, {"alpha": 3})
+    assert not DocumentedConfigStep.is_process_step_dict(None, None, {"alpha": "bad"})
 
 
 def test_process_step__reset():

@@ -196,7 +196,7 @@
             <mxRectangle x="130" y="380" width="160" height="26" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Kb4S_QK6aFj1gtowO3K8-22" value="CONFIG_KEYS: dict  # defining input/output processing keys" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" parent="Kb4S_QK6aFj1gtowO3K8-21" vertex="1">
+        <mxCell id="Kb4S_QK6aFj1gtowO3K8-22" value="CONFIG_KEYS: dict  # shared configuration keys" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" parent="Kb4S_QK6aFj1gtowO3K8-21" vertex="1">
           <mxGeometry y="50" width="340" height="26" as="geometry" />
         </mxCell>
         <mxCell id="Kb4S_QK6aFj1gtowO3K8-23" value="io_sources: IoSources" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rounded=0;shadow=0;html=0;" parent="Kb4S_QK6aFj1gtowO3K8-21" vertex="1">
@@ -247,10 +247,10 @@
         <mxCell id="Kb4S_QK6aFj1gtowO3K8-40" value="modify_config  # adapts self.configuration" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rounded=0;shadow=0;html=0;fillColor=#d5e8d4;strokeColor=#82b366;" parent="Kb4S_QK6aFj1gtowO3K8-21" vertex="1">
           <mxGeometry y="452" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="Kb4S_QK6aFj1gtowO3K8-41" value="is_process_step_dict  # checks against CONFIG_KEYS" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rounded=0;shadow=0;html=0;fillColor=#d5e8d4;strokeColor=#82b366;" parent="Kb4S_QK6aFj1gtowO3K8-21" vertex="1">
+        <mxCell id="Kb4S_QK6aFj1gtowO3K8-41" value="is_process_step_dict  # checks effective config schema" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rounded=0;shadow=0;html=0;fillColor=#d5e8d4;strokeColor=#82b366;" parent="Kb4S_QK6aFj1gtowO3K8-21" vertex="1">
           <mxGeometry y="478" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="Kb4S_QK6aFj1gtowO3K8-42" value="default_config  # creates initial dictionary based on CONFIG_KEYS" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rounded=0;shadow=0;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="Kb4S_QK6aFj1gtowO3K8-21" vertex="1">
+        <mxCell id="Kb4S_QK6aFj1gtowO3K8-42" value="default_config  # creates initial config from schema" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rounded=0;shadow=0;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="Kb4S_QK6aFj1gtowO3K8-21" vertex="1">
           <mxGeometry y="504" width="340" height="26" as="geometry" />
         </mxCell>
         <mxCell id="Kb4S_QK6aFj1gtowO3K8-43" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=classic;startFill=1;endArrow=none;" parent="WIyWlLk6GJQsqaUBKTNV-1" source="jMopiYYdhkfsMJzDt6Zf-2" target="Kb4S_QK6aFj1gtowO3K8-28" edge="1">

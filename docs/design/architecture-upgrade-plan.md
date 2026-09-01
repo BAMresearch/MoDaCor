@@ -43,12 +43,20 @@ Status values:
    manual scheduling helpers remain as compatibility wrappers, and the shared
    runner now uses a local scheduler per job.
 
-4. `Open` Process-step configuration schema
+4. `Done` Process-step configuration schema
 
    Step configuration is split between `CONFIG_KEYS` and
    `ProcessStepDescriber.arguments`. Constructor-provided configuration is
    overwritten during initialization, and documented argument types are not
    centrally validated.
+
+   Outcome: `ProcessStep` now builds a unified effective configuration schema
+   from shared `CONFIG_KEYS` and module-specific
+   `ProcessStepDescriber.arguments`. Constructor-provided configuration,
+   pipeline YAML/spec configuration, and manual config updates all preserve user
+   values and validate unknown keys plus top-level value types through the same
+   path. `CONFIG_KEYS` remains the compatibility location for shared/base
+   options.
 
 5. `Open` Transactional step execution
 
@@ -69,3 +77,5 @@ Status values:
 - 2026-09-01: Completed item 2. Verified with targeted `.venv-dev` pytest runs.
 - 2026-09-01: Started item 3.
 - 2026-09-01: Completed item 3. Verified with full `.venv-dev` pytest run.
+- 2026-09-01: Started item 4.
+- 2026-09-01: Completed item 4. Verified with full `.venv-dev` pytest run.

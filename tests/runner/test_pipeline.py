@@ -51,7 +51,7 @@ def yaml_one_step():
         module: Divide
         requires_steps: []
         configuration:
-          divisor_source: 3
+          divisor_source: sample::divisor
     """
 
 
@@ -150,6 +150,21 @@ def test_pipeline_from_yaml(yaml_one_step):
     ((node, deps),) = pipeline.graph.items()
     assert isinstance(node, ProcessStep)
     assert deps == set()
+
+
+def test_pipeline_from_yaml_rejects_invalid_step_configuration():
+    yaml_str = """
+    name: bad_config
+    steps:
+      di:
+        module: Divide
+        requires_steps: []
+        configuration:
+          divisor_source: 3
+    """
+
+    with pytest.raises(TypeError, match="divisor_source"):
+        Pipeline.from_yaml(yaml_str)
 
 
 def test_pipeline_static_order_uses_fresh_scheduler_each_call(linear_pipeline):

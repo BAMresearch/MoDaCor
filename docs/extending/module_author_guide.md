@@ -43,6 +43,46 @@ Step-specific configuration belongs in `documentation.arguments`. Those entries
 seed the instance `configuration` automatically through
 `ProcessStepDescriber.initial_configuration()`.
 
+`ProcessStep` builds one effective configuration schema from `CONFIG_KEYS` and
+`documentation.arguments`. Defaults are copied from that schema when the step is
+constructed, and values supplied through `ProcessStep(configuration=...)`,
+pipeline YAML, graph specs, `modify_config_by_dict(...)`, or
+`modify_config_by_kwargs(...)` are validated against the same schema. Unknown
+keys raise `KeyError`; wrong value types raise `TypeError`.
+
+For new module-specific settings, add entries to `documentation.arguments`:
+
+```python
+documentation = ProcessStepDescriber(
+    ...,
+    arguments={
+        "signal_key": {
+            "type": str,
+            "default": "signal",
+            "doc": "BaseData key to read and write within each DataBundle.",
+        },
+        "scale": {
+            "type": (float, int),
+            "default": 1.0,
+            "doc": "Scalar factor applied to the signal.",
+        },
+    },
+)
+```
+
+Use `CONFIG_KEYS` only for shared `ProcessStep`-level keys or legacy
+compatibility. It supports `type`, `allow_iterable`, `allow_none`, and
+`default`; when a key exists in both places, the `CONFIG_KEYS` type policy stays
+authoritative and `documentation.arguments` supplies the public default,
+required flag, and docs text. This keeps existing keys such as
+`with_processing_keys` compatible while moving module-specific validation into
+the public metadata.
+
+The central schema checks key presence and top-level value types. Keep
+step-local validation in `calculate()` or helper methods for semantic rules such
+as non-empty strings, mutually exclusive options, source-reference shape, or
+nested dictionary contents.
+
 During execution the runner injects:
 
 - `processing_data`

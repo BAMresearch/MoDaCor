@@ -13,9 +13,11 @@ __status__ = "Development"  # "Development", "Production"
 __version__ = "20251121.1"
 
 from abc import abstractmethod
+from collections.abc import Iterable
+from copy import deepcopy
 from numbers import Integral
 from pathlib import Path
-from typing import Any, Iterable, Type
+from typing import Any, Type
 
 from attrs import define, field
 from attrs import validators as v
@@ -126,6 +128,24 @@ def matches_processing_pattern(changed_key: str, patterns: Iterable[str]) -> boo
     return False
 
 
+def _config_type_tuple(type_spec: Any) -> tuple[type, ...] | None:
+    if type_spec is None or type_spec is Any:
+        return None
+    if isinstance(type_spec, tuple):
+        if not all(isinstance(item, type) for item in type_spec):
+            raise TypeError("Configuration schema 'type' tuples must contain only type objects.")
+        return type_spec
+    if isinstance(type_spec, type):
+        return (type_spec,)
+    raise TypeError("Configuration schema 'type' must be a type, a tuple of types, or omitted.")
+
+
+def _config_type_label(types: tuple[type, ...] | None) -> str:
+    if types is None:
+        return "any value"
+    return " or ".join(item.__name__ for item in types) if types else "None"
+
+
 @define(eq=False)
 class ProcessStep:
     """A base class defining a processing step"""
@@ -163,11 +183,7 @@ class ProcessStep:
     )
 
     # dynamic instance configuration
-    configuration: dict = field(
-        factory=dict,
-        # validator=lambda inst, attrs, val: inst.is_process_step_dict,
-        validator=lambda inst, attrs, val: ProcessStep.is_process_step_dict(inst, attrs.name if attrs else None, val),
-    )
+    configuration: dict = field(factory=dict, validator=v.instance_of(dict))
 
     # flags and attributes for running the pipeline
     requires_steps: list[str] = field(factory=list)
@@ -191,8 +207,10 @@ class ProcessStep:
         """
         Post-initialization method to set up the process step.
         """
+        provided_configuration = dict(self.configuration)
         self.configuration = self.default_config()
-        self.configuration.update(self.documentation.initial_configuration())
+        if provided_configuration:
+            self.modify_config_by_dict(provided_configuration)
 
     def __call__(self, processing_data: ProcessingData) -> None:
         """Allow the process step to be called like a function"""
@@ -317,18 +335,95 @@ class ProcessStep:
         self.produced_outputs = {}
         self._prepared_data = {}
 
-    def modify_config_by_dict(self, by_dict: dict = {}) -> None:
-        """Modify the configuration of the process step by a dictionary"""
-        for key, value in by_dict.items():
-            if key in self.configuration:
-                self.configuration[key] = value
-            elif key in self.documentation.arguments:
-                # Allow setting documented arguments even if they were not part of the
-                # current configuration snapshot yet.
-                self.configuration[key] = value
+    @classmethod
+    def _normalize_config_spec(cls, spec: dict[str, Any], default: Any) -> dict[str, Any]:
+        types = _config_type_tuple(spec.get("type", Any))
+        type_allows_none = types is None or type(None) in types
+        if types is not None:
+            types = tuple(item for item in types if item is not type(None))
+
+        allow_none = bool(spec.get("allow_none", type_allows_none or default is None))
+        return {
+            "type": types,
+            "allow_iterable": bool(spec.get("allow_iterable", False)),
+            "allow_none": allow_none,
+            "required": bool(spec.get("required", False)),
+            "default": default,
+            "doc": spec.get("doc"),
+        }
+
+    @classmethod
+    def effective_config_schema(cls) -> dict[str, dict[str, Any]]:
+        """
+        Return the unified runtime configuration schema for this step class.
+
+        `CONFIG_KEYS` remains the compatibility location for shared/base keys.
+        Step-specific keys come from `documentation.arguments`.
+        """
+        schema: dict[str, dict[str, Any]] = {}
+
+        for key, spec in cls.CONFIG_KEYS.items():
+            schema[key] = cls._normalize_config_spec(spec, deepcopy(spec.get("default", None)))
+
+        documentation = getattr(cls, "documentation", None)
+        doc_arguments = getattr(documentation, "arguments", {}) or {}
+        doc_defaults = documentation.initial_configuration() if hasattr(documentation, "initial_configuration") else {}
+
+        for key, spec in doc_arguments.items():
+            doc_spec = cls._normalize_config_spec(spec, doc_defaults.get(key))
+            if key in schema:
+                merged = dict(schema[key])
+                merged["default"] = deepcopy(doc_spec["default"])
+                merged["required"] = doc_spec["required"]
+                merged["doc"] = doc_spec["doc"]
+                schema[key] = merged
             else:
-                known_keys = ", ".join(sorted(self.configuration.keys()))
-                raise KeyError(f"Key {key} not found in configuration. Known keys: {known_keys}")  # noqa
+                schema[key] = doc_spec
+
+        return schema
+
+    @classmethod
+    def validate_config_value(cls, key: str, value: Any) -> None:
+        """Validate one configuration value against the unified schema."""
+        schema = cls.effective_config_schema()
+        if key not in schema:
+            known_keys = ", ".join(sorted(schema.keys()))
+            raise KeyError(f"Key {key} not found in configuration. Known keys: {known_keys}")  # noqa
+
+        config_spec = schema[key]
+        if value is None:
+            if config_spec["allow_none"]:
+                return
+            raise TypeError(f"Configuration key {key!r} does not allow None.")
+
+        expected_types = config_spec["type"]
+        if expected_types is None:
+            return
+
+        if config_spec["allow_iterable"] and isinstance(value, Iterable) and not isinstance(value, (str, bytes, dict)):
+            if all(isinstance(item, expected_types) for item in value):
+                return
+
+        if isinstance(value, expected_types):
+            return
+
+        expected = _config_type_label(expected_types)
+        if config_spec["allow_iterable"]:
+            expected = f"{expected} or an iterable of {expected}"
+        raise TypeError(
+            f"Configuration key {key!r} for {cls.__name__} must be {expected}, " f"got {type(value).__name__}."
+        )
+
+    def modify_config_by_dict(self, by_dict: dict | None = None) -> None:
+        """Modify the configuration of the process step by a dictionary."""
+        if by_dict is None:
+            return
+        if not isinstance(by_dict, dict):
+            raise TypeError(f"Configuration update must be a dict, got {type(by_dict).__name__}.")
+
+        for key, value in by_dict.items():
+            self.__class__.validate_config_value(key, value)
+            self.configuration[key] = value
         # restart preparation after configuration change:
         self.__prepared = False
 
@@ -345,18 +440,9 @@ class ProcessStep:
         if not isinstance(item, dict):
             return False
         for _key, _value in item.items():
-            if _key not in cls.CONFIG_KEYS:
-                return False
-            _config = cls.CONFIG_KEYS[_key]
-            if _value is None:
-                if _config["allow_none"]:
-                    continue
-                return False
-            if isinstance(_value, Iterable) and not isinstance(_value, str):
-                if not (_config["allow_iterable"] and all([isinstance(_i, _config["type"]) for _i in _value])):
-                    return False
-                continue
-            if not isinstance(_value, _config["type"]):
+            try:
+                cls.validate_config_value(_key, _value)
+            except (KeyError, TypeError, ValueError):
                 return False
         return True
 
@@ -365,4 +451,4 @@ class ProcessStep:
         """
         Create an initial dictionary for the process step configuration.
         """
-        return {_k: _v["default"] for _k, _v in cls.CONFIG_KEYS.items()}
+        return {_k: deepcopy(_v["default"]) for _k, _v in cls.effective_config_schema().items()}
