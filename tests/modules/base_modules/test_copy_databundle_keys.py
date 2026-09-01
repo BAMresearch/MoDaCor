@@ -70,6 +70,18 @@ def test_copy_databundle_keys_can_attach_by_reference() -> None:
     assert processing_data["sample"]["Q"] is processing_data["static"]["Q"]
 
 
+def test_copy_databundle_keys_creates_missing_target_in_place() -> None:
+    processing_data = _processing_data()
+    del processing_data["sample"]
+    step = CopyDataBundleKeys(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(with_processing_keys=["sample", "static"], data_keys=["Q"])
+
+    step(processing_data)
+
+    assert "sample" in processing_data
+    np.testing.assert_allclose(processing_data["sample"]["Q"].signal, [0.1, 0.2, 0.3])
+
+
 def test_copy_databundle_keys_requires_two_processing_keys() -> None:
     processing_data = _processing_data()
     step = CopyDataBundleKeys(io_sources=TEST_IO_SOURCES)

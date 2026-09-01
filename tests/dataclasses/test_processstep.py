@@ -89,8 +89,10 @@ class TESTProcessingStep(ProcessStep):
     def calculate(self) -> dict[str, DataBundle]:
         _data = self.processing_data.get("dummy_key", DataBundle())
         _data["new_key"] = BaseData(signal=np.arange(100).reshape(10, 10), uncertainties={"sem": 0.0}, units=ureg.meter)
+        self.processing_data["dummy_key"] = _data
         _data2 = self.processing_data.get("bundle2", DataBundle())
         _data2["new_key"] = BaseData(signal=np.zeros(20), uncertainties={"sem": 0.0}, units=ureg.meter)
+        self.processing_data["bundle2"] = _data2
         return {"dummy_key": _data, "bundle2": _data2}
 
 
@@ -109,6 +111,13 @@ class DocumentedConfigStep(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         return {}
+
+
+class ReturnOnlyStep(ProcessStep):
+    def calculate(self) -> dict[str, DataBundle]:
+        bundle = DataBundle()
+        bundle["signal"] = BaseData(signal=np.array([1.0]), units=ureg.dimensionless)
+        return {"return_only": bundle}
 
 
 @pytest.fixture
@@ -316,6 +325,42 @@ def test_execute(processing_data):
     assert "dummy_key" in processing_data
     assert isinstance(processing_data["bundle2"]["key2"], BaseData)
     assert isinstance(processing_data["bundle2"]["new_key"], BaseData)
+
+
+def test_execute_does_not_merge_return_only_outputs():
+    data = ProcessingData()
+    ps = ReturnOnlyStep(io_sources=TEST_IO_SOURCES)
+
+    ps.execute(data)
+
+    assert ps.executed is True
+    assert "return_only" in ps.produced_outputs
+    assert "return_only" not in data
+
+
+def test_execute_accepts_none_output_bookkeeping():
+    class NoneOutputStep(ProcessStep):
+        def calculate(self):
+            return None
+
+    data = ProcessingData()
+    ps = NoneOutputStep(io_sources=TEST_IO_SOURCES)
+
+    ps.execute(data)
+
+    assert ps.produced_outputs == {}
+
+
+def test_execute_rejects_non_dict_output_bookkeeping():
+    class BadOutputStep(ProcessStep):
+        def calculate(self):
+            return []
+
+    data = ProcessingData()
+    ps = BadOutputStep(io_sources=TEST_IO_SOURCES)
+
+    with pytest.raises(TypeError, match="must return a dict"):
+        ps.execute(data)
 
 
 def test_call(processing_data):

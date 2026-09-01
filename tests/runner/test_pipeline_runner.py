@@ -20,6 +20,7 @@ class SeedSignal(ProcessStep):
     def calculate(self) -> dict[str, DataBundle]:
         out = DataBundle()
         out["signal"] = BaseData(signal=np.array([1.0]), units=ureg.dimensionless)
+        self.processing_data["sample"] = out
         return {"sample": out}
 
 
@@ -28,6 +29,7 @@ class AddOne(ProcessStep):
         current = self.processing_data["sample"]["signal"]
         out = DataBundle()
         out["signal"] = BaseData(signal=current.signal + 1.0, units=current.units)
+        self.processing_data["sample"] = out
         return {"sample": out}
 
 

@@ -191,7 +191,8 @@ class ProcessStep:
     executed: bool = field(default=False, validator=v.instance_of(bool))
     short_title: str | None = field(default=None, validator=v.optional(v.instance_of(str)))
 
-    # if the process produces intermediate arrays, they are stored here, optionally cached
+    # Optional bookkeeping returned by calculate(), such as touched DataBundle keys.
+    # Authoritative data changes are made in-place on processing_data.
     produced_outputs: dict[str, Any] = field(factory=dict)
     # intermediate prepared data for the process step
     _prepared_data: dict[str, Any] = field(factory=dict)
@@ -235,7 +236,7 @@ class ProcessStep:
         """
         Return the runtime dependencies used for partial-rerun invalidation.
 
-        Subclasses with source/sink side effects or non-in-place outputs should
+        Subclasses with source/sink side effects or custom output keys should
         override this method with an exact contract. The default covers ordinary
         in-place processing steps that use ``with_processing_keys`` and the
         optional ``output_processing_key`` convention.
@@ -311,21 +312,29 @@ class ProcessStep:
 
     @abstractmethod
     def calculate(self) -> dict[str, DataBundle]:
-        """Calculate the process step on the given data"""
+        """
+        Apply this process step to ``self.processing_data`` in-place.
+
+        Implementations may return a mapping of touched ``ProcessingData`` keys
+        to their current ``DataBundle`` values for diagnostics and compatibility.
+        The return value is not merged by ``execute()``; the in-place mutation is
+        the authoritative result.
+        """
         raise NotImplementedError("Subclasses must implement this method")
 
     def execute(self, data: ProcessingData) -> None:
-        """Execute the process step on the given data"""
+        """Execute the process step on the given data."""
         self.processing_data = data
         if not self.__prepared:
             self.prepare_execution()
             self.__prepared = True
-        self.produced_outputs = self.calculate()
-        for _key, value in self.produced_outputs.items():
-            if _key in data:
-                data[_key].update(value)
-            else:
-                data[_key] = value
+        produced_outputs = self.calculate()
+        self.produced_outputs = {} if produced_outputs is None else produced_outputs
+        if not isinstance(self.produced_outputs, dict):
+            raise TypeError(
+                f"{self.__class__.__name__}.calculate() must return a dict of touched outputs or None, "
+                f"got {type(self.produced_outputs).__name__}."
+            )
         self.executed = True
 
     def reset(self):

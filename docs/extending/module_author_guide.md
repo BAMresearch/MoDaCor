@@ -22,7 +22,7 @@ Every module must:
 
 1. Subclass `modacor.dataclasses.process_step.ProcessStep`.
 2. Define a class-level `documentation = ProcessStepDescriber(...)`.
-3. Implement `calculate(self) -> dict[str, DataBundle]`.
+3. Implement `calculate(self) -> dict[str, DataBundle] | None`.
 
 Optionally implement `prepare_execution()` if the step needs one-time setup or
 cached derived state before `calculate()` runs.
@@ -36,8 +36,8 @@ starting point for new work.
 
 - `with_processing_keys`: select which `ProcessingData` bundles the step should
   operate on.
-- `output_processing_key`: optional output target for steps that emit a new
-  bundle instead of updating in place.
+- `output_processing_key`: optional output target for steps that write to a
+  different `ProcessingData` bundle than they read.
 
 Step-specific configuration belongs in `documentation.arguments`. Those entries
 seed the instance `configuration` automatically through
@@ -90,9 +90,21 @@ During execution the runner injects:
 - `io_sinks`
 - `step_id`
 
-`calculate()` should return a mapping of `ProcessingData` key to updated
-`DataBundle`. The base `execute()` method merges that mapping back into the
-current `ProcessingData`.
+`calculate()` is the in-place mutation boundary. It should update
+`self.processing_data` directly, either by mutating existing `BaseData` arrays,
+replacing entries inside a `DataBundle`, or assigning a new/replacement
+`DataBundle` to a `ProcessingData` key.
+
+The optional return value is bookkeeping only: return a mapping of touched
+`ProcessingData` keys to their current `DataBundle` values when that is useful
+for tests, tracing, or compatibility. The base `execute()` method stores this
+mapping in `produced_outputs`, but it does not merge returned data into
+`ProcessingData`.
+
+This contract keeps the normal execution path allocation-aware. Rollback is a
+runtime/session concern: partial-service runs can use snapshots or full rerun
+fallback when recovery is needed, but individual steps should not take full
+pipeline copies just to execute.
 
 For steps that operate on existing bundles, prefer
 `self._normalised_processing_keys()` instead of duplicating input-selection

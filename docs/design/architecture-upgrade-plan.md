@@ -58,12 +58,20 @@ Status values:
    path. `CONFIG_KEYS` remains the compatibility location for shared/base
    options.
 
-5. `Open` Transactional step execution
+5. `Done` Explicit in-place step execution
 
    `calculate()` is documented as returning a mapping that `execute()` merges,
    but several modules mutate shared `ProcessingData` before that merge. Partial
    rerun rollback and trace semantics would be clearer with an explicit commit
    boundary.
+
+   Outcome: MoDaCor now treats in-place `ProcessingData` mutation as the
+   authoritative process-step contract. `execute()` no longer merges returned
+   mappings back into `ProcessingData`; it stores them only as optional
+   `produced_outputs` bookkeeping. Built-in steps that previously relied on the
+   merge path now update `self.processing_data` directly. Runtime rollback stays
+   at session scope through partial snapshots and full-rerun fallback, avoiding
+   per-step full data copies in the normal execution path.
 
 6. `Open` Core data metadata contracts
 
@@ -79,3 +87,4 @@ Status values:
 - 2026-09-01: Completed item 3. Verified with full `.venv-dev` pytest run.
 - 2026-09-01: Started item 4.
 - 2026-09-01: Completed item 4. Verified with full `.venv-dev` pytest run.
+- 2026-09-01: Completed item 5. Verified with full `.venv-dev` pytest run.

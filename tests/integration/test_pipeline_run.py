@@ -47,7 +47,8 @@ def flat_data():
 
 class DummyProcessStep(ProcessStep):
     def calculate(self):
-        return {"test": DataBundle()}
+        self.processing_data["test"] = DataBundle()
+        return {"test": self.processing_data["test"]}
 
 
 def test_processstep_pipeline(flat_data):

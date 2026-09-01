@@ -592,6 +592,10 @@ The scaffold now includes dirty-step detection by changed source references and 
 partial failure.
 When partial mode runs, the service records a boundary checkpoint before the first dirty step and restores it if
 partial execution fails.
+Individual `ProcessStep` modules mutate `ProcessingData` in-place for
+allocation-aware execution. Their optional return mappings are bookkeeping only;
+the runtime service handles recovery at session scope through partial snapshots
+and full-rerun fallback rather than per-step transactional copies.
 The scaffold also includes the `U8` health/readiness split for operational
 probes and basic runtime metrics, plus the `U10` latest-error diagnostics
 endpoint for post-failure inspection.
