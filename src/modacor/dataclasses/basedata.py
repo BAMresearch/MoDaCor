@@ -133,13 +133,102 @@ def _inherit_metadata(source: BaseData, result: BaseData) -> BaseData:
     # Keep the same rank_of_data; attrs validation ensures it is still valid
     result.rank_of_data = source.rank_of_data
 
-    # Try to propagate weights; if shapes are incompatible, keep defaults
+    # Try to propagate weights; if shapes are incompatible, keep defaults.
+    # Scalar/default weights stay scalar so later operations do not mistake
+    # broadcast defaults for real per-point weight maps.
     try:
         arr = np.asarray(source.weights)
-        validate_broadcast(result.signal, arr, "weights")
-        result.weights = np.broadcast_to(arr, result.signal.shape).copy()
+        if arr.size == 1:
+            result.weights = np.array(arr, copy=True)
+        else:
+            validate_broadcast(result.signal, arr, "weights")
+            result.weights = np.broadcast_to(arr, result.signal.shape).copy()
     except ValueError:
         logger.debug("Could not broadcast source weights to result shape; leaving default weights on result BaseData.")
+
+    return result
+
+
+def _has_array_weights(data: BaseData) -> bool:
+    """
+    Return True for weights that carry per-point metadata.
+
+    Size-1 weights are treated like scalar/default weights because they do not
+    identify a particular data grid.
+    """
+    return np.asarray(data.weights).size != 1
+
+
+def _has_structural_metadata(data: BaseData) -> bool:
+    """
+    Return True when `data` carries metadata that should constrain arithmetic.
+
+    Units and uncertainties are numerical contracts handled by Pint and the
+    uncertainty propagation code. This helper is intentionally limited to cheap
+    structural metadata checks.
+    """
+    return bool(data.axes) or data.rank_of_data != 0 or _has_array_weights(data)
+
+
+def _validate_binary_metadata_compatibility(left: BaseData, right: BaseData, out_shape: tuple[int, ...]) -> None:
+    """
+    Validate only cheap metadata contracts for binary BaseData arithmetic.
+
+    This deliberately avoids deep axis comparison and unit policy decisions.
+    Pint handles unit compatibility/algebra, while this check prevents silent
+    inheritance of rank/axes/weight metadata across incompatible array layouts.
+    """
+    left_has_metadata = _has_structural_metadata(left)
+    right_has_metadata = _has_structural_metadata(right)
+
+    if left.axes and left.signal.shape != out_shape:
+        raise ValueError(
+            "Cannot preserve left BaseData axes after arithmetic: "
+            f"left signal shape {left.signal.shape} broadcasts to result shape {out_shape}."
+        )
+    if right.axes and right.signal.shape != out_shape:
+        raise ValueError(
+            "Cannot preserve right BaseData axes after arithmetic: "
+            f"right signal shape {right.signal.shape} broadcasts to result shape {out_shape}."
+        )
+
+    if not (left_has_metadata and right_has_metadata):
+        return
+
+    if left.rank_of_data != right.rank_of_data:
+        raise ValueError(
+            "Cannot combine BaseData metadata with different rank_of_data values: "
+            f"{left.rank_of_data} != {right.rank_of_data}."
+        )
+
+    if left.axes and right.axes and len(left.axes) != len(right.axes):
+        raise ValueError(
+            "Cannot combine BaseData metadata with different axes lengths: " f"{len(left.axes)} != {len(right.axes)}."
+        )
+
+
+def _inherit_binary_metadata(left: BaseData, right: BaseData, result: BaseData) -> BaseData:
+    """
+    Preserve binary-operation metadata after cheap compatibility checks.
+
+    Metadata-neutral operands, such as scalar factors or same-shaped correction
+    arrays without rank/axes/array weights, do not override metadata-bearing
+    operands. If only the right operand carries array-valued weights, preserve
+    those weights after copying the primary metadata source.
+    """
+    out_shape = result.signal.shape
+    _validate_binary_metadata_compatibility(left, right, out_shape)
+
+    left_has_metadata = _has_structural_metadata(left)
+    right_has_metadata = _has_structural_metadata(right)
+
+    source = right if right_has_metadata and not left_has_metadata else left
+    result = _inherit_metadata(source, result)
+
+    if _has_array_weights(right) and not _has_array_weights(left):
+        arr = np.asarray(right.weights)
+        validate_broadcast(result.signal, arr, "weights")
+        result.weights = np.broadcast_to(arr, result.signal.shape).copy()
 
     return result
 
@@ -276,7 +365,7 @@ def _binary_basedata_op(
         result_unc.pop("propagate_to_all", None)
 
     result = BaseData(signal=base_signal, units=result_units, uncertainties=result_unc)
-    return _inherit_metadata(left, result)
+    return _inherit_binary_metadata(left, right, result)
 
 
 def _unary_basedata_op(

@@ -86,8 +86,8 @@ def run_pipeline_job(
         tracer = PipelineTracer(**_kwargs)
 
     pipeline_obj.clear_trace_events()
-    pipeline_obj._reinitialize()
-    pipeline_obj.prepare()
+    scheduler = pipeline_obj.create_scheduler()
+    scheduler.prepare()
 
     stop_token = str(stop_after) if stop_after is not None else None
     selected_steps = {str(step_id) for step_id in selected_step_ids} if selected_step_ids is not None else None
@@ -97,9 +97,9 @@ def run_pipeline_job(
     current_step_id: str | None = None
 
     try:
-        while pipeline_obj.is_active():
+        while scheduler.is_active():
             should_stop = False
-            for node in pipeline_obj.get_ready():
+            for node in scheduler.get_ready():
                 node.processing_data = processing_data_obj
                 node.io_sources = sources_obj
                 node.io_sinks = sinks_obj
@@ -124,7 +124,7 @@ def run_pipeline_job(
                             rendered_format="text/html",
                         )
 
-                pipeline_obj.done(node)
+                scheduler.done(node)
 
                 if stop_token is not None and step_id == stop_token:
                     stopped_after_step = step_id

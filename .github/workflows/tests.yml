@@ -18,6 +18,7 @@ jobs:
         python:
           - [3, 12]
           - [3, 13]
+          - [3, 14]
         # os: ['ubuntu', 'windows', 'macos']
         os: ['ubuntu']
     env:
@@ -72,8 +73,9 @@ jobs:
           pip list --format=freeze
 
       - name: Check
+        if: env.TOX_ENV == 'py312'
         shell: sh
-        run: tox -e check -v
+        run: tox -e lint,manifest -v
 
       - name: Run tests
         shell: sh
@@ -81,9 +83,9 @@ jobs:
           [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
           tox -e ${{ env.TOX_ENV }} -v
 
-      - name: Rename coverage data uniquely
+      - name: Export coverage data
         shell: sh
-        run: mv .coverage coverage.${{ env.TOX_ENV }}.${{ matrix.os }}
+        run: cp .tox/.coverage.${{ env.TOX_ENV }} coverage.${{ env.TOX_ENV }}.${{ matrix.os }}
 
       - name: Upload coverage data for next step
         uses: actions/upload-artifact@v7

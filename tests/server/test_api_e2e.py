@@ -18,11 +18,26 @@ from modacor.io.buffer import decode_npy, encode_npy
 from modacor.runner.pipeline import Pipeline
 from modacor.runner.pipeline_runner import PipelineRunError, RunResult
 from modacor.server.api import create_app
+from modacor.server.runtime_policy import RuntimePolicy
 from modacor.server.session_manager import SessionManager
 
 fastapi = pytest.importorskip("fastapi")
 testclient_mod = pytest.importorskip("fastapi.testclient")
 TestClient = testclient_mod.TestClient
+
+
+def _trusted_policy_summary() -> dict:
+    return {
+        "allow_pipeline_yaml_path": True,
+        "allow_process_step_filesystem_discovery": True,
+        "allow_custom_io_class_path": True,
+        "require_io_path_roots": False,
+        "source_read_roots": [],
+        "sink_write_roots": [],
+        "max_sessions": None,
+        "max_pipeline_yaml_bytes": None,
+        "max_buffer_upload_bytes": None,
+    }
 
 
 def _post_json(client: TestClient, url: str, payload: dict):
@@ -57,6 +72,7 @@ def test_api_health_and_readiness_expose_runtime_metrics():
             "error_session_count": 0,
             "error_session_ids": [],
             "last_updated_utc": None,
+            "runtime_policy": _trusted_policy_summary(),
         },
     }
 
@@ -83,6 +99,7 @@ def test_api_health_and_readiness_expose_runtime_metrics():
             "error_session_count": 1,
             "error_session_ids": ["sess-error"],
             "last_updated_utc": "2026-03-15T10:10:00+00:00",
+            "runtime_policy": _trusted_policy_summary(),
         },
     }
 
@@ -752,6 +769,189 @@ def test_api_create_session_accepts_yaml_path(tmp_path: Path):
     assert response.status_code in {200, 201}
     payload = response.json()
     assert payload["session_id"] == "sess-path"
+
+
+def test_api_restricted_policy_rejects_yaml_path(tmp_path: Path):
+    manager = SessionManager()
+    app = create_app(session_manager=manager, runtime_policy=RuntimePolicy.restricted())
+    client = TestClient(app)
+
+    pipeline_path = tmp_path / "pipeline.yaml"
+    pipeline_path.write_text("name: via-path\nsteps: {}\n", encoding="utf-8")
+
+    response = client.post(
+        "/v1/sessions",
+        json={
+            "session_id": "sess-path-restricted",
+            "pipeline": {"yaml_path": str(pipeline_path)},
+        },
+    )
+
+    assert response.status_code == 422
+    assert "Runtime policy disables pipeline.yaml_path" in response.text
+
+
+def test_api_policy_rejects_pipeline_yaml_text_over_size_limit():
+    manager = SessionManager()
+    app = create_app(
+        session_manager=manager,
+        runtime_policy=RuntimePolicy.trusted(max_pipeline_yaml_bytes=10),
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/v1/sessions",
+        json={
+            "session_id": "sess-yaml-large",
+            "pipeline": {"yaml_text": "name: too-large\nsteps: {}\n"},
+        },
+    )
+
+    assert response.status_code == 413
+    assert "max_pipeline_yaml_bytes" not in response.text
+    assert "pipeline.yaml_text" in response.text
+
+
+def test_api_policy_rejects_session_creation_over_limit():
+    manager = SessionManager()
+    app = create_app(
+        session_manager=manager,
+        runtime_policy=RuntimePolicy.trusted(max_sessions=1),
+    )
+    client = TestClient(app)
+
+    _post_json(
+        client,
+        "/v1/sessions",
+        {"session_id": "sess-one", "pipeline": {"yaml_text": "name: one\nsteps: {}\n"}},
+    )
+    response = client.post(
+        "/v1/sessions",
+        json={"session_id": "sess-two", "pipeline": {"yaml_text": "name: two\nsteps: {}\n"}},
+    )
+
+    assert response.status_code == 429
+    assert "max_sessions=1" in response.text
+
+
+def test_api_policy_rejects_custom_source_class_path():
+    manager = SessionManager()
+    app = create_app(
+        session_manager=manager,
+        runtime_policy=RuntimePolicy.restricted(),
+    )
+    client = TestClient(app)
+
+    _post_json(
+        client,
+        "/v1/sessions",
+        {"session_id": "sess-custom-source", "pipeline": {"yaml_text": "name: p\nsteps: {}\n"}},
+    )
+    response = client.post(
+        "/v1/sessions/sess-custom-source/sources/patch",
+        json={
+            "ref": "sample",
+            "type": "custom",
+            "location": "/tmp/sample.nxs",
+            "kwargs": {"class_path": "some.module.Source"},
+        },
+    )
+
+    assert response.status_code == 422
+    assert "disables arbitrary custom source imports" in response.text
+
+
+def test_api_policy_rejects_source_and_sink_paths_outside_roots(tmp_path: Path):
+    read_root = tmp_path / "input"
+    write_root = tmp_path / "output"
+    read_root.mkdir()
+    write_root.mkdir()
+    manager = SessionManager()
+    app = create_app(
+        session_manager=manager,
+        runtime_policy=RuntimePolicy.trusted(
+            source_read_roots=(read_root,),
+            sink_write_roots=(write_root,),
+        ),
+    )
+    client = TestClient(app)
+
+    _post_json(
+        client,
+        "/v1/sessions",
+        {"session_id": "sess-roots", "pipeline": {"yaml_text": "name: p\nsteps: {}\n"}},
+    )
+
+    source_rejected = client.post(
+        "/v1/sessions/sess-roots/sources/patch",
+        json={"ref": "sample", "type": "hdf", "location": str(tmp_path / "outside.nxs")},
+    )
+    assert source_rejected.status_code == 422
+    assert "outside allowed read roots" in source_rejected.text
+
+    source_accepted = client.post(
+        "/v1/sessions/sess-roots/sources/patch",
+        json={"ref": "sample", "type": "hdf", "location": str(read_root / "sample.nxs")},
+    )
+    assert source_accepted.status_code == 200, source_accepted.text
+
+    sink_rejected = client.post(
+        "/v1/sessions/sess-roots/sinks/patch",
+        json={"ref": "export", "type": "csv", "location": str(tmp_path / "outside.csv")},
+    )
+    assert sink_rejected.status_code == 422
+    assert "outside allowed write roots" in sink_rejected.text
+
+    sink_accepted = client.post(
+        "/v1/sessions/sess-roots/sinks/patch",
+        json={"ref": "export", "type": "csv", "location": str(write_root / "out.csv")},
+    )
+    assert sink_accepted.status_code == 200, sink_accepted.text
+
+
+def test_api_restricted_policy_rejects_file_source_when_no_roots_configured():
+    manager = SessionManager()
+    app = create_app(
+        session_manager=manager,
+        runtime_policy=RuntimePolicy.restricted(),
+    )
+    client = TestClient(app)
+
+    _post_json(
+        client,
+        "/v1/sessions",
+        {"session_id": "sess-no-roots", "pipeline": {"yaml_text": "name: p\nsteps: {}\n"}},
+    )
+    response = client.post(
+        "/v1/sessions/sess-no-roots/sources/patch",
+        json={"ref": "sample", "type": "hdf", "location": "/data/input/sample.nxs"},
+    )
+
+    assert response.status_code == 422
+    assert "no allowed read roots are configured" in response.text
+
+
+def test_api_policy_rejects_buffer_upload_over_size_limit():
+    manager = SessionManager()
+    app = create_app(
+        session_manager=manager,
+        runtime_policy=RuntimePolicy.trusted(max_buffer_upload_bytes=16),
+    )
+    client = TestClient(app)
+
+    _post_json(
+        client,
+        "/v1/sessions",
+        {"session_id": "sess-buffer-limit", "pipeline": {"yaml_text": "name: p\nsteps: {}\n"}},
+    )
+    response = client.put(
+        "/v1/sessions/sess-buffer-limit/buffers/sources/sample/arrays/signal",
+        content=encode_npy(np.arange(4)),
+        headers={"content-type": "application/x-npy"},
+    )
+
+    assert response.status_code == 413
+    assert "buffer source array" in response.text
 
 
 def test_api_set_sample_shortcut_upserts_sample_source():

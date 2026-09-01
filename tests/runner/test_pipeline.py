@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from graphlib import TopologicalSorter
 from pathlib import Path
 
 __coding__ = "utf-8"
@@ -50,7 +51,7 @@ def yaml_one_step():
         module: Divide
         requires_steps: []
         configuration:
-          divisor_source: 3
+          divisor_source: sample::divisor
     """
 
 
@@ -142,12 +143,65 @@ def test_pipeline_from_yaml(yaml_one_step):
     pipeline = Pipeline.from_yaml(yaml_one_step)
     assert pipeline.name == "one_step"
     assert isinstance(pipeline, Pipeline)
+    assert not isinstance(pipeline, TopologicalSorter)
 
     # One node with no prerequisites
     assert len(pipeline.graph) == 1
     ((node, deps),) = pipeline.graph.items()
     assert isinstance(node, ProcessStep)
     assert deps == set()
+
+
+def test_pipeline_from_yaml_rejects_invalid_step_configuration():
+    yaml_str = """
+    name: bad_config
+    steps:
+      di:
+        module: Divide
+        requires_steps: []
+        configuration:
+          divisor_source: 3
+    """
+
+    with pytest.raises(TypeError, match="divisor_source"):
+        Pipeline.from_yaml(yaml_str)
+
+
+def test_pipeline_from_yaml_accepts_tuple_config_from_yaml_sequence():
+    yaml_str = """
+    name: tuple_config
+    steps:
+      coords:
+        module: PixelCoordinates3D
+        requires_steps: []
+        configuration:
+          basis_fast: [0.0, 1.0, 0.0]
+    """
+
+    pipeline = Pipeline.from_yaml(yaml_str)
+    ((node, _deps),) = pipeline.graph.items()
+
+    assert node.configuration["basis_fast"] == (0.0, 1.0, 0.0)
+    assert isinstance(node.configuration["basis_fast"], tuple)
+
+
+def test_pipeline_static_order_uses_fresh_scheduler_each_call(linear_pipeline):
+    pipeline = Pipeline.from_dict(linear_pipeline)
+
+    assert pipeline.static_order() == (1, 2, 3)
+    assert pipeline.static_order() == (1, 2, 3)
+
+
+def test_pipeline_manual_scheduler_is_explicit_compatibility_state(linear_pipeline):
+    pipeline = Pipeline.from_dict(linear_pipeline)
+
+    with pytest.raises(ValueError, match="prepare"):
+        pipeline.get_ready()
+
+    pipeline.prepare()
+    assert pipeline.get_ready() == (1,)
+    pipeline.done(1)
+    assert set(pipeline.get_ready()) == {2}
 
 
 def test_pipeline_from_yaml_with_custom_registry():

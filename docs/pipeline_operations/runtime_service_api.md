@@ -196,6 +196,8 @@ Rules:
 - Exactly one of `yaml_text` or `yaml_path` must be provided.
 - `session_id` must be unique.
 - If `source_profile` is set, required source refs must be registered before `/process` is allowed.
+- In restricted runtime policy, `yaml_path` is disabled. Submit `yaml_text` or
+  use a server-side trusted/local deployment.
 
 ### `GET /sessions`
 
@@ -274,6 +276,11 @@ Request:
 
 Response includes accepted refs and current source map.
 
+In restricted runtime policy, file-backed source locations (`hdf`, `csv`, and
+`yaml`) must resolve under one of the configured `--read-root` directories.
+Custom sources using `kwargs.class_path` are rejected; use built-in source types
+or a programmatically registered `kwargs.class_alias`.
+
 Runtime sessions cache unchanged HDF source objects internally. The cache is
 transparent to API clients: if an HDF source registration has the same `ref`,
 `type`, `location`, `kwargs`, file size, and file modification time as the
@@ -339,6 +346,11 @@ Request:
 ```
 
 Response includes accepted refs and the current sink map.
+
+In restricted runtime policy, file-backed sink locations (`csv`, `hdf`, and
+`hdf_processing`) must resolve under one of the configured `--write-root`
+directories. Custom sinks using `kwargs.class_path` are rejected; use built-in
+sink types or a programmatically registered `kwargs.class_alias`.
 
 ### `POST /sessions/{session_id}/sinks/patch`
 
@@ -411,6 +423,8 @@ Notes:
 - `changed_sources` or `changed_keys` is required for `partial`; both are optional for `auto`.
 - `changed_keys` enables key-aware invalidation (e.g. `sample.signal`, `sample.Q`) for tighter partial reruns.
 - `write_hdf` is optional; if provided, pipeline spec/yaml and trace are persisted.
+- In restricted runtime policy, `write_hdf.path` must resolve under one of the
+  configured `--write-root` directories.
 - Full per-step `ProcessingData` snapshots are opt-in through the session trace
   config. When enabled, the HDF export stores them under
   `/processing/tracer/<run>/steps/<step>/processing_data`.
@@ -480,6 +494,55 @@ Run details include:
 - `elapsed_s`
 - fallback metadata (`fallback_reason`, `recovered_from_run_id`) for auto recovery cases
 - output artifact locations (e.g. `hdf_output`)
+
+## Runtime Policy
+
+The runtime policy is a small trust-boundary layer for the HTTP API. It is not a
+security sandbox; container filesystem mounts, CPU limits, memory limits,
+network policy, and authentication should still be handled by the deployment
+environment.
+
+Policy modes:
+
+- `trusted`: backward-compatible local-helper behavior. Allows
+  `pipeline.yaml_path`, process-step filesystem discovery, and custom IO
+  `kwargs.class_path` imports.
+- `restricted`: recommended for network-facing/container service use. Disables
+  `pipeline.yaml_path`, disables process-step filesystem discovery outside the
+  curated/explicit registry, and disables arbitrary custom source/sink imports
+  through `kwargs.class_path`. File-backed source/sink paths require configured
+  read/write roots.
+
+Optional limits:
+
+- `--read-root PATH`: allowed root for file-backed sources and, in trusted mode,
+  pipeline YAML paths.
+- `--write-root PATH`: allowed root for file-backed sinks and `write_hdf.path`.
+- `--max-sessions N`: maximum in-memory sessions in this process.
+- `--max-pipeline-yaml-bytes N`: maximum pipeline YAML payload size.
+- `--max-buffer-upload-bytes N`: maximum `.npy` source buffer upload size.
+
+Common policy failures and fixes:
+
+- `Runtime policy disables pipeline.yaml_path`: send `pipeline.yaml_text`
+  instead, or run a trusted local service.
+- `filesystem discovery is disabled by runtime policy`: export/register the
+  process step in the curated module registry used by the service.
+- `disables arbitrary custom source/sink imports`: use a built-in IO type or
+  configure a registered `kwargs.class_alias` in the service process.
+- `outside allowed read roots`: mount the file under `--read-root` or add the
+  correct read root.
+- `no allowed read roots are configured`: start the restricted service with at
+  least one `--read-root` before registering file-backed sources.
+- `outside allowed write roots`: write under `--write-root` or add the correct
+  write root.
+- `no allowed write roots are configured`: start the restricted service with at
+  least one `--write-root` before registering file-backed sinks or using
+  `write_hdf.path`.
+- `max_sessions=... has been reached`: delete an old session or raise the
+  process-level cap.
+- `buffer source array`: lower the upload size or raise
+  `--max-buffer-upload-bytes`.
 
 ## WebSocket events
 
@@ -592,6 +655,10 @@ The scaffold now includes dirty-step detection by changed source references and 
 partial failure.
 When partial mode runs, the service records a boundary checkpoint before the first dirty step and restores it if
 partial execution fails.
+Individual `ProcessStep` modules mutate `ProcessingData` in-place for
+allocation-aware execution. Their optional return mappings are bookkeeping only;
+the runtime service handles recovery at session scope through partial snapshots
+and full-rerun fallback rather than per-step transactional copies.
 The scaffold also includes the `U8` health/readiness split for operational
 probes and basic runtime metrics, plus the `U10` latest-error diagnostics
 endpoint for post-failure inspection.
@@ -602,6 +669,26 @@ Run the scaffold service:
 pip install "modacor[server]"
 modacor serve --host 127.0.0.1 --port 8000
 ```
+
+For a container or network-facing deployment, run with the restricted runtime
+policy and mount explicit read/write roots:
+
+```bash
+modacor serve \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --runtime-policy restricted \
+  --read-root /data/input \
+  --write-root /data/output \
+  --max-sessions 8 \
+  --max-pipeline-yaml-bytes 1048576 \
+  --max-buffer-upload-bytes 268435456
+```
+
+The default `trusted` policy preserves local-helper behavior. The `restricted`
+policy is intended for deployments behind container, ingress, or reverse-proxy
+controls. In restricted mode, file-backed source/sink registrations require
+matching `--read-root` and `--write-root` settings.
 
 Optional convenience wrapper for API usage:
 

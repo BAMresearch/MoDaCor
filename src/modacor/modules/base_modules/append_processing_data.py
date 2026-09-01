@@ -22,7 +22,12 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.messagehandler import MessageHandler
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import (
+    ProcessStep,
+    ProcessStepDependencies,
+    processing_key_patterns,
+    source_refs_from_references,
+)
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.io.io_sources import IoSources
 
@@ -126,6 +131,26 @@ class AppendProcessingData(ProcessStep):
     # -------------------------------------------------------------------------
     # Internal helpers
     # -------------------------------------------------------------------------
+    def dependency_contract(self) -> ProcessStepDependencies:
+        cfg = self.configuration or {}
+        databundle_output_key = cfg.get("databundle_output_key")
+        basedata_key = databundle_output_key if isinstance(databundle_output_key, str) else None
+
+        return ProcessStepDependencies(
+            source_refs=source_refs_from_references(
+                cfg.get("signal_location"),
+                cfg.get("units_location"),
+                cfg.get("weights_location"),
+                cfg.get("uncertainties_sources"),
+                cfg.get("rank_of_data"),
+            ),
+            processing_reads=(),
+            processing_writes=processing_key_patterns(
+                cfg.get("processing_key"),
+                basedata_key=basedata_key,
+            ),
+        )
+
     def _resolve_rank_of_data(self, rank_cfg: Any, io_sources: IoSources) -> int:
         """
         Resolve the configured rank_of_data to an integer.

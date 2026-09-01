@@ -34,18 +34,48 @@ def _load_custom_class(class_path: str):
     return getattr(module, class_name)
 
 
+def _resolve_custom_class(
+    *,
+    kind: str,
+    ref: str,
+    kwargs: dict[str, Any],
+    custom_classes: Mapping[str, type] | None,
+    allow_custom_class_path: bool,
+):
+    class_alias = kwargs.pop("class_alias", None)
+    if class_alias:
+        try:
+            return (custom_classes or {})[str(class_alias)]
+        except KeyError as exc:
+            raise ValueError(f"Custom {kind} '{ref}' references unknown kwargs.class_alias {class_alias!r}.") from exc
+
+    class_path = kwargs.pop("class_path", None)
+    if class_path:
+        if not allow_custom_class_path:
+            raise ValueError(
+                f"Custom {kind} '{ref}' uses kwargs.class_path, but runtime policy disables arbitrary custom "
+                f"{kind} imports. Use kwargs.class_alias or a built-in {kind} type."
+            )
+        return _load_custom_class(str(class_path))
+
+    raise ValueError(f"Custom {kind} '{ref}' requires kwargs.class_alias or kwargs.class_path.")
+
+
 def build_source_from_spec(
     spec: Mapping[str, Any],
     *,
     buffer_store: RuntimeBufferStore | None = None,
     session_id: str | None = None,
+    allow_custom_class_path: bool = True,
+    custom_classes: Mapping[str, type] | None = None,
 ) -> Any:
     """
     Build one :class:`IoSource` from a normalized source specification.
 
     The spec must provide `ref`, `type`, and `location`. Optional `kwargs`
     are passed through as `iosource_method_kwargs`, except for `custom`
-    sources where `kwargs.class_path` selects the source class.
+    sources where `kwargs.class_alias` or `kwargs.class_path` selects the
+    source class.
     """
     type_map: dict[str, Any] = {
         "buffer": BufferSource,
@@ -60,10 +90,13 @@ def build_source_from_spec(
     kwargs = dict(spec.get("kwargs", {}) or {})
 
     if source_type == "custom":
-        class_path = kwargs.pop("class_path", None)
-        if not class_path:
-            raise ValueError(f"Custom source '{ref}' requires kwargs.class_path.")
-        source_cls = _load_custom_class(str(class_path))
+        source_cls = _resolve_custom_class(
+            kind="source",
+            ref=ref,
+            kwargs=kwargs,
+            custom_classes=custom_classes,
+            allow_custom_class_path=allow_custom_class_path,
+        )
     else:
         try:
             source_cls = type_map[source_type]
@@ -92,6 +125,8 @@ def build_sources_from_specs(
     *,
     buffer_store: RuntimeBufferStore | None = None,
     session_id: str | None = None,
+    allow_custom_class_path: bool = True,
+    custom_classes: Mapping[str, type] | None = None,
 ) -> IoSources:
     """
     Build an :class:`IoSources` registry from normalized source specifications.
@@ -100,7 +135,13 @@ def build_sources_from_specs(
     sources = IoSources()
 
     for spec in specs:
-        source = build_source_from_spec(spec, buffer_store=buffer_store, session_id=session_id)
+        source = build_source_from_spec(
+            spec,
+            buffer_store=buffer_store,
+            session_id=session_id,
+            allow_custom_class_path=allow_custom_class_path,
+            custom_classes=custom_classes,
+        )
         sources.register_source(source)
 
     return sources
@@ -111,13 +152,15 @@ def build_sink_from_spec(
     *,
     buffer_store: RuntimeBufferStore | None = None,
     session_id: str | None = None,
+    allow_custom_class_path: bool = True,
+    custom_classes: Mapping[str, type] | None = None,
 ) -> Any:
     """
     Build one :class:`IoSink` from a normalized sink specification.
 
     The spec must provide `ref`, `type`, and `location`. Optional `kwargs`
     are passed through as `iosink_method_kwargs`, except for `custom` sinks
-    where `kwargs.class_path` selects the sink class.
+    where `kwargs.class_alias` or `kwargs.class_path` selects the sink class.
     """
     type_map: dict[str, Any] = {
         "buffer": BufferSink,
@@ -132,10 +175,13 @@ def build_sink_from_spec(
     kwargs = dict(spec.get("kwargs", {}) or {})
 
     if sink_type == "custom":
-        class_path = kwargs.pop("class_path", None)
-        if not class_path:
-            raise ValueError(f"Custom sink '{ref}' requires kwargs.class_path.")
-        sink_cls = _load_custom_class(str(class_path))
+        sink_cls = _resolve_custom_class(
+            kind="sink",
+            ref=ref,
+            kwargs=kwargs,
+            custom_classes=custom_classes,
+            allow_custom_class_path=allow_custom_class_path,
+        )
     else:
         try:
             sink_cls = type_map[sink_type]
@@ -164,6 +210,8 @@ def build_sinks_from_specs(
     *,
     buffer_store: RuntimeBufferStore | None = None,
     session_id: str | None = None,
+    allow_custom_class_path: bool = True,
+    custom_classes: Mapping[str, type] | None = None,
 ) -> IoSinks:
     """
     Build an :class:`IoSinks` registry from normalized sink specifications.
@@ -171,7 +219,13 @@ def build_sinks_from_specs(
 
     sinks = IoSinks()
     for spec in specs:
-        sink = build_sink_from_spec(spec, buffer_store=buffer_store, session_id=session_id)
+        sink = build_sink_from_spec(
+            spec,
+            buffer_store=buffer_store,
+            session_id=session_id,
+            allow_custom_class_path=allow_custom_class_path,
+            custom_classes=custom_classes,
+        )
         sinks.register_sink(sink)
 
     return sinks

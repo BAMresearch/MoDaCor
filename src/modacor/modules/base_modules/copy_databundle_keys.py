@@ -128,6 +128,7 @@ class CopyDataBundleKeys(ProcessStep):
         target = self.processing_data.get(target_processing_key)
         if target is None:
             target = DataBundle()
+            self.processing_data[target_processing_key] = target
 
         for source_key, target_key in self._key_pairs():
             if source_key not in source:

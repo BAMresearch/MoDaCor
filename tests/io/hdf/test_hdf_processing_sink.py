@@ -268,7 +268,8 @@ def test_hdf_processing_sink_can_write_all_processing_data(tmp_path: Path):
     bundle = DataBundle()
     bundle["signal"] = BaseData(signal=np.array([1.0, 2.0]), units=ureg.Unit("count"))
     bundle["Q"] = BaseData(signal=np.array([0.1, 0.2]), units=ureg.Unit("1/nm"))
-    bundle["note"] = "not-basedata"
+    with pytest.raises(TypeError, match="DataBundle values must be BaseData"):
+        bundle["note"] = "not-basedata"
     processing_data["sample"] = bundle
 
     sink.write(

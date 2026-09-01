@@ -22,7 +22,7 @@ Every module must:
 
 1. Subclass `modacor.dataclasses.process_step.ProcessStep`.
 2. Define a class-level `documentation = ProcessStepDescriber(...)`.
-3. Implement `calculate(self) -> dict[str, DataBundle]`.
+3. Implement `calculate(self) -> dict[str, DataBundle] | None`.
 
 Optionally implement `prepare_execution()` if the step needs one-time setup or
 cached derived state before `calculate()` runs.
@@ -36,12 +36,56 @@ starting point for new work.
 
 - `with_processing_keys`: select which `ProcessingData` bundles the step should
   operate on.
-- `output_processing_key`: optional output target for steps that emit a new
-  bundle instead of updating in place.
+- `output_processing_key`: optional output target for steps that write to a
+  different `ProcessingData` bundle than they read.
 
 Step-specific configuration belongs in `documentation.arguments`. Those entries
 seed the instance `configuration` automatically through
 `ProcessStepDescriber.initial_configuration()`.
+
+`ProcessStep` builds one effective configuration schema from `CONFIG_KEYS` and
+`documentation.arguments`. Defaults are copied from that schema when the step is
+constructed, and values supplied through `ProcessStep(configuration=...)`,
+pipeline YAML, graph specs, `modify_config_by_dict(...)`, or
+`modify_config_by_kwargs(...)` are validated against the same schema. Unknown
+keys raise `KeyError`; wrong value types raise `TypeError`.
+
+For new module-specific settings, add entries to `documentation.arguments`:
+
+```python
+documentation = ProcessStepDescriber(
+    ...,
+    arguments={
+        "signal_key": {
+            "type": str,
+            "default": "signal",
+            "doc": "BaseData key to read and write within each DataBundle.",
+        },
+        "scale": {
+            "type": (float, int),
+            "default": 1.0,
+            "doc": "Scalar factor applied to the signal.",
+        },
+    },
+)
+```
+
+Use `CONFIG_KEYS` only for shared `ProcessStep`-level keys or legacy
+compatibility. It supports `type`, `allow_iterable`, `allow_none`, and
+`default`; when a key exists in both places, the `CONFIG_KEYS` type policy stays
+authoritative and `documentation.arguments` supplies the public default,
+required flag, and docs text. This keeps existing keys such as
+`with_processing_keys` compatible while moving module-specific validation into
+the public metadata.
+
+The central schema checks key presence and top-level value types. Keep
+step-local validation in `calculate()` or helper methods for semantic rules such
+as non-empty strings, mutually exclusive options, source-reference shape, or
+nested dictionary contents.
+
+Pipeline YAML uses YAML sequences for list-like values. If a module declares a
+configuration key with `"type": tuple`, a YAML sequence such as `[1.0, 0.0,
+0.0]` is accepted and stored as a Python `tuple` in `self.configuration`.
 
 During execution the runner injects:
 
@@ -50,9 +94,36 @@ During execution the runner injects:
 - `io_sinks`
 - `step_id`
 
-`calculate()` should return a mapping of `ProcessingData` key to updated
-`DataBundle`. The base `execute()` method merges that mapping back into the
-current `ProcessingData`.
+`calculate()` is the in-place mutation boundary. It should update
+`self.processing_data` directly, either by mutating existing `BaseData` arrays,
+replacing entries inside a `DataBundle`, or assigning a new/replacement
+`DataBundle` to a `ProcessingData` key.
+
+The optional return value is bookkeeping only: return a mapping of touched
+`ProcessingData` keys to their current `DataBundle` values when that is useful
+for tests, tracing, or compatibility. The base `execute()` method stores this
+mapping in `produced_outputs`, but it does not merge returned data into
+`ProcessingData`.
+
+This contract keeps the normal execution path allocation-aware. Rollback is a
+runtime/session concern: partial-service runs can use snapshots or full rerun
+fallback when recovery is needed, but individual steps should not take full
+pipeline copies just to execute.
+
+`DataBundle` values must be `BaseData` instances stored under non-empty string
+keys. Wrap raw arrays in `BaseData` with explicit units before inserting them
+into a bundle.
+
+For `BaseData` arithmetic, rely on the core operation layer for cheap structural
+metadata protection: it preserves metadata through metadata-neutral scalar
+factors and correction maps, and rejects rank or axes conflicts. Unit
+compatibility and unit algebra are still Pint's responsibility. If both operands
+carry array-valued weights, ordinary arithmetic keeps the left operand's weights
+to preserve existing in-place correction behavior.
+
+If your module requires stronger domain compatibility, such as identical
+coordinate-axis values or a different rule for combining two weight maps, check
+that explicitly before arithmetic and assign the result metadata deliberately.
 
 For steps that operate on existing bundles, prefer
 `self._normalised_processing_keys()` instead of duplicating input-selection

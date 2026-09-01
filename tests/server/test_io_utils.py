@@ -14,6 +14,7 @@ from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 from modacor.io.hdf.hdf_source import HDFSource
 from modacor.runner.pipeline import Pipeline
 from modacor.server.io_utils import build_sinks_from_session, build_sources_from_session
+from modacor.server.runtime_policy import RuntimePolicy
 from modacor.server.session_manager import SessionManager
 
 
@@ -71,6 +72,43 @@ def test_build_sources_and_sinks_from_session_support_buffer_type():
 
     sources = build_sources_from_session(session, buffer_store=manager.buffer_store)
     sinks = build_sinks_from_session(session, buffer_store=manager.buffer_store)
+
+    assert isinstance(sources.get_source("chunk_input"), BufferSource)
+    assert isinstance(sinks.get_sink("chunk_output"), BufferSink)
+
+
+def test_build_sources_and_sinks_from_session_support_custom_aliases():
+    manager = SessionManager()
+    session = manager.create_session(session_id="s-custom-alias", pipeline_yaml="name: custom-demo\nsteps: {}\n")
+    manager.upsert_sources(
+        "s-custom-alias",
+        [
+            {
+                "ref": "chunk_input",
+                "type": "custom",
+                "location": "buffer://session",
+                "kwargs": {"class_alias": "runtime-buffer-source"},
+            }
+        ],
+    )
+    manager.upsert_sinks(
+        "s-custom-alias",
+        [
+            {
+                "ref": "chunk_output",
+                "type": "custom",
+                "location": "buffer://session",
+                "kwargs": {"class_alias": "runtime-buffer-sink"},
+            }
+        ],
+    )
+    policy = RuntimePolicy.restricted(
+        custom_source_classes={"runtime-buffer-source": BufferSource},
+        custom_sink_classes={"runtime-buffer-sink": BufferSink},
+    )
+
+    sources = build_sources_from_session(session, buffer_store=manager.buffer_store, runtime_policy=policy)
+    sinks = build_sinks_from_session(session, buffer_store=manager.buffer_store, runtime_policy=policy)
 
     assert isinstance(sources.get_source("chunk_input"), BufferSource)
     assert isinstance(sinks.get_sink("chunk_output"), BufferSink)
