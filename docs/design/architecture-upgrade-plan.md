@@ -85,11 +85,20 @@ Status values:
    at session scope through partial snapshots and full-rerun fallback, avoiding
    per-step full data copies in the normal execution path.
 
-6. `Open` Core data metadata contracts
+6. `Done` Core data metadata contracts
 
    `DataBundle` is currently a permissive `dict`, and `BaseData` arithmetic
    inherits axes/rank/weights from the left operand. Mixed-axis operations need
    an explicit metadata policy.
+
+   Outcome: `DataBundle` now accepts only non-empty string keys mapped to
+   `BaseData` values while preserving existing construction styles such as
+   `DataBundle(signal=bd)`. `BaseData` binary arithmetic now uses a cheap
+   structural metadata policy: Pint still handles unit compatibility and unit
+   algebra, while MoDaCor rejects rank and axes conflicts that can be checked
+   without scanning full axis arrays. Metadata-neutral scalar factors and
+   correction maps keep the primary data metadata intact, and simultaneous
+   array-valued weights retain the existing left-operand inheritance behavior.
 
 ## Update Log
 
@@ -103,3 +112,5 @@ Status values:
 - 2026-09-01: Completed item 4. Verified with full `.venv-dev` pytest run.
 - 2026-09-01: Fixed item 4 YAML tuple compatibility regression.
 - 2026-09-01: Completed item 5. Verified with full `.venv-dev` pytest run.
+- 2026-09-01: Completed item 6. Added cheap BaseData metadata compatibility
+  checks and DataBundle entry validation.

@@ -110,6 +110,21 @@ runtime/session concern: partial-service runs can use snapshots or full rerun
 fallback when recovery is needed, but individual steps should not take full
 pipeline copies just to execute.
 
+`DataBundle` values must be `BaseData` instances stored under non-empty string
+keys. Wrap raw arrays in `BaseData` with explicit units before inserting them
+into a bundle.
+
+For `BaseData` arithmetic, rely on the core operation layer for cheap structural
+metadata protection: it preserves metadata through metadata-neutral scalar
+factors and correction maps, and rejects rank or axes conflicts. Unit
+compatibility and unit algebra are still Pint's responsibility. If both operands
+carry array-valued weights, ordinary arithmetic keeps the left operand's weights
+to preserve existing in-place correction behavior.
+
+If your module requires stronger domain compatibility, such as identical
+coordinate-axis values or a different rule for combining two weight maps, check
+that explicitly before arithmetic and assign the result metadata deliberately.
+
 For steps that operate on existing bundles, prefer
 `self._normalised_processing_keys()` instead of duplicating input-selection
 logic.
