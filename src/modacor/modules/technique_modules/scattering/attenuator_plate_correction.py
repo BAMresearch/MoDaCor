@@ -224,6 +224,10 @@ class AttenuatorPlateCorrection(ProcessStep):
         for key in self._normalised_processing_keys():
             databundle = self.processing_data[key]
             cos_alpha_bd = databundle[cos_alpha_key]
+            # Current model assumes the plate is detector-parallel, so CosAlpha
+            # is the detector incidence cosine. A future plate_frame option can
+            # resolve a separate NeXus transformation chain for other beamline
+            # materials and compute their own lab-frame incidence cosine.
             cos_alpha = positive_cos_alpha(cos_alpha_bd, minimum_cos_alpha=minimum_cos_alpha)
 
             transmission = self._transmission(
