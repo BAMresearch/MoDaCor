@@ -24,7 +24,7 @@ import numpy as np
 
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.modules.helpers import attach_prepared_data
 
@@ -59,11 +59,13 @@ class ThresholdMask(ProcessStep):
                 "type": str,
                 "default": "threshold_mask",
                 "doc": "BaseData key for the mask to create inside the DataBundle.",
+                "dependency_role": "processing_write_basedata_key",
             },
             "source_basedata_key": {
                 "type": str,
                 "default": "signal",
                 "doc": "BaseData key whose signal array is evaluated to create the mask.",
+                "dependency_role": "processing_read_basedata_key",
             },
             "lower_bound": {
                 "type": (float, int, type(None)),
@@ -106,18 +108,6 @@ class ThresholdMask(ProcessStep):
             upper_bound is not configured.
         """,
     )
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        cfg = self.configuration or {}
-        keys = cfg.get("with_processing_keys")
-        source_key = cfg.get("source_basedata_key", "signal")
-        target_key = cfg.get("target_mask_key", "threshold_mask")
-
-        return ProcessStepDependencies(
-            source_refs=(),
-            processing_reads=processing_key_patterns(keys, basedata_key=source_key),
-            processing_writes=processing_key_patterns(keys, basedata_key=target_key),
-        )
 
     @staticmethod
     def _resolve_bounds(cfg: dict[str, Any]) -> tuple[float | None, float | None]:

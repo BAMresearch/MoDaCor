@@ -17,6 +17,7 @@ import pytest
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.modules.base_modules.combine_uncertainties import CombineUncertainties
 
@@ -58,6 +59,22 @@ def test_combine_uncertainties_creates_new_key():
     np.testing.assert_allclose(bd.uncertainties["stat_total"], expected)
     assert "poisson" in bd.uncertainties
     assert "readout" in bd.uncertainties
+
+
+def test_combine_uncertainties_dependency_contract_is_derived_from_documentation():
+    step = CombineUncertainties()
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        target_basedata_key="I",
+        combinations={"stat_total": ["poisson", "readout"]},
+    )
+
+    contract = step.dependency_contract()
+
+    assert isinstance(contract, ProcessStepDependencies)
+    assert contract.source_refs == frozenset()
+    assert contract.processing_reads == frozenset({"sample.I"})
+    assert contract.processing_writes == frozenset({"sample.I"})
 
 
 def test_combine_uncertainties_can_drop_sources():

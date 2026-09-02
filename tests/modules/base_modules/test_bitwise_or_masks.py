@@ -18,6 +18,7 @@ import numpy as np
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 
@@ -71,6 +72,16 @@ class TestBitwiseOrMasksProcessingStep(unittest.TestCase):
 
         expected = np.array([[4, 0, 0], [0, 32, 0]], dtype=np.uint32)
         np.testing.assert_array_equal(out, expected)
+
+    def test_bitwise_or_masks_dependency_contract_is_derived_from_documentation(self):
+        step = self._make_step(sources=["bs_mask"])
+
+        contract = step.dependency_contract()
+
+        self.assertIsInstance(contract, ProcessStepDependencies)
+        self.assertEqual(contract.source_refs, frozenset())
+        self.assertEqual(contract.processing_reads, frozenset({"sample.mask", "sample.bs_mask"}))
+        self.assertEqual(contract.processing_writes, frozenset({"sample.mask"}))
 
     def test_bitwise_or_masks_execution_via_call(self):
         """

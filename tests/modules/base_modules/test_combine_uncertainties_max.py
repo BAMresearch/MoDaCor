@@ -17,6 +17,7 @@ import pytest
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.modules.base_modules.combine_uncertainties_max import CombineUncertaintiesMax
 
@@ -62,6 +63,22 @@ def test_combine_uncertainties_maximum():
         ]
     )
     np.testing.assert_allclose(bd.uncertainties["sigma_max"], expected)
+
+
+def test_combine_uncertainties_max_dependency_contract_is_derived_from_documentation():
+    step = CombineUncertaintiesMax()
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        target_basedata_key="I",
+        combinations={"sigma_max": ["poisson", "readout"]},
+    )
+
+    contract = step.dependency_contract()
+
+    assert isinstance(contract, ProcessStepDependencies)
+    assert contract.source_refs == frozenset()
+    assert contract.processing_reads == frozenset({"sample.I"})
+    assert contract.processing_writes == frozenset({"sample.I"})
 
 
 def test_combine_uncertainties_max_drop_sources():

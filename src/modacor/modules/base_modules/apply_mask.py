@@ -23,7 +23,7 @@ import numpy as np
 
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -53,12 +53,14 @@ class ApplyMask(ProcessStep):
                 "type": str,
                 "default": "mask",
                 "doc": "BaseData key for the mask to be used inside the DataBundle.",
+                "dependency_role": "processing_read_basedata_key",
             },
             "basedata_to_mask": {
                 "type": list,
                 "required": True,
                 "default": ["signal"],
                 "doc": "List of BaseData keys to apply the mask to.",
+                "dependency_role": "processing_read_write_basedata_key_list",
             },
         },
         step_keywords=["mask", "signal", "apply", "databundle"],
@@ -78,26 +80,6 @@ class ApplyMask(ProcessStep):
     @staticmethod
     def _require_int(arr: np.ndarray, name: str) -> None:
         assert np.issubdtype(arr.dtype, np.integer), f"{name} must be an integer mask, got {arr.dtype}."
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        cfg = self.configuration or {}
-        keys = cfg.get("with_processing_keys")
-        mask_key = cfg.get("mask_key", "mask")
-        source_keys = cfg.get("basedata_to_mask", ["signal"])
-
-        reads = set(processing_key_patterns(keys, basedata_key=mask_key))
-        for source_key in source_keys:
-            reads.update(processing_key_patterns(keys, basedata_key=source_key))
-
-        writes = set()
-        for source_key in source_keys:
-            writes.update(processing_key_patterns(keys, basedata_key=source_key))
-
-        return ProcessStepDependencies(
-            source_refs=(),
-            processing_reads=reads,
-            processing_writes=writes,
-        )
 
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration

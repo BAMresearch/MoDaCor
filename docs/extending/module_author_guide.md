@@ -83,6 +83,55 @@ step-local validation in `calculate()` or helper methods for semantic rules such
 as non-empty strings, mutually exclusive options, source-reference shape, or
 nested dictionary contents.
 
+Argument specs can also declare how configuration values contribute to the
+runtime dependency contract used by partial reruns. Use `dependency_role` when a
+configuration value names a `BaseData` entry in each selected
+`with_processing_keys` bundle:
+
+```python
+documentation = ProcessStepDescriber(
+    ...,
+    arguments={
+        "source_basedata_key": {
+            "type": str,
+            "default": "signal",
+            "doc": "BaseData key to read.",
+            "dependency_role": "processing_read_basedata_key",
+        },
+        "target_basedata_key": {
+            "type": str,
+            "default": "corrected",
+            "doc": "BaseData key to write.",
+            "dependency_role": "processing_write_basedata_key",
+        },
+        "basedata_to_update": {
+            "type": list,
+            "default": ["signal"],
+            "doc": "BaseData keys to read and update.",
+            "dependency_role": "processing_read_write_basedata_key_list",
+        },
+    },
+)
+```
+
+Supported roles are:
+
+- `processing_read_basedata_key`
+- `processing_write_basedata_key`
+- `processing_read_write_basedata_key`
+- `processing_read_basedata_key_list`
+- `processing_write_basedata_key_list`
+- `processing_read_write_basedata_key_list`
+
+When at least one argument declares a dependency role,
+`ProcessStep.dependency_contract()` derives exact `sample.signal`-style reads
+and writes from the current configuration. Modules with no dependency roles keep
+the older conservative behavior based on whole `with_processing_keys` bundles.
+Override `dependency_contract()` only for unusual cases, such as IO side
+effects, source/sink registration steps, parsing dependency paths from strings,
+or steps where different positions in `with_processing_keys` have different
+meanings.
+
 Pipeline YAML uses YAML sequences for list-like values. If a module declares a
 configuration key with `"type": tuple`, a YAML sequence such as `[1.0, 0.0,
 0.0]` is accepted and stored as a Python `tuple` in `self.configuration`.
