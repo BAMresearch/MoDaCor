@@ -108,6 +108,45 @@ def test_resolve_nexus_transform_chain_translation_and_rotation(io_sources):
     )
 
 
+def test_resolve_nexus_transform_chain_allows_zero_vector_for_zero_translation(tmp_path):
+    h5py = pytest.importorskip("h5py")
+    path = tmp_path / "zero_translation.nxs"
+    with h5py.File(path, "w") as h5:
+        transform = h5.create_dataset("/entry1/transformations/noop", data=0.0)
+        _write_transform(
+            transform,
+            transformation_type="translation",
+            units="mm",
+            vector=[0.0, 0.0, 0.0],
+        )
+
+    sources = IoSources()
+    sources.register_source(HDFSource(source_reference="calibration", resource_location=path))
+
+    result = resolve_nexus_transform_chain(sources, "calibration", "/entry1/transformations/noop")
+
+    np.testing.assert_allclose(result.matrix, np.eye(4), atol=1e-15)
+
+
+def test_resolve_nexus_transform_chain_rejects_zero_vector_for_nonzero_translation(tmp_path):
+    h5py = pytest.importorskip("h5py")
+    path = tmp_path / "bad_translation.nxs"
+    with h5py.File(path, "w") as h5:
+        transform = h5.create_dataset("/entry1/transformations/bad", data=1.0)
+        _write_transform(
+            transform,
+            transformation_type="translation",
+            units="mm",
+            vector=[0.0, 0.0, 0.0],
+        )
+
+    sources = IoSources()
+    sources.register_source(HDFSource(source_reference="calibration", resource_location=path))
+
+    with pytest.raises(ValueError, match="vector must be non-zero"):
+        resolve_nexus_transform_chain(sources, "calibration", "/entry1/transformations/bad")
+
+
 def test_load_nexus_detector_frame_inputs_first_pixel_center_origin(io_sources):
     frame = load_nexus_detector_frame_inputs(
         io_sources,

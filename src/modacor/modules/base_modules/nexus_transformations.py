@@ -92,6 +92,14 @@ def _vector3(value: Any, *, name: str) -> np.ndarray:
     return vector / norm
 
 
+def _optional_vector3(value: Any, *, name: str) -> np.ndarray | None:
+    vector = np.asarray(_decode(value), dtype=float).reshape(3)
+    norm = float(np.linalg.norm(vector))
+    if norm == 0.0:
+        return None
+    return vector / norm
+
+
 def _offset3(attrs: dict[str, Any]) -> np.ndarray:
     if "offset" not in attrs:
         return np.zeros(3, dtype=float)
@@ -167,14 +175,19 @@ def resolve_nexus_transform_path(
 
 def _transform_matrix(value: Any, attrs: dict[str, Any], *, path: str) -> np.ndarray:
     transform_type = str(_decode(attrs.get("transformation_type", ""))).strip().lower()
-    vector = _vector3(attrs.get("vector", [0.0, 0.0, 1.0]), name=f"{path}@vector")
-    offset = _offset3(attrs)
 
     if transform_type == "translation":
         distance = _quantity(value, attrs.get("units", "m"), "m")
+        vector = _optional_vector3(attrs.get("vector", [0.0, 0.0, 1.0]), name=f"{path}@vector")
+        if vector is None:
+            if distance == 0.0:
+                return _identity()
+            raise ValueError(f"{path}@vector must be non-zero.")
         return _translation(distance * vector)
 
     if transform_type == "rotation":
+        vector = _vector3(attrs.get("vector", [0.0, 0.0, 1.0]), name=f"{path}@vector")
+        offset = _offset3(attrs)
         angle = _quantity(value, attrs.get("units", "radian"), "radian")
         return _translation(offset) @ _rotation(vector, angle) @ _translation(-offset)
 
