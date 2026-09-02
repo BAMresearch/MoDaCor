@@ -28,6 +28,13 @@ from modacor.io.io_source import ArraySlice
 
 from ..io_source import IoSource
 
+try:
+    import hdf5plugin  # noqa: F401
+except ImportError as error:
+    _HDF5PLUGIN_IMPORT_ERROR: ImportError | None = error
+else:
+    _HDF5PLUGIN_IMPORT_ERROR = None
+
 
 def _slice_cache_key(load_slice: ArraySlice) -> Any:
     if load_slice is Ellipsis:
@@ -43,6 +50,22 @@ def _slice_cache_key(load_slice: ArraySlice) -> Any:
     except TypeError:
         return repr(load_slice)
     return load_slice
+
+
+def _raise_hdf5_read_error(error: OSError) -> None:
+    message = str(error)
+    lower_message = message.lower()
+    plugin_related = any(token in lower_message for token in ("plugin", "filter", "blosc", "bshuf", "lz4"))
+    if plugin_related:
+        if _HDF5PLUGIN_IMPORT_ERROR is None:
+            hint = "hdf5plugin is installed, but HDF5 could not load the required filter plugin."
+        else:
+            hint = (
+                "This HDF5 dataset appears to require an external compression filter. "
+                "Install hdf5plugin in the active MoDaCor environment."
+            )
+        raise OSError(f"{message}\n{hint}") from error
+    raise OSError(error) from error
 
 
 @define(kw_only=True)
@@ -101,20 +124,26 @@ class HDFSource(IoSource):
                 dkey, akey = data_key.rsplit("@", 1)
                 self._static_metadata_cache[data_key] = self.get_data_attributes(dkey).get(akey, None)
             else:
-                with h5py.File(self._file_path, "r") as f:
-                    value = f[data_key][()]
-                    # decode bytes to string if necessary
-                    if isinstance(value, bytes):
-                        value = value.decode("utf-8")
-                    self._static_metadata_cache[data_key] = value
+                try:
+                    with h5py.File(self._file_path, "r") as f:
+                        value = f[data_key][()]
+                        # decode bytes to string if necessary
+                        if isinstance(value, bytes):
+                            value = value.decode("utf-8")
+                        self._static_metadata_cache[data_key] = value
+                except OSError as error:
+                    _raise_hdf5_read_error(error)
         return self._static_metadata_cache[data_key]
 
     def get_data(self, data_key: str, load_slice: ArraySlice = ...) -> np.ndarray:
         cache_key = (data_key, _slice_cache_key(load_slice))
         if cache_key not in self._data_cache:
-            with h5py.File(self._file_path, "r") as f:
-                data_array = f[data_key][load_slice]  # if load_slice is not None else f[data_key][()]
-                self._data_cache[cache_key] = np.array(data_array)
+            try:
+                with h5py.File(self._file_path, "r") as f:
+                    data_array = f[data_key][load_slice]  # if load_slice is not None else f[data_key][()]
+                    self._data_cache[cache_key] = np.array(data_array)
+            except OSError as error:
+                _raise_hdf5_read_error(error)
         return np.array(self._data_cache[cache_key], copy=True)
 
     def get_data_shape(self, data_key: str) -> tuple[int, ...]:
