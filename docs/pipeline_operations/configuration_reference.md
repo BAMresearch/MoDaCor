@@ -49,6 +49,86 @@ code still performs semantic checks for values that need runtime context, such
 as missing sources, non-empty required strings, mutually exclusive options, or
 nested dictionary contents.
 
+## NeXus detector frames
+
+MoDaCor has a generic NeXus transformation-chain resolver in the base modules.
+It follows scalar `depends_on` links, resolves relative NeXus paths, and returns
+a 4x4 affine transform matrix in SI length units. The resolver is deliberately
+not a scattering-only feature: the same NeXus transformation-chain convention
+can describe detectors, sample stages, and other instrument components.
+
+Scattering detector coordinate modules can use this resolver through a
+`detector_frame` configuration block. This keeps pipeline YAML lean because
+`PixelCoordinates3D` can read the detector origin, fast/slow pixel directions,
+pixel pitches, and detector normal from the configured `NXdetector` directly:
+
+```yaml
+steps:
+  pixel_coordinates:
+    module: PixelCoordinates3D
+    configuration:
+      with_processing_keys: [static]
+      detector_frame:
+        type: nexus
+        source: calibration
+        detector_path: /entry1/instrument/detector
+        module_origin: first_pixel_center
+```
+
+`XSGeometryFromPixelCoordinates` accepts the same `detector_frame` block to
+reuse the NeXus pixel pitches and detector normal for solid-angle calculation:
+
+```yaml
+steps:
+  scattering_geometry:
+    module: XSGeometryFromPixelCoordinates
+    requires_steps: [pixel_coordinates]
+    configuration:
+      with_processing_keys: [static]
+      detector_frame:
+        type: nexus
+        source: calibration
+        detector_path: /entry1/instrument/detector
+        module_origin: first_pixel_center
+      sample_z_override:
+        value: 0.0
+        units: mm
+      wavelength_source: calibration::/entry1/calibration_sample/beam/incident_wavelength
+      wavelength_units_source: calibration::/entry1/calibration_sample/beam/incident_wavelength@units
+```
+
+For measurement files with a NeXus sample-stage transformation chain,
+`sample_z_override` can also resolve the sample position from that chain:
+
+```yaml
+      sample_z_override:
+        type: nexus
+        source: sample
+        transform_path: /entry1/sample/transformations/sample_z
+        component: z
+```
+
+`component` defaults to `z` and is extracted from the resolved lab-frame
+translation. The current scattering geometry calculation still models the
+sample position as `(0, 0, sample_z)`; this override makes chained NeXus
+translations usable for the z coordinate without adding a separate
+preprocessing copy step.
+
+The `source` value is an `IoSources` reference. `detector_path` points to the
+`NXdetector`; by default MoDaCor reads its `detector_module` child. Use
+`detector_module_name` when the module has a different child name.
+
+`module_origin` controls how an `NXdetector_module/module_offset` is interpreted:
+
+- `corner`: use the resolved module offset directly.
+- `first_pixel_center`: treat the resolved module offset as the first pixel
+  centre. MoDaCor converts it back to a corner origin because
+  `PixelCoordinates3D` adds the half-pixel centre shift internally.
+
+The older explicit configuration form remains supported. Use direct
+`det_coord_*_source`, `pixel_pitch_*_source`, and `basis_*` values when data are
+not NeXus encoded or when a pipeline intentionally overrides the file geometry.
+
 ## Threshold masks
 
 `ThresholdMask` creates a uint32 mask from any `BaseData` entry in a selected

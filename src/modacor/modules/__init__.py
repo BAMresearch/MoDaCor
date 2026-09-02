@@ -24,6 +24,13 @@ from modacor.modules.base_modules.divide import Divide
 from modacor.modules.base_modules.find_scale_factor1d import FindScaleFactor1D
 from modacor.modules.base_modules.multiply import Multiply
 from modacor.modules.base_modules.multiply_databundles import MultiplyDatabundles
+from modacor.modules.base_modules.nexus_transformations import (
+    NexusDetectorFrameInputs,
+    NexusTransformResult,
+    load_nexus_detector_frame_inputs,
+    resolve_nexus_transform_chain,
+    resolve_nexus_transform_path,
+)
 from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertainties
 from modacor.modules.base_modules.reduce_dimensionality import ReduceDimensionality
 from modacor.modules.base_modules.sink_processing_data import SinkProcessingData
@@ -55,6 +62,8 @@ __all__ = [
     "FindScaleFactor1D",
     "Multiply",
     "MultiplyDatabundles",
+    "NexusDetectorFrameInputs",
+    "NexusTransformResult",
     "PixelCoordinates3D",
     "PoissonUncertainties",
     "ReduceDimensionality",
@@ -66,4 +75,7 @@ __all__ = [
     "UnitsLabelUpdate",
     "XSGeometry",
     "XSGeometryFromPixelCoordinates",
+    "load_nexus_detector_frame_inputs",
+    "resolve_nexus_transform_chain",
+    "resolve_nexus_transform_path",
 ]
