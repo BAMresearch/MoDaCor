@@ -41,6 +41,20 @@ def test_arguments_required_flag_must_be_boolean():
         _build_describer(arguments={"key": {"required": "yes"}})
 
 
+def test_arguments_dependency_role_must_be_known():
+    _build_describer(
+        arguments={
+            "source_key": {
+                "default": "signal",
+                "dependency_role": "processing_read_basedata_key",
+            },
+        }
+    )
+
+    with pytest.raises(ValueError, match="unknown role"):
+        _build_describer(arguments={"source_key": {"dependency_role": "read_some_stuff"}})
+
+
 def test_list_fields_allow_tuples_and_strip_whitespace():
     describer = _build_describer(
         required_data_keys=(" signal ", "units"),

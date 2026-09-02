@@ -54,6 +54,7 @@ class CombineUncertainties(ProcessStep):
                 "type": str,
                 "default": "signal",
                 "doc": "Name of the BaseData entry within each DataBundle to modify (default: 'signal').",
+                "dependency_role": "processing_read_write_basedata_key",
             },
             "combinations": {
                 "type": dict,
