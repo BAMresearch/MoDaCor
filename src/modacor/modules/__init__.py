@@ -45,6 +45,7 @@ from modacor.modules.technique_modules.scattering.detector_efficiency_correction
 from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
 from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
+from modacor.modules.technique_modules.scattering.polarization_correction import PolarizationCorrection
 from modacor.modules.technique_modules.scattering.solid_angle_correction import SolidAngleCorrection
 from modacor.modules.technique_modules.scattering.xs_geometry import XSGeometry
 from modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordinates import (
@@ -72,6 +73,7 @@ __all__ = [
     "NexusDetectorFrameInputs",
     "NexusTransformResult",
     "PixelCoordinates3D",
+    "PolarizationCorrection",
     "PoissonUncertainties",
     "ReduceDimensionality",
     "ReduceMask",
