@@ -52,6 +52,16 @@ def _slice_cache_key(load_slice: ArraySlice) -> Any:
     return load_slice
 
 
+def _decode_hdf_value(value: Any) -> Any:
+    if isinstance(value, (bytes, np.bytes_)):
+        return value.decode("utf-8")
+    if isinstance(value, np.ndarray) and value.shape == ():
+        return _decode_hdf_value(value.item())
+    if isinstance(value, np.ndarray) and value.dtype.kind in {"S", "O", "U"}:
+        return np.array([_decode_hdf_value(item) for item in value.ravel()]).reshape(value.shape)
+    return value
+
+
 def _raise_hdf5_read_error(error: OSError) -> None:
     message = str(error)
     lower_message = message.lower()
@@ -126,11 +136,7 @@ class HDFSource(IoSource):
             else:
                 try:
                     with h5py.File(self._file_path, "r") as f:
-                        value = f[data_key][()]
-                        # decode bytes to string if necessary
-                        if isinstance(value, bytes):
-                            value = value.decode("utf-8")
-                        self._static_metadata_cache[data_key] = value
+                        self._static_metadata_cache[data_key] = _decode_hdf_value(f[data_key][()])
                 except OSError as error:
                     _raise_hdf5_read_error(error)
         return self._static_metadata_cache[data_key]
@@ -162,5 +168,5 @@ class HDFSource(IoSource):
             if data_key in f:
                 dataset = f[data_key]
                 for attr_key in dataset.attrs:
-                    attributes[attr_key] = dataset.attrs[attr_key]
+                    attributes[attr_key] = _decode_hdf_value(dataset.attrs[attr_key])
         return attributes
