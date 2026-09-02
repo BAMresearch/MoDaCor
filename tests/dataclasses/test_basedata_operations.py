@@ -203,6 +203,47 @@ class TestBinaryOpsWithUncertainties(unittest.TestCase):
         np.testing.assert_allclose(result.uncertainties["u"], expected_u)
         np.testing.assert_allclose(result.uncertainties["v"], expected_v)
 
+    def test_inplace_divide_matches_regular_divide_for_framewise_divisor(self):
+        signal = np.arange(1.0, 25.0).reshape(2, 3, 2, 2)
+        base = BaseData(
+            signal=signal.copy(),
+            units=ureg.count,
+            uncertainties={"Poisson": np.sqrt(signal)},
+            rank_of_data=2,
+        )
+        divisor = BaseData(
+            signal=np.array([2.0, 4.0, 8.0]).reshape(1, 3, 1, 1),
+            units=ureg.second,
+            uncertainties={"propagate_to_all": np.array([0.2, 0.4, 0.8]).reshape(1, 3, 1, 1)},
+        )
+        expected = base / divisor
+
+        result = base
+        original_object_id = id(result)
+        original_uncertainty = result.uncertainties["Poisson"]
+        result /= divisor
+
+        self.assertEqual(id(result), original_object_id)
+        self.assertIs(result.uncertainties["Poisson"], original_uncertainty)
+        self.assertEqual(result.rank_of_data, 2)
+        self.assertEqual(result.units, expected.units)
+        np.testing.assert_allclose(result.signal, expected.signal)
+        np.testing.assert_allclose(result.uncertainties["Poisson"], expected.uncertainties["Poisson"])
+
+    def test_inplace_divide_promotes_integer_signal_once(self):
+        base = BaseData(
+            signal=np.array([2, 4, 8], dtype=np.int32),
+            units=ureg.count,
+            uncertainties={"Poisson": np.array([1.0, 2.0, 3.0])},
+        )
+        divisor = BaseData(signal=2.0, units=ureg.dimensionless)
+
+        base /= divisor
+
+        self.assertEqual(base.signal.dtype, np.dtype("float64"))
+        np.testing.assert_allclose(base.signal, [1.0, 2.0, 4.0])
+        np.testing.assert_allclose(base.uncertainties["Poisson"], [0.5, 1.0, 1.5])
+
 
 class TestScalarAndQuantityCoercion(unittest.TestCase):
     """
