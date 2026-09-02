@@ -46,7 +46,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         legacy forms such as mm/pixel are accepted because pixel is dimensionless
 
     Outputs:
-      - Q0, Q1, Q2, Q, Psi, TwoTheta, Omega
+      - Q0, Q1, Q2, Q, Psi, TwoTheta, CosAlpha, Omega
     """
 
     documentation = ProcessStepDescriber(
@@ -150,13 +150,14 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
             "Q": ["signal", "uncertainties"],
             "Psi": ["signal"],  # computed from nominal x/y only
             "TwoTheta": ["signal", "uncertainties"],
+            "CosAlpha": ["signal", "uncertainties"],
             "Omega": ["signal", "uncertainties"],
         },
         step_keywords=["geometry", "Q", "Psi", "TwoTheta", "Solid Angle", "Omega", "scattering"],
         step_doc="Compute Q-vector components and angles from lab-frame pixel coordinates.",
     )
 
-    output_keys: Tuple[str, ...] = ("Q0", "Q1", "Q2", "Q", "Psi", "TwoTheta", "Omega")
+    output_keys: Tuple[str, ...] = ("Q0", "Q1", "Q2", "Q", "Psi", "TwoTheta", "CosAlpha", "Omega")
 
     # ----------------------------
     # loading helpers
@@ -292,13 +293,22 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         cos_alpha = (rhat_x * n[0]) + (rhat_y * n[1]) + (rhat_z * n[2])
         cos_alpha_clipped = cos_alpha.copy()
         cos_alpha_clipped.signal = np.clip(cos_alpha.signal, 0.0, None)
-        cos_alpha = cos_alpha_clipped
+        CosAlpha = cos_alpha_clipped
 
         area_pixel = pitch_fast * pitch_slow
-        Omega = (area_pixel * cos_alpha) / (R**2)
+        Omega = (area_pixel * CosAlpha) / (R**2)
         Omega.units = ureg.steradian
 
-        return {"Q0": Q0, "Q1": Q1, "Q2": Q2, "Q": Q, "Psi": Psi, "TwoTheta": TwoTheta, "Omega": Omega}
+        return {
+            "Q0": Q0,
+            "Q1": Q1,
+            "Q2": Q2,
+            "Q": Q,
+            "Psi": Psi,
+            "TwoTheta": TwoTheta,
+            "CosAlpha": CosAlpha,
+            "Omega": Omega,
+        }
 
     # ----------------------------
     # ProcessStep lifecycle

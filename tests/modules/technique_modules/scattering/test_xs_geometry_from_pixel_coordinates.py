@@ -113,7 +113,7 @@ def _expected_geometry_arrays(
     area = pitch_fast * pitch_slow  # m^2
     omega = (area * cos_alpha) / (R * R)
 
-    return two_theta, psi, Q0, Q1, Q2, Q, omega
+    return two_theta, psi, Q0, Q1, Q2, Q, cos_alpha, omega
 
 
 # ----------------------------
@@ -151,7 +151,7 @@ def test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arr
 
     # compute expected
     exp_sample_z = float(np.mean(sample_z_vals))
-    exp_two_theta, exp_psi, exp_Q0, exp_Q1, exp_Q2, exp_Q, exp_omega = _expected_geometry_arrays(
+    exp_two_theta, exp_psi, exp_Q0, exp_Q1, exp_Q2, exp_Q, exp_cos_alpha, exp_omega = _expected_geometry_arrays(
         coord_x=b["coord_x"].signal,
         coord_y=b["coord_y"].signal,
         coord_z=b["coord_z"].signal,
@@ -172,6 +172,7 @@ def test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arr
     np.testing.assert_allclose(out["Q2"].signal, exp_Q2)
     np.testing.assert_allclose(out["Q"].signal, exp_Q)
 
+    np.testing.assert_allclose(out["CosAlpha"].signal, exp_cos_alpha)
     np.testing.assert_allclose(out["Omega"].signal, exp_omega)
 
     # basic metadata checks
@@ -179,6 +180,7 @@ def test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arr
     assert out["TwoTheta"].units.is_compatible_with(ureg.radian)
     assert out["Psi"].units.is_compatible_with(ureg.radian)
     assert out["Q"].units.is_compatible_with(ureg.m**-1)
+    assert out["CosAlpha"].units.is_compatible_with(ureg.dimensionless)
     assert out["Omega"].units == ureg.steradian
 
 

@@ -40,6 +40,8 @@ from modacor.modules.base_modules.subtract import Subtract
 from modacor.modules.base_modules.subtract_databundles import SubtractDatabundles
 from modacor.modules.base_modules.threshold_mask import ThresholdMask
 from modacor.modules.base_modules.units_label_update import UnitsLabelUpdate
+from modacor.modules.technique_modules.scattering.attenuator_plate_correction import AttenuatorPlateCorrection
+from modacor.modules.technique_modules.scattering.detector_efficiency_correction import DetectorEfficiencyCorrection
 from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
 from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
@@ -53,11 +55,13 @@ __all__ = [
     "AppendProcessingData",
     "AppendSink",
     "AppendSource",
+    "AttenuatorPlateCorrection",
     "ApplyMask",
     "BitwiseOrMasks",
     "CombineUncertainties",
     "CombineUncertaintiesMax",
     "CopyDataBundleKeys",
+    "DetectorEfficiencyCorrection",
     "DilateMask",
     "Divide",
     "IndexPixels",
