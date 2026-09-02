@@ -244,6 +244,35 @@ class TestBinaryOpsWithUncertainties(unittest.TestCase):
         np.testing.assert_allclose(base.signal, [1.0, 2.0, 4.0])
         np.testing.assert_allclose(base.uncertainties["Poisson"], [0.5, 1.0, 1.5])
 
+    def test_inplace_subtract_matches_regular_subtract(self):
+        signal = np.arange(1.0, 13.0).reshape(3, 4)
+        background = signal * 0.1
+        base = BaseData(
+            signal=signal.copy(),
+            units=ureg.count / ureg.second,
+            uncertainties={"Poisson": np.sqrt(signal), "bsdiodes_STD": signal * 0.02},
+            rank_of_data=2,
+        )
+        subtrahend = BaseData(
+            signal=background,
+            units=ureg.count / ureg.second,
+            uncertainties={"Poisson": np.sqrt(background), "bsdiodes_STD": background * 0.05},
+            rank_of_data=2,
+        )
+        expected = base / 1.0 - subtrahend
+
+        original_object_id = id(base)
+        original_uncertainty = base.uncertainties["Poisson"]
+        base -= subtrahend
+
+        self.assertEqual(id(base), original_object_id)
+        self.assertIs(base.uncertainties["Poisson"], original_uncertainty)
+        self.assertEqual(base.rank_of_data, 2)
+        self.assertEqual(base.units, expected.units)
+        np.testing.assert_allclose(base.signal, expected.signal)
+        np.testing.assert_allclose(base.uncertainties["Poisson"], expected.uncertainties["Poisson"])
+        np.testing.assert_allclose(base.uncertainties["bsdiodes_STD"], expected.uncertainties["bsdiodes_STD"])
+
 
 class TestScalarAndQuantityCoercion(unittest.TestCase):
     """

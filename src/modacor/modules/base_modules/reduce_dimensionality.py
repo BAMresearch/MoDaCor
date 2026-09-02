@@ -108,6 +108,21 @@ class ReduceDimensionality(ProcessStep):
         return normalized
 
     @staticmethod
+    def _axis_count(shape: tuple[int, ...], axis: int | tuple[int, ...] | None) -> int:
+        if axis is None:
+            return int(np.prod(shape))
+        if isinstance(axis, tuple):
+            return int(np.prod([shape[a if a >= 0 else len(shape) + a] for a in axis]))
+        return int(shape[axis if axis >= 0 else len(shape) + axis])
+
+    @staticmethod
+    def _scalar_weight(weights: np.ndarray) -> float | None:
+        weights = np.asarray(weights, dtype=float)
+        if weights.size != 1:
+            return None
+        return float(weights.reshape(-1)[0])
+
+    @staticmethod
     def _weighted_mean_with_uncertainty(
         bd: BaseData,
         axis: int | tuple[int, ...] | None,
@@ -124,13 +139,20 @@ class ReduceDimensionality(ProcessStep):
             'sum'  → S = Σ w x
         """
         x = bd.signal
+        scalar_weight = ReduceDimensionality._scalar_weight(bd.weights) if use_weights else 1.0
+
+        if scalar_weight is not None:
+            return ReduceDimensionality._scalar_weight_reduction(
+                bd=bd,
+                axis=axis,
+                nan_policy=nan_policy,
+                reduction=reduction,
+                scalar_weight=scalar_weight,
+            )
 
         # Choose weights
-        if use_weights:
-            w = np.asarray(bd.weights, dtype=float)
-            w = np.broadcast_to(w, x.shape)
-        else:
-            w = np.ones_like(x, dtype=float)
+        w = np.asarray(bd.weights, dtype=float)
+        w = np.broadcast_to(w, x.shape)
 
         # NaN handling
         if nan_policy == "omit":
@@ -220,6 +242,93 @@ class ReduceDimensionality(ProcessStep):
         # Rank of data: cannot exceed new ndim, and should not exceed original rank
         result.rank_of_data = min(bd.rank_of_data, new_ndim)
 
+        return result
+
+    @staticmethod
+    def _scalar_weight_reduction(
+        *,
+        bd: BaseData,
+        axis: int | tuple[int, ...] | None,
+        nan_policy: str,
+        reduction: str,
+        scalar_weight: float,
+    ) -> BaseData:
+        x = bd.signal
+
+        if nan_policy == "propagate":
+            if reduction == "mean":
+                signal_out = np.mean(x, axis=axis)
+                denom = ReduceDimensionality._axis_count(x.shape, axis)
+            elif reduction == "sum":
+                signal_out = np.sum(x, axis=axis) * scalar_weight
+                denom = None
+            else:
+                raise ValueError(f"Invalid reduction: {reduction!r}. Use 'mean' or 'sum'.")
+
+            uncertainties_out = {}
+            for key, err in bd.uncertainties.items():
+                err_arr = np.broadcast_to(np.asarray(err, dtype=float), x.shape)
+                sigma = np.sqrt(np.sum(err_arr * err_arr, axis=axis))
+                if reduction == "mean":
+                    sigma = sigma / denom
+                else:
+                    sigma = sigma * abs(scalar_weight)
+                uncertainties_out[key] = sigma
+        elif nan_policy == "omit":
+            if np.isnan(scalar_weight):
+                signal_out = np.sum(np.full_like(x, np.nan), axis=axis)
+                uncertainties_out = {key: np.sum(np.full_like(x, np.nan), axis=axis) for key in bd.uncertainties}
+            else:
+                mask = np.isnan(x)
+                finite_count = np.sum(~mask, axis=axis)
+                x_eff = np.where(mask, 0.0, x)
+                if reduction == "mean":
+                    denom = np.where(finite_count == 0, np.nan, finite_count)
+                    signal_out = np.sum(x_eff, axis=axis) / denom
+                elif reduction == "sum":
+                    signal_out = np.sum(x_eff, axis=axis) * scalar_weight
+                    denom = None
+                else:
+                    raise ValueError(f"Invalid reduction: {reduction!r}. Use 'mean' or 'sum'.")
+
+                uncertainties_out = {}
+                for key, err in bd.uncertainties.items():
+                    err_arr = np.broadcast_to(np.asarray(err, dtype=float), x.shape)
+                    err_eff = np.where(mask, 0.0, err_arr)
+                    sigma = np.sqrt(np.sum(err_eff * err_eff, axis=axis))
+                    if reduction == "mean":
+                        sigma = sigma / denom
+                    else:
+                        sigma = sigma * abs(scalar_weight)
+                    uncertainties_out[key] = sigma
+        else:
+            raise ValueError(f"Invalid nan_policy: {nan_policy!r}. Use 'omit' or 'propagate'.")
+
+        result = BaseData(
+            signal=signal_out,
+            units=bd.units,
+            uncertainties=uncertainties_out,
+            weights=(
+                np.array(1.0)
+                if reduction == "mean"
+                else np.full(signal_out.shape, scalar_weight * ReduceDimensionality._axis_count(x.shape, axis))
+            ),
+        )
+
+        new_ndim = result.signal.ndim
+        if axis is None:
+            reduced_axes_tuple: tuple[int, ...] = tuple(range(x.ndim))
+        elif isinstance(axis, tuple):
+            reduced_axes_tuple = axis
+        else:
+            reduced_axes_tuple = (axis,)
+
+        reduced_axes_norm = {a if a >= 0 else x.ndim + a for a in reduced_axes_tuple}
+        old_axes = bd.axes
+        result.axes = (
+            [ax for i, ax in enumerate(old_axes) if i not in reduced_axes_norm] if len(old_axes) == x.ndim else []
+        )
+        result.rank_of_data = min(bd.rank_of_data, new_ndim)
         return result
 
     # ---------------------------- main API ---------------------------------

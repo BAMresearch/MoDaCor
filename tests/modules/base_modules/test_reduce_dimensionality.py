@@ -334,6 +334,42 @@ def test_reduce_dimensionality_nan_uncertainty_omit_policy_is_explicit():
     assert np.isnan(out.uncertainties["u"][1])
 
 
+def test_scalar_weight_fast_path_matches_explicit_unit_weights():
+    signal = np.arange(24.0).reshape(2, 3, 4)
+    unc = {"u": np.sqrt(signal + 1.0)}
+
+    scalar_weight_bd = BaseData(
+        signal=signal,
+        units=ureg.count,
+        uncertainties=unc,
+        weights=np.array(1.0),
+    )
+    explicit_weight_bd = BaseData(
+        signal=signal,
+        units=ureg.count,
+        uncertainties=unc,
+        weights=np.ones_like(signal),
+    )
+
+    fast = ReduceDimensionality._weighted_mean_with_uncertainty(
+        bd=scalar_weight_bd,
+        axis=(0, 1),
+        use_weights=True,
+        nan_policy="propagate",
+        reduction="mean",
+    )
+    explicit = ReduceDimensionality._weighted_mean_with_uncertainty(
+        bd=explicit_weight_bd,
+        axis=(0, 1),
+        use_weights=True,
+        nan_policy="propagate",
+        reduction="mean",
+    )
+
+    np.testing.assert_allclose(fast.signal, explicit.signal)
+    np.testing.assert_allclose(fast.uncertainties["u"], explicit.uncertainties["u"])
+
+
 def test_reduce_dimensionality_emits_info_and_debug_logs(caplog):
     """
     Ensure that ReduceDimensionality.calculate() emits at least one INFO and

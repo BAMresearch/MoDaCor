@@ -378,6 +378,16 @@ def _coerce_inplace_divisor(other: Any) -> BaseData | None:
     return None
 
 
+def _coerce_inplace_add_sub_operand(target: BaseData, other: Any) -> BaseData | None:
+    if isinstance(other, numbers.Real):
+        return BaseData(signal=float(other), units=target.units)
+    if isinstance(other, pint.Quantity):
+        return BaseData(signal=float(other.magnitude), units=other.units)
+    if isinstance(other, BaseData):
+        return other
+    return None
+
+
 def _uncertainty_key_plan(
     left_unc: Dict[str, np.ndarray],
     right_unc: Dict[str, np.ndarray],
@@ -476,6 +486,55 @@ def _inplace_truediv_metadata_neutral(target: BaseData, other: BaseData) -> Base
         uncertainty_factor=abs(unit_factor),
     )
     target.units = result_units
+    return target
+
+
+def _inplace_add_sub(target: BaseData, other: BaseData, *, sign: float) -> BaseData | None:
+    try:
+        out_shape = np.broadcast_shapes(target.signal.shape, other.signal.shape)
+    except ValueError:
+        return None
+    if out_shape != target.signal.shape:
+        return None
+    _validate_binary_metadata_compatibility(target, other, out_shape)
+
+    result_units = (1 * target.units + sign * (1 * other.units)).units
+    cf_target = float(result_units.m_from(target.units))
+    cf_other = float(result_units.m_from(other.units))
+
+    other_signal = np.broadcast_to(np.asarray(other.signal, dtype=float), target.signal.shape)
+    if not np.issubdtype(target.signal.dtype, np.floating):
+        target.signal = target.signal.astype(float)
+    if cf_target != 1.0:
+        target.signal *= cf_target
+    target.signal += sign * cf_other * other_signal
+
+    out_keys, left_global, right_global = _uncertainty_key_plan(target.uncertainties, other.uncertainties)
+    left_unc = dict(target.uncertainties)
+    result_unc: Dict[str, np.ndarray] = {}
+    for key in out_keys:
+        if key in left_unc:
+            sigma = _writable_full_shape_uncertainty(target, left_unc[key], key)
+            if cf_target != 1.0:
+                sigma *= abs(cf_target)
+        elif left_global is not None:
+            sigma = _writable_full_shape_uncertainty(target, left_global, key)
+            if cf_target != 1.0:
+                sigma *= abs(cf_target)
+        else:
+            sigma = np.zeros_like(target.signal, dtype=float)
+
+        sigma_b = other.uncertainties.get(key, right_global)
+        if sigma_b is not None:
+            term_b = np.empty_like(target.signal, dtype=float)
+            term_b[...] = np.asarray(sigma_b, dtype=float)
+            if cf_other != 1.0:
+                term_b *= abs(cf_other)
+            np.hypot(sigma, term_b, out=sigma)
+        result_unc[key] = sigma
+
+    target.units = result_units
+    target.uncertainties = result_unc
     return target
 
 
@@ -601,6 +660,20 @@ class UncertaintyOpsMixin:
 
     def __rsub__(self, other: Any) -> BaseData:
         return self._binary_op(other, operator.sub, swapped=True)
+
+    def __iadd__(self, other: Any) -> BaseData:
+        other_basedata = _coerce_inplace_add_sub_operand(self, other)
+        if other_basedata is None:
+            return NotImplemented
+        in_place_result = _inplace_add_sub(self, other_basedata, sign=1.0)
+        return self + other_basedata if in_place_result is None else in_place_result
+
+    def __isub__(self, other: Any) -> BaseData:
+        other_basedata = _coerce_inplace_add_sub_operand(self, other)
+        if other_basedata is None:
+            return NotImplemented
+        in_place_result = _inplace_add_sub(self, other_basedata, sign=-1.0)
+        return self - other_basedata if in_place_result is None else in_place_result
 
     def __mul__(self, other: Any) -> BaseData:
         return self._binary_op(other, operator.mul)
