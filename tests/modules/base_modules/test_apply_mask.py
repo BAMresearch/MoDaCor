@@ -34,7 +34,7 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
     def setUp(self):
         self.test_processing_data = ProcessingData()
 
-        tgt = np.ones((2, 3), dtype=np.uint32)
+        tgt = np.ones((2, 3), dtype=float)
         mask = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.uint32)
 
         db = DataBundle(
@@ -43,13 +43,14 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
         )
         self.test_processing_data["sample"] = db
 
-    def _make_step(self, *, mask="mask", sources=None) -> ApplyMask:
+    def _make_step(self, *, mask="mask", sources=None, masked_value=0) -> ApplyMask:
         step = ApplyMask(io_sources=TEST_IO_SOURCES)
         step.modify_config_by_dict(
             {
                 "with_processing_keys": ["sample"],
                 "mask_key": mask,
                 "basedata_to_mask": list(sources or ["signal"]),
+                "masked_value": masked_value,
             }
         )
         step.processing_data = self.test_processing_data
@@ -73,6 +74,25 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
         expected = np.array([[0, 1, 1], [1, 0, 1]])
         np.testing.assert_array_equal(out, expected)
 
+    def test_apply_mask_default_masked_value_is_nan(self):
+        self.setUp()
+
+        step = ApplyMask(io_sources=TEST_IO_SOURCES)
+        step.modify_config_by_dict(
+            {
+                "with_processing_keys": ["sample"],
+                "mask_key": "mask",
+                "basedata_to_mask": ["signal"],
+            }
+        )
+        step.processing_data = self.test_processing_data
+
+        step.calculate()
+
+        out = step.processing_data["sample"]["signal"].signal
+        expected = np.array([[np.nan, 1.0, 1.0], [1.0, np.nan, 1.0]])
+        np.testing.assert_allclose(out, expected)
+
     def test_apply_mask_treats_any_nonzero_bit_as_masked(self):
         self.test_processing_data = ProcessingData()
 
@@ -89,7 +109,46 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
         step.calculate()
 
         expected = np.array([[0, 1, 1], [1, 0, 1]], dtype=np.uint32)
-        np.testing.assert_array_equal(self.test_processing_data["sample"]["signal"].signal, expected)
+        out = self.test_processing_data["sample"]["signal"].signal
+        self.assertEqual(out.dtype, np.uint32)
+        np.testing.assert_array_equal(out, expected)
+
+    def test_apply_mask_promotes_integer_signal_for_nan(self):
+        self.test_processing_data = ProcessingData()
+
+        tgt = np.ones((2, 3), dtype=np.uint32)
+        mask = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.uint32)
+
+        self.test_processing_data["sample"] = DataBundle(
+            mask=BaseData(signal=mask, units=ureg.dimensionless, uncertainties={}),
+            signal=BaseData(signal=tgt, units=ureg.dimensionless, uncertainties={}),
+        )
+
+        step = self._make_step(masked_value="nan")
+        step.calculate()
+
+        out = self.test_processing_data["sample"]["signal"].signal
+        assert np.issubdtype(out.dtype, np.floating)
+        expected = np.array([[np.nan, 1.0, 1.0], [1.0, np.nan, 1.0]])
+        np.testing.assert_allclose(out, expected)
+
+    def test_apply_mask_accepts_negative_masked_value(self):
+        self.test_processing_data = ProcessingData()
+
+        tgt = np.ones((2, 3), dtype=np.uint32)
+        mask = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.uint32)
+
+        self.test_processing_data["sample"] = DataBundle(
+            mask=BaseData(signal=mask, units=ureg.dimensionless, uncertainties={}),
+            signal=BaseData(signal=tgt, units=ureg.dimensionless, uncertainties={}),
+        )
+
+        step = self._make_step(masked_value=-1)
+        step.calculate()
+
+        out = self.test_processing_data["sample"]["signal"].signal
+        expected = np.array([[-1, 1, 1], [1, -1, 1]])
+        np.testing.assert_array_equal(out, expected)
 
     def test_apply_mask_broadcasts_detector_mask_over_frame_axis(self):
         self.test_processing_data = ProcessingData()

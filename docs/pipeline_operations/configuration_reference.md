@@ -211,6 +211,35 @@ Use `mask_mode: inside` for the inverse region of interest, for example to mask
 only a beamstop band or a known bad azimuthal sector while leaving the rest of
 the detector unmasked.
 
+For dynamic detector data, keep the dimensionality semantics explicit:
+
+- Use `ThresholdMask` before normalization or frame averaging to create a
+  frame-resolved raw-count mask.
+- Use `ReduceMask` to collapse non-detector axes while preserving NeXus bitfield
+  reason bits. `reduction: any` keeps a pixel masked if it was masked in any
+  reduced frame; `reduction: all` keeps only bits present in every reduced
+  frame.
+- Use `BitwiseOrMasks` to combine a reduced dynamic mask with a static
+  instrument mask before `IndexedAverager`.
+
+`ReduceDimensionality` is intentionally signal-oriented and performs numeric
+mean/sum reductions. It is not a replacement for `ReduceMask`, because numeric
+averaging does not preserve integer mask bitfields.
+
+When `ApplyMask` is used to replace masked signal values, `masked_value`
+defaults to `nan`. Explicit sentinel values remain available:
+
+```yaml
+steps:
+  apply_mask:
+    module: ApplyMask
+    configuration:
+      with_processing_keys: [sample]
+      mask_key: mask
+      basedata_to_mask: [signal]
+      masked_value: nan
+```
+
 When a pipeline is loaded through a runtime service using the restricted
 runtime policy, the `module` name must resolve through the service's curated or
 explicit `ProcessStepRegistry`. Filesystem discovery of unregistered module

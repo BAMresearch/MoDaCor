@@ -33,6 +33,7 @@ from modacor.modules.base_modules.nexus_transformations import (
 )
 from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertainties
 from modacor.modules.base_modules.reduce_dimensionality import ReduceDimensionality
+from modacor.modules.base_modules.reduce_mask import ReduceMask
 from modacor.modules.base_modules.sink_processing_data import SinkProcessingData
 from modacor.modules.base_modules.subtract import Subtract
 from modacor.modules.base_modules.subtract_databundles import SubtractDatabundles
@@ -67,6 +68,7 @@ __all__ = [
     "PixelCoordinates3D",
     "PoissonUncertainties",
     "ReduceDimensionality",
+    "ReduceMask",
     "SinkProcessingData",
     "SolidAngleCorrection",
     "SubtractDatabundles",
