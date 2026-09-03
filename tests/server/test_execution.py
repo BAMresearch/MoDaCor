@@ -124,3 +124,19 @@ def test_sink_processing_data_dependency_contract_reads_exported_paths():
     assert contract.processing_writes == frozenset()
     assert find_dirty_step_ids(Pipeline.from_dict({export: set()}), changed_keys=["sample.Q"]) == {"export"}
     assert find_dirty_step_ids(Pipeline.from_dict({export: set()}), changed_keys=["other.signal"]) == set()
+
+
+def test_sink_processing_data_dependency_contract_reads_bundle_root():
+    export = SinkProcessingData(step_id="export")
+    export.modify_config_by_dict(
+        {
+            "target": "result_hdf::after_plot_2d",
+            "data_paths": ["/sample"],
+        }
+    )
+
+    contract = export.dependency_contract()
+
+    assert contract.processing_reads == {"sample.*"}
+    assert find_dirty_step_ids(Pipeline.from_dict({export: set()}), changed_keys=["sample.signal"]) == {"export"}
+    assert find_dirty_step_ids(Pipeline.from_dict({export: set()}), changed_keys=["background.signal"]) == set()

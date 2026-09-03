@@ -59,8 +59,55 @@ def test_plot_2d_visualization_publishes_first_frame_for_higher_rank_data():
     assert payload["metadata"]["color_scale"]["source_zmin"] == 1.0
     assert payload["metadata"]["color_scale"]["source_zmax"] == pytest.approx(10.91)
     assert payload["data"][0]["colorscale"] == "Plasma"
+    assert payload["metadata"]["colormap"] == "Plasma"
     assert payload["data"][0]["z"][0] == [None, 0.0, pytest.approx(np.log10(2.0)), pytest.approx(np.log10(3.0))]
     assert payload["data"][0]["z"][1][2] is None
     assert payload["data"][0]["zmin"] == 0.0
     assert payload["data"][0]["zmax"] == pytest.approx(np.log10(10.91))
     assert payload["layout"]["yaxis"]["autorange"] == "reversed"
+
+
+def test_plot_2d_visualization_accepts_colormap_configuration():
+    processing = ProcessingData()
+    sample = DataBundle()
+    sample["image"] = BaseData(signal=np.array([[1.0, 2.0], [3.0, 4.0]]), units=ureg.Unit("count"), rank_of_data=2)
+    processing["sample"] = sample
+    store = RuntimeBufferStore()
+
+    step = Plot2DVisualization(processing_data=processing, io_sinks=_sinks(store), step_id="plot2d")
+    step.modify_config_by_dict(
+        {
+            "target": "plots::detector",
+            "data_path": "/sample/image",
+            "colormap": "Cividis",
+        }
+    )
+
+    step.calculate()
+
+    payload = store.get_metadata("s1", "sink", "plots", "detector")
+    assert payload["data"][0]["colorscale"] == "Cividis"
+    assert payload["metadata"]["colormap"] == "Cividis"
+
+
+def test_plot_2d_visualization_keeps_colorscale_alias():
+    processing = ProcessingData()
+    sample = DataBundle()
+    sample["image"] = BaseData(signal=np.array([[1.0, 2.0], [3.0, 4.0]]), units=ureg.Unit("count"), rank_of_data=2)
+    processing["sample"] = sample
+    store = RuntimeBufferStore()
+
+    step = Plot2DVisualization(processing_data=processing, io_sinks=_sinks(store), step_id="plot2d")
+    step.modify_config_by_dict(
+        {
+            "target": "plots::detector",
+            "data_path": "/sample/image",
+            "colorscale": "Viridis",
+        }
+    )
+
+    step.calculate()
+
+    payload = store.get_metadata("s1", "sink", "plots", "detector")
+    assert payload["data"][0]["colorscale"] == "Viridis"
+    assert payload["metadata"]["colormap"] == "Viridis"

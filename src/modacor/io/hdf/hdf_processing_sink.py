@@ -14,7 +14,7 @@ __status__ = "Development"  # "Development", "Production"
 """HDF5 sink for writing processing results, pipeline metadata, and trace events."""
 
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Sequence
 
 import h5py
@@ -380,17 +380,48 @@ def _collect_all_basedata_paths(processing_data: ProcessingData) -> list[str]:
     return paths
 
 
+def _path_parts(path: str) -> tuple[str, ...]:
+    return tuple(part for part in PurePosixPath(str(path).strip()).parts if part != "/")
+
+
+def _collect_bundle_basedata_paths(processing_data: ProcessingData, bundle_key: str) -> list[str]:
+    try:
+        databundle = processing_data[bundle_key]
+    except KeyError as exc:
+        raise KeyError(f"ProcessingData missing bundle '{bundle_key}'.") from exc
+
+    return [
+        f"/{bundle_key}/{basedata_name}"
+        for basedata_name in sorted(databundle.keys())
+        if isinstance(databundle[basedata_name], BaseData)
+    ]
+
+
+def _expand_basedata_paths(processing_data: ProcessingData, data_paths: Sequence[str] | str | None) -> list[str]:
+    if isinstance(data_paths, str):
+        raw_data_paths = [data_paths]
+    elif data_paths is not None:
+        raw_data_paths = [str(path) for path in data_paths]
+    else:
+        raw_data_paths = []
+
+    resolved_data_paths: list[str] = []
+    for path in raw_data_paths:
+        parts = _path_parts(path)
+        if len(parts) == 1:
+            resolved_data_paths.extend(_collect_bundle_basedata_paths(processing_data, parts[0]))
+        else:
+            resolved_data_paths.append(path)
+    return resolved_data_paths
+
+
 def _resolve_basedata_paths(
     processing_data: ProcessingData,
     data_paths: Sequence[str] | str | None,
     *,
     write_all_processing_data: bool = False,
 ) -> list[str]:
-    resolved_data_paths: list[str] = []
-    if isinstance(data_paths, str):
-        resolved_data_paths = [data_paths]
-    elif data_paths is not None:
-        resolved_data_paths = [str(path) for path in data_paths]
+    resolved_data_paths = _expand_basedata_paths(processing_data, data_paths)
 
     if write_all_processing_data:
         resolved_data_paths.extend(_collect_all_basedata_paths(processing_data))

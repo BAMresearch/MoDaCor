@@ -77,6 +77,14 @@ def _float_or_none(value: Any) -> float | None:
     return float(value)
 
 
+def _configured_colormap(cfg: dict[str, Any]) -> str:
+    colormap = str(cfg.get("colormap") or "Plasma")
+    colorscale = _str_or_none(cfg.get("colorscale"))
+    if colorscale is not None and colormap == "Plasma":
+        return colorscale
+    return colormap
+
+
 def _scaled_frame(
     frame: np.ndarray,
     *,
@@ -155,9 +163,14 @@ class Plot2DVisualization(ProcessStep):
                 "doc": "Optional plot title.",
             },
             "colorscale": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Backward-compatible alias for colormap.",
+            },
+            "colormap": {
                 "type": str,
                 "default": "Plasma",
-                "doc": "Plotly colorscale name.",
+                "doc": "Plotly colormap/colorscale name.",
             },
             "zmin": {
                 "type": (int, float, type(None)),
@@ -234,7 +247,7 @@ class Plot2DVisualization(ProcessStep):
         trace: dict[str, Any] = {
             "type": "heatmap",
             "z": _plotly_z_values(scaled_frame),
-            "colorscale": str(cfg.get("colorscale") or "Plasma"),
+            "colorscale": _configured_colormap(cfg),
             "colorbar": {
                 "title": {"text": f"log10({units})" if scale_metadata["scale"] == "log10" and units else units}
             },
@@ -268,6 +281,7 @@ class Plot2DVisualization(ProcessStep):
                 "positive_pixels": int((finite & (frame > 0)).sum()),
                 "total_pixels": int(finite.size),
                 "color_scale": scale_metadata,
+                "colormap": _configured_colormap(cfg),
             },
         }
         self.io_sinks.write_data(target, payload)
