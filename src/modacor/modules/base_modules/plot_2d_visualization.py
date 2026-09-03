@@ -163,6 +163,11 @@ class Plot2DVisualization(ProcessStep):
                 "default": "Plasma",
                 "doc": "Plotly colorscale name. Use the 'colormap' key and Plotly's canonical capitalization.",
             },
+            "uirevision": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Stable Plotly UI revision key. Keep unchanged to preserve zoom/pan during live updates.",
+            },
             "zmin": {
                 "type": (int, float, type(None)),
                 "default": None,
@@ -254,6 +259,7 @@ class Plot2DVisualization(ProcessStep):
             "yaxis": {"title": {"text": "y pixel"}, "showgrid": False, "scaleanchor": "x"},
             "margin": {"l": 70, "r": 70, "t": 56, "b": 58},
             "template": "plotly_white",
+            "uirevision": _str_or_none(cfg.get("uirevision")) or target,
         }
         if bool(cfg.get("reverse_y", True)):
             layout["yaxis"]["autorange"] = "reversed"

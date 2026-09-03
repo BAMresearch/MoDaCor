@@ -40,6 +40,7 @@ ERROR_BAR_COLORS = [
 DEFAULT_ERROR_BAR_OPACITY = 0.65
 DEFAULT_ERROR_BAR_THICKNESS = 2.0
 DEFAULT_ERROR_BAR_WIDTH = 3
+DEFAULT_LEGEND_MARKER_SIZE = 9
 
 
 @define(frozen=True, slots=True)
@@ -186,6 +187,16 @@ class Plot1DVisualization(ProcessStep):
                 "type": (int, float),
                 "default": DEFAULT_ERROR_BAR_WIDTH,
                 "doc": "Plotly error bar cap width.",
+            },
+            "legend_marker_size": {
+                "type": (int, float),
+                "default": DEFAULT_LEGEND_MARKER_SIZE,
+                "doc": "Marker size for legend-only uncertainty entries.",
+            },
+            "uirevision": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Stable Plotly UI revision key. Keep unchanged to preserve zoom/pan during live updates.",
             },
             "title": {
                 "type": (str, type(None)),
@@ -340,11 +351,14 @@ class Plot1DVisualization(ProcessStep):
             for candidate in yerr_candidates
         ]
         title = _str_or_none(cfg.get("title")) or f"{y_path} vs {x_path}"
+        uirevision = _str_or_none(cfg.get("uirevision")) or target
         error_bar_opacity = float(cfg.get("error_bar_opacity", DEFAULT_ERROR_BAR_OPACITY))
         error_bar_thickness = float(cfg.get("error_bar_thickness", DEFAULT_ERROR_BAR_THICKNESS))
         error_bar_width = float(cfg.get("error_bar_width", DEFAULT_ERROR_BAR_WIDTH))
+        legend_marker_size = float(cfg.get("legend_marker_size", DEFAULT_LEGEND_MARKER_SIZE))
 
         traces: list[dict[str, Any]] = []
+        legend_traces: list[dict[str, Any]] = []
         first_valid: np.ndarray | None = None
         trace_count = max(len(xerr_candidates), len(yerr_candidates), 1)
         for index in range(trace_count):
@@ -359,14 +373,18 @@ class Plot1DVisualization(ProcessStep):
                 first_valid = valid
             color = ERROR_BAR_COLORS[index % len(ERROR_BAR_COLORS)]
             marker_size = 5 if index == 0 else 0
+            trace_name = self._trace_name(title, xerr_candidate, yerr_candidate)
+            legendgroup = f"uncertainty-{index}"
             trace: dict[str, Any] = {
                 "type": "scatter",
                 "mode": "markers",
-                "name": self._trace_name(title, xerr_candidate, yerr_candidate),
+                "name": trace_name,
                 "x": x[valid].tolist(),
                 "y": y[valid].tolist(),
                 "marker": {"size": marker_size, "opacity": 0.85, "color": color},
-                "showlegend": True,
+                "showlegend": False,
+                "legendgroup": legendgroup,
+                "meta": {"modacor_role": "data"},
             }
             error_bar_color = _rgba(color, error_bar_opacity)
             if xerr_candidate is not None:
@@ -388,6 +406,20 @@ class Plot1DVisualization(ProcessStep):
                     "color": error_bar_color,
                 }
             traces.append(trace)
+            legend_traces.append(
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": trace_name,
+                    "x": [None],
+                    "y": [None],
+                    "marker": {"size": legend_marker_size, "opacity": 0.95, "color": color},
+                    "showlegend": True,
+                    "legendgroup": legendgroup,
+                    "hoverinfo": "skip",
+                    "meta": {"modacor_role": "legend"},
+                }
+            )
 
         axis_valid = first_valid if first_valid is not None else base_valid
         x_valid = x[axis_valid]
@@ -400,6 +432,8 @@ class Plot1DVisualization(ProcessStep):
             "margin": {"l": 76, "r": 30, "t": 56, "b": 64},
             "template": "plotly_white",
             "showlegend": True,
+            "legend": {"groupclick": "togglegroup"},
+            "uirevision": uirevision,
         }
         if bool(cfg.get("auto_log_x", True)) and x_valid.size and np.all(x_valid > 0):
             layout["xaxis"]["type"] = "log"
@@ -408,7 +442,7 @@ class Plot1DVisualization(ProcessStep):
 
         payload = {
             "schema_version": "modacor.plotly_1d.v1",
-            "data": traces,
+            "data": traces + legend_traces,
             "layout": layout,
             "metadata": {
                 "x_path": x_path,

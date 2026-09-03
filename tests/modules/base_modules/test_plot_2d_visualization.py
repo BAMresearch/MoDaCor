@@ -65,6 +65,7 @@ def test_plot_2d_visualization_publishes_first_frame_for_higher_rank_data():
     assert payload["data"][0]["zmin"] == 0.0
     assert payload["data"][0]["zmax"] == pytest.approx(np.log10(10.91))
     assert payload["layout"]["yaxis"]["autorange"] == "reversed"
+    assert payload["layout"]["uirevision"] == "plots::detector"
 
 
 def test_plot_2d_visualization_accepts_colormap_configuration():

@@ -40,6 +40,14 @@ def _sinks(store: RuntimeBufferStore) -> IoSinks:
     return sinks
 
 
+def _data_traces(payload):
+    return [trace for trace in payload["data"] if trace.get("meta", {}).get("modacor_role") != "legend"]
+
+
+def _legend_traces(payload):
+    return [trace for trace in payload["data"] if trace.get("meta", {}).get("modacor_role") == "legend"]
+
+
 def test_plot_1d_visualization_publishes_plotly_payload_with_uncertainties():
     store = RuntimeBufferStore()
     step = Plot1DVisualization(processing_data=_processing_data(), io_sinks=_sinks(store), step_id="plot")
@@ -57,7 +65,8 @@ def test_plot_1d_visualization_publishes_plotly_payload_with_uncertainties():
     assert step.calculate() == {}
 
     payload = store.get_metadata("s1", "sink", "plots", "corrected")
-    trace = payload["data"][0]
+    trace = _data_traces(payload)[0]
+    legend_trace = _legend_traces(payload)[0]
     assert trace["x"] == [0.1, 0.3]
     assert trace["y"] == [10.0, 30.0]
     assert trace["error_x"]["array"] == [0.01, 0.03]
@@ -65,12 +74,17 @@ def test_plot_1d_visualization_publishes_plotly_payload_with_uncertainties():
     assert trace["error_x"]["thickness"] == 2.0
     assert trace["error_y"]["width"] == 3.0
     assert trace["error_y"]["color"] == "rgba(31, 119, 180, 0.65)"
+    assert trace["showlegend"] is False
+    assert legend_trace["showlegend"] is True
+    assert legend_trace["marker"]["size"] == 9.0
+    assert legend_trace["legendgroup"] == trace["legendgroup"]
     assert payload["metadata"]["xerr_name"] == "SEM"
     assert payload["metadata"]["yerr_name"] == "Poisson"
     assert payload["metadata"]["valid_points"] == 2
     assert payload["metadata"]["total_points"] == 3
     assert payload["layout"]["xaxis"]["type"] == "log"
     assert payload["layout"]["yaxis"]["type"] == "log"
+    assert payload["layout"]["uirevision"] == "plots::corrected"
 
 
 def test_plot_1d_visualization_direct_error_path_takes_precedence():
@@ -91,7 +105,7 @@ def test_plot_1d_visualization_direct_error_path_takes_precedence():
     step.calculate()
 
     payload = store.get_metadata("s1", "sink", "plots", "direct")
-    assert payload["data"][0]["error_y"]["array"] == [4.0, 6.0]
+    assert _data_traces(payload)[0]["error_y"]["array"] == [4.0, 6.0]
     assert payload["metadata"]["yerr_name"] == "/sample/signal/uncertainties/SEM"
     assert payload["metadata"]["yerr_path"] == "/sample/signal/uncertainties/SEM"
 
@@ -114,12 +128,16 @@ def test_plot_1d_visualization_publishes_multiple_y_uncertainty_traces():
     step.calculate()
 
     payload = store.get_metadata("s1", "sink", "plots", "multi")
-    traces = payload["data"]
+    traces = _data_traces(payload)
+    legend_traces = _legend_traces(payload)
     assert [trace["error_y"]["array"] for trace in traces] == [[7.0, 9.0], [4.0, 6.0], [1.0, 3.0]]
     assert [trace["marker"]["size"] for trace in traces] == [5, 0, 0]
     assert len({trace["error_y"]["color"] for trace in traces}) == 3
-    assert all(trace["showlegend"] for trace in traces)
+    assert all(not trace["showlegend"] for trace in traces)
+    assert [trace["marker"]["size"] for trace in legend_traces] == [9.0, 9.0, 9.0]
+    assert all(trace["showlegend"] for trace in legend_traces)
     assert payload["layout"]["showlegend"] is True
+    assert payload["layout"]["legend"]["groupclick"] == "togglegroup"
     assert payload["metadata"]["yerr_name"] == "combined"
     assert payload["metadata"]["yerr_names"] == ["combined", "SEM", "Poisson"]
 
@@ -143,9 +161,12 @@ def test_plot_1d_visualization_publishes_multiple_x_and_y_uncertainty_traces():
     step.calculate()
 
     payload = store.get_metadata("s1", "sink", "plots", "multi_xy")
-    traces = payload["data"]
+    traces = _data_traces(payload)
+    legend_traces = _legend_traces(payload)
     assert len(traces) == 2
+    assert len(legend_traces) == 2
     assert [trace["marker"]["size"] for trace in traces] == [5, 0]
+    assert [trace["marker"]["size"] for trace in legend_traces] == [9.0, 9.0]
     assert traces[0]["error_x"]["array"] == [0.01, 0.03]
     assert traces[0]["error_y"]["array"] == [1.0, 3.0]
     assert traces[1]["error_x"]["array"] == [0.04, 0.06]
@@ -175,7 +196,7 @@ def test_plot_1d_visualization_converts_x_units_and_uncertainties_for_display():
     step.calculate()
 
     payload = store.get_metadata("s1", "sink", "plots", "converted_q")
-    trace = payload["data"][0]
+    trace = _data_traces(payload)[0]
     np.testing.assert_allclose(trace["x"], [1.0, 3.0])
     np.testing.assert_allclose(trace["error_x"]["array"], [0.1, 0.3])
     assert payload["layout"]["xaxis"]["title"]["text"] == "Q (1/nm)"
