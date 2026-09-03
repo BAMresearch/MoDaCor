@@ -156,7 +156,7 @@ class Plot2DVisualization(ProcessStep):
             },
             "colorscale": {
                 "type": str,
-                "default": "Viridis",
+                "default": "Plasma",
                 "doc": "Plotly colorscale name.",
             },
             "zmin": {
@@ -234,7 +234,7 @@ class Plot2DVisualization(ProcessStep):
         trace: dict[str, Any] = {
             "type": "heatmap",
             "z": _plotly_z_values(scaled_frame),
-            "colorscale": str(cfg.get("colorscale") or "Viridis"),
+            "colorscale": str(cfg.get("colorscale") or "Plasma"),
             "colorbar": {
                 "title": {"text": f"log10({units})" if scale_metadata["scale"] == "log10" and units else units}
             },

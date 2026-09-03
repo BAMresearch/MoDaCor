@@ -58,6 +58,7 @@ def test_plot_2d_visualization_publishes_first_frame_for_higher_rank_data():
     assert payload["metadata"]["color_scale"]["scale"] == "log10"
     assert payload["metadata"]["color_scale"]["source_zmin"] == 1.0
     assert payload["metadata"]["color_scale"]["source_zmax"] == pytest.approx(10.91)
+    assert payload["data"][0]["colorscale"] == "Plasma"
     assert payload["data"][0]["z"][0] == [None, 0.0, pytest.approx(np.log10(2.0)), pytest.approx(np.log10(3.0))]
     assert payload["data"][0]["z"][1][2] is None
     assert payload["data"][0]["zmin"] == 0.0
