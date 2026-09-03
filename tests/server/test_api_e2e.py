@@ -705,6 +705,91 @@ steps:
     assert clear_sink.json()["removed"] >= 1
 
 
+def test_api_serves_plotly_1d_visualization_from_session_sink(monkeypatch):
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+    monkeypatch.setattr("modacor.server.api._plotly_js_bytes", lambda: b"window.Plotly = {};")
+
+    pipeline_yaml = """
+name: api_plot
+steps:
+  plot:
+    module: Plot1DVisualization
+    requires_steps: []
+    configuration:
+      target: "plots::corrected"
+      x_path: /sample/Q/signal
+      y_path: /sample/signal/signal
+      yerr_uncertainty_names: [Poisson]
+      title: Corrected I(Q)
+"""
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "sess-plot",
+            "pipeline": {"yaml_text": pipeline_yaml},
+        },
+    )
+    _post_json(
+        client,
+        "/v1/sessions/sess-plot/sinks/patch",
+        {"ref": "plots", "type": "plotly_json", "location": "buffer://session"},
+    )
+
+    session = manager.get_session("sess-plot")
+    assert session is not None
+    processing_data = ProcessingData()
+    bundle = DataBundle()
+    bundle["Q"] = BaseData(signal=np.array([0.1, 0.2, 0.3]), units=ureg.Unit("1/nm"))
+    signal = BaseData(signal=np.array([10.0, 20.0, 30.0]), units=ureg.Unit("count"))
+    signal.uncertainties["Poisson"] = np.array([1.0, 2.0, 3.0])
+    bundle["signal"] = signal
+    processing_data["sample"] = bundle
+    session.processing_data = processing_data
+
+    result = _post_json(
+        client,
+        "/v1/sessions/sess-plot/process",
+        {"mode": "partial", "changed_keys": ["sample.signal"]},
+    )
+    assert result["status"] == "succeeded"
+
+    payload_response = client.get("/v1/sessions/sess-plot/plots/plots/corrected/json")
+    assert payload_response.status_code == 200, payload_response.text
+    payload = payload_response.json()
+    assert payload["state"] == "idle"
+    assert payload["latest_run"]["status"] == "succeeded"
+    assert payload["plot"]["data"][0]["error_y"]["array"] == [1.0, 2.0, 3.0]
+
+    page_response = client.get("/v1/sessions/sess-plot/plots/plots/corrected")
+    assert page_response.status_code == 200, page_response.text
+    assert "Plotly.react" in page_response.text
+    assert "/v1/sessions/sess-plot/plots/plots/corrected/json" in page_response.text
+    assert "cdn.plot.ly" not in page_response.text
+    assert "/v1/assets/plotting/plotly.min.js" in page_response.text
+
+    asset_response = client.get("/v1/assets/plotting/plotly.min.js")
+    assert asset_response.status_code == 200
+    assert asset_response.text == "window.Plotly = {};"
+
+
+def test_api_plotly_asset_route_reports_missing_plotting_extra(monkeypatch):
+    app = create_app(session_manager=SessionManager())
+    client = TestClient(app)
+
+    def missing_plotly():
+        raise RuntimeError("Plotly assets are not installed. Install them with 'pip install modacor[plotting]'.")
+
+    monkeypatch.setattr("modacor.server.api._plotly_js_bytes", missing_plotly)
+
+    response = client.get("/v1/assets/plotting/plotly.min.js")
+
+    assert response.status_code == 503
+    assert "modacor[plotting]" in response.text
+
+
 def test_api_source_templates_and_profile_validation():
     manager = SessionManager()
     app = create_app(session_manager=manager)

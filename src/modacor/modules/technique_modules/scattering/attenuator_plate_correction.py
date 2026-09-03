@@ -60,6 +60,13 @@ class AttenuatorPlateCorrection(ProcessStep):
                 "default": False,
                 "doc": "If true, divide by transmission(cos_alpha) / transmission(cos_alpha=1).",
             },
+            "apply_as": {
+                "type": str,
+                "default": "divide",
+                "doc": (
+                    "Apply the transmission map by 'divide' for correction or 'multiply' for DAWN-style attenuation."
+                ),
+            },
             "linear_attenuation_coefficient": {
                 "type": (int, float, type(None)),
                 "default": None,
@@ -187,10 +194,12 @@ class AttenuatorPlateCorrection(ProcessStep):
             },
         },
         step_keywords=["attenuator", "plate", "attenuation", "absorption", "transmission"],
-        step_doc="Divide signal by angle-dependent attenuator plate transmission.",
+        step_doc="Apply angle-dependent attenuator plate transmission.",
         step_note=(
             "Material parameters can be provided as direct values or *_source paths. "
-            "xraylib is used for material lookup unless linear_attenuation_coefficient is configured directly."
+            "xraylib is used for material lookup unless linear_attenuation_coefficient is configured directly. "
+            "The default applies a physical correction by dividing by transmission; apply_as='multiply' is provided "
+            "for DAWN cross-validation where the recorded operation applies the attenuation factor itself."
         ),
     )
 
@@ -217,6 +226,9 @@ class AttenuatorPlateCorrection(ProcessStep):
         thickness_m = thickness_m_from_config(self.io_sources, cfg)
         minimum_cos_alpha = float(cfg.get("minimum_cos_alpha", 1e-12))
         normalize = bool(cfg.get("normalize_to_normal_incidence", False))
+        apply_as = str(cfg.get("apply_as", "divide")).strip().lower()
+        if apply_as not in {"divide", "multiply"}:
+            raise ValueError("AttenuatorPlateCorrection apply_as must be 'divide' or 'multiply'.")
         cos_alpha_key = cfg.get("cos_alpha_key", "CosAlpha")
         correction_key = cfg.get("correction_key", "attenuator_transmission")
 
@@ -253,6 +265,9 @@ class AttenuatorPlateCorrection(ProcessStep):
                 rank_of_data=cos_alpha_bd.rank_of_data,
             )
             databundle[correction_key] = correction
-            databundle["signal"] /= correction
+            if apply_as == "divide":
+                databundle["signal"] /= correction
+            else:
+                databundle["signal"] *= correction
             output[key] = databundle
         return output

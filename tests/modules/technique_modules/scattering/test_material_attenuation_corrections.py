@@ -101,6 +101,31 @@ def test_attenuator_plate_correction_can_normalize_to_normal_incidence():
     np.testing.assert_allclose(pd["sample"]["signal"].signal, np.array([10.0, 10.0]) / expected_divisor)
 
 
+def test_attenuator_plate_correction_can_apply_transmission_for_dawn_crosscheck():
+    pd = _processing_data()
+
+    _run_step(
+        AttenuatorPlateCorrection(io_sources=IoSources()),
+        pd,
+        apply_as="multiply",
+    )
+
+    transmission = np.exp(-1.0 / np.array([1.0, 0.5]))
+    np.testing.assert_allclose(pd["sample"]["attenuator_transmission"].signal, transmission)
+    np.testing.assert_allclose(pd["sample"]["signal"].signal, np.array([10.0, 10.0]) * transmission)
+
+
+def test_attenuator_plate_correction_rejects_unknown_apply_as():
+    pd = _processing_data()
+
+    with pytest.raises(ValueError, match="apply_as"):
+        _run_step(
+            AttenuatorPlateCorrection(io_sources=IoSources()),
+            pd,
+            apply_as="subtract",
+        )
+
+
 def test_material_attenuation_can_derive_energy_from_wavelength():
     energy = energy_kev_from_config_or_wavelength(
         IoSources(),

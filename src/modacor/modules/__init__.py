@@ -32,6 +32,8 @@ from modacor.modules.base_modules.nexus_transformations import (
     resolve_nexus_transform_chain,
     resolve_nexus_transform_path,
 )
+from modacor.modules.base_modules.plot_1d_visualization import Plot1DVisualization
+from modacor.modules.base_modules.plot_2d_visualization import Plot2DVisualization
 from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertainties
 from modacor.modules.base_modules.reduce_dimensionality import ReduceDimensionality
 from modacor.modules.base_modules.reduce_mask import ReduceMask
@@ -75,6 +77,8 @@ __all__ = [
     "PixelCoordinates3D",
     "PolarizationCorrection",
     "PoissonUncertainties",
+    "Plot1DVisualization",
+    "Plot2DVisualization",
     "ReduceDimensionality",
     "ReduceMask",
     "SinkProcessingData",

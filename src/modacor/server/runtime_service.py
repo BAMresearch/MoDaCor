@@ -468,6 +468,24 @@ class RuntimeService:
         except ValueError as exc:
             raise ApiError(status_code=422, detail=str(exc)) from exc
 
+    def get_plot_payload(self, session_id: str, sink_ref: str, plot_id: str) -> dict[str, Any]:
+        session = self._require_session(session_id)
+        try:
+            plot = self.manager.buffer_store.get_metadata(session_id, "sink", sink_ref, plot_id)
+        except KeyError as exc:
+            raise ApiError(status_code=404, detail=str(exc)) from exc
+        if not isinstance(plot, dict):
+            raise ApiError(status_code=500, detail=f"Stored plot payload {sink_ref!r}/{plot_id!r} is not an object.")
+        return {
+            "session_id": session_id,
+            "sink_ref": sink_ref,
+            "plot_id": plot_id,
+            "state": session.state,
+            "updated_utc": session.updated_utc,
+            "latest_run": session.run_history[-1] if session.run_history else None,
+            "plot": plot,
+        }
+
     def clear_buffers(
         self,
         session_id: str,
