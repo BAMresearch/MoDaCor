@@ -14,7 +14,7 @@ __status__ = "Development"  # "Development", "Production"
 import pytest
 
 from modacor.dataclasses.process_step import ProcessStep
-from modacor.runner.process_step_registry import ProcessStepRegistry
+from modacor.runner.process_step_registry import ProcessStepRegistry, _pascal_to_snake
 
 
 def test_register_and_get_process_step():
@@ -67,3 +67,16 @@ def test_get_unknown_with_filesystem_discovery_disabled_raises_policy_message():
 
     with pytest.raises(KeyError, match="filesystem discovery is disabled"):
         registry.get("DoesNotExistStep")
+
+
+def test_pascal_to_snake_handles_digit_named_process_steps():
+    assert _pascal_to_snake("Plot1DVisualization") == "plot_1d_visualization"
+    assert _pascal_to_snake("Plot2DVisualization") == "plot_2d_visualization"
+    assert _pascal_to_snake("Q2Mapper") == "q2_mapper"
+
+
+def test_get_digit_named_plot_steps_with_filesystem_discovery():
+    registry = ProcessStepRegistry(curated_module=None)
+
+    assert registry.get("Plot1DVisualization").__name__ == "Plot1DVisualization"
+    assert registry.get("Plot2DVisualization").__name__ == "Plot2DVisualization"

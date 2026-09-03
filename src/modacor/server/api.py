@@ -40,7 +40,7 @@ def _plot_page_html(*, session_id: str, sink_ref: str, plot_id: str) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title}</title>
-  <script src="/v1/assets/plotting/plotly.min.js"></script>
+  <script src="/v1/assets/plotting/plotly.min.js" onerror="window.__plotlyLoadError = true"></script>
   <style>
     html, body {{
       height: 100%;
@@ -84,6 +84,12 @@ def _plot_page_html(*, session_id: str, sink_ref: str, plot_id: str) -> str:
 
     async function refreshPlot() {{
       try {{
+        if (!window.Plotly) {{
+          statusNode.textContent = window.__plotlyLoadError
+            ? "Plotly asset unavailable; install modacor[plotting] and restart the server"
+            : "loading Plotly";
+          return;
+        }}
         const response = await fetch(jsonUrl, {{cache: "no-store"}});
         if (!response.ok) {{
           statusNode.textContent = response.status === 404 ? "waiting for plot" : `HTTP ${{response.status}}`;
