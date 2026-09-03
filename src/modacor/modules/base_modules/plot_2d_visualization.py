@@ -78,11 +78,7 @@ def _float_or_none(value: Any) -> float | None:
 
 
 def _configured_colormap(cfg: dict[str, Any]) -> str:
-    colormap = str(cfg.get("colormap") or "Plasma")
-    colorscale = _str_or_none(cfg.get("colorscale"))
-    if colorscale is not None and colormap == "Plasma":
-        return colorscale
-    return colormap
+    return _str_or_none(cfg.get("colormap")) or "Plasma"
 
 
 def _scaled_frame(
@@ -162,15 +158,10 @@ class Plot2DVisualization(ProcessStep):
                 "default": None,
                 "doc": "Optional plot title.",
             },
-            "colorscale": {
-                "type": (str, type(None)),
-                "default": None,
-                "doc": "Backward-compatible alias for colormap.",
-            },
             "colormap": {
                 "type": str,
                 "default": "Plasma",
-                "doc": "Plotly colormap/colorscale name.",
+                "doc": "Plotly colorscale name. Use the 'colormap' key and Plotly's canonical capitalization.",
             },
             "zmin": {
                 "type": (int, float, type(None)),

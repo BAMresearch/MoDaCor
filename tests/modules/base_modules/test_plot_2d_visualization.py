@@ -88,26 +88,3 @@ def test_plot_2d_visualization_accepts_colormap_configuration():
     payload = store.get_metadata("s1", "sink", "plots", "detector")
     assert payload["data"][0]["colorscale"] == "Cividis"
     assert payload["metadata"]["colormap"] == "Cividis"
-
-
-def test_plot_2d_visualization_keeps_colorscale_alias():
-    processing = ProcessingData()
-    sample = DataBundle()
-    sample["image"] = BaseData(signal=np.array([[1.0, 2.0], [3.0, 4.0]]), units=ureg.Unit("count"), rank_of_data=2)
-    processing["sample"] = sample
-    store = RuntimeBufferStore()
-
-    step = Plot2DVisualization(processing_data=processing, io_sinks=_sinks(store), step_id="plot2d")
-    step.modify_config_by_dict(
-        {
-            "target": "plots::detector",
-            "data_path": "/sample/image",
-            "colorscale": "Viridis",
-        }
-    )
-
-    step.calculate()
-
-    payload = store.get_metadata("s1", "sink", "plots", "detector")
-    assert payload["data"][0]["colorscale"] == "Viridis"
-    assert payload["metadata"]["colormap"] == "Viridis"
