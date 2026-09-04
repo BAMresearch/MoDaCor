@@ -343,6 +343,7 @@ def test_to_dot_matches_spec():
 
     # Basic header
     assert 'digraph "dot_test"' in dot_src
+    assert "rankdir=LR;" in dot_src
 
     # Node labels should include "<id>: <module name>"
     assert '"1" [label="1: DummyNode"];' in dot_src
@@ -350,6 +351,9 @@ def test_to_dot_matches_spec():
 
     # Edge representation
     assert '"1" -> "2";' in dot_src
+
+    top_down_dot_src = pipeline.to_dot(direction="TB")
+    assert "rankdir=TB;" in top_down_dot_src
 
 
 def test_to_mermaid_flowchart():

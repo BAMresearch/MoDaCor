@@ -521,16 +521,22 @@ class Pipeline:
 
         return {"name": self.name, "nodes": nodes, "edges": edges}
 
-    def to_dot(self) -> str:
+    def to_dot(self, direction: str = "LR") -> str:
         """
         Export the pipeline as a Graphviz DOT string for visualization.
 
         Nodes are labeled with "<step_id>: <calling_name/module_name>".
+
+        Parameters
+        ----------
+        direction:
+            Graphviz rank direction, e.g. "LR" for left-to-right or "TB" for
+            top-to-bottom.
         """
         spec = self.to_spec()
         lines: list[str] = [
             f'digraph "{spec["name"]}" {{',
-            "  rankdir=LR;",  # left-to-right layout; change to TB for top-to-bottom
+            f"  rankdir={direction};",
         ]
 
         # Nodes

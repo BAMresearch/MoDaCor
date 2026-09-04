@@ -32,9 +32,11 @@ def _pascal_to_snake(name: str) -> str:
     XSGeometry  -> xs_geometry
     Divide      -> divide
     Q2Mapper    -> q2_mapper
+    Plot1DVisualization -> plot_1d_visualization
     APIClient   -> api_client
     """
-    return re.sub(r"(?<!^)(?=[A-Z][a-z])", "_", name).lower()
+    digit_separated = re.sub(r"(?<=[a-z])(?=\d)", "_", name)
+    return re.sub(r"(?<!^)(?=[A-Z][a-z])", "_", digit_separated).lower()
 
 
 def _path_to_module_name(py_file: Path, package_root: Path) -> str:

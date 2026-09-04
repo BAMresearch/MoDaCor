@@ -368,6 +368,176 @@ def _binary_basedata_op(
     return _inherit_binary_metadata(left, right, result)
 
 
+def _coerce_inplace_divisor(other: Any) -> BaseData | None:
+    if isinstance(other, numbers.Real):
+        return BaseData(signal=float(other), units=ureg.dimensionless)
+    if isinstance(other, pint.Quantity):
+        return BaseData(signal=float(other.magnitude), units=other.units)
+    if isinstance(other, BaseData):
+        return other
+    return None
+
+
+def _coerce_inplace_add_sub_operand(target: BaseData, other: Any) -> BaseData | None:
+    if isinstance(other, numbers.Real):
+        return BaseData(signal=float(other), units=target.units)
+    if isinstance(other, pint.Quantity):
+        return BaseData(signal=float(other.magnitude), units=other.units)
+    if isinstance(other, BaseData):
+        return other
+    return None
+
+
+def _uncertainty_key_plan(
+    left_unc: Dict[str, np.ndarray],
+    right_unc: Dict[str, np.ndarray],
+) -> tuple[set[str], Any | None, Any | None]:
+    left_global = left_unc.get("propagate_to_all") if set(left_unc.keys()) == {"propagate_to_all"} else None
+    right_global = right_unc.get("propagate_to_all") if set(right_unc.keys()) == {"propagate_to_all"} else None
+
+    left_non_global_keys = set(left_unc.keys()) - {"propagate_to_all"}
+    right_non_global_keys = set(right_unc.keys()) - {"propagate_to_all"}
+
+    if left_global is not None and right_global is not None:
+        out_keys = {"propagate_to_all"}
+    elif left_global is not None and right_non_global_keys:
+        out_keys = set(right_non_global_keys)
+    elif right_global is not None and left_non_global_keys:
+        out_keys = set(left_non_global_keys)
+    else:
+        out_keys = left_non_global_keys | right_non_global_keys
+    return out_keys, left_global, right_global
+
+
+def _writable_full_shape_uncertainty(owner: BaseData, source: Any, key: str) -> np.ndarray:
+    arr = np.asarray(source, dtype=float)
+    if key in owner.uncertainties and arr.shape == owner.signal.shape and arr.flags.writeable:
+        return arr
+    target = np.empty_like(owner.signal, dtype=float)
+    target[...] = arr
+    return target
+
+
+def _propagate_inplace_division_uncertainties(
+    target: BaseData,
+    divisor: np.ndarray,
+    right_unc: Dict[str, np.ndarray],
+    *,
+    uncertainty_factor: float,
+) -> Dict[str, np.ndarray]:
+    left_unc = dict(target.uncertainties)
+    out_keys, left_global, right_global = _uncertainty_key_plan(left_unc, right_unc)
+    zero_divisor = divisor == 0.0
+    has_zero_divisor = bool(np.any(zero_divisor))
+
+    result_unc: Dict[str, np.ndarray] = {}
+    for key in out_keys:
+        if key in left_unc:
+            sigma = _writable_full_shape_uncertainty(target, left_unc[key], key)
+        elif left_global is not None:
+            sigma = _writable_full_shape_uncertainty(target, left_global, key)
+        else:
+            sigma = np.zeros_like(target.signal, dtype=float)
+
+        np.divide(sigma, divisor, out=sigma)
+        if uncertainty_factor != 1.0:
+            sigma *= uncertainty_factor
+
+        sigma_b = right_unc.get(key, right_global)
+        if sigma_b is not None:
+            term_b = np.empty_like(target.signal, dtype=float)
+            term_b[...] = np.asarray(sigma_b, dtype=float)
+            np.divide(term_b, divisor, out=term_b)
+            term_b *= target.signal
+            np.hypot(sigma, term_b, out=sigma)
+
+        if has_zero_divisor:
+            np.copyto(sigma, np.nan, where=zero_divisor)
+        result_unc[key] = sigma
+
+    return result_unc
+
+
+def _inplace_truediv_metadata_neutral(target: BaseData, other: BaseData) -> BaseData | None:
+    if _has_structural_metadata(other):
+        return None
+
+    try:
+        out_shape = np.broadcast_shapes(target.signal.shape, other.signal.shape)
+    except ValueError:
+        return None
+    if out_shape != target.signal.shape:
+        return None
+
+    result_units = (1 * target.units / (1 * other.units)).units
+    unit_factor = float(result_units.m_from(target.units / other.units))
+    divisor = np.broadcast_to(np.asarray(other.signal, dtype=float), target.signal.shape)
+
+    if not np.issubdtype(target.signal.dtype, np.floating):
+        target.signal = target.signal.astype(float)
+    np.divide(target.signal, divisor, out=target.signal)
+    if unit_factor != 1.0:
+        target.signal *= unit_factor
+
+    target.uncertainties = _propagate_inplace_division_uncertainties(
+        target,
+        divisor,
+        other.uncertainties,
+        uncertainty_factor=abs(unit_factor),
+    )
+    target.units = result_units
+    return target
+
+
+def _inplace_add_sub(target: BaseData, other: BaseData, *, sign: float) -> BaseData | None:
+    try:
+        out_shape = np.broadcast_shapes(target.signal.shape, other.signal.shape)
+    except ValueError:
+        return None
+    if out_shape != target.signal.shape:
+        return None
+    _validate_binary_metadata_compatibility(target, other, out_shape)
+
+    result_units = (1 * target.units + sign * (1 * other.units)).units
+    cf_target = float(result_units.m_from(target.units))
+    cf_other = float(result_units.m_from(other.units))
+
+    other_signal = np.broadcast_to(np.asarray(other.signal, dtype=float), target.signal.shape)
+    if not np.issubdtype(target.signal.dtype, np.floating):
+        target.signal = target.signal.astype(float)
+    if cf_target != 1.0:
+        target.signal *= cf_target
+    target.signal += sign * cf_other * other_signal
+
+    out_keys, left_global, right_global = _uncertainty_key_plan(target.uncertainties, other.uncertainties)
+    left_unc = dict(target.uncertainties)
+    result_unc: Dict[str, np.ndarray] = {}
+    for key in out_keys:
+        if key in left_unc:
+            sigma = _writable_full_shape_uncertainty(target, left_unc[key], key)
+            if cf_target != 1.0:
+                sigma *= abs(cf_target)
+        elif left_global is not None:
+            sigma = _writable_full_shape_uncertainty(target, left_global, key)
+            if cf_target != 1.0:
+                sigma *= abs(cf_target)
+        else:
+            sigma = np.zeros_like(target.signal, dtype=float)
+
+        sigma_b = other.uncertainties.get(key, right_global)
+        if sigma_b is not None:
+            term_b = np.empty_like(target.signal, dtype=float)
+            term_b[...] = np.asarray(sigma_b, dtype=float)
+            if cf_other != 1.0:
+                term_b *= abs(cf_other)
+            np.hypot(sigma, term_b, out=sigma)
+        result_unc[key] = sigma
+
+    target.units = result_units
+    target.uncertainties = result_unc
+    return target
+
+
 def _unary_basedata_op(
     element: BaseData,
     func: Callable[[np.ndarray], np.ndarray],
@@ -491,6 +661,20 @@ class UncertaintyOpsMixin:
     def __rsub__(self, other: Any) -> BaseData:
         return self._binary_op(other, operator.sub, swapped=True)
 
+    def __iadd__(self, other: Any) -> BaseData:
+        other_basedata = _coerce_inplace_add_sub_operand(self, other)
+        if other_basedata is None:
+            return NotImplemented
+        in_place_result = _inplace_add_sub(self, other_basedata, sign=1.0)
+        return self + other_basedata if in_place_result is None else in_place_result
+
+    def __isub__(self, other: Any) -> BaseData:
+        other_basedata = _coerce_inplace_add_sub_operand(self, other)
+        if other_basedata is None:
+            return NotImplemented
+        in_place_result = _inplace_add_sub(self, other_basedata, sign=-1.0)
+        return self - other_basedata if in_place_result is None else in_place_result
+
     def __mul__(self, other: Any) -> BaseData:
         return self._binary_op(other, operator.mul)
 
@@ -502,6 +686,14 @@ class UncertaintyOpsMixin:
 
     def __rtruediv__(self, other: Any) -> BaseData:
         return self._binary_op(other, operator.truediv, swapped=True)
+
+    def __itruediv__(self, other: Any) -> BaseData:
+        other_basedata = _coerce_inplace_divisor(other)
+        if other_basedata is None:
+            return NotImplemented
+
+        in_place_result = _inplace_truediv_metadata_neutral(self, other_basedata)
+        return self / other_basedata if in_place_result is None else in_place_result
 
     # ---- unary dunder + convenience methods ----
 
@@ -656,9 +848,10 @@ class BaseData(UncertaintyOpsMixin):
         Post-initialization to ensure that the shapes of elements in variances dict,
         and the shapes of weights are compatible with the signal array.
         """
-        # Validate variances
-        for kind, var in self.variances.items():
-            validate_broadcast(self.signal, var, f"variances[{kind}]")
+        # Validate uncertainties directly. Going through ``variances`` would
+        # square every array and can allocate gigabytes for large detector data.
+        for kind, uncertainty in self.uncertainties.items():
+            validate_broadcast(self.signal, uncertainty, f"uncertainties[{kind}]")
 
         # Validate weights
         validate_broadcast(self.signal, self.weights, "weights")

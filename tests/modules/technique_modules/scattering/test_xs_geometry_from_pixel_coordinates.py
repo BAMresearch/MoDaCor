@@ -13,11 +13,13 @@ __status__ = "Development"  # "Development", "Production"
 __version__ = "20260106.1"
 
 import numpy as np
+import pytest
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.hdf.hdf_source import HDFSource
 from modacor.io.io_sources import IoSources
 from modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordinates import (
     XSGeometryFromPixelCoordinates,
@@ -111,7 +113,7 @@ def _expected_geometry_arrays(
     area = pitch_fast * pitch_slow  # m^2
     omega = (area * cos_alpha) / (R * R)
 
-    return two_theta, psi, Q0, Q1, Q2, Q, omega
+    return two_theta, psi, Q0, Q1, Q2, Q, cos_alpha, omega
 
 
 # ----------------------------
@@ -149,7 +151,7 @@ def test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arr
 
     # compute expected
     exp_sample_z = float(np.mean(sample_z_vals))
-    exp_two_theta, exp_psi, exp_Q0, exp_Q1, exp_Q2, exp_Q, exp_omega = _expected_geometry_arrays(
+    exp_two_theta, exp_psi, exp_Q0, exp_Q1, exp_Q2, exp_Q, exp_cos_alpha, exp_omega = _expected_geometry_arrays(
         coord_x=b["coord_x"].signal,
         coord_y=b["coord_y"].signal,
         coord_z=b["coord_z"].signal,
@@ -170,6 +172,7 @@ def test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arr
     np.testing.assert_allclose(out["Q2"].signal, exp_Q2)
     np.testing.assert_allclose(out["Q"].signal, exp_Q)
 
+    np.testing.assert_allclose(out["CosAlpha"].signal, exp_cos_alpha)
     np.testing.assert_allclose(out["Omega"].signal, exp_omega)
 
     # basic metadata checks
@@ -177,6 +180,7 @@ def test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arr
     assert out["TwoTheta"].units.is_compatible_with(ureg.radian)
     assert out["Psi"].units.is_compatible_with(ureg.radian)
     assert out["Q"].units.is_compatible_with(ureg.m**-1)
+    assert out["CosAlpha"].units.is_compatible_with(ureg.dimensionless)
     assert out["Omega"].units == ureg.steradian
 
 
@@ -222,3 +226,127 @@ def test_geometry_from_pixel_coordinates_detector_normal_is_normalized():
     )
 
     np.testing.assert_allclose(omega_nonunit, exp_omega_unit)
+
+
+def test_geometry_from_pixel_coordinates_uses_nexus_detector_frame(tmp_path):
+    h5py = pytest.importorskip("h5py")
+    calibration_path = tmp_path / "calibration.nxs"
+
+    def write_transform(dataset, *, transformation_type, units, vector, depends_on="."):
+        dataset.attrs["transformation_type"] = transformation_type
+        dataset.attrs["units"] = units
+        dataset.attrs["vector"] = np.asarray(vector, dtype=float)
+        dataset.attrs["depends_on"] = depends_on
+
+    with h5py.File(calibration_path, "w") as h5:
+        module = h5.require_group("/entry1/instrument/detector/detector_module")
+        offset = module.create_dataset("module_offset", data=2.5)
+        write_transform(offset, transformation_type="translation", units="m", vector=[0.0, 0.0, 1.0])
+
+        fast = module.create_dataset("fast_pixel_direction", data=3.0)
+        write_transform(
+            fast,
+            transformation_type="translation",
+            units="mm",
+            vector=[1.0, 0.0, 0.0],
+            depends_on="./module_offset",
+        )
+
+        slow = module.create_dataset("slow_pixel_direction", data=4.0)
+        write_transform(
+            slow,
+            transformation_type="translation",
+            units="mm",
+            vector=[0.0, 1.0, 0.0],
+            depends_on="./module_offset",
+        )
+
+    pd = _make_processing_data_with_coords((3, 5), rod=2)
+    b = pd["sample"]
+    sources = {
+        "wavelength": BaseData(signal=np.asarray(1.0e-10), units=ureg.m, rank_of_data=0),
+    }
+    io_sources = IoSources()
+    io_sources.register_source(HDFSource(source_reference="calibration", resource_location=calibration_path))
+
+    step = DummyXSGeometryFromPixelCoordinates(io_sources=io_sources, sources=sources)
+    step.configuration["with_processing_keys"] = ["sample"]
+    step.configuration["detector_frame"] = {
+        "type": "nexus",
+        "source": "calibration",
+        "detector_path": "/entry1/instrument/detector",
+    }
+    step.configuration["sample_z_override"] = {"value": 0.5, "units": "m"}
+
+    step.execute(pd)
+
+    *_, exp_omega = _expected_geometry_arrays(
+        coord_x=b["coord_x"].signal,
+        coord_y=b["coord_y"].signal,
+        coord_z=b["coord_z"].signal,
+        sample_z=0.5,
+        wavelength=1.0e-10,
+        pitch_fast=3.0e-3,
+        pitch_slow=4.0e-3,
+        detector_normal=(0.0, 0.0, 1.0),
+    )
+
+    np.testing.assert_allclose(pd["sample"]["Omega"].signal, exp_omega)
+
+
+def test_geometry_from_pixel_coordinates_uses_nexus_sample_z_override(tmp_path):
+    h5py = pytest.importorskip("h5py")
+    measurement_path = tmp_path / "measurement.nxs"
+
+    def write_transform(dataset, *, transformation_type, units, vector, depends_on="."):
+        dataset.attrs["transformation_type"] = transformation_type
+        dataset.attrs["units"] = units
+        dataset.attrs["vector"] = np.asarray(vector, dtype=float)
+        dataset.attrs["depends_on"] = depends_on
+
+    with h5py.File(measurement_path, "w") as h5:
+        transformations = h5.require_group("/entry1/sample/transformations")
+        base_z = transformations.create_dataset("base_z", data=1.0)
+        write_transform(base_z, transformation_type="translation", units="m", vector=[0.0, 0.0, 1.0])
+
+        sample_z = transformations.create_dataset("sample_z", data=50.0)
+        write_transform(
+            sample_z,
+            transformation_type="translation",
+            units="mm",
+            vector=[0.0, 0.0, 1.0],
+            depends_on="./base_z",
+        )
+
+    pd = _make_processing_data_with_coords((3, 5), rod=2)
+    b = pd["sample"]
+    sources = {
+        "wavelength": BaseData(signal=np.asarray(1.0e-10), units=ureg.m, rank_of_data=0),
+        "pixel_pitch_fast": BaseData(signal=np.asarray(1.0e-3), units=ureg.m, rank_of_data=0),
+        "pixel_pitch_slow": BaseData(signal=np.asarray(2.0e-3), units=ureg.m, rank_of_data=0),
+    }
+    io_sources = IoSources()
+    io_sources.register_source(HDFSource(source_reference="sample", resource_location=measurement_path))
+
+    step = DummyXSGeometryFromPixelCoordinates(io_sources=io_sources, sources=sources)
+    step.configuration["with_processing_keys"] = ["sample"]
+    step.configuration["sample_z_override"] = {
+        "type": "nexus",
+        "source": "sample",
+        "transform_path": "/entry1/sample/transformations/sample_z",
+    }
+
+    step.execute(pd)
+
+    exp_two_theta, *_ = _expected_geometry_arrays(
+        coord_x=b["coord_x"].signal,
+        coord_y=b["coord_y"].signal,
+        coord_z=b["coord_z"].signal,
+        sample_z=1.05,
+        wavelength=1.0e-10,
+        pitch_fast=1.0e-3,
+        pitch_slow=2.0e-3,
+        detector_normal=(0.0, 0.0, 1.0),
+    )
+
+    np.testing.assert_allclose(pd["sample"]["TwoTheta"].signal, exp_two_theta)

@@ -55,8 +55,18 @@ docs = [
     "sphinxcontrib-mermaid",
     "toml"
 ]
+masks = [
+    "scikit-image",
+]
+attenuation = [
+    "xraylib",
+]
+plotting = [
+    "plotly>=5.24",
+]
 server = [
     "fastapi>=0.110",
+    "hdf5plugin",
     "uvicorn>=0.27",
 ]
 ci = [
@@ -74,19 +84,23 @@ all = [
     "fastapi>=0.110",
     "flake8",
     "httpx",
+    "hdf5plugin",
     "isort",
     "linkify-it-py",
     "myst-parser>=2.0",
     "pre-commit",
     "pydata-sphinx-theme>=0.14",
+    "plotly>=5.24",
     "pytest",
     "pytest-cov",
     "python-semantic-release",
+    "scikit-image",
     "sphinx>=6.2",
     "sphinxcontrib-mermaid",
     "toml",
     "tox",
     "uvicorn>=0.27",
+    "xraylib",
 ]
 
 [[project.authors]]

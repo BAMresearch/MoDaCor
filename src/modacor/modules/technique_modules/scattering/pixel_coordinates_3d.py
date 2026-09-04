@@ -29,6 +29,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
+from modacor.modules.base_modules.nexus_transformations import load_nexus_detector_frame_inputs
 from modacor.modules.helpers import attach_prepared_data, normalize_str_list
 from modacor.modules.technique_modules.scattering.geometry_helpers import (
     detector_index_basedata,
@@ -55,10 +56,10 @@ class CanonicalDetectorFrame:
       legacy forms such as mm/pixel are accepted because pixel is dimensionless
 
     Notes:
-    Tilt support will be integrated when needed following the NeXus pitch, yaw, roll for rotations around x, y, z.
-    This implementation assumes a non-moving, planar detector.
-    For other, instrument-specific implementations, subclass PixelCoordinates3D and replace _load_canonical_frame().
-    Origin of the detector is at detector element index (0,0).
+    The frame can be supplied directly through scalar coordinates and basis
+    vectors, or loaded from a NeXus NXdetector/NXdetector_module transformation
+    chain via ``detector_frame``. This implementation assumes a non-moving,
+    planar detector with its grid origin at detector element index (0, 0).
     """
 
     det_coord_z: BaseData
@@ -100,7 +101,7 @@ class PixelCoordinates3D(ProcessStep):
 
     Notes:
       - output coordinate ndim is clamped to RoD (which can never be larger than signal.ndim), so we never produce arrays larger than the detector.
-      - Planar detector assumed; tilt support will be implemented (following NeXus pitch, yaw, roll for rotations around x, y, z) in the future as needed.
+      - Planar detector assumed; tilted or rotated detector frames are supported through explicit basis vectors or NeXus detector_frame input.
       - no sensor thickness offset applied, it is assumed the photon detection happens at the coordinates computed.
     """
 
@@ -206,6 +207,15 @@ class PixelCoordinates3D(ProcessStep):
                 "default": (0.0, 0.0, 1.0),
                 "doc": "Basis vector for the detector normal.",
             },
+            "detector_frame": {
+                "type": (dict, type(None)),
+                "default": None,
+                "doc": (
+                    "Optional detector-frame adapter. Use {'type': 'nexus', 'source': '<ref>', "
+                    "'detector_path': '/entry1/instrument/detector'} to load a NeXus "
+                    "NXdetector/NXdetector_module transformation chain."
+                ),
+            },
         },
         modifies={
             "coord_x": ["signal", "uncertainties"],
@@ -231,6 +241,31 @@ class PixelCoordinates3D(ProcessStep):
         detector_shape: Tuple[int, ...],
         reference_signal: BaseData,
     ) -> CanonicalDetectorFrame:
+        detector_frame_cfg = self.configuration.get("detector_frame")
+        if detector_frame_cfg is not None:
+            if not isinstance(detector_frame_cfg, dict):
+                raise TypeError("PixelCoordinates3D detector_frame configuration must be a mapping.")
+            frame_type = str(detector_frame_cfg.get("type", "")).strip().lower()
+            if frame_type != "nexus":
+                raise ValueError(f"Unsupported PixelCoordinates3D detector_frame type: {frame_type!r}.")
+            frame_inputs = load_nexus_detector_frame_inputs(
+                self.io_sources,
+                source_reference=str(detector_frame_cfg["source"]),
+                detector_path=str(detector_frame_cfg["detector_path"]),
+                detector_module_name=str(detector_frame_cfg.get("detector_module_name", "detector_module")),
+                module_origin=str(detector_frame_cfg.get("module_origin", "corner")),
+            )
+            return CanonicalDetectorFrame(
+                det_coord_z=frame_inputs.det_coord_z,
+                det_coord_x=frame_inputs.det_coord_x,
+                det_coord_y=frame_inputs.det_coord_y,
+                e_fast=frame_inputs.basis_fast,
+                e_slow=frame_inputs.basis_slow,
+                e_normal=frame_inputs.basis_normal,
+                pixel_pitch_slow=frame_inputs.pixel_pitch_slow,
+                pixel_pitch_fast=frame_inputs.pixel_pitch_fast,
+            )
+
         det_coord_z = prepare_static_scalar(
             self._load_from_sources("det_coord_z"), require_units=ureg.m, uncertainty_key="detector_position_jitter"
         )  # scalar length

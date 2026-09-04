@@ -255,6 +255,28 @@ def test_hdf_processing_sink_accepts_string_data_path(
         assert "processing/result/run2/sample/signal/signal" in h5
 
 
+def test_hdf_processing_sink_can_write_bundle_root(tmp_path: Path, processing_data_with_uncertainties: ProcessingData):
+    out_file = tmp_path / "out_bundle_root.h5"
+    sink = HDFProcessingSink(resource_location=out_file)
+
+    processing_data_with_uncertainties["background"] = DataBundle()
+    processing_data_with_uncertainties["background"]["signal"] = BaseData(
+        signal=np.array([4.0, 5.0]),
+        units=ureg.Unit("count"),
+    )
+
+    sink.write(
+        "after_plot_2d",
+        processing_data_with_uncertainties,
+        data_paths=["/sample"],
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        assert "processing/result/after_plot_2d/sample/signal/signal" in h5
+        assert "processing/result/after_plot_2d/sample/Q/signal" in h5
+        assert "processing/result/after_plot_2d/background" not in h5
+
+
 def test_hdf_processing_sink_can_write_all_processing_data(tmp_path: Path):
     out_file = tmp_path / "out_all.h5"
     sink = HDFProcessingSink(resource_location=out_file)

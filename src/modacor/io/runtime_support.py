@@ -17,6 +17,7 @@ from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 from modacor.io.hdf.hdf_source import HDFSource
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
+from modacor.io.visualization import PlotlyJSONSink
 from modacor.io.yaml.yaml_source import YAMLSource
 
 __all__ = [
@@ -167,6 +168,10 @@ def build_sink_from_spec(
         "csv": CSVSink,
         "hdf": HDFProcessingSink,
         "hdf_processing": HDFProcessingSink,
+        "plotly": PlotlyJSONSink,
+        "plotly_json": PlotlyJSONSink,
+        "visualisation": PlotlyJSONSink,
+        "visualization": PlotlyJSONSink,
     }
 
     ref = str(spec["ref"]).strip()
@@ -188,9 +193,9 @@ def build_sink_from_spec(
         except KeyError as exc:
             raise ValueError(f"Unsupported sink type '{sink_type}' for ref '{ref}'.") from exc
 
-    if sink_cls is BufferSink:
+    if sink_cls in {BufferSink, PlotlyJSONSink}:
         if buffer_store is None or session_id is None:
-            raise ValueError(f"Buffer sink '{ref}' requires runtime buffer_store and session_id.")
+            raise ValueError(f"Runtime sink '{ref}' requires runtime buffer_store and session_id.")
         return sink_cls(
             sink_reference=ref,
             resource_location=str(spec["location"]),

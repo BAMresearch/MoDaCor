@@ -63,7 +63,11 @@ class PoissonUncertainties(ProcessStep):
             databundle = data.get(key)
             signal = databundle["signal"].signal
 
-            # Add the variance to the data
-            databundle["signal"].variances["Poisson"] = np.clip(signal, 1, None)
+            # Store sigma directly. Assigning through ``variances`` would first
+            # materialize the variance and then a second sqrt array.
+            poisson_sigma = np.array(signal, dtype=float, copy=True)
+            np.maximum(poisson_sigma, 1.0, out=poisson_sigma)
+            np.sqrt(poisson_sigma, out=poisson_sigma)
+            databundle["signal"].uncertainties["Poisson"] = poisson_sigma
             output[key] = databundle
         return output

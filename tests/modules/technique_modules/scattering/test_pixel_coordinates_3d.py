@@ -19,6 +19,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.hdf.hdf_source import HDFSource
 from modacor.io.io_sources import IoSources
 from modacor.modules.technique_modules.scattering.geometry_helpers import prepare_static_scalar
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import CanonicalDetectorFrame, PixelCoordinates3D
@@ -280,3 +281,81 @@ def test_pixel_coordinates_rod0_returns_scalars():
     np.testing.assert_allclose(out["coord_x"].signal, 0.1)
     np.testing.assert_allclose(out["coord_y"].signal, 0.2)
     np.testing.assert_allclose(out["coord_z"].signal, 2.0)
+
+
+def test_pixel_coordinates_2d_from_nexus_detector_frame(tmp_path):
+    h5py = pytest.importorskip("h5py")
+    calibration_path = tmp_path / "calibration.nxs"
+
+    def write_transform(dataset, *, transformation_type, units, vector, depends_on="."):
+        dataset.attrs["transformation_type"] = transformation_type
+        dataset.attrs["units"] = units
+        dataset.attrs["vector"] = np.asarray(vector, dtype=float)
+        dataset.attrs["depends_on"] = depends_on
+
+    with h5py.File(calibration_path, "w") as h5:
+        module = h5.require_group("/entry1/instrument/detector/detector_module")
+        transformations = h5.require_group("/entry1/instrument/detector/transformations")
+
+        origin = transformations.create_dataset("origin_offset", data=100.0)
+        write_transform(origin, transformation_type="translation", units="mm", vector=[1.0, 0.0, 0.0])
+
+        rotation = transformations.create_dataset("euler_c", data=90.0)
+        write_transform(
+            rotation,
+            transformation_type="rotation",
+            units="degree",
+            vector=[0.0, 0.0, 1.0],
+            depends_on="./origin_offset",
+        )
+
+        offset = module.create_dataset("module_offset", data=0.0)
+        write_transform(
+            offset,
+            transformation_type="translation",
+            units="mm",
+            vector=[0.0, 0.0, 1.0],
+            depends_on="../transformations/euler_c",
+        )
+
+        fast = module.create_dataset("fast_pixel_direction", data=1.0)
+        write_transform(
+            fast,
+            transformation_type="translation",
+            units="mm",
+            vector=[1.0, 0.0, 0.0],
+            depends_on="./module_offset",
+        )
+
+        slow = module.create_dataset("slow_pixel_direction", data=2.0)
+        write_transform(
+            slow,
+            transformation_type="translation",
+            units="mm",
+            vector=[0.0, 1.0, 0.0],
+            depends_on="./module_offset",
+        )
+
+    sources = IoSources()
+    sources.register_source(HDFSource(source_reference="calibration", resource_location=calibration_path))
+    pd = _make_processing_data_2d((2, 3), rod=2)
+
+    step = PixelCoordinates3D(io_sources=sources)
+    step.configuration["with_processing_keys"] = ["sample"]
+    step.configuration["detector_frame"] = {
+        "type": "nexus",
+        "source": "calibration",
+        "detector_path": "/entry1/instrument/detector",
+        "module_origin": "first_pixel_center",
+    }
+
+    step.execute(pd)
+
+    out = pd["sample"]
+    expected_x = np.array([[0.1, 0.1, 0.1], [0.098, 0.098, 0.098]])
+    expected_y = np.array([[0.0, 0.001, 0.002], [0.0, 0.001, 0.002]])
+    expected_z = np.zeros((2, 3))
+
+    np.testing.assert_allclose(out["coord_x"].signal, expected_x, atol=1e-15)
+    np.testing.assert_allclose(out["coord_y"].signal, expected_y, atol=1e-15)
+    np.testing.assert_allclose(out["coord_z"].signal, expected_z, atol=1e-15)

@@ -105,3 +105,22 @@ class TestHDFSource(unittest.TestCase):
         self.test_hdf_source._preload()
         data_attributes = self.test_hdf_source.get_data_attributes(self.temp_dataset_name)
         self.assertEqual({}, data_attributes)  # No attributes set, should return empty dict
+
+    def test_get_static_metadata_decodes_scalar_bytes_dataset(self):
+        with h5py.File(self.temp_file_path, "a") as hdf_file:
+            hdf_file.create_dataset("unit_name", data=np.bytes_("mm"))
+
+        source = HDFSource(source_reference="Test Data", resource_location=self.temp_file_path)
+
+        self.assertEqual("mm", source.get_static_metadata("unit_name"))
+
+    def test_get_data_attributes_decodes_numpy_bytes_values(self):
+        with h5py.File(self.temp_file_path, "a") as hdf_file:
+            hdf_file[self.temp_dataset_name].attrs["units"] = np.bytes_("mm")
+            hdf_file[self.temp_dataset_name].attrs["labels"] = np.asarray([np.bytes_("x"), np.bytes_("y")])
+
+        source = HDFSource(source_reference="Test Data", resource_location=self.temp_file_path)
+        data_attributes = source.get_data_attributes(self.temp_dataset_name)
+
+        self.assertEqual("mm", data_attributes["units"])
+        np.testing.assert_array_equal(data_attributes["labels"], np.asarray(["x", "y"]))

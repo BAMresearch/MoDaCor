@@ -14,7 +14,7 @@ __status__ = "Development"  # "Development", "Production"
 __all__ = ["SinkProcessingData"]
 __version__ = "20260901.1"
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
@@ -32,6 +32,7 @@ class SinkProcessingData(ProcessStep):
 
     - target: 'sink_id::subpath' (for CSV usually 'export_csv::')
     - data_paths: ProcessingData paths without '::', e.g. '/sample/Q/signal'
+      HDF sinks also accept bundle roots, e.g. '/sample'.
     """
 
     documentation = ProcessStepDescriber(
@@ -68,6 +69,11 @@ class SinkProcessingData(ProcessStep):
 
         read_patterns: set[str] = set()
         for data_path in data_paths:
+            parts = tuple(part for part in PurePosixPath(str(data_path).strip()).parts if part != "/")
+            if len(parts) == 1:
+                read_patterns.add(f"{parts[0]}.*")
+                continue
+
             try:
                 parsed = parse_processing_path(str(data_path))
             except (TypeError, ValueError):
