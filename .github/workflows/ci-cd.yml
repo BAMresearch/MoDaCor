@@ -23,7 +23,7 @@ jobs:
     secrets: inherit
 
   docs:
-    needs: [tests, release]  # get (release) version number first
+    needs: [tests]  # publish documentation even if release automation is blocked
     uses: ./.github/workflows/docs.yml
 
   publish:  # needs to be in the top-level .yml for Trusted Publishing to work @pypi
