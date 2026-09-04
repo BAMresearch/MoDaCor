@@ -12,10 +12,16 @@ jobs:
   tests:
     uses: ./.github/workflows/tests.yml
 
-  # make a new version next, release or prerelease
+  # Tag an already-prepared release commit, if the current version is untagged.
   release:
     needs: [tests]
     uses: ./.github/workflows/release.yml
+
+  # Open or update a release-preparation PR after normal main-branch changes.
+  release_pr:
+    needs: [tests, release]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/release-pr.yml
 
   build:
     needs: [tests, release]  # build only if all tests are successful
@@ -27,7 +33,7 @@ jobs:
     uses: ./.github/workflows/docs.yml
 
   publish:  # needs to be in the top-level .yml for Trusted Publishing to work @pypi
-    needs: [build,docs]
+    needs: [build, docs, release]
     runs-on: 'ubuntu-latest'
     permissions:
       id-token: write
