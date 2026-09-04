@@ -1,4 +1,4 @@
-# CLI And Runner API
+# CLI and Runner API
 
 Use MoDaCor either from the command line (`modacor run`) or from Python via a shared execution helper
 (`run_pipeline_job`). Both paths use the same pipeline scheduler backend.
