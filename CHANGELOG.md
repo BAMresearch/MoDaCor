@@ -1,5 +1,109 @@
 # CHANGELOG
 
+## v1.4.0 (2026-09-04)
+
+### Bug fixes
+
+* fix: correct release workflow contributor docs ([`6398d0e`](https://github.com/BAMresearch/MoDaCor/commit/6398d0ec789552e81c99dfc0bde54738eadc5558))
+
+* fix: keep live plot zoom levels through updates ([`d447198`](https://github.com/BAMresearch/MoDaCor/commit/d44719858b0bd6af788bb094f4ad2086940243c8))
+
+* fix: update plotting methods to improve visibility ([`f227b56`](https://github.com/BAMresearch/MoDaCor/commit/f227b56fac3a667ab5e0f2b25ef231ec16463a2f))
+
+* fix: adjusting process step registry to allow numbers in module names (like Plot1D) ([`944847f`](https://github.com/BAMresearch/MoDaCor/commit/944847ffb09189b92e99425a23cb0686dc291dd9))
+
+* fix: updated pyproject.toml ([`e72009d`](https://github.com/BAMresearch/MoDaCor/commit/e72009d5be4bf7e5a97e25e35932ddf4b7e5983d))
+
+* fix: normalize HDF5 strings ([`6770db9`](https://github.com/BAMresearch/MoDaCor/commit/6770db9bf354a518cb5032da4c3aac261249b5b9))
+
+* fix: allow zero-vectors for orientations ([`472eb14`](https://github.com/BAMresearch/MoDaCor/commit/472eb1411fef27c65f493aa3b1e136beb9187964))
+
+* fix: more robustness for reading HDF5 files in case of unsupported compressions ([`f8becab`](https://github.com/BAMresearch/MoDaCor/commit/f8becabf39a21bcb4a1dc10a49058472351c7cd1))
+
+* fix: allow threshold masking and flexible data input for mask generation. ([`a121442`](https://github.com/BAMresearch/MoDaCor/commit/a1214420289e989ae1596a0af06ca6683e1278e9))
+
+* fix: ensuring tuple types are allowed in configuration validation ([`5a6f5f4`](https://github.com/BAMresearch/MoDaCor/commit/5a6f5f43f8ef0607ed2deb0722a435074ee00f8f))
+
+* fix: consistent pipeline step configuration handling from CONFIG_KEYS plus ProcessStepDescriber.arguments. ([`a6d380c`](https://github.com/BAMresearch/MoDaCor/commit/a6d380c16ec4d9d735405e74361f42827cf27c3a))
+
+* fix: flake8 complaints in test_threshold_mask.py ([`cb63859`](https://github.com/BAMresearch/MoDaCor/commit/cb63859fd9aa4bc06f7aa80c818224ad4896431e))
+
+* fix: pytest notebook url has changed (tox.ini) ([`1d7f34f`](https://github.com/BAMresearch/MoDaCor/commit/1d7f34f432054a27c4db5afb240be3a57e789ebf))
+
+### Continuous integration
+
+* ci: further small fix: semantic-release and release now auto-runs but requires an extra approval ([`bed5f65`](https://github.com/BAMresearch/MoDaCor/commit/bed5f65f0a6029182946316c8337be39122343b2))
+
+* ci: further small fix: docs are updated even if release is blockec ([`52891b8`](https://github.com/BAMresearch/MoDaCor/commit/52891b83e04c7e5a6d41a17325a096478fe25c84))
+
+* ci: small fix to semantic-release scope (runs only on commits to main now) ([`ae7753b`](https://github.com/BAMresearch/MoDaCor/commit/ae7753b7b60560dffcc1232affd6394c3697de84))
+
+* ci: improved tox configuration and added 3.14 as target. ([`11596b6`](https://github.com/BAMresearch/MoDaCor/commit/11596b63f08d7e9785ab814e34890d44b2c8250e))
+
+### Enh
+
+* enh: updated HDF processing sink allows storage of entire databundles. also small plotting update ([`062ef47`](https://github.com/BAMresearch/MoDaCor/commit/062ef477e213ce934e49c157c710de3cc2c84b81))
+
+* enh: improved attenuator plate correction options, and adding 1d and 2d visualisation modules via server ([`10798cf`](https://github.com/BAMresearch/MoDaCor/commit/10798cfee07035e1e6c17d3fc94a27d33093ff75))
+
+* enh: polarization correction step ([`bdf1887`](https://github.com/BAMresearch/MoDaCor/commit/bdf1887f75f4d77e7dd594d1a0759764a545a778))
+
+* enh: plate attenuator and angle-dependent detector efficiency corrections ([`1f04d5c`](https://github.com/BAMresearch/MoDaCor/commit/1f04d5c85dfabce3fbf3a4dab5e7ce51f14ec043))
+
+* enh: mask dilation module, exploiting optional scikit-image import ([`6706032`](https://github.com/BAMresearch/MoDaCor/commit/6706032e5be7c0dbf211f9950476b1b47b60266b))
+
+* enh: faster inplace addition and subtraction, and adding a scalar-weight fast path to reduceDimensionality ([`3904007`](https://github.com/BAMresearch/MoDaCor/commit/3904007e2d5a130e6b553e5c032e7ffc0d2ca699))
+
+* enh: faster inplace divisor to speed up expensive divisions ([`406dd10`](https://github.com/BAMresearch/MoDaCor/commit/406dd10747a63d79a92442d84612da1c16777f38))
+
+* enh: adding a reduce_mask module to make threshold masks conform to image dimensions, apply_mask is updated to default to nan ([`476f9c1`](https://github.com/BAMresearch/MoDaCor/commit/476f9c14ba3daa42f2203f4d1f0dc21747c599f6))
+
+* enh: adding a NeXus transformation chain resolver, and using it to process the i22 SAXS + WAXS detector tilts. ([`ed63b94`](https://github.com/BAMresearch/MoDaCor/commit/ed63b94eccdec684bb2e657a0945b8bcb1072f9e))
+
+* enh: making the dependency contract more automated and derived from the ProcessStepDescriber ([`9259a15`](https://github.com/BAMresearch/MoDaCor/commit/9259a15d4a777ea6ba1dd274114631ad52470b29))
+
+* enh: shoring up security a little so server operation via network is a little more robust ([`3645849`](https://github.com/BAMresearch/MoDaCor/commit/3645849108587c5be449a9165e5d1ceafb943f8f))
+
+* enh: enforcing step execution changes processingdata in place, any step output is only additional metadata ([`8af266f`](https://github.com/BAMresearch/MoDaCor/commit/8af266f673788add20c71a383cb47373160579a0))
+
+* enh: pipeline now owns the graph and controls ordering ([`59d00b8`](https://github.com/BAMresearch/MoDaCor/commit/59d00b84b1a29026abdc1bd9120f79d963644053))
+
+* enh: upgrade plan for the design improvements ([`8865ea3`](https://github.com/BAMresearch/MoDaCor/commit/8865ea3b5aa10ce5f3499e5a1747b25d8ec55c68))
+
+* enh: better housekeeping for source/sink dependencies for partial invalidation of pipelines ([`2630726`](https://github.com/BAMresearch/MoDaCor/commit/2630726a3a385be3b8bfc93d70ff75825f534aba))
+
+* enh: adding iosource cache for speeding up sequential processing ([`3ea1daf`](https://github.com/BAMresearch/MoDaCor/commit/3ea1daf5f90dca03c550d9e7f06e2d03db6f5ec5))
+
+* enh: adding a module to copy or link (e.g. precomputed) BaseData between DataBundles ([`0900552`](https://github.com/BAMresearch/MoDaCor/commit/090055284db30bb4ca10c817cfa7582944ac1c94))
+
+* enh: making tracer result available on server success and fail ([`8142aff`](https://github.com/BAMresearch/MoDaCor/commit/8142aff574f8d3748c5200bce471dc29b04a9ebb))
+
+### Unknown Scope
+
+* doc: updated i22 example with notebook snippets ([`8ac8ee1`](https://github.com/BAMresearch/MoDaCor/commit/8ac8ee1eea70f8da6c2e0b7edea2c76f935ab8ff))
+
+* doc: improved document structure with better server description ([`a70de1f`](https://github.com/BAMresearch/MoDaCor/commit/a70de1f7ed5ec7eca1d7215d05fad7ec45093531))
+
+* doc: small note on a possible future extension for a more generically useful plate attenuator correction ([`de03560`](https://github.com/BAMresearch/MoDaCor/commit/de0356042362b2af7b7dfc5aa25732f88844a61a))
+
+* doc: add examples on how threshold masking can be used to create a signal mask based on Q or psi thresholding ([`ca89b49`](https://github.com/BAMresearch/MoDaCor/commit/ca89b49ed61c27a06a25472cc79efdf5772f9dcd))
+
+* adding DataBundle validation and additional tightening of BaseData operations contract ([`f48cf4e`](https://github.com/BAMresearch/MoDaCor/commit/f48cf4e3a1a4af5daf3271bb5322ac9953c05053))
+
+* doc: update recommended pipeline usage ([`42e443c`](https://github.com/BAMresearch/MoDaCor/commit/42e443cd8968336a87b52e25304862a6489558be))
+
+* remove pytest-notebook dependency to fix CI/CD issue ([`0d882e0`](https://github.com/BAMresearch/MoDaCor/commit/0d882e0cea0e2ac8093fcc9cd2cb688010827b9d))
+
+* ThresholdMask: add tests ([`2ecb200`](https://github.com/BAMresearch/MoDaCor/commit/2ecb20063903c1ead41d5da8302e9f7de8c1b860))
+
+* ApplyMask: add tests and fix mask casting to uint32 ([`8294aa2`](https://github.com/BAMresearch/MoDaCor/commit/8294aa2bced28142e964d03b71adb6e889498df1))
+
+* add ApplyMask and ThresholdMask to modules/__init__.py ([`7e7cd28`](https://github.com/BAMresearch/MoDaCor/commit/7e7cd28ec0418855feea15d3c629da76d5bcd234))
+
+* Create ProcessStep ThresholdMask ([`e6022e1`](https://github.com/BAMresearch/MoDaCor/commit/e6022e127b18e7b4dd94b8dbf854435c4f5eebea))
+
+* create ProcessStep ApplyMask ([`9954a31`](https://github.com/BAMresearch/MoDaCor/commit/9954a317fa230bd055f69db1a5b29753075d40dd))
+
 ## v1.3.5 (2026-05-24)
 
 ### Bug fixes
@@ -23,6 +127,12 @@
 * ci: reorganizing ([`3d59880`](https://github.com/BAMresearch/MoDaCor/commit/3d59880b7d7aa01b82403da3795be15ce19ed689))
 
 * ci: fixing test dependencies ([`a4a3aac`](https://github.com/BAMresearch/MoDaCor/commit/a4a3aaca2122894de935074fa41a7bc70a8e0925))
+
+### Enh
+
+* enh: add a buffer iosink for sequential processing of direct data arrays via the API ([`2255eda`](https://github.com/BAMresearch/MoDaCor/commit/2255edaeb255d7e5c5c236c78858be2175f94c08))
+
+* enh: adding a small script that makes nexus files compatible with MoDaCor's stricter broadcasting rules ([`9e62388`](https://github.com/BAMresearch/MoDaCor/commit/9e62388bcae9e34a12b5eba8663160c47494f895))
 
 ### Unknown Scope
 
