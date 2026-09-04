@@ -26,7 +26,7 @@ from ..io.io_sinks import IoSinks
 from ..io.io_sources import IoSources
 from .databundle import DataBundle
 from .messagehandler import MessageHandler
-from .process_step_describer import ProcessStepDescriber
+from .process_step_describer import DEPENDENCY_ROLES, ProcessStepDescriber
 from .processing_data import ProcessingData
 
 # from .validators import is_list_of_ints
@@ -126,6 +126,44 @@ def matches_processing_pattern(changed_key: str, patterns: Iterable[str]) -> boo
         if changed == pattern:
             return True
     return False
+
+
+_DEPENDENCY_ROLE_BEHAVIOR = {
+    "processing_read_basedata_key": (True, False),
+    "processing_write_basedata_key": (False, True),
+    "processing_read_write_basedata_key": (True, True),
+    "processing_read_basedata_key_list": (True, False),
+    "processing_write_basedata_key_list": (False, True),
+    "processing_read_write_basedata_key_list": (True, True),
+}
+assert set(_DEPENDENCY_ROLE_BEHAVIOR) == set(DEPENDENCY_ROLES)
+
+
+def _dependency_roles_from_spec(config_spec: dict[str, Any]) -> tuple[str, ...]:
+    role_value = config_spec.get("dependency_role")
+    if role_value is None:
+        return ()
+    if isinstance(role_value, str):
+        return (role_value,)
+    try:
+        return tuple(str(role) for role in role_value)
+    except TypeError as exc:
+        raise TypeError("Configuration schema 'dependency_role' must be a string or iterable of strings.") from exc
+
+
+def _basedata_keys_from_dependency_value(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        stripped = value.strip()
+        return [stripped] if stripped else []
+    if isinstance(value, dict):
+        return []
+    try:
+        return [str(item).strip() for item in value if str(item).strip()]
+    except TypeError:
+        text = str(value).strip()
+        return [text] if text else []
 
 
 def _config_type_tuple(type_spec: Any) -> tuple[type, ...] | None:
@@ -252,29 +290,63 @@ class ProcessStep:
         """
         Return the runtime dependencies used for partial-rerun invalidation.
 
-        Subclasses with source/sink side effects or custom output keys should
-        override this method with an exact contract. The default covers ordinary
-        in-place processing steps that use ``with_processing_keys`` and the
-        optional ``output_processing_key`` convention.
+        Argument specs may declare ``dependency_role`` to derive exact
+        BaseData-level reads and writes from configuration values. Subclasses
+        with source/sink side effects or unusual key relationships can still
+        override this method with a custom contract. Without dependency roles,
+        the default covers ordinary in-place processing steps that use
+        ``with_processing_keys`` and the optional ``output_processing_key``
+        convention.
         """
 
         cfg = self.configuration or {}
         source_refs = source_refs_from_references(cfg)
-        read_patterns = processing_key_patterns(cfg.get("with_processing_keys"))
+        schema = self.effective_config_schema()
+        read_patterns: set[str] = set()
+        write_patterns: set[str] = set()
+        has_dependency_hints = False
 
-        output_key = cfg.get("output_processing_key")
-        if isinstance(output_key, str) and output_key.strip():
-            write_patterns = set(processing_key_patterns(output_key))
-        else:
-            write_patterns = set(read_patterns)
+        for config_key, config_spec in schema.items():
+            dependency_roles = _dependency_roles_from_spec(config_spec)
+            if not dependency_roles:
+                continue
+            has_dependency_hints = True
+            basedata_keys = _basedata_keys_from_dependency_value(cfg.get(config_key, config_spec.get("default")))
+            for role in dependency_roles:
+                try:
+                    reads, writes = _DEPENDENCY_ROLE_BEHAVIOR[role]
+                except KeyError as exc:
+                    known = ", ".join(sorted(_DEPENDENCY_ROLE_BEHAVIOR))
+                    raise ValueError(f"Unknown dependency_role {role!r}. Known roles: {known}.") from exc
+                for basedata_key in basedata_keys:
+                    patterns = processing_key_patterns(cfg.get("with_processing_keys"), basedata_key=basedata_key)
+                    if reads:
+                        read_patterns.update(patterns)
+                    if writes:
+                        write_patterns.update(patterns)
 
-        processing_key = cfg.get("processing_key")
-        if isinstance(processing_key, str) and processing_key.strip():
-            databundle_output_key = cfg.get("databundle_output_key")
-            if isinstance(databundle_output_key, str) and databundle_output_key.strip():
-                write_patterns.update(processing_key_patterns(processing_key, basedata_key=databundle_output_key))
+        if not has_dependency_hints:
+            read_patterns = set(processing_key_patterns(cfg.get("with_processing_keys")))
+
+            output_key = cfg.get("output_processing_key")
+            if isinstance(output_key, str) and output_key.strip():
+                write_patterns = set(processing_key_patterns(output_key))
             else:
-                write_patterns.update(processing_key_patterns(processing_key))
+                write_patterns = set(read_patterns)
+
+            processing_key = cfg.get("processing_key")
+            if isinstance(processing_key, str) and processing_key.strip():
+                databundle_output_key = cfg.get("databundle_output_key")
+                if isinstance(databundle_output_key, str) and databundle_output_key.strip():
+                    write_patterns.update(processing_key_patterns(processing_key, basedata_key=databundle_output_key))
+                else:
+                    write_patterns.update(processing_key_patterns(processing_key))
+
+        if has_dependency_hints and not read_patterns and not write_patterns:
+            # Hinted BaseData keys are only exact when paired with processing keys.
+            # Without them, keep partial-rerun invalidation conservative.
+            read_patterns = {"*"}
+            write_patterns = {"*"}
 
         if not source_refs and not read_patterns and not write_patterns:
             # Generic/custom steps without a contract are treated conservatively.
@@ -375,6 +447,7 @@ class ProcessStep:
             "required": bool(spec.get("required", False)),
             "default": default,
             "doc": spec.get("doc"),
+            "dependency_role": spec.get("dependency_role"),
         }
 
     @classmethod

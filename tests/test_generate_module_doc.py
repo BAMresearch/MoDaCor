@@ -84,8 +84,8 @@ def test_build_markdown_contains_core_sections(divide_docs):
     ]:
         assert section in md
 
-    assert "| Argument | Type | Required | Default | Description |" in md
-    assert "| `divisor_source` | str | No | - | IoSources key for the divisor signal. |" in md
+    assert "| Argument | Type | Required | Default | Dependency role | Description |" in md
+    assert "| `divisor_source` | str | No | - | - | IoSources key for the divisor signal. |" in md
     assert "Divide" in md
 
 
@@ -99,7 +99,7 @@ def test_cli_writes_to_file(tmp_path: Path, monkeypatch, target: str):
     assert output_path.exists()
     content = output_path.read_text(encoding="utf-8")
     assert "Divide" in content
-    assert "| Argument | Type | Required | Default | Description |" in content
+    assert "| Argument | Type | Required | Default | Dependency role | Description |" in content
     assert completed.stdout == ""
 
 
@@ -108,7 +108,7 @@ def test_cli_stdout(monkeypatch):
     completed = subprocess.run(args, check=True, capture_output=True, text=True, cwd=PROJECT_ROOT)
     assert completed.stdout.startswith("# Divide")
     assert "## Argument specification" in completed.stdout
-    assert "| Argument | Type | Required | Default | Description |" in completed.stdout
+    assert "| Argument | Type | Required | Default | Dependency role | Description |" in completed.stdout
 
 
 def test_cli_error_on_missing_documentation(tmp_path: Path, monkeypatch):

@@ -139,7 +139,7 @@ def _format_arguments(documentation: ProcessStepDescriber) -> str:
     if hasattr(documentation, "initial_configuration"):
         defaults = documentation.initial_configuration() or {}
 
-    header = "| Argument | Type | Required | Default | Description |\n|---|---|---|---|---|"
+    header = "| Argument | Type | Required | Default | Dependency role | Description |\n" "|---|---|---|---|---|---|"
     rows = []
     for name, spec in sorted(arguments.items()):
         raw_types = spec.get("type", [])
@@ -160,8 +160,18 @@ def _format_arguments(documentation: ProcessStepDescriber) -> str:
             default_repr = "-"
         else:
             default_repr = str(default_value)
+        dependency_role = spec.get("dependency_role")
+        if isinstance(dependency_role, (list, tuple, set)):
+            dependency_role_repr = ", ".join(str(role) for role in dependency_role)
+        elif dependency_role is None:
+            dependency_role_repr = "-"
+        else:
+            dependency_role_repr = str(dependency_role)
         description = spec.get("doc", "") or ""
-        rows.append(f"| `{name}` | {type_repr or '-'} | {required} | {default_repr} | {description} |")
+        rows.append(
+            f"| `{name}` | {type_repr or '-'} | {required} | {default_repr} | "
+            f"{dependency_role_repr} | {description} |"
+        )
 
     return "\n".join([header, *rows])
 

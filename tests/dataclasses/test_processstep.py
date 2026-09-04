@@ -107,6 +107,21 @@ class DocumentedConfigStep(ProcessStep):
             "nested": {"type": dict, "default": {"values": []}},
             "optional_label": {"type": (str, type(None)), "default": None},
             "vector": {"type": tuple, "default": (1.0, 0.0, 0.0)},
+            "source_key": {
+                "type": str,
+                "default": "signal",
+                "dependency_role": "processing_read_basedata_key",
+            },
+            "target_key": {
+                "type": str,
+                "default": "mask",
+                "dependency_role": "processing_write_basedata_key",
+            },
+            "read_write_keys": {
+                "type": list,
+                "default": ["signal"],
+                "dependency_role": "processing_read_write_basedata_key_list",
+            },
         },
     )
 
@@ -229,6 +244,34 @@ def test_tuple_config_accepts_yaml_style_list_and_stores_tuple():
     assert instance.configuration["vector"] == (0.0, 1.0, 0.0)
     assert isinstance(instance.configuration["vector"], tuple)
     assert DocumentedConfigStep.is_process_step_dict(None, None, {"vector": [0.0, 1.0, 0.0]})
+
+
+def test_dependency_contract_uses_process_step_describer_dependency_roles():
+    instance = DocumentedConfigStep(
+        configuration={
+            "with_processing_keys": ["sample"],
+            "source_key": "flatfield",
+            "target_key": "flatfield_mask",
+            "read_write_keys": ["signal", "weights"],
+            "optional_label": "file::/entry/value",
+        }
+    )
+
+    contract = instance.dependency_contract()
+
+    assert contract.source_refs == frozenset({"file"})
+    assert contract.processing_reads == frozenset({"sample.flatfield", "sample.signal", "sample.weights"})
+    assert contract.processing_writes == frozenset({"sample.flatfield_mask", "sample.signal", "sample.weights"})
+
+
+def test_dependency_contract_with_dependency_roles_falls_back_to_wildcard_without_processing_keys():
+    instance = DocumentedConfigStep()
+
+    contract = instance.dependency_contract()
+
+    assert contract.source_refs == frozenset()
+    assert contract.processing_reads == frozenset({"*"})
+    assert contract.processing_writes == frozenset({"*"})
 
 
 def test_process_step__reset():
