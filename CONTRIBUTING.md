@@ -56,7 +56,7 @@ To set up `modacor` for local development:
 
    ```bash
    git add .
-   git commit -m "Your detailed description of your changes."
+   git commit -m "fix: describe the concrete change"
    git push origin name-of-your-bugfix-or-feature
    ```
 
@@ -70,8 +70,19 @@ For merging, you should:
 
 1. Include passing tests (run `tox`).
 2. Update documentation when there's new API, functionality, etc.
-3. Add a note to `CHANGELOG.md` about the changes.
+3. Use a semantic commit prefix such as `fix:`, `enh:`, `feat:`, or `docs:`
+   when the change should appear in release notes.
 4. Add yourself to `AUTHORS.md`.
+
+### Releases and changelog
+
+Do not edit `CHANGELOG.md` manually for normal feature or bug-fix PRs. After
+changes land on `main`, the GitHub Actions release-preparation workflow opens a
+separate release PR with the generated changelog and version bumps. Review and
+merge that release PR like any other change.
+
+The release workflow only tags and publishes a version after the generated
+release PR has been merged into `main`.
 
 ### Tips
 

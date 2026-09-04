@@ -31,6 +31,8 @@ python -m isort --check-only --diff --filter-files src/modacor tests
 
 - Update user-facing docs when CLI, runtime-service, pipeline behavior, or
   extension contracts change.
+- Use `docs:` as the commit prefix for documentation-only changes that should
+  be classified as documentation updates in generated release notes.
 - If you add or change a public `ProcessStep`, regenerate the module reference
   pages:
 
@@ -52,3 +54,13 @@ python -m sphinx -E -b html docs dist/docs
 - Preserve docstrings and type hints when simplifying code.
 - Avoid leaving unfinished pages or stale backlog state after structural
   refactors.
+
+## Release notes
+
+- Do not manually edit `CHANGELOG.md` for ordinary PRs. The release-preparation
+  workflow generates a dedicated release PR after changes reach `main`.
+- Use semantic commit prefixes that match the project configuration:
+  `fix:`/`perf:` for patch releases, `enh:`/`feat:` for minor releases, and
+  `docs:` for documentation entries.
+- Review and merge the generated release PR before expecting a new version tag
+  or PyPI publication.
