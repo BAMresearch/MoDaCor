@@ -1,9 +1,9 @@
 # Application examples
 
-These pages collect the current instrument-oriented examples from the repository
-and active workspace notes. They are intentionally grounded in existing code,
-tests, runtime-service source profiles, and working pipeline notebooks rather
-than in future plans.
+These pages collect instrument-oriented examples from the repository and from
+active workspace workflows that are useful documentation patterns. They are
+grounded in existing code, tests, runtime-service source profiles, and working
+notebooks rather than in future plans.
 
 For a runnable end-to-end example, start with
 `docs/getting_started/quickstart.md` and then use the pages below for
