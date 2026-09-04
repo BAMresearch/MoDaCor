@@ -19,4 +19,4 @@ Use the shared runner API in Python (notebooks/scripts):
 from modacor.runner import run_pipeline_job
 ```
 
-See [Getting started: CLI And Runner API](getting_started/cli_and_runner.md) for full examples.
+See [Getting started: CLI and Runner API](getting_started/cli_and_runner.md) for full examples.
