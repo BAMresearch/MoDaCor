@@ -180,9 +180,10 @@ patch_tags = ["fix", "perf"]
 exclude_commit_patterns = ["chore", ".*\\bGHA\\b.*", ".*\\b[gG][hH] actions?\\b.*"]
 [tool.semantic_release.publish]
 upload_to_vcs_release = false
-# allow PRs to make a release version, for testing, exists in that branch only then
-[tool.semantic_release.branches.all]
-match = ".*"
+# Release only from main. Feature branches should not create version tags or
+# changelog commits; repository policy requires their changes to reach main via PR.
+[tool.semantic_release.branches.main]
+match = "main"
 
 [tool.black]
 line-length = 120

@@ -1,70 +1,89 @@
 name: Release
 
-# Controls when the action will run.
 on:
   workflow_call:
+    outputs:
+      new_version:
+        description: Whether this run created a new version tag.
+        value: ${{ jobs.release.outputs.new_version }}
 
 jobs:
-  # make a new version first, release or prerelease
   release:
-    # Only run this job if new work is pushed and not on PRs, avoids duplicate runs
-    # semantic-release run on the commit and pushes new version to branch
-    # on merge there is already a new version in git history, no new commit needed
-    # semantic-release github-actions bot can't push to main anyway
-    if: github.event_name == 'push'
+    # Release PRs carry version/changelog updates through normal branch
+    # protection. This job only tags an already-versioned main commit.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
-      new_version: ${{ steps.semver.outputs.new_version }}
+      new_version: ${{ steps.tag.outputs.new_version }}
     steps:
-
-      # depth=0 is needed for semantic-release
       - name: Checking out the repo
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          # ensure actual branch name instead of a commit SHA
-          ref: ${{ github.head_ref || github.ref }}
+          ref: main
 
-      - name: Setup git user
+      - name: Read package version
+        id: version
         shell: sh
         run: |
+          set -eu
+          VERSION=$(python - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("src/modacor/__init__.py").read_text()
+          match = re.search(r'__version__\s*=\s*"([^"]+)"', text)
+          if not match:
+              raise SystemExit("Could not find src/modacor/__init__.py __version__")
+          print(match.group(1))
+          PY
+          )
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check release file versions
+        shell: sh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -eu
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          expected = os.environ["VERSION"]
+          checks = {
+              "src/modacor/__init__.py": r'__version__\s*=\s*"([^"]+)"',
+              "docs/conf.py": r'version\s*=\s*"([^"]+)"',
+              ".copier-answers.yml": r"(?m)^version:\s*([0-9]+(?:\.[0-9]+){2})\s*$",
+          }
+          for filename, pattern in checks.items():
+              text = Path(filename).read_text()
+              match = re.search(pattern, text)
+              if not match:
+                  raise SystemExit(f"Could not find version in {filename}")
+              if match.group(1) != expected:
+                  raise SystemExit(f"{filename} has version {match.group(1)}, expected {expected}")
+          PY
+
+      - name: Create version tag if needed
+        id: tag
+        shell: sh
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -eu
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists; nothing to release."
+            echo "new_version=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           git config user.name "${GITHUB_ACTOR}"
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-
-      - name: Setting up Python 3.12
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: |
-            pyproject.toml
-
-      - name: Install dependencies
-        shell: sh
-        run: |
-          [ -d "/c/miniconda" ] && /c/miniconda/condabin/activate.bat
-          python -m pip install --upgrade pip
-          python -m pip install --progress-bar=off .[ci]
-
-      - name: Determine a version number
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        id: semver
-        shell: sh
-        run: |
-          set -xe
-          NEWVER=$(semantic-release version --print)
-          [ -z "$NEWVER" ] && exit 1
-          if [ "$NEWVER" = "$(semantic-release version --print-last-released 2>/dev/null)" ]; then
-            # make this info available for other job down the road
-            echo "new_version=false" >> $GITHUB_OUTPUT
-          else
-            echo "new_version=true" >> $GITHUB_OUTPUT
-          fi
-          # version number updates with regexp which is not supported by
-          # semantic_release.version_variables in pyproject.toml
-          sed -i -e "s/v\([0-9]\+\.\)\{2\}\([0-9]\+\)/v$NEWVER/g" README.md
-          sed -i -e "/version:/s/\([0-9]\+\.\)\{2\}[0-9]\+/$NEWVER/" .copier-answers.yml
-          git add README.md .copier-answers.yml
-          # creates a release only if there are relevant changes/commits starting with 'fix/feat()'
-          semantic-release version
+          git tag -a "$TAG" -m "$TAG"
+          git push origin "$TAG"
+          echo "new_version=true" >> "$GITHUB_OUTPUT"
