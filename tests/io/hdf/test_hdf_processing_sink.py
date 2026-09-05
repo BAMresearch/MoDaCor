@@ -149,7 +149,7 @@ def test_hdf_processing_sink_writes_result_and_metadata(
         _assert_utf8_string_attr(h5["processing/result"], "default")
 
         signal_group = h5["processing/result/run1/sample/signal"]
-        assert "default" not in signal_group.attrs
+        assert signal_group.attrs["default"] == "signal"
         assert signal_group.attrs["NX_class"] == "NXdata"
         assert "canSAS_class" not in signal_group.attrs
         assert signal_group.attrs["signal"] == "signal"
@@ -157,6 +157,7 @@ def test_hdf_processing_sink_writes_result_and_metadata(
         assert "I_axes" not in signal_group.attrs
         assert "Q_indices" not in signal_group.attrs
         _assert_utf8_string_attr(signal_group, "NX_class")
+        _assert_utf8_string_attr(signal_group, "default")
         _assert_utf8_string_attr(signal_group, "signal")
         _assert_utf8_string_attr(signal_group, "axes")
         assert "I" not in signal_group

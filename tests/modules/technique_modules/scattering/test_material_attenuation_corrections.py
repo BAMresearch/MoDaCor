@@ -17,6 +17,7 @@ from modacor.modules.technique_modules.scattering.attenuator_plate_correction im
 from modacor.modules.technique_modules.scattering.detector_efficiency_correction import DetectorEfficiencyCorrection
 from modacor.modules.technique_modules.scattering.material_attenuation import (
     HC_KEV_ANGSTROM,
+    _decode_scalar,
     energy_kev_from_config_or_wavelength,
 )
 
@@ -136,6 +137,15 @@ def test_material_attenuation_can_derive_energy_from_wavelength():
     )
 
     assert energy == pytest.approx(HC_KEV_ANGSTROM)
+
+
+def test_material_attenuation_accepts_broadcast_constant_as_scalar():
+    assert _decode_scalar(np.full((5, 1, 1, 1), 0.154)) == pytest.approx(0.154)
+
+
+def test_material_attenuation_rejects_varying_array_as_scalar():
+    with pytest.raises(ValueError, match="scalar or constant-valued array"):
+        _decode_scalar(np.array([0.154, 0.071]))
 
 
 def test_detector_efficiency_dependency_contract_tracks_sources_and_cos_alpha():

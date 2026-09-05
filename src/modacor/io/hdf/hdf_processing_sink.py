@@ -145,6 +145,7 @@ def _write_basedata(
     if databundle is not None and basedata_name is not None and _is_plot_basedata(databundle, basedata_name):
         axis_names = _infer_axis_names(databundle, basedata)
         group.attrs["NX_class"] = "NXdata"
+        group.attrs["default"] = "signal"
         group.attrs["signal"] = "signal"
         group.attrs["axes"] = _as_hdf_str_list(axis_names)
         _write_axis_fields(group, databundle, basedata, axis_names, compression=compression)
