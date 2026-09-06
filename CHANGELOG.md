@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v1.5.0 (2026-09-06)
+
+### Bug fixes
+
+* fix: small fixes that appeared during latest MOUSE pipeline extensions ([`4eebd67`](https://github.com/BAMresearch/MoDaCor/commit/4eebd67be216e2f83fd11c3541c7a4c31b7e3700))
+
+### Documentation
+
+* docs: updating docs on the MOUSE application, adding MOUSE pipeline as example ([`b067528`](https://github.com/BAMresearch/MoDaCor/commit/b067528ae9956cc4be8f622a25a91d01c492e2bb))
+
+### Enh
+
+* enh: adding a plate self-absorption correction ([`935af9a`](https://github.com/BAMresearch/MoDaCor/commit/935af9a27538daa48454fcd7623c59ef0d932c52))
+
 ## v1.4.0 (2026-09-04)
 
 ### Bug fixes
