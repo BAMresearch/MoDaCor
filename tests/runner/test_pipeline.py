@@ -90,6 +90,17 @@ def test_linear_pipeline(linear_pipeline):
     assert sequence == [1, 2, 3]
 
 
+def test_documented_mouse_solids_pipeline_loads():
+    """Keep the checked-in working example compatible with the module registry."""
+    pipeline_path = Path(__file__).parents[2] / "docs" / "examples" / "MOUSE_solids.yaml"
+
+    pipeline = Pipeline.from_yaml_file(pipeline_path)
+
+    step_ids = {str(node.step_id) for node in pipeline.graph}
+    assert len(step_ids) == 42
+    assert {"TI", "MK_instrument_dilate", "DE", "PO", "SA", "PL_IQ", "PL_2D"} <= step_ids
+
+
 def test_node_addition(linear_pipeline):
     pipeline = Pipeline.from_dict(linear_pipeline)
     ps = DummyProcessStep()
