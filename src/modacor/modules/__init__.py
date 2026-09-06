@@ -36,6 +36,12 @@ from modacor.modules.base_modules.subtract_databundles import SubtractDatabundle
 from modacor.modules.base_modules.threshold_mask import ThresholdMask
 from modacor.modules.base_modules.units_label_update import UnitsLabelUpdate
 from modacor.modules.technique_modules.scattering.attenuator_plate_correction import AttenuatorPlateCorrection
+from modacor.modules.technique_modules.scattering.capillary_sample_container_correction import (
+    CapillarySampleContainerCorrection,
+)
+from modacor.modules.technique_modules.scattering.capillary_self_absorption_correction import (
+    CapillarySelfAbsorptionCorrection,
+)
 from modacor.modules.technique_modules.scattering.detector_efficiency_correction import DetectorEfficiencyCorrection
 from modacor.modules.technique_modules.scattering.flat_plate_self_absorption_correction import (
     FlatPlateSelfAbsorptionCorrection,
@@ -57,6 +63,8 @@ __all__ = [
     "AttenuatorPlateCorrection",
     "ApplyMask",
     "BitwiseOrMasks",
+    "CapillarySelfAbsorptionCorrection",
+    "CapillarySampleContainerCorrection",
     "CombineUncertainties",
     "CombineUncertaintiesMax",
     "CopyDataBundleKeys",

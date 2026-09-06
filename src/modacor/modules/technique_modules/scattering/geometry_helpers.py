@@ -20,15 +20,12 @@ import pint
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
+from modacor.geometry import unit_vector3
 
 
 def unit_vec3(v: Tuple[float, float, float] | np.ndarray, *, name: str = "vector") -> np.ndarray:
-    """Normalize a 3-vector to unit length."""
-    v = np.asarray(v, dtype=float).reshape(3)
-    n = float(np.linalg.norm(v))
-    if n == 0.0:
-        raise ValueError(f"{name} must be non-zero")
-    return v / n
+    """Compatibility wrapper for :func:`modacor.geometry.unit_vector3`."""
+    return unit_vector3(np.asarray(v, dtype=float).reshape(3), name=name)
 
 
 def require_scalar(name: str, bd: BaseData) -> BaseData:
