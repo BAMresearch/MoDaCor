@@ -43,9 +43,10 @@ detector:
 YAML
 ```
 
-The NeXus file exposes counts in `entry1/instrument/detector00/data` and the exposure time in
-`entry1/instrument/detector00/frame_exposure_time`. The metadata file supplies a scalar dark-current estimate so the
-last pipeline step can remove it.
+The NeXus file exposes summed counts in `entry1/instrument/detector00/data` and the total acquisition time in
+`entry1/instrument/detector00/count_time`. Because the stored image is a sum over the stacked frames, use the total
+`count_time`, not the duration of one frame in `frame_exposure_time`. The metadata file supplies a scalar dark-current
+estimate so the last pipeline step can remove it.
 
 ## Step 3 – Create the pipeline configuration
 
@@ -62,14 +63,14 @@ steps:
       with_processing_keys:
         - sample
   2:
-    name: normalize_by_exposure
+    name: normalize_by_total_count_time
     module: Divide
     requires_steps: [1]
     configuration:
       with_processing_keys:
         - sample
-      divisor_source: sample::entry1/instrument/detector00/frame_exposure_time
-      divisor_units_source: sample::entry1/instrument/detector00/frame_exposure_time@units
+      divisor_source: sample::entry1/instrument/detector00/count_time
+      divisor_units_source: sample::entry1/instrument/detector00/count_time@units
   3:
     name: subtract_darkcurrent
     module: Subtract

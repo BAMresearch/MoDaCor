@@ -28,9 +28,16 @@ class MaterialAttenuation:
 def _decode_scalar(value: Any) -> Any:
     arr = np.asarray(value)
     if arr.shape != ():
-        if arr.size != 1:
-            raise ValueError(f"Expected a scalar value, got shape {arr.shape}.")
-        value = arr.reshape(-1)[0]
+        flattened = arr.reshape(-1)
+        if flattened.size != 1:
+            first = flattened[0]
+            if np.issubdtype(arr.dtype, np.number):
+                is_constant = np.allclose(flattened, first, rtol=0.0, atol=0.0, equal_nan=True)
+            else:
+                is_constant = bool(np.all(flattened == first))
+            if not is_constant:
+                raise ValueError(f"Expected a scalar or constant-valued array, got shape {arr.shape}.")
+        value = flattened[0]
     else:
         value = arr.item() if hasattr(arr, "item") else value
     if isinstance(value, (bytes, np.bytes_)):
