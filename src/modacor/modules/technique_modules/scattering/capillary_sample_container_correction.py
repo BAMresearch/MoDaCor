@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySampleContainerCorrection"]
-__version__ = "20260906.2"
+__version__ = "20260906.3"
 
 from copy import deepcopy
 from pathlib import Path
@@ -27,6 +27,9 @@ from modacor.models.attenuation import (
 from modacor.modules.helpers import get_first_present
 from modacor.modules.technique_modules.scattering.capillary_self_absorption_correction import (
     CapillarySelfAbsorptionCorrection,
+    _add_uncertainty_component,
+    _nominal_and_derivative,
+    _uncertainties_from_derivative,
 )
 
 _ARGUMENTS = deepcopy(CapillarySelfAbsorptionCorrection.documentation.arguments)
@@ -153,12 +156,13 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         modifies={
             "signal": ["signal", "uncertainties"],
             "mask": ["signal"],
-            "capillary_sample_attenuation": ["signal"],
-            "capillary_wall_attenuation_filled": ["signal"],
+            "capillary_sample_attenuation": ["signal", "uncertainties"],
+            "capillary_wall_attenuation_filled": ["signal", "uncertainties"],
             "capillary_wall_attenuation_empty": ["signal"],
-            "capillary_wall_subtraction_scale": ["signal"],
-            "capillary_filled_calculated_transmission": ["signal"],
+            "capillary_wall_subtraction_scale": ["signal", "uncertainties"],
+            "capillary_filled_calculated_transmission": ["signal", "uncertainties"],
             "capillary_empty_calculated_transmission": ["signal"],
+            "capillary_effective_sample_mu": ["signal", "uncertainties"],
             "capillary_beam_profile_retained_fraction": ["signal"],
             "capillary_sample_attenuation_evaluated": ["signal"],
             "capillary_wall_filled_attenuation_evaluated": ["signal"],
@@ -208,6 +212,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             cfg.get("wall_subtraction_scale_key", "capillary_wall_subtraction_scale"),
             cfg.get("filled_calculated_transmission_key", "capillary_filled_calculated_transmission"),
             cfg.get("empty_calculated_transmission_key", "capillary_empty_calculated_transmission"),
+            cfg.get("effective_sample_mu_key", "capillary_effective_sample_mu"),
             cfg.get("profile_retained_fraction_key", "capillary_beam_profile_retained_fraction"),
             cfg.get("sample_evaluated_mask_key", "capillary_sample_attenuation_evaluated"),
             cfg.get("wall_filled_evaluated_mask_key", "capillary_wall_filled_attenuation_evaluated"),
@@ -297,6 +302,33 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             replacement = 0.0 if original_values is None else original_values
             corrected.uncertainties[name] = np.where(mask, replacement, values)
 
+    @staticmethod
+    def _add_correlated_sample_mu_uncertainties(
+        corrected: BaseData,
+        filled_signal: BaseData,
+        empty_signal: BaseData,
+        sample_factor: np.ndarray,
+        sample_factor_mu_derivative: np.ndarray | None,
+        wall_scale: np.ndarray,
+        wall_filled_mu_derivative: np.ndarray | None,
+        wall_empty_factor: np.ndarray,
+        sample_mu_uncertainties: dict[str, float],
+    ) -> None:
+        if sample_factor_mu_derivative is None or wall_filled_mu_derivative is None:
+            return
+        wall_scale_mu_derivative = wall_filled_mu_derivative / wall_empty_factor
+        numerator = filled_signal.signal - wall_scale * empty_signal.signal
+        corrected_mu_derivative = (
+            -wall_scale_mu_derivative * empty_signal.signal / sample_factor
+            - numerator * sample_factor_mu_derivative / sample_factor**2
+        )
+        for name, uncertainty in sample_mu_uncertainties.items():
+            _add_uncertainty_component(
+                corrected.uncertainties,
+                name,
+                np.abs(corrected_mu_derivative) * uncertainty,
+            )
+
     def calculate(self) -> dict[str, DataBundle]:
         filled_key = self.configuration.get("filled_processing_key", "sample")
         empty_key = self.configuration.get("empty_processing_key", "background")
@@ -313,9 +345,12 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
                 f"Filled and empty signal shapes must match, got {filled_signal.shape} and {empty_signal.shape}."
             )
 
-        geometry, filled_coefficients = self._geometry_and_coefficients()
+        geometry, filled_coefficients, resolved_sample_mu = self._geometry_and_coefficients()
         if geometry.phase_count != 2:
             raise ValueError("Composite sample/container correction requires a positive wall_thickness.")
+        sample_evaluation_coefficients, mu_delta, central_mu_difference = self._sample_mu_coefficient_sets(
+            geometry, filled_coefficients, resolved_sample_mu.uncertainties
+        )
         empty_mu = self._scalar("empty_centre_mu", "1/m", required=False)
         if empty_mu < 0.0:
             raise ValueError("empty_centre_mu must be non-negative.")
@@ -365,25 +400,45 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             else ~combined_mask
         )
 
-        sample_factor, sample_evaluated = self._factor_map(
+        sample_factor_values, sample_evaluated = self._factor_map(
             geometry=geometry,
-            coefficients=filled_coefficients,
+            coefficients=sample_evaluation_coefficients,
             scattering_points=sample_points,
             volume_weights=sample_weights,
             detector_grid=detector_grid,
             active=active,
             incident_direction=incident_direction,
         )
+        sample_factor, sample_factor_mu_derivative = _nominal_and_derivative(
+            sample_factor_values, mu_delta, central_mu_difference
+        )
+        filled_rows = (
+            sample_evaluation_coefficients[None, :]
+            if sample_evaluation_coefficients.ndim == 1
+            else sample_evaluation_coefficients
+        )
+        wall_evaluation_coefficients = np.concatenate(
+            (filled_rows[:1], empty_coefficients[None, :], filled_rows[1:]), axis=0
+        )
         wall_factors, wall_evaluated = self._factor_map(
             geometry=geometry,
-            coefficients=np.stack((filled_coefficients, empty_coefficients)),
+            coefficients=wall_evaluation_coefficients,
             scattering_points=wall_points,
             volume_weights=wall_weights,
             detector_grid=detector_grid,
             active=active,
             incident_direction=incident_direction,
         )
-        wall_filled_factor, wall_empty_factor = wall_factors
+        wall_filled_factor = wall_factors[0]
+        wall_empty_factor = wall_factors[1]
+        if mu_delta is None:
+            wall_filled_mu_derivative = None
+        else:
+            _wall_nominal, wall_filled_mu_derivative = _nominal_and_derivative(
+                np.concatenate((wall_factors[:1], wall_factors[2:])),
+                mu_delta,
+                central_mu_difference,
+            )
         wall_filled_evaluated = wall_evaluated
         wall_empty_evaluated = wall_evaluated
         minimum_factor = float(self.configuration.get("minimum_attenuation_factor", 1e-12))
@@ -399,15 +454,67 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
 
         rank = min(filled_signal.rank_of_data, sample_factor.ndim)
 
-        def factor_data(values):
-            return BaseData(signal=values, units=ureg.dimensionless, rank_of_data=rank)
+        sample_factor_uncertainties = _uncertainties_from_derivative(
+            sample_factor_mu_derivative, resolved_sample_mu.uncertainties
+        )
+        wall_filled_uncertainties = _uncertainties_from_derivative(
+            wall_filled_mu_derivative, resolved_sample_mu.uncertainties
+        )
+        wall_scale_uncertainties = {
+            name: values / wall_empty_factor for name, values in wall_filled_uncertainties.items()
+        }
 
-        sample_factor_data = factor_data(sample_factor)
-        wall_filled_data = factor_data(wall_filled_factor)
+        def factor_data(values, uncertainties=None):
+            return BaseData(
+                signal=values,
+                units=ureg.dimensionless,
+                uncertainties={} if uncertainties is None else uncertainties,
+                rank_of_data=rank,
+            )
+
+        sample_factor_calculation = factor_data(sample_factor)
+        wall_filled_calculation = factor_data(wall_filled_factor)
         wall_empty_data = factor_data(wall_empty_factor)
-        wall_scale_data = wall_filled_data / wall_empty_data
-        corrected = (filled_signal - wall_scale_data * empty_signal) / sample_factor_data
+        wall_scale_calculation = wall_filled_calculation / wall_empty_data
+        corrected = (filled_signal - wall_scale_calculation * empty_signal) / sample_factor_calculation
+        self._add_correlated_sample_mu_uncertainties(
+            corrected,
+            filled_signal,
+            empty_signal,
+            sample_factor,
+            sample_factor_mu_derivative,
+            wall_scale_calculation.signal,
+            wall_filled_mu_derivative,
+            wall_empty_factor,
+            resolved_sample_mu.uncertainties,
+        )
         self._restore_masked_values(corrected, filled_signal, combined_mask)
+
+        sample_factor_data = factor_data(sample_factor, sample_factor_uncertainties)
+        wall_filled_data = factor_data(wall_filled_factor, wall_filled_uncertainties)
+        wall_scale_data = factor_data(wall_scale_calculation.signal, wall_scale_uncertainties)
+        filled_transmission_values = np.asarray(
+            [
+                direct_beam_transmission(
+                    geometry=geometry,
+                    attenuation_coefficients=coefficient_row,
+                    beam_points=profile.points,
+                    beam_weights=profile.weights,
+                    incident_direction=incident_direction,
+                )
+                for coefficient_row in filled_rows
+            ]
+        )
+        if mu_delta is None:
+            filled_transmission = filled_transmission_values[0]
+            filled_transmission_mu_derivative = None
+        else:
+            filled_transmission, filled_transmission_mu_derivative = _nominal_and_derivative(
+                filled_transmission_values, mu_delta, central_mu_difference
+            )
+        filled_transmission_uncertainties = _uncertainties_from_derivative(
+            filled_transmission_mu_derivative, resolved_sample_mu.uncertainties
+        )
 
         filled["signal"] = corrected
         if mask_key:
@@ -435,16 +542,9 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             self.configuration.get(
                 "filled_calculated_transmission_key", "capillary_filled_calculated_transmission"
             ): BaseData(
-                signal=np.asarray(
-                    direct_beam_transmission(
-                        geometry=geometry,
-                        attenuation_coefficients=filled_coefficients,
-                        beam_points=profile.points,
-                        beam_weights=profile.weights,
-                        incident_direction=incident_direction,
-                    )
-                ),
+                signal=np.asarray(filled_transmission),
                 units=ureg.dimensionless,
+                uncertainties=filled_transmission_uncertainties,
                 rank_of_data=0,
             ),
             self.configuration.get(
@@ -460,6 +560,14 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
                     )
                 ),
                 units=ureg.dimensionless,
+                rank_of_data=0,
+            ),
+            self.configuration.get("effective_sample_mu_key", "capillary_effective_sample_mu"): BaseData(
+                signal=np.asarray(resolved_sample_mu.value),
+                units=ureg.Unit("1/m"),
+                uncertainties={
+                    name: np.asarray(uncertainty) for name, uncertainty in resolved_sample_mu.uncertainties.items()
+                },
                 rank_of_data=0,
             ),
             self.configuration.get(

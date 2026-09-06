@@ -236,17 +236,19 @@ $$
 
 The accepted alternatives are:
 
-| Quantity | Direct value | Data source | Units source |
-|---|---|---|---|
-| Sample-only transmission $T_s$ | `sample_phase_transmission` | `sample_phase_transmission_source` | dimensionless |
-| Sample-only absorbed fraction $A_s=1-T_s$ | `sample_phase_absorption` | `sample_phase_absorption_source` | dimensionless |
-| Transmission path thickness $t_s$ | `sample_phase_thickness` | `sample_phase_thickness_source` | `sample_phase_thickness_units_source` |
+| Quantity | Direct value | Data source | Units source | Uncertainty sources |
+|---|---|---|---|---|
+| Sample-only transmission $T_s$ | `sample_phase_transmission` | `sample_phase_transmission_source` | dimensionless | `sample_phase_transmission_uncertainties_sources` |
+| Sample-only absorbed fraction $A_s=1-T_s$ | `sample_phase_absorption` | `sample_phase_absorption_source` | dimensionless | `sample_phase_absorption_uncertainties_sources` |
+| Transmission path thickness $t_s$ | `sample_phase_thickness` | `sample_phase_thickness_source` | `sample_phase_thickness_units_source` | `sample_phase_thickness_uncertainties_sources` |
 
 Configure exactly one of `sample_mu`, `sample_phase_transmission`, or
 `sample_phase_absorption`. The two sample-phase factors are mutually exclusive
 and each requires `sample_phase_thickness`. Source references take precedence
 over direct values of the same quantity. Transmission must be in $(0,1]$,
 absorption in $[0,1)$, and thickness must be positive.
+Uncertainty values use the same units as their associated quantity and must be
+scalar or constant-valued.
 
 For example, values already separated from the empty-container absorption can
 be read directly from a measurement HDF5 file:
@@ -254,8 +256,12 @@ be read directly from a measurement HDF5 file:
 ```yaml
 sample_mu: null
 sample_phase_absorption_source: sample::/entry1/sample/absorption_by_sample
+sample_phase_absorption_uncertainties_sources:
+  sample_absorption_SEM: sample::/entry1/sample/absorption_by_sample_sem
 sample_phase_thickness_source: sample::/entry1/sample/thickness_averaged/mean
 sample_phase_thickness_units_source: sample::/entry1/sample/thickness_averaged/mean@units
+sample_phase_thickness_uncertainties_sources:
+  sample_thickness_SEM: sample::/entry1/sample/thickness_averaged/sem
 ```
 
 Equivalently, use `sample_phase_transmission_source` for a sample-only
@@ -275,8 +281,8 @@ check.
 
 ## Uncertainty support
 
-The current implementation distinguishes measurement uncertainty from model
-parameter uncertainty:
+The current implementation distinguishes measured input uncertainty, derived
+effective-$\mu$ uncertainty, and unsupported model-parameter uncertainty.
 
 - Uncertainties already attached to the input `signal` `BaseData` propagate
   through division by the sample factor. In the composite module, filled- and
@@ -286,25 +292,48 @@ parameter uncertainty:
 - Covariance is not represented. In particular, a monitor or normalization
   uncertainty shared by the filled and empty measurements is still treated as
   uncorrelated by ordinary `BaseData` arithmetic; the module does not model its
-  cancellation or correlation.
+  cancellation or correlation. The same limitation applies when the
+  sample-phase absorption estimate and empty-capillary scattering originate
+  from a common background measurement.
 - For the sample-only module with `input_state: transmission_normalized`,
   measured-transmission uncertainties supplied through
   `transmission_uncertainties_sources` propagate through the residual divisor
   and corrected signal.
-- The calculated sample, filled-wall, and empty-wall attenuation maps and the
-  calculated direct transmissions are currently deterministic: they do not
-  carry uncertainty from $\mu$, radius, wall thickness, capillary orientation,
-  detector geometry, or beam-profile parameters.
-- Uncertainty datasets associated with `sample_mu`, `wall_mu`, or the derived
-  sample-phase absorption/transmission/thickness inputs are not currently read.
+- Uncertainties configured for the sample-phase transmission or absorption and
+  thickness propagate first to the derived coefficient according to
 
-This omission is intentional for now: reliable $\mu$ uncertainty metadata is
-rare, and an unused interface would imply more confidence than the input data
-support. If needed later, it should be implemented at coefficient resolution
-and factor evaluation, using shared nominal/perturbed coefficient sets. For the
-composite correction, derivatives must be taken through the complete corrected
-expression because one coefficient affects several correlated attenuation
-maps; propagating those maps as independent errors would be incorrect.
+  $$
+  \sigma_{\mu,T}=\frac{\sigma_T}{t_sT_s},\qquad
+  \sigma_{\mu,A}=\frac{\sigma_A}{t_s(1-A_s)},\qquad
+  \sigma_{\mu,t}=\frac{\mu_{eff}\sigma_t}{t_s}.
+  $$
+
+  Distinct mapping keys remain distinct uncertainty components. Contributions
+  with the same key are combined in quadrature.
+- The derived-$\mu$ terms propagate to `capillary_effective_sample_mu`, the
+  affected attenuation-factor maps, calculated filled/sample transmission, and
+  corrected signal. The empty-wall factor and empty-capillary calculated
+  transmission do not depend on sample $\mu$ and therefore receive no such
+  component.
+- The composite module differentiates its complete expression. Thus the same
+  physical sample-$\mu$ uncertainty is correlated between $A_{s,sc}$ and
+  $A_{c,sc}$ rather than being incorrectly combined as two independent factor
+  errors.
+
+Factor sensitivities use nominal and perturbed sample coefficients while
+sharing scattering points, geometric path calculations, and one adaptive
+detector mesh. A central difference is used except close to $\mu=0$, where a
+forward difference avoids a negative coefficient. The dimensionless control
+`sample_mu_sensitivity_relative_step` defaults to $10^{-2}$; it scales against
+the larger of $\mu$ and $1/R$. Check stability by changing this value when
+establishing a high-accuracy pipeline.
+
+Direct `sample_mu` and `wall_mu` uncertainties are intentionally not exposed
+yet because reliable coefficient-uncertainty metadata appears uncommon.
+Uncertainties in sample radius, wall thickness, capillary orientation, detector
+geometry, and beam-profile parameters are also not propagated. Those would be
+geometry/model-parameter uncertainties rather than the implemented
+measurement-derived effective-$\mu$ path.
 
 ## Beam profiles
 
@@ -464,6 +493,7 @@ The default output keys are:
 | `capillary_sample_attenuation` | Absolute sample-origin attenuation $A_{s,sc}(d)$. |
 | `capillary_self_absorption` | Residual divisor $C(d)$ actually applied to `signal`. |
 | `capillary_calculated_transmission` | Scalar model prediction $T_{calc}$. |
+| `capillary_effective_sample_mu` | Resolved or measurement-derived effective sample coefficient, in $mathrm{m}^{-1}$. |
 | `capillary_attenuation_evaluated` | Boolean map: `True` where an exact detector ray was calculated. |
 | `capillary_beam_profile_retained_fraction` | Scalar incident-weight fraction retained after profile truncation or thresholding. |
 
@@ -591,13 +621,17 @@ The filled output bundle receives:
 | `capillary_wall_subtraction_scale` | Pixelwise ratio $A_{c,sc}/A_{c,c}$. |
 | `capillary_filled_calculated_transmission` | Calculated effective transmission of the filled capillary. |
 | `capillary_empty_calculated_transmission` | Calculated effective transmission of the empty capillary. |
+| `capillary_effective_sample_mu` | Resolved or measurement-derived effective sample coefficient. |
 | `capillary_beam_profile_retained_fraction` | Incident weight retained by profile truncation or thresholding. |
 | `capillary_sample_attenuation_evaluated` | Exact-evaluation mask for $A_{s,sc}$. |
 | `capillary_wall_filled_attenuation_evaluated` | Exact-evaluation mask for $A_{c,sc}$. |
 | `capillary_wall_empty_attenuation_evaluated` | Exact-evaluation mask for $A_{c,c}$. |
 
 Filled- and empty-signal uncertainties propagate through the subtraction and
-sample division. Model parameter uncertainties are not yet included. The two
+sample division. When $\mu_{eff}$ is derived from uncertain sample-phase
+absorption/transmission and thickness, those uncertainty components also
+propagate through the correlated sample- and wall-factor dependence described
+above. Other model-parameter uncertainties are not yet included. The two
 calculated transmissions are diagnostics only and are not used to rescale the
 signals. Sample-origin refinement is independent, while the two wall maps use
 one shared refinement mesh whose acceptance test covers both factors. Validate

@@ -455,18 +455,20 @@ subtraction and division. The sample-only step additionally propagates a
 configured measured-transmission uncertainty when correcting data that were
 already transmission-normalized.
 
-Model-parameter uncertainty is intentionally not implemented yet. In
-particular, uncertainties associated with sample/wall $\mu$, derived
-sample-phase transmission/absorption/thickness, inner radius, wall thickness,
-orientation, detector geometry, and beam-profile calibration are not loaded
-into the calculated factor maps. Reliable $\mu$ uncertainty metadata appears
-uncommon, so adding configuration without a real use case would be premature.
-The extension point is coefficient resolution followed by factor evaluation:
-nominal and perturbed coefficient vectors can share the existing path kernel
-and adaptive mesh. The derivative of the complete composite expression must be
-used because each physical coefficient affects multiple correlated factors.
-Geometry and profile derivatives could later use checked finite differences or
-repeated quadrature once their convergence and runtime are characterized.
+Uncertainties supplied for derived sample-phase transmission/absorption and
+thickness are propagated analytically into $\mu_{eff}$. Nominal and perturbed
+sample-coefficient vectors then share the existing path kernel and adaptive
+mesh to obtain factor sensitivities. The composite derivative is evaluated
+through the complete corrected expression because sample $\mu$ affects both
+$A_{s,sc}$ and $A_{c,sc}$. The resolved coefficient, affected factor maps,
+calculated filled/sample transmission, and corrected signal retain the named
+uncertainty components.
+
+Direct sample/wall-$\mu$ uncertainty and geometry/profile parameter uncertainty
+remain intentionally out of scope. Reliable direct coefficient uncertainty
+metadata appears uncommon. Geometry and profile derivatives could later use
+checked finite differences or repeated quadrature once their convergence and
+runtime are characterized.
 
 Expose focused diagnostics:
 

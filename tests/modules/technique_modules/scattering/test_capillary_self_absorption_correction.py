@@ -25,6 +25,8 @@ class CapillarySource(IoSource):
             "/sample_phase_absorption": np.asarray(1.0 - np.exp(-0.5)),
             "/sample_phase_transmission": np.asarray(np.exp(-0.5)),
             "/sample_phase_thickness": np.asarray(1.0e-3),
+            "/sample_phase_factor_sem": np.asarray(2.0e-3),
+            "/sample_phase_thickness_sem": np.asarray(1.0e-5),
         }
         return values[data_key]
 
@@ -217,13 +219,108 @@ def test_effective_sample_mu_can_be_derived_from_phase_factor_and_thickness_sour
         sample_phase_thickness_units_source="measurement::/sample_phase_thickness@units",
         **phase_input,
     )
-
     np.testing.assert_allclose(
         derived["sample"]["capillary_sample_attenuation"].signal,
         direct["sample"]["capillary_sample_attenuation"].signal,
         rtol=1e-14,
         atol=1e-14,
     )
+
+
+def test_derived_mu_uncertainties_propagate_to_factors_and_corrected_signal():
+    processing = _processing_data(masked=False)
+    _run(
+        processing,
+        sample_mu=None,
+        sample_phase_transmission_source="measurement::/sample_phase_transmission",
+        sample_phase_transmission_uncertainties_sources={
+            "sample_transmission_SEM": "measurement::/sample_phase_factor_sem"
+        },
+        sample_phase_thickness_source="measurement::/sample_phase_thickness",
+        sample_phase_thickness_units_source="measurement::/sample_phase_thickness@units",
+        sample_phase_thickness_uncertainties_sources={
+            "sample_thickness_SEM": "measurement::/sample_phase_thickness_sem"
+        },
+    )
+
+    bundle = processing["sample"]
+    resolved_mu = bundle["capillary_effective_sample_mu"]
+    transmission = np.exp(-0.5)
+    expected_mu_uncertainties = {
+        "sample_transmission_SEM": 2.0e-3 / (1.0e-3 * transmission),
+        "sample_thickness_SEM": 500.0 * 1.0e-5 / 1.0e-3,
+    }
+    assert float(resolved_mu.signal) == pytest.approx(500.0)
+    for name, expected in expected_mu_uncertainties.items():
+        assert float(resolved_mu.uncertainties[name]) == pytest.approx(expected)
+
+    decreased = _processing_data(masked=False)
+    increased = _processing_data(masked=False)
+    _run(decreased, sample_mu=490.0)
+    _run(increased, sample_mu=510.0)
+    attenuation = bundle["capillary_sample_attenuation"]
+    derivative = (
+        increased["sample"]["capillary_sample_attenuation"].signal
+        - decreased["sample"]["capillary_sample_attenuation"].signal
+    ) / 20.0
+    for name, mu_uncertainty in expected_mu_uncertainties.items():
+        expected_factor_uncertainty = np.abs(derivative) * mu_uncertainty
+        np.testing.assert_allclose(attenuation.uncertainties[name], expected_factor_uncertainty, rtol=1e-13, atol=1e-15)
+        expected_signal_uncertainty = 10.0 * expected_factor_uncertainty / attenuation.signal**2
+        np.testing.assert_allclose(
+            bundle["signal"].uncertainties[name], expected_signal_uncertainty, rtol=1e-13, atol=1e-15
+        )
+        assert name in bundle["capillary_calculated_transmission"].uncertainties
+
+
+def test_absorbed_fraction_uncertainty_propagates_to_effective_mu():
+    processing = _processing_data(masked=False)
+    _run(
+        processing,
+        sample_mu=None,
+        sample_phase_absorption_source="measurement::/sample_phase_absorption",
+        sample_phase_absorption_uncertainties_sources={
+            "sample_absorption_SEM": "measurement::/sample_phase_factor_sem"
+        },
+        sample_phase_thickness_source="measurement::/sample_phase_thickness",
+        sample_phase_thickness_units_source="measurement::/sample_phase_thickness@units",
+    )
+
+    resolved_mu = processing["sample"]["capillary_effective_sample_mu"]
+    expected = 2.0e-3 / (1.0e-3 * np.exp(-0.5))
+    assert float(resolved_mu.uncertainties["sample_absorption_SEM"]) == pytest.approx(expected)
+
+
+def test_adaptive_derived_mu_uncertainty_matches_exact_evaluation():
+    exact = _processing_data(masked=True)
+    adaptive = _processing_data(masked=True)
+    uncertainty_configuration = {
+        "sample_mu": None,
+        "sample_phase_transmission_source": "measurement::/sample_phase_transmission",
+        "sample_phase_transmission_uncertainties_sources": {
+            "sample_transmission_SEM": "measurement::/sample_phase_factor_sem"
+        },
+        "sample_phase_thickness_source": "measurement::/sample_phase_thickness",
+        "sample_phase_thickness_units_source": "measurement::/sample_phase_thickness@units",
+    }
+    _run(exact, **uncertainty_configuration)
+    _run(
+        adaptive,
+        evaluation_mode="adaptive",
+        relative_tolerance=2e-4,
+        **uncertainty_configuration,
+    )
+
+    exact_bundle = exact["sample"]
+    adaptive_bundle = adaptive["sample"]
+    active = ~exact_bundle["Mask"].signal
+    for key in ("capillary_sample_attenuation", "signal"):
+        np.testing.assert_allclose(
+            adaptive_bundle[key].uncertainties["sample_transmission_SEM"][active],
+            exact_bundle[key].uncertainties["sample_transmission_SEM"][active],
+            rtol=2e-3,
+            atol=1e-12,
+        )
 
 
 def test_default_horizontal_axis_gives_fast_axis_symmetric_factor_on_planar_detector():

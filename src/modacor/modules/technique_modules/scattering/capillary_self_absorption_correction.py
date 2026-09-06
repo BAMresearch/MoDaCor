@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySelfAbsorptionCorrection"]
-__version__ = "20260906.2"
+__version__ = "20260906.3"
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +60,38 @@ def _rotation_radians(profile_config: dict[str, Any]) -> float:
         raise ValueError("beam_profile rotation must use angular units.") from error
 
 
+@dataclass(frozen=True, slots=True)
+class _ResolvedSampleMu:
+    value: float
+    uncertainties: dict[str, float]
+
+
+def _add_uncertainty_component(target: dict[str, np.ndarray], name: str, values) -> None:
+    component = np.asarray(values, dtype=float)
+    if name in target:
+        component = np.hypot(target[name], component)
+    target[name] = component
+
+
+def _nominal_and_derivative(
+    values: np.ndarray, delta: float | None, central: bool
+) -> tuple[np.ndarray, np.ndarray | None]:
+    if delta is None:
+        return values, None
+    nominal = values[0]
+    if central:
+        return nominal, (values[1] - values[2]) / (2.0 * delta)
+    return nominal, (values[1] - nominal) / delta
+
+
+def _uncertainties_from_derivative(
+    derivative: np.ndarray | float | None, parameter_uncertainties: dict[str, float]
+) -> dict[str, np.ndarray]:
+    if derivative is None:
+        return {}
+    return {name: np.abs(derivative) * uncertainty for name, uncertainty in parameter_uncertainties.items()}
+
+
 class CapillarySelfAbsorptionCorrection(ProcessStep):
     """Correct sample-origin attenuation in a centred concentric capillary."""
 
@@ -70,9 +103,10 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         required_data_keys=["signal", "coord_x", "coord_y", "coord_z"],
         modifies={
             "signal": ["signal", "uncertainties"],
-            "capillary_sample_attenuation": ["signal"],
+            "capillary_sample_attenuation": ["signal", "uncertainties"],
             "capillary_self_absorption": ["signal", "uncertainties"],
-            "capillary_calculated_transmission": ["signal"],
+            "capillary_calculated_transmission": ["signal", "uncertainties"],
+            "capillary_effective_sample_mu": ["signal", "uncertainties"],
             "capillary_beam_profile_retained_fraction": ["signal"],
             "capillary_attenuation_evaluated": ["signal"],
         },
@@ -165,6 +199,11 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 "default": None,
                 "doc": "Optional IoSources reference for the dimensionless sample-only absorbed fraction.",
             },
+            "sample_phase_absorption_uncertainties_sources": {
+                "type": dict,
+                "default": {},
+                "doc": "Uncertainty-name to IoSources-reference mapping for sample-only absorption.",
+            },
             "sample_phase_transmission": {
                 "type": (int, float, type(None)),
                 "default": None,
@@ -174,6 +213,11 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 "type": (str, type(None)),
                 "default": None,
                 "doc": "Optional IoSources reference for the dimensionless sample-only transmission.",
+            },
+            "sample_phase_transmission_uncertainties_sources": {
+                "type": dict,
+                "default": {},
+                "doc": "Uncertainty-name to IoSources-reference mapping for sample-only transmission.",
             },
             "sample_phase_thickness": {
                 "type": (int, float, type(None)),
@@ -194,6 +238,11 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 "type": (str, type(None)),
                 "default": None,
                 "doc": "Optional IoSources reference for sample-phase thickness units.",
+            },
+            "sample_phase_thickness_uncertainties_sources": {
+                "type": dict,
+                "default": {},
+                "doc": "Uncertainty-name to IoSources-reference mapping for sample-phase thickness.",
             },
             "wall_mu": {
                 "type": (int, float, type(None)),
@@ -246,6 +295,11 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             "absolute_tolerance": {"type": (int, float), "default": 1e-12, "doc": "Adaptive absolute tolerance."},
             "max_depth": {"type": int, "default": 10, "doc": "Maximum adaptive subdivision depth."},
             "chord_order": {"type": int, "default": 12, "doc": "Gauss--Legendre nodes per occupied chord."},
+            "sample_mu_sensitivity_relative_step": {
+                "type": (int, float),
+                "default": 1e-2,
+                "doc": "Relative finite-difference step for derived-sample-mu uncertainty propagation.",
+            },
             "detector_chunk_size": {"type": int, "default": 256, "doc": "Expert detector chunk-size override."},
             "minimum_attenuation_factor": {
                 "type": (int, float),
@@ -266,6 +320,11 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 "type": str,
                 "default": "capillary_calculated_transmission",
                 "doc": "Calculated whole-beam transmission diagnostic key.",
+            },
+            "effective_sample_mu_key": {
+                "type": str,
+                "default": "capillary_effective_sample_mu",
+                "doc": "Resolved or derived effective sample attenuation-coefficient key.",
             },
             "profile_retained_fraction_key": {
                 "type": str,
@@ -309,6 +368,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             cfg.get("attenuation_key", "capillary_sample_attenuation"),
             cfg.get("correction_key", "capillary_self_absorption"),
             cfg.get("calculated_transmission_key", "capillary_calculated_transmission"),
+            cfg.get("effective_sample_mu_key", "capillary_effective_sample_mu"),
             cfg.get("profile_retained_fraction_key", "capillary_beam_profile_retained_fraction"),
             cfg.get("evaluated_mask_key", "capillary_attenuation_evaluated"),
         ]
@@ -323,25 +383,38 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         )
 
     def _scalar(self, name: str, units: str, *, required: bool) -> float:
+        value, _uncertainties = self._scalar_with_uncertainties(name, units, required=required)
+        return value
+
+    def _scalar_with_uncertainties(self, name: str, units: str, *, required: bool) -> tuple[float, dict[str, float]]:
         data = scalar_quantity_from_config_or_source(
             self.io_sources,
             self.configuration,
             name,
             default_units=units,
             required=required,
+            uncertainty_sources=self.configuration.get(f"{name}_uncertainties_sources", {}),
         )
         if data is None:
-            return 0.0
-        return scalar_in_units(data, units, name=name)
+            return 0.0, {}
+        value = scalar_in_units(data, units, name=name)
+        converted = data.copy(with_axes=False)
+        converted.to_units(ureg.Unit(units))
+        uncertainties = {}
+        for uncertainty_name, uncertainty_values in converted.uncertainties.items():
+            values = np.asarray(uncertainty_values, dtype=float).reshape(-1)
+            if values.size != 1 and not np.allclose(values, values[0], rtol=0.0, atol=0.0, equal_nan=True):
+                raise ValueError(f"{name} uncertainty {uncertainty_name!r} must be scalar or constant-valued.")
+            uncertainty = float(values[0])
+            if not np.isfinite(uncertainty) or uncertainty < 0.0:
+                raise ValueError(f"{name} uncertainty {uncertainty_name!r} must be finite and non-negative.")
+            uncertainties[uncertainty_name] = uncertainty
+        return value, uncertainties
 
     def _is_configured(self, name: str) -> bool:
         return self.configuration.get(f"{name}_source") is not None or self.configuration.get(name) is not None
 
-    def _sample_mu(self) -> float:
-        # This resolves the nominal coefficient only. If model-parameter
-        # uncertainty is added later, retain it here and propagate derivatives
-        # through the complete factor calculation rather than assigning
-        # independent uncertainties to correlated factor maps.
+    def _sample_mu(self) -> _ResolvedSampleMu:
         has_mu = self._is_configured("sample_mu")
         has_absorption = self._is_configured("sample_phase_absorption")
         has_transmission = self._is_configured("sample_phase_transmission")
@@ -351,7 +424,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         if derived_count > 1:
             raise ValueError("Configure only one of sample_phase_absorption and sample_phase_transmission.")
         if has_mu:
-            return self._scalar("sample_mu", "1/m", required=True)
+            return _ResolvedSampleMu(self._scalar("sample_mu", "1/m", required=True), {})
         if not derived_count:
             raise ValueError("Configure sample_mu, sample_phase_absorption, or sample_phase_transmission.")
         if not self._is_configured("sample_phase_thickness"):
@@ -359,24 +432,42 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 "sample_phase_thickness is required when deriving sample_mu from absorption or transmission."
             )
 
-        thickness = self._scalar("sample_phase_thickness", "m", required=True)
+        thickness, thickness_uncertainties = self._scalar_with_uncertainties(
+            "sample_phase_thickness", "m", required=True
+        )
         if not np.isfinite(thickness) or thickness <= 0.0:
             raise ValueError("sample_phase_thickness must be finite and positive.")
         if has_absorption:
-            absorption = self._scalar("sample_phase_absorption", "dimensionless", required=True)
+            absorption, factor_uncertainties = self._scalar_with_uncertainties(
+                "sample_phase_absorption", "dimensionless", required=True
+            )
             if not np.isfinite(absorption) or not 0.0 <= absorption < 1.0:
                 raise ValueError("sample_phase_absorption must be finite and in [0, 1).")
             transmission = 1.0 - absorption
+            factor_derivative = 1.0 / (thickness * transmission)
         else:
-            transmission = self._scalar("sample_phase_transmission", "dimensionless", required=True)
+            transmission, factor_uncertainties = self._scalar_with_uncertainties(
+                "sample_phase_transmission", "dimensionless", required=True
+            )
             if not np.isfinite(transmission) or not 0.0 < transmission <= 1.0:
                 raise ValueError("sample_phase_transmission must be finite and in (0, 1].")
-        return float(-np.log(transmission) / thickness)
+            factor_derivative = -1.0 / (thickness * transmission)
+        sample_mu = float(-np.log(transmission) / thickness)
+        thickness_derivative = -sample_mu / thickness
+        uncertainties = {}
+        for uncertainty_name in factor_uncertainties.keys() | thickness_uncertainties.keys():
+            factor_component = factor_derivative * factor_uncertainties.get(uncertainty_name, 0.0)
+            thickness_component = thickness_derivative * thickness_uncertainties.get(uncertainty_name, 0.0)
+            uncertainties[uncertainty_name] = float(np.hypot(factor_component, thickness_component))
+        return _ResolvedSampleMu(sample_mu, uncertainties)
 
-    def _geometry_and_coefficients(self) -> tuple[ConcentricCylinderGeometry, np.ndarray]:
+    def _geometry_and_coefficients(
+        self,
+    ) -> tuple[ConcentricCylinderGeometry, np.ndarray, _ResolvedSampleMu]:
         radius = self._scalar("sample_radius", "m", required=True)
         thickness = self._scalar("wall_thickness", "m", required=False)
-        sample_mu = self._sample_mu()
+        resolved_sample_mu = self._sample_mu()
+        sample_mu = resolved_sample_mu.value
         wall_mu = self._scalar("wall_mu", "1/m", required=False)
         if radius <= 0.0:
             raise ValueError("sample_radius must be positive.")
@@ -403,7 +494,28 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             axis=self.configuration.get("capillary_axis", (1.0, 0.0, 0.0)),
             centre=centre,
         )
-        return geometry, np.asarray(coefficients)
+        return geometry, np.asarray(coefficients), resolved_sample_mu
+
+    def _sample_mu_coefficient_sets(
+        self,
+        geometry: ConcentricCylinderGeometry,
+        coefficients: np.ndarray,
+        sample_mu_uncertainties: dict[str, float],
+    ) -> tuple[np.ndarray, float | None, bool]:
+        if not sample_mu_uncertainties:
+            return coefficients, None, False
+        relative_step = float(self.configuration.get("sample_mu_sensitivity_relative_step", 1e-2))
+        if not np.isfinite(relative_step) or not 0.0 < relative_step < 1.0:
+            raise ValueError("sample_mu_sensitivity_relative_step must be finite and in (0, 1).")
+        sample_mu = float(coefficients[0])
+        delta = relative_step * max(sample_mu, 1.0 / float(geometry.radii[0]))
+        increased = coefficients.copy()
+        increased[0] = sample_mu + delta
+        if sample_mu <= delta:
+            return np.stack((coefficients, increased)), delta, False
+        decreased = coefficients.copy()
+        decreased[0] = sample_mu - delta
+        return np.stack((coefficients, increased, decreased)), delta, True
 
     def _beam_profile(self, centre: np.ndarray, incident_direction):
         profile = self.configuration.get("beam_profile")
@@ -523,7 +635,10 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         return transmission
 
     def calculate(self) -> dict[str, DataBundle]:
-        geometry, coefficients = self._geometry_and_coefficients()
+        geometry, coefficients, resolved_sample_mu = self._geometry_and_coefficients()
+        evaluation_coefficients, mu_delta, central_mu_difference = self._sample_mu_coefficient_sets(
+            geometry, coefficients, resolved_sample_mu.uncertainties
+        )
         incident_direction = self.configuration.get("incident_direction", (0.0, 0.0, 1.0))
         profile = self._beam_profile(geometry.centre, incident_direction)
         scattering_points, volume_weights = beam_chord_quadrature(
@@ -534,13 +649,28 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             incident_direction=incident_direction,
             chord_order=self.configuration.get("chord_order", 12),
         )
-        calculated_transmission = direct_beam_transmission(
-            geometry=geometry,
-            attenuation_coefficients=coefficients,
-            beam_points=profile.points,
-            beam_weights=profile.weights,
-            incident_direction=incident_direction,
+        coefficient_rows = (
+            evaluation_coefficients[None, :] if evaluation_coefficients.ndim == 1 else evaluation_coefficients
         )
+        calculated_transmission_values = np.asarray(
+            [
+                direct_beam_transmission(
+                    geometry=geometry,
+                    attenuation_coefficients=coefficient_row,
+                    beam_points=profile.points,
+                    beam_weights=profile.weights,
+                    incident_direction=incident_direction,
+                )
+                for coefficient_row in coefficient_rows
+            ]
+        )
+        if mu_delta is None:
+            calculated_transmission = calculated_transmission_values[0]
+            transmission_mu_derivative = None
+        else:
+            calculated_transmission, transmission_mu_derivative = _nominal_and_derivative(
+                calculated_transmission_values, mu_delta, central_mu_difference
+            )
         measured_transmission = self._measured_transmission()
         measured_value = (
             1.0
@@ -559,6 +689,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         attenuation_key = self.configuration.get("attenuation_key", "capillary_sample_attenuation")
         correction_key = self.configuration.get("correction_key", "capillary_self_absorption")
         transmission_key = self.configuration.get("calculated_transmission_key", "capillary_calculated_transmission")
+        effective_mu_key = self.configuration.get("effective_sample_mu_key", "capillary_effective_sample_mu")
         evaluated_key = self.configuration.get("evaluated_mask_key", "capillary_attenuation_evaluated")
         retained_fraction_key = self.configuration.get(
             "profile_retained_fraction_key", "capillary_beam_profile_retained_fraction"
@@ -575,7 +706,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             if evaluation_mode == "adaptive":
                 adaptive = adaptive_attenuation_factors_on_grid(
                     geometry=geometry,
-                    attenuation_coefficients=coefficients,
+                    attenuation_coefficients=evaluation_coefficients,
                     scattering_points=scattering_points,
                     volume_weights=volume_weights,
                     detector_position_grid=detector_grid,
@@ -586,38 +717,65 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                     max_depth=self.configuration.get("max_depth", 10),
                     detector_chunk_size=self.configuration.get("detector_chunk_size", 256),
                 )
-                attenuation = adaptive.factors
+                attenuation_values = adaptive.factors
                 evaluated = adaptive.evaluated_mask
             else:
-                attenuation = np.ones(detector_grid.shape[:2], dtype=float)
-                attenuation[active] = attenuation_factors_at_detectors(
+                active_values = attenuation_factors_at_detectors(
                     geometry=geometry,
-                    attenuation_coefficients=coefficients,
+                    attenuation_coefficients=evaluation_coefficients,
                     scattering_points=scattering_points,
                     volume_weights=volume_weights,
                     detector_positions=detector_grid[active],
                     incident_direction=incident_direction,
                     detector_chunk_size=self.configuration.get("detector_chunk_size", 256),
                 )
+                if evaluation_coefficients.ndim == 1:
+                    attenuation_values = np.ones(detector_grid.shape[:2], dtype=float)
+                    attenuation_values[active] = active_values
+                else:
+                    attenuation_values = np.ones(
+                        (evaluation_coefficients.shape[0], *detector_grid.shape[:2]), dtype=float
+                    )
+                    attenuation_values[:, active] = active_values
                 evaluated = active.copy()
+
+            attenuation, attenuation_mu_derivative = _nominal_and_derivative(
+                attenuation_values, mu_delta, central_mu_difference
+            )
 
             if not np.all(np.isfinite(attenuation[active])) or np.any(attenuation[active] < minimum_factor):
                 raise ValueError("Capillary attenuation factor is too small or non-finite at active pixels.")
             residual = attenuation / measured_value
             residual[~active] = 1.0
-            correction_uncertainties = {}
-            if measured_transmission is not None:
-                correction_uncertainties = {
-                    name: attenuation * np.asarray(values, dtype=float) / measured_value**2
-                    for name, values in measured_transmission.uncertainties.items()
+            attenuation_uncertainties = {}
+            if attenuation_mu_derivative is not None:
+                attenuation_uncertainties = {
+                    name: np.abs(attenuation_mu_derivative) * uncertainty
+                    for name, uncertainty in resolved_sample_mu.uncertainties.items()
                 }
-                for values in correction_uncertainties.values():
+                for values in attenuation_uncertainties.values():
                     values[~active] = 0.0
+            correction_uncertainties = {
+                name: values / measured_value for name, values in attenuation_uncertainties.items()
+            }
+            if measured_transmission is not None:
+                for name, values in measured_transmission.uncertainties.items():
+                    component = attenuation * np.asarray(values, dtype=float) / measured_value**2
+                    component[~active] = 0.0
+                    _add_uncertainty_component(correction_uncertainties, name, component)
+
+            transmission_uncertainties = {}
+            if transmission_mu_derivative is not None:
+                transmission_uncertainties = {
+                    name: np.asarray(abs(transmission_mu_derivative) * uncertainty)
+                    for name, uncertainty in resolved_sample_mu.uncertainties.items()
+                }
 
             rank = min(databundle["signal"].rank_of_data, attenuation.ndim)
             databundle[attenuation_key] = BaseData(
                 signal=attenuation,
                 units=ureg.dimensionless,
+                uncertainties=attenuation_uncertainties,
                 rank_of_data=rank,
             )
             databundle[correction_key] = BaseData(
@@ -629,6 +787,15 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             databundle[transmission_key] = BaseData(
                 signal=np.asarray(calculated_transmission),
                 units=ureg.dimensionless,
+                uncertainties=transmission_uncertainties,
+                rank_of_data=0,
+            )
+            databundle[effective_mu_key] = BaseData(
+                signal=np.asarray(resolved_sample_mu.value),
+                units=ureg.Unit("1/m"),
+                uncertainties={
+                    name: np.asarray(uncertainty) for name, uncertainty in resolved_sample_mu.uncertainties.items()
+                },
                 rank_of_data=0,
             )
             databundle[evaluated_key] = BaseData(

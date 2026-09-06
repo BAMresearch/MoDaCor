@@ -9,10 +9,20 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.io_source import IoSource
 from modacor.io.io_sources import IoSources
 from modacor.modules.technique_modules.scattering.capillary_sample_container_correction import (
     CapillarySampleContainerCorrection,
 )
+
+
+class CompositeUncertaintySource(IoSource):
+    def get_data(self, data_key, load_slice=...):
+        values = {
+            "/sample_transmission_sem": np.asarray(2.0e-3),
+            "/sample_thickness_sem": np.asarray(1.0e-2),
+        }
+        return values[data_key]
 
 
 def _processing(filled_signal, empty_signal, *, filled_mask=None, empty_mask=None):
@@ -79,7 +89,9 @@ def _configuration(**overrides):
 
 
 def _run(processing, **overrides):
-    step = CapillarySampleContainerCorrection(io_sources=IoSources())
+    sources = IoSources()
+    sources.register_source(CompositeUncertaintySource(source_reference="measurement"))
+    step = CapillarySampleContainerCorrection(io_sources=sources)
     step.modify_config_by_dict(_configuration(**overrides))
     step.processing_data = processing
     step.calculate()
@@ -155,6 +167,61 @@ def test_composite_uses_effective_mu_derived_from_sample_phase_transmission():
             rtol=1e-14,
             atol=1e-14,
         )
+
+
+def test_composite_propagates_derived_mu_uncertainty_as_one_correlated_source():
+    sample_factor, wall_filled_factor, wall_empty_factor = _factor_maps(shape=(5, 7))
+    true_sample = np.full(sample_factor.shape, 7.0)
+    true_wall = np.full(sample_factor.shape, 2.0)
+    filled_observed = sample_factor * true_sample + wall_filled_factor * true_wall
+    empty_observed = wall_empty_factor * true_wall
+    processing = _processing(filled_observed, empty_observed)
+
+    _run(
+        processing,
+        sample_mu=None,
+        sample_phase_transmission=np.exp(-0.5),
+        sample_phase_transmission_uncertainties_sources={
+            "sample_transmission_SEM": "measurement::/sample_transmission_sem"
+        },
+        sample_phase_thickness=1.0,
+        sample_phase_thickness_units="mm",
+        sample_phase_thickness_uncertainties_sources={"sample_thickness_SEM": "measurement::/sample_thickness_sem"},
+    )
+
+    decreased = _processing(filled_observed, empty_observed)
+    increased = _processing(filled_observed, empty_observed)
+    _run(decreased, sample_mu=490.0)
+    _run(increased, sample_mu=510.0)
+    nominal = processing["sample"]
+    attenuation_derivative = (
+        increased["sample"]["capillary_sample_attenuation"].signal
+        - decreased["sample"]["capillary_sample_attenuation"].signal
+    ) / 20.0
+    wall_derivative = (
+        increased["sample"]["capillary_wall_attenuation_filled"].signal
+        - decreased["sample"]["capillary_wall_attenuation_filled"].signal
+    ) / 20.0
+    scale_derivative = wall_derivative / wall_empty_factor
+    numerator = filled_observed - nominal["capillary_wall_subtraction_scale"].signal * empty_observed
+    corrected_derivative = (
+        -scale_derivative * empty_observed / sample_factor - numerator * attenuation_derivative / sample_factor**2
+    )
+    expected_mu_uncertainties = {
+        "sample_transmission_SEM": 2.0e-3 / (1.0e-3 * np.exp(-0.5)),
+        "sample_thickness_SEM": 5.0,
+    }
+    for name, mu_uncertainty in expected_mu_uncertainties.items():
+        np.testing.assert_allclose(
+            nominal["signal"].uncertainties[name],
+            np.abs(corrected_derivative) * mu_uncertainty,
+            rtol=1e-13,
+            atol=1e-15,
+        )
+        assert name in nominal["capillary_sample_attenuation"].uncertainties
+        assert name in nominal["capillary_wall_attenuation_filled"].uncertainties
+        assert name in nominal["capillary_wall_subtraction_scale"].uncertainties
+        assert name in nominal["capillary_filled_calculated_transmission"].uncertainties
 
 
 def test_union_mask_is_applied_and_masked_filled_values_are_preserved():
