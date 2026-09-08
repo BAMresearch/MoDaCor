@@ -1,10 +1,11 @@
 
 # Reference
 
-```{autosummary}
-:toctree: autosummary
-:template: module.rst
-:recursive:
+Reference pages for generated process-step documentation and other API-adjacent
+material.
 
-modacor
+```{toctree}
+:maxdepth: 1
+
+modules/index
 ```

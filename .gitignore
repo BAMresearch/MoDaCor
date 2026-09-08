@@ -21,7 +21,7 @@ develop-eggs
 lib
 lib64
 venv*/
-.venv*
+.venv*/
 pyvenv*/
 pip-wheel-metadata/
 
@@ -59,10 +59,12 @@ output/*/index.html
 # Sphinx
 docs/_build
 docs/reference/autosummary
+docs/reference/modules
 
 .DS_Store
 *~
 .*.sw[po]
+.*.kate-swp
 .build
 .ve
 .env
@@ -75,3 +77,9 @@ docs/reference/autosummary
 
 # Mypy Cache
 .mypy_cache/
+
+# Local tooling
+.continue/
+example_notebook/playground.ipynb
+example_notebook/profile.html
+example_notebook/mydask.html

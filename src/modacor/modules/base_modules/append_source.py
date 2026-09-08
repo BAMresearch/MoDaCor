@@ -20,7 +20,7 @@ from typing import Any, Callable
 
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.io.io_sources import IoSources
 
@@ -77,6 +77,13 @@ class AppendSource(ProcessStep):
     # -------------------------------------------------------------------------
     # Public API used by the pipeline
     # -------------------------------------------------------------------------
+    def dependency_contract(self) -> ProcessStepDependencies:
+        return ProcessStepDependencies(
+            source_refs=normalize_processing_key_values(self.configuration.get("source_identifier")),
+            processing_reads=(),
+            processing_writes=(),
+        )
+
     def calculate(self) -> dict[str, DataBundle]:
         """
         Append one or more sources to ``self.io_sources``.

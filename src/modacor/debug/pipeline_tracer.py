@@ -11,6 +11,7 @@ __date__ = "13/12/2025"
 __status__ = "Development"  # "Development", "Production"
 __version__ = "20251213.2"
 
+from copy import deepcopy
 from typing import Any, Protocol
 
 import numpy as np
@@ -43,26 +44,19 @@ ANSI = {
 
 
 class ReportRenderer(Protocol):
-    def header(self, text: str) -> str:
-        ...
+    def header(self, text: str) -> str: ...  # noqa: E704
 
-    def dim(self, text: str) -> str:
-        ...
+    def dim(self, text: str) -> str: ...  # noqa: E704
 
-    def ok(self, text: str) -> str:
-        ...
+    def ok(self, text: str) -> str: ...  # noqa: E704
 
-    def changed(self, text: str) -> str:
-        ...
+    def changed(self, text: str) -> str: ...  # noqa: E704
 
-    def badge_ok(self) -> str:
-        ...
+    def badge_ok(self) -> str: ...  # noqa: E704
 
-    def badge_changed(self) -> str:
-        ...
+    def badge_changed(self) -> str: ...  # noqa: E704
 
-    def codewrap(self, text: str) -> str:
-        ...
+    def codewrap(self, text: str) -> str: ...  # noqa: E704
 
 
 @define(frozen=True)
@@ -260,6 +254,11 @@ class PipelineTracer:
     # Include scalar min/max in probes (does not affect change detection unless you add "minmax" to change_kinds)
     compute_min_max: bool = False
 
+    # Optional full ProcessingData snapshots. These are intentionally kept out of
+    # `events` because events must remain lightweight and JSON-friendly.
+    snapshot_processing_data: bool = False
+    snapshot_step_ids: set[str] = field(factory=set)
+
     # Guards (fail fast at the *first* step that introduces the issue)
     fail_on_expected_mismatch: bool = False
     fail_on_nan_increase: bool = False
@@ -276,6 +275,7 @@ class PipelineTracer:
 
     _last: dict[tuple[str, str], BaseDataProbe] = field(factory=dict)
     events: list[dict[str, Any]] = field(factory=list)
+    processing_data_snapshots: list[dict[str, Any]] = field(factory=list)
 
     def _diff_kinds(self, prev: BaseDataProbe, now: BaseDataProbe) -> set[str]:
         kinds: set[str] = set()
@@ -409,6 +409,18 @@ class PipelineTracer:
 
                 if diff:
                     changed[(bundle_key, ds_key)] = {"prev": prev, "now": now, "diff": diff}
+
+        snapshot_step_ids = {str(value) for value in self.snapshot_step_ids}
+        if self.snapshot_processing_data and (not snapshot_step_ids or str(step_id) in snapshot_step_ids):
+            self.processing_data_snapshots.append(
+                {
+                    "step_id": str(step_id),
+                    "module": module,
+                    "name": name,
+                    "duration_s": duration_s,
+                    "processing_data": deepcopy(data),
+                }
+            )
 
         if (not self.record_only_on_change) or changed or self.record_empty_step_events:
             self.events.append(

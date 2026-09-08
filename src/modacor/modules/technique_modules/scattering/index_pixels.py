@@ -308,9 +308,8 @@ class IndexPixels(ProcessStep):
         else:
             q_limits_unit = ureg.Unit(q_limits_unit_cfg)
 
-        q_full = np.asarray(q_bd.signal, dtype=float)
         try:
-            q_flat = q_full.ravel()
+            q_flat = q_bd.signal.ravel()
         except Exception as exc:  # noqa: BLE001
             raise ValueError("IndexPixels: could not flatten Q array.") from exc
 
@@ -383,9 +382,8 @@ class IndexPixels(ProcessStep):
         psi_min_val = (float(psi_min_cfg) * psi_limits_unit).to(psi_bd.units).magnitude
         psi_max_val = (float(psi_max_cfg) * psi_limits_unit).to(psi_bd.units).magnitude
 
-        psi_full = np.asarray(psi_bd.signal, dtype=float)
         try:
-            psi_flat = psi_full.ravel()
+            psi_flat = psi_bd.signal.ravel()
         except Exception as exc:  # noqa: BLE001
             raise ValueError("IndexPixels: could not flatten Psi array.") from exc
 

@@ -14,12 +14,13 @@ __status__ = "Development"  # "Development", "Production"
 __all__ = ["SinkProcessingData"]
 __version__ = "20260901.1"
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.io.processing_path import parse_processing_path
 
 # Module-level handler; facilities can swap MessageHandler implementation as needed
 logger = MessageHandler(name=__name__)
@@ -31,6 +32,7 @@ class SinkProcessingData(ProcessStep):
 
     - target: 'sink_id::subpath' (for CSV usually 'export_csv::')
     - data_paths: ProcessingData paths without '::', e.g. '/sample/Q/signal'
+      HDF sinks also accept bundle roots, e.g. '/sample'.
     """
 
     documentation = ProcessStepDescriber(
@@ -59,6 +61,30 @@ class SinkProcessingData(ProcessStep):
         step_reference="",
         step_note="This step performs an export side-effect and returns an empty output dict.",
     )
+
+    def dependency_contract(self) -> ProcessStepDependencies:
+        data_paths = self.configuration.get("data_paths", [])
+        if isinstance(data_paths, str):
+            data_paths = [data_paths]
+
+        read_patterns: set[str] = set()
+        for data_path in data_paths:
+            parts = tuple(part for part in PurePosixPath(str(data_path).strip()).parts if part != "/")
+            if len(parts) == 1:
+                read_patterns.add(f"{parts[0]}.*")
+                continue
+
+            try:
+                parsed = parse_processing_path(str(data_path))
+            except (TypeError, ValueError):
+                read_patterns.add("*")
+            else:
+                read_patterns.add(f"{parsed.databundle_key}.{parsed.basedata_name}")
+
+        return ProcessStepDependencies(
+            processing_reads=read_patterns,
+            processing_writes=(),
+        )
 
     def calculate(self) -> dict[str, DataBundle]:
         output: dict[str, DataBundle] = {}

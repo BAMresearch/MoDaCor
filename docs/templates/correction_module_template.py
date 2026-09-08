@@ -35,8 +35,8 @@ class YourCorrectionStep(ProcessStep):
 
     Fill in:
     - required_data_keys: BaseData keys required in each DataBundle
-    - arguments: runtime configuration defaults and documentation
-    - calculate(): core logic, returning updated DataBundles
+    - arguments: runtime configuration schema, defaults, and documentation
+    - calculate(): core in-place logic, optionally returning touched DataBundles
     """
 
     documentation = ProcessStepDescriber(
@@ -86,7 +86,10 @@ class YourCorrectionStep(ProcessStep):
     # ------------------------------------------------------------------
     def calculate(self) -> dict[str, DataBundle]:
         """
-        Apply the correction and return updated DataBundles.
+        Apply the correction in-place and return touched DataBundles.
+
+        The returned mapping is bookkeeping for tests/tracing. Authoritative
+        data changes must already have been made on self.processing_data.
         """
         output: dict[str, DataBundle] = {}
 
@@ -100,7 +103,6 @@ class YourCorrectionStep(ProcessStep):
             if databundle is None:
                 raise KeyError(f"ProcessingData key {key!r} not found.")
 
-            # Copy if you need to avoid mutating inputs; otherwise edit in-place.
             signal_bd: BaseData = databundle[signal_key]
 
             # Example correction: multiply signal by a scalar, optionally using a cached lookup

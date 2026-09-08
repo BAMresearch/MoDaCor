@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw"]
@@ -25,6 +25,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.modules.helpers import get_first_present, normalize_str_list
 
 logger = MessageHandler(name=__name__)
 
@@ -90,8 +91,8 @@ class IndexedAverager(ProcessStep):
         uncertainties:
           * For each original signal uncertainty key 'k', a propagated sigma
             for the bin mean under that key.
-          * An additional key "SEM" with a bin-level standard error on the
-            mean derived from the weighted scatter of the signal values.
+          * Optional keys "SEM" and "STD" with bin-level standard error on the
+            mean and standard deviation derived from the weighted scatter.
 
     - "Q": BaseData
         Weighted mean Q per bin (length n_bins).
@@ -99,6 +100,7 @@ class IndexedAverager(ProcessStep):
         uncertainties:
           * For each original Q uncertainty key 'k', propagated sigma on the
             bin mean for that key.
+          * Optional keys "SEM" and "STD" derived from the weighted scatter.
 
     - "Psi": BaseData
         Weighted circular mean of Psi per bin (length n_bins).
@@ -106,6 +108,7 @@ class IndexedAverager(ProcessStep):
         uncertainties:
           * For each original Psi uncertainty key 'k', propagated sigma on the
             bin mean for that key (using linear propagation on angles).
+          * Optional keys "SEM" and "STD" derived from the weighted scatter.
 
     The original 2D/1D "pixel_index" and optional "Mask" remain present in
     the databundle, enabling further inspection or reuse.
@@ -150,6 +153,14 @@ class IndexedAverager(ProcessStep):
                 "default": None,
                 "doc": "Uncertainty key to use as weights if enabled.",
             },
+            "stats_keys": {
+                "type": (list, str, type(None)),
+                "default": None,
+                "doc": (
+                    "BaseData keys to receive SEM/STD statistics (e.g. ['signal', 'Q']). "
+                    "If None, statistics are computed for all outputs."
+                ),
+            },
         },
         modifies={
             # We overwrite 'signal', 'Q', 'Psi' with their 1D binned versions.
@@ -172,21 +183,6 @@ class IndexedAverager(ProcessStep):
             "Q and Psi, including uncertainty propagation."
         ),
     )
-
-    def __attrs_post_init__(self) -> None:
-        super().__attrs_post_init__()
-
-    # ------------------------------------------------------------------
-    # Helper: normalise with_processing_keys to a list
-    # ------------------------------------------------------------------
-    def _normalised_keys(self) -> List[str]:
-        """
-        Normalise with_processing_keys into a non-empty list of strings.
-
-        If configuration value is None and exactly one databundle is present
-        in processing_data, that key is returned as the single entry.
-        """
-        return self._normalised_processing_keys()
 
     # ------------------------------------------------------------------
     # Helper: validate geometry, signal and pixel_index for a databundle
@@ -222,12 +218,8 @@ class IndexedAverager(ProcessStep):
                 f"IndexedAverager: pixel_index shape {pix_bd.shape} does not match signal shape {spatial_shape}."
             )
 
-        mask_bd: BaseData | None = None
         # Optional mask: we accept 'Mask' or 'mask'
-        if "Mask" in databundle:
-            mask_bd = databundle["Mask"]
-        elif "mask" in databundle:
-            mask_bd = databundle["mask"]
+        mask_bd = get_first_present(databundle, "Mask", "mask")
 
         if mask_bd is not None and mask_bd.shape != spatial_shape:
             raise ValueError(
@@ -249,6 +241,7 @@ class IndexedAverager(ProcessStep):
         use_signal_weights: bool,
         use_signal_uncertainty_weights: bool,
         uncertainty_weight_key: str | None,
+        stats_keys: list[str] | None,
     ) -> Tuple[BaseData, BaseData, BaseData]:
         """
         Core binning logic: produce 1D BaseData for signal, Q, Psi.
@@ -257,9 +250,9 @@ class IndexedAverager(ProcessStep):
         """
 
         # Flatten arrays
-        sig_full = np.asarray(signal_bd.signal, dtype=float).ravel()
-        q_full = np.asarray(q_bd.signal, dtype=float).ravel()
-        psi_full = np.asarray(psi_bd.signal, dtype=float).ravel()
+        sig_full = signal_bd.signal.ravel()
+        q_full = q_bd.signal.ravel()
+        psi_full = psi_bd.signal.ravel()
 
         pix_flat = np.asarray(pix_bd.signal, dtype=float).ravel().astype(int)
 
@@ -438,8 +431,11 @@ class IndexedAverager(ProcessStep):
             psi_unc_binned.update(_propagate_uncertainties(psi_bd.uncertainties, psi_bd))
 
         # ------------------------------------------------------------------
-        # 5. SEM from scatter of signal ("SEM" key)
+        # 5. SEM/STD from scatter of selected outputs
         # ------------------------------------------------------------------
+        if stats_keys is None:
+            stats_keys = ["signal", "Q", "Psi"]
+
         # Effective sample size:
         sum_w2 = np.bincount(bin_idx, weights=w_valid**2, minlength=n_bins)
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -447,24 +443,41 @@ class IndexedAverager(ProcessStep):
             positive = sum_w2 > 0.0
             N_eff[positive] = (sum_w[positive] ** 2) / sum_w2[positive]
 
-        # Weighted variance around mean
-        # dev_i = x_i - mean_signal[bin_idx_i]
-        mean_signal_per_pixel = mean_signal[bin_idx]
-        dev_valid = sig_valid - mean_signal_per_pixel
+        def _scatter_stats(values: np.ndarray, mean_per_bin: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+            mean_per_pixel = mean_per_bin[bin_idx]
+            dev = values - mean_per_pixel
+            sum_w_dev2 = np.bincount(bin_idx, weights=w_valid * (dev**2), minlength=n_bins)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                var_spread = np.full(n_bins, np.nan, dtype=float)
+                sem_spread = np.full(n_bins, np.nan, dtype=float)
+                std_spread = np.full(n_bins, np.nan, dtype=float)
 
-        sum_w_dev2 = np.bincount(bin_idx, weights=w_valid * (dev_valid**2), minlength=n_bins)
+                valid_bins = (sum_w > 0.0) & np.isfinite(N_eff) & (N_eff > 1.0)
+                var_spread[valid_bins] = sum_w_dev2[valid_bins] / sum_w[valid_bins]
+                std_spread[valid_bins] = np.sqrt(var_spread[valid_bins])
+                sem_spread[valid_bins] = np.sqrt(var_spread[valid_bins] / N_eff[valid_bins])
 
-        with np.errstate(divide="ignore", invalid="ignore"):
-            var_spread = np.full(n_bins, np.nan, dtype=float)
-            sem_spread = np.full(n_bins, np.nan, dtype=float)
+            return sem_spread, std_spread
 
-            valid_bins = (sum_w > 0.0) & np.isfinite(N_eff) & (N_eff > 1.0)
+        if "signal" in stats_keys:
+            sem_signal, std_signal = _scatter_stats(sig_valid, mean_signal)
+            sig_unc_binned["SEM"] = sem_signal
+            sig_unc_binned["STD"] = std_signal
 
-            var_spread[valid_bins] = sum_w_dev2[valid_bins] / sum_w[valid_bins]
-            sem_spread[valid_bins] = np.sqrt(var_spread[valid_bins] / N_eff[valid_bins])
+        if "Q" in stats_keys:
+            sem_q, std_q = _scatter_stats(q_valid, mean_q)
+            q_unc_binned["SEM"] = sem_q
+            q_unc_binned["STD"] = std_q
 
-        # Add SEM as a dedicated uncertainty key on the binned signal
-        sig_unc_binned["SEM"] = sem_spread
+        if "Psi" in stats_keys:
+            mean_psi_rad_per_pixel = mean_psi_rad[bin_idx]
+            dev_rad = psi_rad_valid - mean_psi_rad_per_pixel
+            dev_rad = (dev_rad + np.pi) % (2 * np.pi) - np.pi
+            sem_psi_rad, std_psi_rad = _scatter_stats(dev_rad + mean_psi_rad_per_pixel, mean_psi_rad)
+            sem_psi = sem_psi_rad * cf_from_rad
+            std_psi = std_psi_rad * cf_from_rad
+            psi_unc_binned["SEM"] = sem_psi
+            psi_unc_binned["STD"] = std_psi
 
         # ------------------------------------------------------------------
         # 6. Build output BaseData objects
@@ -525,8 +538,9 @@ class IndexedAverager(ProcessStep):
     def calculate(self) -> Dict[str, DataBundle]:
         """
         For each databundle in with_processing_keys, perform the binning /
-        averaging using the precomputed pixel_index map and return updated
-        DataBundles containing 1D 'signal', 'Q', and 'Psi' BaseData.
+        averaging using the precomputed pixel_index map and replace the selected
+        ProcessingData entry in-place with a reduced DataBundle containing 1D
+        'signal', 'Q', and 'Psi' BaseData.
         """
         output: Dict[str, DataBundle] = {}
 
@@ -534,11 +548,12 @@ class IndexedAverager(ProcessStep):
             logger.warning("IndexedAverager: processing_data is None in calculate; nothing to do.")
             return output
 
-        keys = self._normalised_keys()
+        keys = self._normalised_processing_keys()
         use_signal_weights = bool(self.configuration.get("use_signal_weights", True))
         use_unc_w = bool(self.configuration.get("use_signal_uncertainty_weights", False))
         uncertainty_weight_key = self.configuration.get("uncertainty_weight_key", None)
         direction = str(self.configuration.get("averaging_direction", "azimuthal")).lower()
+        stats_keys_cfg = normalize_str_list(self.configuration.get("stats_keys", None))
 
         for key in keys:
             if key not in self.processing_data:
@@ -569,6 +584,7 @@ class IndexedAverager(ProcessStep):
                 use_signal_weights=use_signal_weights,
                 use_signal_uncertainty_weights=use_unc_w,
                 uncertainty_weight_key=uncertainty_weight_key,
+                stats_keys=stats_keys_cfg,
             )
 
             # Attach axis: Q for azimuthal, Psi for radial (convention)
@@ -586,6 +602,7 @@ class IndexedAverager(ProcessStep):
                 }
             )
 
+            self.processing_data[key] = db_out
             output[key] = db_out
 
         return output

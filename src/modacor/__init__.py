@@ -1,6 +1,6 @@
-# SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: BSD-3-Clause
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "22/11/2025"
 __status__ = "Development"  # "Development", "Production"
 
-__version__ = "1.0.0"
+__version__ = "1.5.0"
 
 from pint import UnitRegistry, set_application_registry
 
@@ -18,7 +18,8 @@ from .units import configure_detector_pixel_units
 
 ureg = UnitRegistry(system="SI")
 
-# Make pixel/px mean "detector element" everywhere in MoDaCor
+# Detector element indices are dimensionless in MoDaCor. Pint's built-in
+# display/CSS pixel units are replaced with detector-coordinate aliases.
 configure_detector_pixel_units(ureg)
 
 # we need to define an arbitrary intensity unit for scaling of intensity data:
@@ -27,4 +28,4 @@ Q_ = ureg.Quantity
 # recommended for pickling and unpickling:
 set_application_registry(ureg)
 ureg.formatter.default_format = "~P"
-ureg.setup_matplotlib(True)
+# ureg.setup_matplotlib(True)

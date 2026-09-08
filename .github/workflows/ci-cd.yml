@@ -2,12 +2,8 @@ name: CI-CD
 
 # Controls when the action will run.
 on:
-  # Triggers the workflow on push or pull request events but only for the main branch
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
-
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -16,20 +12,45 @@ jobs:
   tests:
     uses: ./.github/workflows/tests.yml
 
-  # make a new version next, release or prerelease
+  # Tag an already-prepared release commit, if the current version is untagged.
   release:
     needs: [tests]
     uses: ./.github/workflows/release.yml
 
+  # Open or update a release-preparation PR after normal main-branch changes.
+  release_pr:
+    needs: [tests, release]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/release-pr.yml
+
   build:
-    needs: [release, tests]  # build only if all tests are successful
+    needs: [tests, release]  # build only if all tests are successful
     uses: ./.github/workflows/build.yml
     secrets: inherit
 
   docs:
-    needs: [release]  # get (release) version number first
+    needs: [tests]  # publish documentation even if release automation is blocked
     uses: ./.github/workflows/docs.yml
 
-  coverage:
-    needs: [tests, docs]  # coverage report is added to the docs webpage
-    uses: ./.github/workflows/coverage.yml
+  publish:  # needs to be in the top-level .yml for Trusted Publishing to work @pypi
+    needs: [build, docs, release]
+    runs-on: 'ubuntu-latest'
+    permissions:
+      id-token: write
+    environment:
+      name: pypi
+    # Publish package from main branch only, and only if there is a new version
+    # errors out otherwise, in any case
+    if: github.ref == 'refs/heads/main' && needs.release.outputs.new_version == 'true'
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: packages-*
+          merge-multiple: true
+          path: dist
+
+      - name: Publish package distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true

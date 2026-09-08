@@ -1,17 +1,18 @@
+# MoDaCor (v1.5.0)
 
-# Overview
+## Overview
 
 New modular data corrections for any neutron or X-ray technique that produces 1D or 2D scattering/diffraction/imaging
 data.
 
-[![PyPI Package latest release](https://img.shields.io/pypi/v/modacor.svg)](https://test.pypi.org/project/modacor)<!-- -->
-[![Commits since latest release](https://img.shields.io/github/commits-since/BAMresearch/modacor/v1.0.0.svg)](https://github.com/BAMresearch/modacor/compare/v1.0.0...main)<!-- -->
-[![License](https://img.shields.io/pypi/l/modacor.svg)](https://en.wikipedia.org/wiki/MIT_license)<!-- -->
-[![Supported Python versions](https://img.shields.io/pypi/pyversions/modacor.svg)](https://test.pypi.org/project/modacor)<!-- -->
-[![PyPI Wheel](https://img.shields.io/pypi/wheel/modacor.svg)](https://test.pypi.org/project/modacor#files)<!-- -->
-[![Weekly PyPI downloads](https://img.shields.io/pypi/dw/modacor.svg)](https://test.pypi.org/project/modacor/)<!-- -->
-[![CI/CD status](https://github.com/BAMresearch/modacor/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/BAMresearch/modacor/actions/workflows/ci-cd.yml)<!-- -->
-[![Coverage report](https://img.shields.io/endpoint?url=https://BAMresearch.github.io/modacor/coverage-report/cov.json)](https://BAMresearch.github.io/modacor/coverage-report/)
+[![PyPI Package latest release](https://img.shields.io/pypi/v/modacor.svg)](https://pypi.org/project/modacor)
+[![Commits since latest release](https://img.shields.io/github/commits-since/BAMresearch/MoDaCor/v1.5.0.svg)](https://github.com/BAMresearch/MoDaCor/compare/v1.5.0...main)
+[![License](https://img.shields.io/pypi/l/modacor.svg)](https://en.wikipedia.org/wiki/BSD-3-Clause)
+[![Supported versions](https://img.shields.io/pypi/pyversions/modacor.svg)](https://pypi.org/project/modacor)
+[![PyPI Wheel](https://img.shields.io/pypi/wheel/modacor.svg)](https://pypi.org/project/modacor#files)
+[![Weekly PyPI downloads](https://img.shields.io/pypi/dw/modacor.svg)](https://pypi.org/project/modacor/)
+[![Continuous Integration and Deployment Status](https://github.com/BAMresearch/MoDaCor/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/BAMresearch/MoDaCor/actions/workflows/ci-cd.yml)
+[![Coverage report](https://img.shields.io/endpoint?url=https://BAMresearch.github.io/MoDaCor/coverage-report/cov.json)](https://BAMresearch.github.io/MoDaCor/coverage-report/)
 
 ## Summary
 
@@ -27,19 +28,25 @@ or as a reference to validate faster, more integrated data-correction implementa
 
 ## Installation
 
+MoDaCor requires Python 3.12 or newer.
+
+    pip install modacor
+
+### Optional extras
+
+Support for the Tiled-backed IoSource is provided via an optional dependency set. Install it with:
+
 ```bash
-pip install modacor
+pip install modacor[tiled]
 ```
 
 To install the in-development version:
 
-```bash
-pip install git+https://github.com/BAMresearch/modacor.git@main
-```
+    pip install git+https://github.com/BAMresearch/MoDaCor.git@main
 
 ## Documentation structure
 
-The published documentation at <https://BAMresearch.github.io/modacor> is organised around three main tracks:
+The published documentation at <https://BAMresearch.github.io/MoDaCor> is organised around three main tracks:
 
 - **Getting started** – a Quickstart walkthrough that runs a sample pipeline with the bundled MOUSE dataset and
   highlights pipeline tracing.
@@ -60,6 +67,8 @@ Planned documentation stubs now live in the repository to signal the intended st
 
 These pages currently contain explicit TODO notes and will be expanded during the documentation refresh.
 
+Documentation contributors can follow `docs/README.md` for local build instructions and authoring notes.
+
 ## Development
 
 For coding contributions, we strongly recommend:
@@ -67,23 +76,52 @@ For coding contributions, we strongly recommend:
 - using `flake8` and/or `black` for consistent formatting;
 - writing tests for every added functionality to encourage test-driven development practices.
 
-To run all the tests:
+Set up a local editable environment with the test and lint tooling installed:
 
 ```bash
-tox
+python -m venv .venv-dev
+source .venv-dev/bin/activate
+pip install --upgrade pip
+pip install -e ".[tests,lint]"
 ```
 
-To combine coverage data from all `tox` environments:
+Run the local lint checks with:
 
-- **Windows**
+```bash
+python -m flake8
+python -m isort --check-only --diff --filter-files .
+```
 
-  ```cmd
-  set PYTEST_ADDOPTS=--cov-append
-  tox
-  ```
+### Testing
 
-- **Other platforms**
+See which tests are available (arguments after `--` get passed to *pytest* which runs the tests):
 
-  ```bash
-  PYTEST_ADDOPTS=--cov-append tox
-  ```
+    tox -e py -- --co
+
+Run a specific test only:
+
+    tox -e py -- -k <test_name from listing before>
+
+Run all tests with:
+
+    tox -e py
+
+### Package Version
+
+Get the next version number and how the GIT history would be interpreted for that:
+
+    pip install python-semantic-release
+    semantic-release -v version --print
+
+This prints its interpretation of the commits in detail. Make sure to supply the `--print`
+argument during local checks. Version bumps and changelog updates are generated by a
+release-preparation pull request after changes reach `main`; the release workflow tags and
+publishes only after that release PR is merged.
+
+### Project template
+
+Update the project configuration from the *copier* template and make sure the required packages
+are installed:
+
+    pip install copier jinja2-time
+    copier update --trust --skip-answered

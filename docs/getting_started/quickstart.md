@@ -6,7 +6,7 @@ configuration file, and inspect the pipeline trace that records what changed at 
 
 ## Prerequisites
 
-- Python 3.11 or newer
+- Python 3.12 or newer
 - `pip`, `curl` (or `wget`) and a POSIX-like shell
 - Approximately 1.3 GB of free disk space for the sample NeXus file
 
@@ -43,9 +43,10 @@ detector:
 YAML
 ```
 
-The NeXus file exposes counts in `entry1/instrument/detector00/data` and the exposure time in
-`entry1/instrument/detector00/frame_exposure_time`. The metadata file supplies a scalar dark-current estimate so the
-last pipeline step can remove it.
+The NeXus file exposes summed counts in `entry1/instrument/detector00/data` and the total acquisition time in
+`entry1/instrument/detector00/count_time`. Because the stored image is a sum over the stacked frames, use the total
+`count_time`, not the duration of one frame in `frame_exposure_time`. The metadata file supplies a scalar dark-current
+estimate so the last pipeline step can remove it.
 
 ## Step 3 – Create the pipeline configuration
 
@@ -62,14 +63,14 @@ steps:
       with_processing_keys:
         - sample
   2:
-    name: normalize_by_exposure
+    name: normalize_by_total_count_time
     module: Divide
     requires_steps: [1]
     configuration:
       with_processing_keys:
         - sample
-      divisor_source: sample::entry1/instrument/detector00/frame_exposure_time
-      divisor_units_source: sample::entry1/instrument/detector00/frame_exposure_time@units
+      divisor_source: sample::entry1/instrument/detector00/count_time
+      divisor_units_source: sample::entry1/instrument/detector00/count_time@units
   3:
     name: subtract_darkcurrent
     module: Subtract
@@ -142,9 +143,10 @@ def main() -> None:
     processing_data = build_processing_data(sources)
     tracer = PipelineTracer(watch={"sample": ["signal"]})
 
-    pipeline.prepare()
-    while pipeline.is_active():
-        for node in pipeline.get_ready():
+    scheduler = pipeline.create_scheduler()
+    scheduler.prepare()
+    while scheduler.is_active():
+        for node in scheduler.get_ready():
             node.processing_data = processing_data
             node.io_sources = sources
 
@@ -152,7 +154,7 @@ def main() -> None:
             node.execute(processing_data)
             tracer.after_step(node, processing_data, duration_s=perf_counter() - start)
 
-            pipeline.done(node)
+            scheduler.done(node)
 
     sample_signal = processing_data["sample"]["signal"]
     mean_intensity = float(sample_signal.signal.mean())
@@ -187,6 +189,7 @@ graph.
   additional `DataBundle` entries (for example `background` or `calibration`).
 - Add `pipeline.attach_tracer_event(node, tracer, include_rendered_trace=True)` inside the execution loop if you want to
   export the trace alongside the configuration.
+- Use the dedicated [CLI and Runner API](cli_and_runner.md) guide for production command-line runs (`modacor run`) and
+  the shared `run_pipeline_job(...)` Python interface.
 - Explore the **Pipeline operations** and **Extending MoDaCor** sections for branching workflows, module development,
   and integration best practices.
-}

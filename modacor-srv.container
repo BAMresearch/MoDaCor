@@ -1,0 +1,23 @@
+# modacor.container
+# 1. Put this into: $HOME/.config/containers/systemd/
+# 2. Activate:      systemctl --user daemon-reload
+# 3. Start:         systemctl --user start modacor
+# -> Assumes the modacor container was build already (via Dockerfile)
+
+[Unit]
+Description=Modacor Server
+After=network-online.target
+
+[Container]
+ContainerName=modacor-srv
+Image=modacor:latest
+
+PublishPort=8700:8700
+Network=modacor-network
+
+[Service]
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

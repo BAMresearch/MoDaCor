@@ -20,7 +20,7 @@ from typing import Any, Callable
 
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.io.io_sinks import IoSinks
 
@@ -77,6 +77,9 @@ class AppendSink(ProcessStep):
     # -------------------------------------------------------------------------
     # Public API used by the pipeline
     # -------------------------------------------------------------------------
+    def dependency_contract(self) -> ProcessStepDependencies:
+        return ProcessStepDependencies()
+
     def calculate(self) -> dict[str, DataBundle]:
         output: dict[str, DataBundle] = {}
 

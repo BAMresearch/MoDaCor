@@ -1,0 +1,398 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# /usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from __future__ import annotations
+
+__coding__ = "utf-8"
+__authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
+__copyright__ = "Copyright 2026, The MoDaCor team"
+__date__ = "30/11/2026"
+__status__ = "Development"  # "Development", "Production"
+# end of header and standard imports
+
+import json
+from pathlib import Path
+
+import h5py
+import numpy as np
+import pytest
+
+from modacor import ureg
+from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
+
+
+@pytest.fixture
+def processing_data_with_uncertainties() -> ProcessingData:
+    pd = ProcessingData()
+    bundle = DataBundle()
+
+    q = BaseData(
+        signal=np.array([0.01, 0.02, 0.03], dtype=float),
+        units=ureg.Unit("1/nm"),
+        rank_of_data=1,
+    )
+    signal = np.arange(3, dtype=float)
+    poisson = np.full_like(signal, 0.1, dtype=float)
+
+    bundle["Q"] = q
+    bundle["signal"] = BaseData(
+        signal=signal,
+        units=ureg.Unit("count"),
+        uncertainties={"poisson": poisson},
+        axes=[q],
+        rank_of_data=1,
+    )
+    bundle.default_plot = "signal"
+    pd["sample"] = bundle
+    return pd
+
+
+def _read_json_dataset(group: h5py.Group, name: str) -> dict | list:
+    data = group[name][()]
+    if isinstance(data, bytes):
+        payload = data.decode("utf-8")
+    else:
+        payload = "".join(chr(c) for c in data.tolist())
+    return json.loads(payload)
+
+
+def _read_text_dataset(group: h5py.Group, name: str) -> str:
+    data = group[name][()]
+    if isinstance(data, bytes):
+        return data.decode("utf-8")
+    return str(data)
+
+
+def _read_str_value(value: str | bytes) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return str(value)
+
+
+def _read_str_attr_list(value) -> list[str]:
+    return [_read_str_value(item) for item in list(value)]
+
+
+def _assert_utf8_string_attr(group: h5py.Group, attr_name: str) -> None:
+    attr_type = group.attrs.get_id(attr_name).get_type()
+    assert attr_type.get_class() == h5py.h5t.STRING
+    assert attr_type.get_cset() == h5py.h5t.CSET_UTF8
+
+
+def _resolve_default_nxdata(h5: h5py.File) -> h5py.Group:
+    current = h5[h5.attrs["default"]]
+    while isinstance(current, h5py.Group) and current.attrs.get("NX_class") != "NXdata":
+        current = current[current.attrs["default"]]
+    return current
+
+
+def test_hdf_processing_sink_writes_result_and_metadata(
+    tmp_path: Path, processing_data_with_uncertainties: ProcessingData
+):
+    out_file = tmp_path / "out.h5"
+    sink = HDFProcessingSink(resource_location=out_file, iosink_method_kwargs={"compression": "gzip"})
+
+    pipeline_spec = {"name": "demo", "version": "1.0"}
+    pipeline_yaml = "name: demo\nsteps: {}\n"
+    trace_events = [
+        {
+            "step_id": "S1",
+            "module": "Example",
+            "duration_s": 0.1,
+            "config": {"a": 1},
+            "datasets": {
+                "sample.signal": {
+                    "diff": ["units"],
+                    "prev": {"units": "count"},
+                    "now": {"units": "1/s"},
+                }
+            },
+        }
+    ]
+
+    sink.write(
+        "run1",
+        processing_data_with_uncertainties,
+        data_paths=["/sample/signal/signal"],
+        pipeline_spec=pipeline_spec,
+        pipeline_yaml=pipeline_yaml,
+        trace_events=trace_events,
+    )
+
+    assert out_file.exists()
+
+    with h5py.File(out_file, "r") as h5:
+        assert h5.attrs["NX_class"] == "NXroot"
+        assert h5.attrs["default"] == "processing"
+        assert h5["processing"].attrs["NX_class"] == "NXentry"
+        assert "canSAS_class" not in h5["processing"].attrs
+        assert "version" not in h5["processing"].attrs
+        assert h5["processing"].attrs["default"] == "result"
+        assert h5["processing/result"].attrs["NX_class"] == "NXcollection"
+        assert h5["processing/result"].attrs["default"] == "run1"
+        assert h5["processing/result/run1"].attrs["NX_class"] == "NXcollection"
+        assert h5["processing/result/run1"].attrs["default"] == "sample"
+        assert h5["processing/result/run1/sample"].attrs["NX_class"] == "NXcollection"
+        assert h5["processing/result/run1/sample"].attrs["default"] == "signal"
+        assert "definition" not in h5["processing"]
+        assert _read_text_dataset(h5["processing"], "run") == "run1"
+        assert _read_text_dataset(h5["processing"], "title") == "MoDaCor processing result run1"
+        assert _read_text_dataset(h5["processing"], "program_name") == "MoDaCor"
+        assert _resolve_default_nxdata(h5).name == "/processing/result/run1/sample/signal"
+        assert _resolve_default_nxdata(h5).attrs["signal"] == "signal"
+        _assert_utf8_string_attr(h5, "default")
+        _assert_utf8_string_attr(h5["processing"], "default")
+        _assert_utf8_string_attr(h5["processing/result"], "default")
+
+        signal_group = h5["processing/result/run1/sample/signal"]
+        assert signal_group.attrs["default"] == "signal"
+        assert signal_group.attrs["NX_class"] == "NXdata"
+        assert "canSAS_class" not in signal_group.attrs
+        assert signal_group.attrs["signal"] == "signal"
+        assert _read_str_attr_list(signal_group.attrs["axes"]) == ["Q"]
+        assert "I_axes" not in signal_group.attrs
+        assert "Q_indices" not in signal_group.attrs
+        _assert_utf8_string_attr(signal_group, "NX_class")
+        _assert_utf8_string_attr(signal_group, "default")
+        _assert_utf8_string_attr(signal_group, "signal")
+        _assert_utf8_string_attr(signal_group, "axes")
+        assert "I" not in signal_group
+        assert "Q" in signal_group
+
+        np.testing.assert_allclose(
+            signal_group["signal"], processing_data_with_uncertainties["sample"]["signal"].signal
+        )
+        np.testing.assert_allclose(signal_group["Q"], processing_data_with_uncertainties["sample"]["Q"].signal)
+        assert signal_group["signal"].attrs["units"] == "count"
+        assert signal_group["Q"].attrs["units"] == "1/nm"
+
+        np.testing.assert_allclose(
+            signal_group["uncertainties/poisson"],
+            processing_data_with_uncertainties["sample"]["signal"].uncertainties["poisson"],
+        )
+
+        pipeline_group = h5["processing/pipeline/run1"]
+        assert _read_json_dataset(pipeline_group, "spec") == pipeline_spec
+        assert _read_text_dataset(pipeline_group, "yaml") == pipeline_yaml
+
+        tracer_group = h5["processing/tracer/run1"]
+        assert _read_json_dataset(tracer_group, "events") == trace_events
+        assert tracer_group.attrs["schema_version"] == "1.1"
+        assert _read_str_value(tracer_group["index/step_ids"][0]) == "S1"
+        assert _read_str_value(tracer_group["index/modules"][0]) == "Example"
+        assert bool(tracer_group["index/any_change"][0]) is True
+        dataset_group = tracer_group["steps/0001_S1/datasets/sample.signal"]
+        assert dataset_group.attrs["path"] == "sample.signal"
+        assert _read_str_value(dataset_group["changed_kinds"][0]) == "units"
+        assert json.loads(_read_text_dataset(dataset_group, "prev_json")) == {"units": "count"}
+        assert json.loads(_read_text_dataset(dataset_group, "now_json")) == {"units": "1/s"}
+
+
+def test_hdf_processing_sink_defaults_to_run_default(
+    tmp_path: Path, processing_data_with_uncertainties: ProcessingData
+):
+    out_file = tmp_path / "out_default.h5"
+    sink = HDFProcessingSink(resource_location=out_file)
+
+    sink.write(
+        "",
+        processing_data_with_uncertainties,
+        data_paths=["/sample/signal/signal"],
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        assert "processing/result/default/sample/signal/signal" in h5
+        assert bool(h5["processing/pipeline/default"].attrs["empty"]) is True
+        assert bool(h5["processing/tracer/default"].attrs["empty"]) is True
+
+
+def test_hdf_processing_sink_sets_processing_default_when_raw_entry_exists(
+    tmp_path: Path, processing_data_with_uncertainties: ProcessingData
+):
+    out_file = tmp_path / "out_with_raw_entry.h5"
+    with h5py.File(out_file, "w") as h5:
+        h5.attrs["NX_class"] = "NXroot"
+        h5.attrs["default"] = "entry"
+        raw_entry = h5.create_group("entry")
+        raw_entry.attrs["NX_class"] = "NXentry"
+        raw_entry.attrs["default"] = "data"
+        raw_data = raw_entry.create_group("data")
+        raw_data.attrs["NX_class"] = "NXdata"
+        raw_data.attrs["signal"] = "counts"
+        raw_data.create_dataset("counts", data=np.array([10.0, 11.0]))
+
+    sink = HDFProcessingSink(resource_location=out_file)
+    sink.write(
+        "run_raw",
+        processing_data_with_uncertainties,
+        data_paths=["/sample/signal/signal"],
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        assert "entry/data/counts" in h5
+        assert h5.attrs["default"] == "processing"
+        assert h5["entry"].attrs["default"] == "data"
+        assert h5["processing"].attrs["default"] == "result"
+        assert _resolve_default_nxdata(h5).name == "/processing/result/run_raw/sample/signal"
+
+
+def test_hdf_processing_sink_accepts_string_data_path(
+    tmp_path: Path, processing_data_with_uncertainties: ProcessingData
+):
+    out_file = tmp_path / "out_single_path.h5"
+    sink = HDFProcessingSink(resource_location=out_file)
+
+    sink.write(
+        "run2",
+        processing_data_with_uncertainties,
+        data_paths="/sample/signal/signal",
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        assert "processing/result/run2/sample/signal/signal" in h5
+
+
+def test_hdf_processing_sink_can_write_bundle_root(tmp_path: Path, processing_data_with_uncertainties: ProcessingData):
+    out_file = tmp_path / "out_bundle_root.h5"
+    sink = HDFProcessingSink(resource_location=out_file)
+
+    processing_data_with_uncertainties["background"] = DataBundle()
+    processing_data_with_uncertainties["background"]["signal"] = BaseData(
+        signal=np.array([4.0, 5.0]),
+        units=ureg.Unit("count"),
+    )
+
+    sink.write(
+        "after_plot_2d",
+        processing_data_with_uncertainties,
+        data_paths=["/sample"],
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        assert "processing/result/after_plot_2d/sample/signal/signal" in h5
+        assert "processing/result/after_plot_2d/sample/Q/signal" in h5
+        assert "processing/result/after_plot_2d/background" not in h5
+
+
+def test_hdf_processing_sink_can_write_all_processing_data(tmp_path: Path):
+    out_file = tmp_path / "out_all.h5"
+    sink = HDFProcessingSink(resource_location=out_file)
+
+    processing_data = ProcessingData()
+    calibration_bundle = DataBundle()
+    calibration_bundle["signal"] = BaseData(signal=np.array([5.0, 6.0]), units=ureg.Unit("count"))
+    calibration_bundle.default_plot = "signal"
+    processing_data["intensity_calibration"] = calibration_bundle
+
+    bundle = DataBundle()
+    bundle["signal"] = BaseData(signal=np.array([1.0, 2.0]), units=ureg.Unit("count"))
+    bundle["Q"] = BaseData(signal=np.array([0.1, 0.2]), units=ureg.Unit("1/nm"))
+    with pytest.raises(TypeError, match="DataBundle values must be BaseData"):
+        bundle["note"] = "not-basedata"
+    processing_data["sample"] = bundle
+
+    sink.write(
+        "run_all",
+        processing_data,
+        data_paths=None,
+        write_all_processing_data=True,
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        assert h5["processing/result/run_all"].attrs["default"] == "sample"
+        assert _resolve_default_nxdata(h5).name == "/processing/result/run_all/sample/signal"
+        assert "processing/result/run_all/intensity_calibration/signal/signal" in h5
+        assert "processing/result/run_all/sample/signal/signal" in h5
+        assert "processing/result/run_all/sample/Q/signal" in h5
+        assert "processing/result/run_all/sample/note" not in h5
+
+
+def test_hdf_processing_sink_writes_processing_data_snapshots(
+    tmp_path: Path, processing_data_with_uncertainties: ProcessingData
+):
+    out_file = tmp_path / "out_snapshots.h5"
+    sink = HDFProcessingSink(resource_location=out_file)
+
+    trace_events = [
+        {
+            "step_id": "S1",
+            "module": "Example",
+            "duration_s": 0.1,
+            "datasets": {},
+        }
+    ]
+    snapshots = [
+        {
+            "step_id": "S1",
+            "module": "Example",
+            "name": "example",
+            "duration_s": 0.1,
+            "processing_data": processing_data_with_uncertainties,
+        }
+    ]
+
+    sink.write(
+        "run_snap",
+        processing_data_with_uncertainties,
+        data_paths=["/sample/signal/signal"],
+        trace_events=trace_events,
+        processing_data_snapshots=snapshots,
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        tracer_group = h5["processing/tracer/run_snap"]
+        assert tracer_group.attrs["processing_data_snapshot_count"] == 1
+        assert "default_processing_data" not in tracer_group["steps/0001_S1"].attrs
+        snapshot_group = tracer_group["steps/0001_S1/processing_data"]
+        assert snapshot_group.attrs["snapshot_kind"] == "full_processing_data"
+        assert "default_path" not in snapshot_group.attrs
+        signal_group = snapshot_group["sample/signal"]
+        assert signal_group.attrs["NX_class"] == "NXdata"
+        assert "canSAS_class" not in signal_group.attrs
+        assert signal_group.attrs["signal"] == "signal"
+        assert _read_str_attr_list(signal_group.attrs["axes"]) == ["Q"]
+        assert "I_axes" not in signal_group.attrs
+        assert "Q_indices" not in signal_group.attrs
+        assert "NX_class" not in snapshot_group["sample/Q"].attrs
+        assert h5["processing/result/run_snap/sample/signal/signal"].compression is None
+        assert h5["processing/result/run_snap/sample/signal/Q"].compression is None
+        assert signal_group["signal"].compression == "lzf"
+        assert signal_group["Q"].compression == "lzf"
+        assert snapshot_group["sample/Q/signal"].compression == "lzf"
+        np.testing.assert_allclose(
+            signal_group["signal"],
+            processing_data_with_uncertainties["sample"]["signal"].signal,
+        )
+        assert "sample/Q/signal" in snapshot_group
+
+
+def test_hdf_processing_sink_snapshot_lzf_skips_scalar_datasets(tmp_path: Path):
+    out_file = tmp_path / "out_scalar_snapshot.h5"
+    sink = HDFProcessingSink(resource_location=out_file)
+
+    processing_data = ProcessingData()
+    bundle = DataBundle()
+    bundle["signal"] = BaseData(signal=np.array(1.0), units=ureg.Unit("count"))
+    processing_data["sample"] = bundle
+
+    sink.write(
+        "run_scalar",
+        processing_data,
+        data_paths=["/sample/signal/signal"],
+        processing_data_snapshots=[
+            {
+                "step_id": "DC_bg",
+                "module": "Example",
+                "processing_data": processing_data,
+            }
+        ],
+    )
+
+    with h5py.File(out_file, "r") as h5:
+        scalar_dataset = h5["processing/tracer/run_scalar/steps/0001_DC_bg/processing_data/sample/signal/signal"]
+        assert scalar_dataset.shape == ()
+        assert scalar_dataset.compression is None

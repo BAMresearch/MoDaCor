@@ -18,12 +18,22 @@ from typing import Any
 from attrs import define, evolve, field
 from attrs import validators as v
 
-__all__ = ["ProcessStepDescriber"]
+__all__ = ["DEPENDENCY_ROLES", "ProcessStepDescriber"]
 
 
 NXCite = str
 ArgumentSpec = dict[str, Any]
 
+DEPENDENCY_ROLES = frozenset(
+    {
+        "processing_read_basedata_key",
+        "processing_write_basedata_key",
+        "processing_read_write_basedata_key",
+        "processing_read_basedata_key_list",
+        "processing_write_basedata_key_list",
+        "processing_read_write_basedata_key_list",
+    }
+)
 
 _MISSING = object()
 
@@ -60,6 +70,24 @@ def _normalize_arguments(value: Any, field_name: str) -> dict[str, ArgumentSpec]
         if not isinstance(required, bool):
             raise TypeError(f"{field_name}[{normalized_key!r}]['required'] must be a boolean.")
         normalized_spec["required"] = required
+
+        dependency_role = normalized_spec.get("dependency_role")
+        if dependency_role is not None:
+            if isinstance(dependency_role, str):
+                dependency_roles = (dependency_role,)
+            elif isinstance(dependency_role, (list, tuple, set)):
+                dependency_roles = tuple(dependency_role)
+            else:
+                raise TypeError(
+                    f"{field_name}[{normalized_key!r}]['dependency_role'] must be a string or list of strings."
+                )
+            unknown_roles = sorted(str(role) for role in dependency_roles if role not in DEPENDENCY_ROLES)
+            if unknown_roles:
+                known = ", ".join(sorted(DEPENDENCY_ROLES))
+                raise ValueError(
+                    f"{field_name}[{normalized_key!r}]['dependency_role'] contains unknown role(s): "
+                    f"{', '.join(unknown_roles)}. Known roles: {known}."
+                )
 
         normalized[normalized_key] = normalized_spec
     return normalized
