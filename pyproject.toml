@@ -35,6 +35,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+tiled = [
+    "tiled[client]>=0.2.18,<0.3",
+]
+tiled-tests = [
+    "tiled[client,minimal-server]>=0.2.18,<0.3",
+    "openpyxl",
+    "obstore",
+    "strawberry-graphql[fastapi]>=0.315.3",
+    "pytest",
+]
 tests = [
     "tox",
     "pytest",
@@ -88,6 +98,8 @@ all = [
     "isort",
     "linkify-it-py",
     "myst-parser>=2.0",
+    "obstore",
+    "openpyxl",
     "pre-commit",
     "pydata-sphinx-theme>=0.14",
     "plotly>=5.24",
@@ -97,6 +109,8 @@ all = [
     "scikit-image",
     "sphinx>=6.2",
     "sphinxcontrib-mermaid",
+    "strawberry-graphql[fastapi]>=0.315.3",
+    "tiled[client,minimal-server]>=0.2.18,<0.3",
     "toml",
     "tox",
     "uvicorn>=0.27",

@@ -77,6 +77,10 @@ jobs:
         shell: sh
         run: tox -e lint,manifest -v
 
+      - name: Run Tiled integration tests
+        shell: sh
+        run: tox -e tiled -v
+
       - name: Run tests
         shell: sh
         run: |

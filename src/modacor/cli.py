@@ -270,7 +270,11 @@ def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     set_source_parser.add_argument("--session-id", required=True)
     set_source_parser.add_argument("--ref", required=True)
     set_source_parser.add_argument("--type", required=True, dest="source_type")
-    set_source_parser.add_argument("--location", required=True, type=Path)
+    set_source_parser.add_argument(
+        "--location",
+        required=True,
+        help="Source path or URI. URI schemes are preserved for remote sources such as Tiled.",
+    )
     set_source_parser.add_argument(
         "--kwargs-json",
         default="{}",
@@ -281,7 +285,11 @@ def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     set_sink_parser.add_argument("--session-id", required=True)
     set_sink_parser.add_argument("--ref", required=True)
     set_sink_parser.add_argument("--type", required=True, dest="sink_type")
-    set_sink_parser.add_argument("--location", required=True, type=Path)
+    set_sink_parser.add_argument(
+        "--location",
+        required=True,
+        help="Sink path or URI. URI schemes are preserved for remote sinks such as Tiled.",
+    )
     set_sink_parser.add_argument(
         "--kwargs-json",
         default="{}",
@@ -293,7 +301,11 @@ def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.Argument
         help="Shortcut to upsert the 'sample' source reference.",
     )
     set_sample_parser.add_argument("--session-id", required=True)
-    set_sample_parser.add_argument("--location", required=True, type=Path)
+    set_sample_parser.add_argument(
+        "--location",
+        required=True,
+        help="Sample source path or URI. URI schemes are preserved for remote sources such as Tiled.",
+    )
     set_sample_parser.add_argument("--type", default="hdf", dest="source_type")
     set_sample_parser.add_argument(
         "--kwargs-json",
