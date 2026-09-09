@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v1.6.0 (2026-09-09)
+
+### Enh
+
+* enh: Tiled interface ready, next up: chunked processing ([`f5af262`](https://github.com/BAMresearch/MoDaCor/commit/f5af2624fe2aebdf1ca69970370030e4722d6a6c))
+
 ## v1.5.0 (2026-09-06)
 
 ### Bug fixes
@@ -374,13 +380,21 @@
 
 * generate module doc not in the right branch. ([`6662da1`](https://github.com/BAMresearch/MoDaCor/commit/6662da15361a0516cd5c25507c550a05052a3d89))
 
+* test not in the right branch. ([`75add3e`](https://github.com/BAMresearch/MoDaCor/commit/75add3e9f4db8baaf0ba37adf990f7e89a15649e))
+
 * draft merge-uncertainties modules for combining BaseData uncertainties ([`f3c4c12`](https://github.com/BAMresearch/MoDaCor/commit/f3c4c1259ec995a68cc64781e5314572cd63d0a0))
 
 * drafting a tiled IoSource ([`cde0357`](https://github.com/BAMresearch/MoDaCor/commit/cde0357a00ebc0e735900f8e6d281a2c2963e761))
 
+* adding an integration test for tiled ([`62eff21`](https://github.com/BAMresearch/MoDaCor/commit/62eff21fb8dc379c17562e87b8fd7119b0732c47))
+
+* drafting a tiled IoSource ([`183e2a6`](https://github.com/BAMresearch/MoDaCor/commit/183e2a64d9079ef1d04b4276cf8e58b0cba63309))
+
 * removed duplicate functionality and cleaned up processstepdescriber usage, arguments dictionary is now more comprehensive ([`8ea3585`](https://github.com/BAMresearch/MoDaCor/commit/8ea35855ce35a0d2b115ffcc9863e1540eedb589))
 
 * documentation syntax updates ([`f093b6c`](https://github.com/BAMresearch/MoDaCor/commit/f093b6c1c9fb4f978c911ca200b1322fe690c4c8))
+
+* adding an integration test for tiled ([`4776f4a`](https://github.com/BAMresearch/MoDaCor/commit/4776f4a45b4c8cb6416e4b9359b5f3f29bee3a49))
 
 * draft merge-uncertainties modules for combining BaseData uncertainties ([`926b263`](https://github.com/BAMresearch/MoDaCor/commit/926b2636b34f7a5c8fd57c3e00d4d291395cd657))
 
