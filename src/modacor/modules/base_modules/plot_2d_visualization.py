@@ -11,7 +11,7 @@ __date__ = "03/09/2026"
 __status__ = "Development"
 
 __all__ = ["Plot2DVisualization"]
-__version__ = "20260903.1"
+__version__ = "20260909.1"
 
 from pathlib import Path
 from typing import Any
@@ -46,6 +46,8 @@ def _resolve_array(processing_data: Any, path: str) -> np.ndarray:
     value = resolve_processing_path(processing_data, path)
     if isinstance(value, BaseData):
         value = value.signal
+    if np.ma.isMaskedArray(value):
+        return np.asarray(value.filled(np.nan), dtype=float)
     return np.asarray(value, dtype=float)
 
 
@@ -87,18 +89,28 @@ def _scaled_frame(
     scale: str,
     zmin: float | None,
     zmax: float | None,
-    percentile: float,
+    lower_percentile: float,
+    upper_percentile: float,
 ) -> tuple[np.ndarray, float | None, float | None, dict[str, Any]]:
     finite = np.isfinite(frame)
     if scale == "linear":
         finite_values = frame[finite]
         if finite_values.size == 0:
             return frame, zmin, zmax, {"scale": "linear", "reason": "no_finite_pixels"}
-        lower = float(np.nanmin(finite_values)) if zmin is None else zmin
-        upper = float(np.nanpercentile(finite_values, percentile)) if zmax is None else zmax
+        lower = float(np.nanpercentile(finite_values, lower_percentile)) if zmin is None else zmin
+        upper = float(np.nanpercentile(finite_values, upper_percentile)) if zmax is None else zmax
         if upper <= lower:
             upper = float(np.nanmax(finite_values))
-        return frame, lower, upper, {"scale": "linear", "percentile": percentile}
+        return (
+            frame,
+            lower,
+            upper,
+            {
+                "scale": "linear",
+                "auto_zmin_percentile": lower_percentile,
+                "auto_zmax_percentile": upper_percentile,
+            },
+        )
 
     if scale != "log10":
         raise ValueError("Plot2DVisualization scale must be one of: log10, linear.")
@@ -108,8 +120,8 @@ def _scaled_frame(
     if positive_values.size == 0:
         return frame, zmin, zmax, {"scale": "linear", "requested_scale": "log10", "reason": "no_positive_pixels"}
 
-    lower = float(np.nanmin(positive_values)) if zmin is None else zmin
-    upper = float(np.nanpercentile(positive_values, percentile)) if zmax is None else zmax
+    lower = float(np.nanpercentile(positive_values, lower_percentile)) if zmin is None else zmin
+    upper = float(np.nanpercentile(positive_values, upper_percentile)) if zmax is None else zmax
     if lower <= 0:
         raise ValueError("Plot2DVisualization log10 scale requires zmin to be positive when provided.")
     if upper <= lower:
@@ -125,7 +137,8 @@ def _scaled_frame(
             "scale": "log10",
             "source_zmin": lower,
             "source_zmax": upper,
-            "percentile": percentile,
+            "auto_zmin_percentile": lower_percentile,
+            "auto_zmax_percentile": upper_percentile,
         },
     )
 
@@ -183,10 +196,15 @@ class Plot2DVisualization(ProcessStep):
                 "default": "log10",
                 "doc": "Color scaling: 'log10' or 'linear'.",
             },
+            "auto_zmin_percentile": {
+                "type": (int, float),
+                "default": 5.0,
+                "doc": "Percentile used for automatic zmin on finite, unmasked pixels in the displayed frame.",
+            },
             "auto_zmax_percentile": {
                 "type": (int, float),
                 "default": 99.0,
-                "doc": "Percentile used for automatic zmax on the displayed frame.",
+                "doc": "Percentile used for automatic zmax on finite, unmasked pixels in the displayed frame.",
             },
             "transpose": {
                 "type": bool,
@@ -202,7 +220,11 @@ class Plot2DVisualization(ProcessStep):
         step_keywords=["plot", "visualization", "plotly", "2d", "image"],
         step_doc="Publish a Plotly-compatible 2D heatmap payload.",
         step_reference="",
-        step_note="Higher-dimensional data is sliced to the first frame over leading dimensions.",
+        step_note=(
+            "Higher-dimensional data is sliced to the first frame over leading dimensions. "
+            "Automatic color bounds default to the 5th and 99th percentiles of finite pixels; "
+            "log10 scaling uses only positive finite pixels."
+        ),
     )
 
     def dependency_contract(self) -> ProcessStepDependencies:
@@ -228,16 +250,22 @@ class Plot2DVisualization(ProcessStep):
         title = _str_or_none(cfg.get("title")) or data_path
         units = _units_for_path(self.processing_data, data_path)
         finite = np.isfinite(frame)
-        percentile = float(cfg.get("auto_zmax_percentile", 99.0))
-        if not 0 < percentile <= 100:
+        lower_percentile = float(cfg.get("auto_zmin_percentile", 5.0))
+        upper_percentile = float(cfg.get("auto_zmax_percentile", 99.0))
+        if not 0 <= lower_percentile < 100:
+            raise ValueError("Plot2DVisualization auto_zmin_percentile must be in the range [0, 100).")
+        if not 0 < upper_percentile <= 100:
             raise ValueError("Plot2DVisualization auto_zmax_percentile must be in the range (0, 100].")
+        if lower_percentile >= upper_percentile:
+            raise ValueError("Plot2DVisualization auto_zmin_percentile must be below auto_zmax_percentile.")
         scale = str(cfg.get("scale") or "log10").strip().lower()
         scaled_frame, zmin, zmax, scale_metadata = _scaled_frame(
             frame,
             scale=scale,
             zmin=_float_or_none(cfg.get("zmin")),
             zmax=_float_or_none(cfg.get("zmax")),
-            percentile=percentile,
+            lower_percentile=lower_percentile,
+            upper_percentile=upper_percentile,
         )
 
         trace: dict[str, Any] = {

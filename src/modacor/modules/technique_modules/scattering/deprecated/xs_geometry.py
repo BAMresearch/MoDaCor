@@ -26,7 +26,7 @@ from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.modules.helpers import attach_prepared_data, normalize_str_list
-from modacor.modules.technique_modules.scattering.geometry_helpers import detector_index_basedata
+from modacor.modules.helpers.scattering.detector_data import detector_index_basedata
 
 # Module-level handler; facilities can swap MessageHandler implementation as needed
 logger = MessageHandler(name=__name__)

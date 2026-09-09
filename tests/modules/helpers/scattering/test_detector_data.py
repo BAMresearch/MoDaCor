@@ -17,28 +17,10 @@ import pytest
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
-from modacor.modules.technique_modules.scattering.geometry_helpers import (
+from modacor.modules.helpers.scattering.detector_data import (
     prepare_static_scalar,
     require_scalar,
-    unit_vec3,
 )
-
-# ----------------------------
-# unit_vec3
-# ----------------------------
-
-
-def test_unit_vec3_normalizes():
-    v = np.array([3.0, 0.0, 4.0])
-    u = unit_vec3(v)
-    np.testing.assert_allclose(np.linalg.norm(u), 1.0)
-    np.testing.assert_allclose(u, np.array([0.6, 0.0, 0.8]))
-
-
-def test_unit_vec3_rejects_zero_vector():
-    with pytest.raises(ValueError, match="must be non-zero"):
-        unit_vec3((0.0, 0.0, 0.0), name="basis_fast")
-
 
 # ----------------------------
 # require_scalar

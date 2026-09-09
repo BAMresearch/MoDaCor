@@ -6,6 +6,7 @@ pipeline metadata, and compatibility.
 ```{toctree}
 :maxdepth: 1
 
+capillary-self-absorption
 api-buffer-source-sink
 io-sink-runtime-api
 pixel-unit-removal

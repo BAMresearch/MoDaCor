@@ -11,24 +11,13 @@ __date__ = "06/01/2026"
 __status__ = "Development"  # "Development", "Production"
 
 __version__ = "20260106.1"
-__all__ = ["unit_vec3", "require_scalar", "prepare_static_scalar", "detector_index_basedata"]
-
-from typing import Tuple
+__all__ = ["require_scalar", "prepare_static_scalar", "detector_index_basedata"]
 
 import numpy as np
 import pint
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
-
-
-def unit_vec3(v: Tuple[float, float, float] | np.ndarray, *, name: str = "vector") -> np.ndarray:
-    """Normalize a 3-vector to unit length."""
-    v = np.asarray(v, dtype=float).reshape(3)
-    n = float(np.linalg.norm(v))
-    if n == 0.0:
-        raise ValueError(f"{name} must be non-zero")
-    return v / n
 
 
 def require_scalar(name: str, bd: BaseData) -> BaseData:

@@ -14,7 +14,7 @@ __status__ = "Development"  # "Development", "Production"
 from modacor.dataclasses.databundle import DataBundle
 
 """
-Tests for the XSGeometry processing step.
+Tests retained for the deprecated XSGeometry implementation.
 
 We test:
 - Low-level geometry helpers (_compute_coordinates, _compute_angles, _compute_Q, ...)
@@ -31,7 +31,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
-from modacor.modules.technique_modules.scattering.xs_geometry import XSGeometry
+from modacor.modules.technique_modules.scattering.deprecated.xs_geometry import XSGeometry
 
 # ---------------------------------------------------------------------------
 # Small helpers for building geometry BaseData

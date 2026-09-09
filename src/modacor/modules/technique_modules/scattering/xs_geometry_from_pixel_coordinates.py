@@ -15,15 +15,15 @@ from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
-from modacor.modules.base_modules.nexus_transformations import (
+from modacor.geometry import unit_vector3
+from modacor.io.nexus.geometry import (
     load_nexus_detector_frame_inputs,
     resolve_nexus_transform_chain,
 )
 from modacor.modules.helpers import attach_prepared_data, normalize_str_list
-from modacor.modules.technique_modules.scattering.geometry_helpers import (
+from modacor.modules.helpers.scattering.detector_data import (
     prepare_static_scalar,
     require_scalar,
-    unit_vec3,
 )
 
 logger = MessageHandler(name=__name__)
@@ -349,13 +349,13 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
                 require_units=ureg.m,
                 uncertainty_key="pixel_pitch_jitter",
             )
-            detector_normal = unit_vec3(
+            detector_normal = unit_vector3(
                 self.configuration.get("detector_normal", (0.0, 0.0, 1.0)), name="detector_normal"
             )
         else:
             pitch_slow = nexus_frame_inputs.pixel_pitch_slow
             pitch_fast = nexus_frame_inputs.pixel_pitch_fast
-            detector_normal = unit_vec3(
+            detector_normal = unit_vector3(
                 self.configuration.get("detector_normal", nexus_frame_inputs.basis_normal), name="detector_normal"
             )
 

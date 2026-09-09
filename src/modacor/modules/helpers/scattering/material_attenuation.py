@@ -52,19 +52,26 @@ def scalar_quantity_from_config_or_source(
     *,
     default_units: str,
     required: bool = False,
+    uncertainty_sources: dict[str, str] | None = None,
 ) -> BaseData | None:
+    uncertainty_sources = {} if uncertainty_sources is None else uncertainty_sources
     source = cfg.get(f"{name}_source")
     if source is not None:
         return basedata_from_sources(
             io_sources=io_sources,
             signal_source=str(source),
             units_source=cfg.get(f"{name}_units_source"),
+            uncertainty_sources=uncertainty_sources,
         )
 
     if name in cfg and cfg[name] is not None:
         return BaseData(
             signal=np.asarray(cfg[name], dtype=float),
             units=ureg.Unit(str(cfg.get(f"{name}_units", default_units))),
+            uncertainties={
+                uncertainty_name: io_sources.get_data(reference)
+                for uncertainty_name, reference in uncertainty_sources.items()
+            },
             rank_of_data=0,
         )
 

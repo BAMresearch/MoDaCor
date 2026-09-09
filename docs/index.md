@@ -10,6 +10,7 @@ readme
 installation
 getting_started/index
 pipeline_operations/index
+corrections/index
 design/index
 extending/index
 examples/index

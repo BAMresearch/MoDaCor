@@ -19,7 +19,11 @@ from modacor.dataclasses.process_step import (
     source_refs_from_references,
 )
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
-from modacor.modules.technique_modules.scattering.material_attenuation import positive_cos_alpha, scalar_in_units
+from modacor.models.attenuation import (
+    flat_plate_relative_attenuation,
+    flat_plate_relative_attenuation_derivative,
+)
+from modacor.modules.helpers.scattering.material_attenuation import positive_cos_alpha, scalar_in_units
 
 
 class FlatPlateSelfAbsorptionCorrection(ProcessStep):
@@ -85,28 +89,6 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
         ),
     )
 
-    @staticmethod
-    def _relative_attenuation(transmission: float, cos_alpha: np.ndarray) -> np.ndarray:
-        x = ((1.0 / cos_alpha) - 1.0) * np.log(transmission)
-        result = np.ones_like(x, dtype=float)
-        regular = np.abs(x) >= 1e-6
-        result[regular] = np.expm1(x[regular]) / x[regular]
-        small = ~regular
-        result[small] = 1.0 + x[small] / 2.0 + x[small] ** 2 / 6.0
-        return result
-
-    @staticmethod
-    def _relative_attenuation_derivative(transmission: float, cos_alpha: np.ndarray) -> np.ndarray:
-        """Derivative of the relative attenuation factor with respect to transmission."""
-        k = (1.0 / cos_alpha) - 1.0
-        x = k * np.log(transmission)
-        derivative_x = np.empty_like(x, dtype=float)
-        regular = np.abs(x) >= 1e-6
-        derivative_x[regular] = (np.exp(x[regular]) * x[regular] - np.expm1(x[regular])) / (x[regular] ** 2)
-        small = ~regular
-        derivative_x[small] = 0.5 + x[small] / 3.0 + x[small] ** 2 / 8.0
-        return derivative_x * k / transmission
-
     def dependency_contract(self) -> ProcessStepDependencies:
         cfg = self.configuration or {}
         keys = cfg.get("with_processing_keys")
@@ -149,11 +131,11 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
             databundle = self.processing_data[key]
             cos_alpha_bd = databundle[cos_alpha_key]
             cos_alpha = positive_cos_alpha(cos_alpha_bd, minimum_cos_alpha=minimum_cos_alpha)
-            attenuation = self._relative_attenuation(transmission, cos_alpha)
+            attenuation = flat_plate_relative_attenuation(transmission, cos_alpha)
             if np.any(attenuation < minimum_factor) or not np.all(np.isfinite(attenuation)):
                 raise ValueError("Flat-plate self-absorption factor is too small or non-finite.")
 
-            derivative = self._relative_attenuation_derivative(transmission, cos_alpha)
+            derivative = flat_plate_relative_attenuation_derivative(transmission, cos_alpha)
             correction_uncertainties = {
                 name: np.abs(derivative) * float(np.asarray(values).reshape(-1)[0])
                 for name, values in transmission_data.uncertainties.items()

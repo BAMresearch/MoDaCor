@@ -36,6 +36,12 @@ from modacor.modules.base_modules.subtract_databundles import SubtractDatabundle
 from modacor.modules.base_modules.threshold_mask import ThresholdMask
 from modacor.modules.base_modules.units_label_update import UnitsLabelUpdate
 from modacor.modules.technique_modules.scattering.attenuator_plate_correction import AttenuatorPlateCorrection
+from modacor.modules.technique_modules.scattering.capillary_sample_container_correction import (
+    CapillarySampleContainerCorrection,
+)
+from modacor.modules.technique_modules.scattering.capillary_self_absorption_correction import (
+    CapillarySelfAbsorptionCorrection,
+)
 from modacor.modules.technique_modules.scattering.detector_efficiency_correction import DetectorEfficiencyCorrection
 from modacor.modules.technique_modules.scattering.flat_plate_self_absorption_correction import (
     FlatPlateSelfAbsorptionCorrection,
@@ -45,7 +51,6 @@ from modacor.modules.technique_modules.scattering.indexed_averager import Indexe
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
 from modacor.modules.technique_modules.scattering.polarization_correction import PolarizationCorrection
 from modacor.modules.technique_modules.scattering.solid_angle_correction import SolidAngleCorrection
-from modacor.modules.technique_modules.scattering.xs_geometry import XSGeometry
 from modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordinates import (
     XSGeometryFromPixelCoordinates,
 )
@@ -57,6 +62,8 @@ __all__ = [
     "AttenuatorPlateCorrection",
     "ApplyMask",
     "BitwiseOrMasks",
+    "CapillarySelfAbsorptionCorrection",
+    "CapillarySampleContainerCorrection",
     "CombineUncertainties",
     "CombineUncertaintiesMax",
     "CopyDataBundleKeys",
@@ -82,6 +89,5 @@ __all__ = [
     "Subtract",
     "ThresholdMask",
     "UnitsLabelUpdate",
-    "XSGeometry",
     "XSGeometryFromPixelCoordinates",
 ]
