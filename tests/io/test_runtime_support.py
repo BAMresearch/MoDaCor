@@ -179,3 +179,38 @@ def test_build_sinks_from_specs_requires_custom_class_selector(tmp_path: Path):
                 }
             ]
         )
+
+
+@pytest.mark.parametrize("kind", ["source", "sink"])
+@pytest.mark.parametrize("custom", [False, True])
+def test_tiled_runtime_preserves_url(monkeypatch, kind, custom):
+    import sys
+    from types import SimpleNamespace
+
+    from modacor.io.runtime_support import build_sink_from_spec, build_source_from_spec
+    from modacor.io.tiled import TiledSink, TiledSource
+
+    calls = []
+
+    def connect(uri, **kwargs):
+        calls.append((uri, kwargs))
+        return {}
+
+    monkeypatch.setitem(sys.modules, "tiled.client", SimpleNamespace(from_uri=connect, from_profile=connect))
+    cls = TiledSource if kind == "source" else TiledSink
+    kwargs = {"base_path": "entry", "connection_kwargs": {"api_key": "test-key"}}
+    if custom:
+        kwargs = {
+            "class_path": f"modacor.io.tiled.{cls.__name__}",
+            "iosource_method_kwargs" if kind == "source" else "iosink_method_kwargs": kwargs,
+        }
+    spec = {
+        "ref": "tiled",
+        "type": "custom" if custom else "tiled",
+        "location": "https://example.test/api/v1",
+        "kwargs": kwargs,
+    }
+    build = build_source_from_spec if kind == "source" else build_sink_from_spec
+    instance = build(spec)
+    assert isinstance(instance, cls)
+    assert calls == [("https://example.test/api/v1", {"api_key": "test-key"})]

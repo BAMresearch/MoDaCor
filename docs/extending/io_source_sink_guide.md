@@ -43,6 +43,7 @@ examples are:
 
 - `src/modacor/io/csv/csv_sink.py`
 - `src/modacor/io/hdf/hdf_processing_sink.py`
+- `src/modacor/io/tiled/tiled_sink.py`
 
 ## Registration paths
 
@@ -58,8 +59,8 @@ There are three supported ways to add sources or sinks:
 
 The shared CLI/runtime builder currently supports:
 
-- source types: `hdf`, `yaml`, `csv`, and `custom`
-- sink types: `csv`, `hdf`, `hdf_processing`, and `custom`
+- source types: `hdf`, `yaml`, `csv`, `buffer`, `tiled`, and `custom`
+- sink types: `csv`, `hdf`, `hdf_processing`, `buffer`, `plotly_json`, `tiled`, and `custom`
 
 For `custom` sources or sinks, trusted/local builders can use
 `kwargs.class_path` with the fully qualified class import path. Runtime services
@@ -111,3 +112,57 @@ Current examples include:
   `NotImplementedError` rather than silently guessing.
 - Reuse the existing registry and runtime-support helpers instead of creating a
   parallel configuration path.
+
+## Tiled source and sink
+
+Install the optional client with `pip install 'modacor[tiled]'`. Both
+`modacor.io.tiled.TiledSource` and `modacor.io.tiled.TiledSink` accept a Tiled
+URL, `profile:profile-name`, or an existing client via `root_node=client`.
+The runtime builders accept `type: tiled` and preserve the URL. Connection
+options, including authentication, go in `connection_kwargs` inside
+`iosource_method_kwargs` or `iosink_method_kwargs` (or runtime `kwargs`).
+See the [Tiled Python client reference](https://blueskyproject.io/tiled/reference/python-client.html)
+for connection and catalog methods.
+
+```python
+from modacor.io.tiled import TiledSource, TiledSink
+
+sink = TiledSink(
+    sink_reference="corrected",
+    resource_location="profile:beamline",
+    iosink_method_kwargs={"base_path": "processed"},
+)
+sink.write("run_001", processing_data, data_paths=["/sample/signal"])
+
+source = TiledSource(
+    source_reference="result",
+    resource_location="profile:beamline",
+    iosource_method_kwargs={"base_path": "processed/run_001"},
+)
+array = source.get_data("sample/signal/signal")
+units = source.get_static_metadata("sample/signal/signal@units")
+```
+
+A BaseData path such as `/sample/signal` exports its `signal`, `weights`, and
+named `uncertainties` arrays. Numeric leaf paths such as
+`/sample/signal/variances/poisson` are also supported. Units are stored in
+array metadata under `attrs.units`; nonnumeric leaves such as
+`/sample/signal/units` are stored in a metadata container and can be read with
+`get_static_metadata("sample/signal/units@value")`. Select BaseData roots or
+individual leaves; whole DataBundle roots are not supported by this sink.
+
+The sink needs a writable Tiled catalog and write credentials. It creates
+missing containers under the configured base path and rejects existing targets
+by default. Set `iosink_method_kwargs={"overwrite": True}` to update existing
+arrays with the same shape and dtype. Writes occur one array at a time and
+are not transactional; use a distinct run subpath for separate exports.
+
+The source caches full-array reads and metadata locally and returns caller-owned
+copies, so in-place processing does not modify later reads. Call
+`source.clear_cache()` after server-side updates. Explicit slices bypass the
+full-array cache. An empty key or `@attribute` resolves relative to `base_path`.
+
+Install `pip install 'modacor[tiled-tests]'` and run
+`python -m pytest tests/io/tiled` for source and sink integration tests against
+an in-process Tiled server with temporary storage. This exercises real client
+requests and serialization without an external service or listening port.

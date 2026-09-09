@@ -17,6 +17,7 @@ from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 from modacor.io.hdf.hdf_source import HDFSource
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
+from modacor.io.tiled import TiledSink, TiledSource
 from modacor.io.visualization import PlotlyJSONSink
 from modacor.io.yaml.yaml_source import YAMLSource
 
@@ -83,6 +84,7 @@ def build_source_from_spec(
         "csv": CSVSource,
         "hdf": HDFSource,
         "yaml": YAMLSource,
+        "tiled": TiledSource,
     }
 
     ref = str(spec["ref"]).strip()
@@ -116,7 +118,7 @@ def build_source_from_spec(
         )
     return source_cls(
         source_reference=ref,
-        resource_location=location,
+        resource_location=spec["location"] if issubclass(source_cls, TiledSource) else location,
         iosource_method_kwargs=kwargs.get("iosource_method_kwargs", kwargs),
     )
 
@@ -168,6 +170,7 @@ def build_sink_from_spec(
         "csv": CSVSink,
         "hdf": HDFProcessingSink,
         "hdf_processing": HDFProcessingSink,
+        "tiled": TiledSink,
         "plotly": PlotlyJSONSink,
         "plotly_json": PlotlyJSONSink,
         "visualisation": PlotlyJSONSink,
@@ -205,7 +208,7 @@ def build_sink_from_spec(
         )
     return sink_cls(
         sink_reference=ref,
-        resource_location=location,
+        resource_location=spec["location"] if issubclass(sink_cls, TiledSink) else location,
         iosink_method_kwargs=kwargs.get("iosink_method_kwargs", kwargs),
     )
 

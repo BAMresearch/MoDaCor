@@ -13,7 +13,7 @@ __status__ = "Development"  # "Development", "Production"
 
 __all__ = ["TiledSource"]
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, Optional
 
 import numpy as np
@@ -23,11 +23,7 @@ from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.io.io_source import ArraySlice
 
 from ..io_source import IoSource
-
-_TILED_IMPORT_ERROR = (
-    "TiledSource requires the 'tiled' dependency. Install the optional extra with "
-    "'pip install modacor[tiled]' or otherwise ensure 'tiled' is available."
-)
+from .connection import connect_tiled
 
 
 def _normalise_path_tokens(path: str | Sequence[str] | None) -> tuple[str, ...]:
@@ -79,7 +75,9 @@ class TiledSource(IoSource):
     Notes
     -----
     Data and metadata are cached per resolved path when retrieved without an explicit slice to reduce
-    repeated network round-trips. Sliced reads bypass the cache.
+    repeated network round-trips. Sliced reads bypass the cache. Call ``clear_cache()``
+    before reading data that has changed on the server. Empty paths refer to the
+    configured base path, including attribute keys such as ``@title``.
     """
 
     resource_location: str | dict[str, Any] | None = field(default=None)
@@ -97,11 +95,9 @@ class TiledSource(IoSource):
         self.logger = MessageHandler(level=self.logging_level, name="TiledSource")
 
         method_kwargs = dict(self.iosource_method_kwargs or {})
-        base_path_setting = (
-            method_kwargs.pop("base_item_path", None)
-            or method_kwargs.pop("base_path", None)
-            or _extract_from_mapping(self.resource_location, ("base_item_path", "base_path"))
-        )
+        base_path_setting = method_kwargs.pop(
+            "base_item_path", method_kwargs.pop("base_path", None)
+        ) or _extract_from_mapping(self.resource_location, ("base_item_path", "base_path"))
         self._base_path = _normalise_path_tokens(base_path_setting)
 
         connection_kwargs = method_kwargs.pop("connection_kwargs", {})
@@ -126,7 +122,7 @@ class TiledSource(IoSource):
 
         if load_slice is Ellipsis or load_slice is None:
             if key_path in self._data_cache:
-                return self._data_cache[key_path]
+                return np.array(self._data_cache[key_path], copy=True)
             slice_arg: Optional[ArraySlice] = None
         else:
             slice_arg = self._prepare_slice(load_slice)
@@ -140,13 +136,8 @@ class TiledSource(IoSource):
             data_obj = node.read(**read_kwargs)
         except TypeError as exc:
             if slice_arg is not None:
-                self.logger.warning(
-                    "Slice %s not supported for '%s' (%s); fetching complete dataset instead.",
-                    slice_arg,
-                    key_path,
-                    exc,
-                )
-                data_obj = node.read()
+                self.logger.warning(f"Slice {slice_arg} not supported for '{key_path}' ({exc}); slicing locally.")
+                return np.array(self._to_numpy(node.read())[slice_arg], copy=True)
             else:
                 raise
         except AttributeError as exc:
@@ -155,15 +146,16 @@ class TiledSource(IoSource):
         array = self._to_numpy(data_obj)
 
         if slice_arg is None:
-            self._data_cache[key_path] = array
-            self._update_structure_cache(key_path, array)
+            self._data_cache[key_path] = np.array(array, copy=True)
+            self._update_structure_cache(key_path, self._data_cache[key_path])
+            return np.array(self._data_cache[key_path], copy=True)
 
-        return array
+        return np.array(array, copy=True)
 
     def get_data_shape(self, data_key: str) -> tuple[int, ...]:
         key_path, _ = self._split_key(data_key)
         cached = self._structure_cache.get(key_path)
-        if cached and cached.get("shape"):
+        if cached and "shape" in cached:
             return cached["shape"]
 
         node = self._resolve_node(key_path)
@@ -199,12 +191,12 @@ class TiledSource(IoSource):
     def get_data_attributes(self, data_key: str) -> dict[str, Any]:
         key_path, _ = self._split_key(data_key)
         if key_path in self._attribute_cache:
-            return self._attribute_cache[key_path]
+            return dict(self._attribute_cache[key_path])
 
         node = self._resolve_node(key_path)
         attributes = self._extract_attributes(node)
-        self._attribute_cache[key_path] = attributes
-        return attributes
+        self._attribute_cache[key_path] = dict(attributes)
+        return dict(attributes)
 
     def get_static_metadata(self, data_key: str) -> Any:
         key_path, attribute = self._split_key(data_key)
@@ -221,56 +213,7 @@ class TiledSource(IoSource):
     # ------------------------------------------------------------------
 
     def _connect(self, resource_location: str | dict[str, Any] | None, connection_kwargs: dict[str, Any]) -> Any:
-        if resource_location is None:
-            return None
-
-        # Import within the method to keep the module importable without tiled installed
-        try:
-            from tiled.client import from_profile, from_uri
-        except ImportError as exc:  # noqa: PERF203 - explicit, user-facing error message
-            self.logger.error(_TILED_IMPORT_ERROR)
-            raise ImportError(_TILED_IMPORT_ERROR) from exc
-
-        if isinstance(resource_location, dict):
-            location_map = dict(resource_location)
-            explicit_client = location_map.pop("client", None) or location_map.pop("node", None)
-            if explicit_client is not None:
-                return explicit_client
-
-            extra_kwargs = location_map.pop("kwargs", {}) or location_map.pop("connection_kwargs", {})
-            if extra_kwargs and not isinstance(extra_kwargs, dict):
-                raise TypeError("kwargs/connection_kwargs in resource_location must be a dictionary if provided.")
-            merged_kwargs = {**(extra_kwargs or {}), **connection_kwargs}
-
-            if "uri" in location_map:
-                return from_uri(location_map["uri"], **merged_kwargs)
-            if "from_uri" in location_map:
-                return from_uri(location_map["from_uri"], **merged_kwargs)
-            if "profile" in location_map:
-                return from_profile(location_map["profile"], **merged_kwargs)
-            if "from_profile" in location_map:
-                return from_profile(location_map["from_profile"], **merged_kwargs)
-
-            if not location_map:
-                raise ValueError("resource_location mapping did not contain a recognised connection descriptor.")
-            raise ValueError(
-                f"Unsupported keys in resource_location mapping for TiledSource: {', '.join(sorted(location_map))}"
-            )
-
-        if not isinstance(resource_location, str):
-            raise TypeError("resource_location must be a string, mapping, or None.")
-
-        location_str = resource_location.strip()
-        merged_kwargs = dict(connection_kwargs)
-
-        if location_str.startswith("profile://"):
-            profile_name = location_str[len("profile://") :]
-            return from_profile(profile_name, **merged_kwargs)
-        if location_str.startswith("profile:"):
-            profile_name = location_str.split(":", 1)[1]
-            return from_profile(profile_name, **merged_kwargs)
-
-        return from_uri(location_str, **merged_kwargs)
+        return connect_tiled(resource_location, connection_kwargs)
 
     def _split_key(self, data_key: str) -> tuple[str, Optional[str]]:
         if "@" in data_key:
@@ -279,9 +222,6 @@ class TiledSource(IoSource):
         return data_key.strip(), None
 
     def _resolve_node(self, data_key: str) -> Any:
-        if data_key == "":
-            return self._root_node
-
         tokens = self._base_path + _normalise_path_tokens(data_key)
         cache_key = "/".join(tokens)
         if cache_key in self._node_cache:
@@ -296,6 +236,13 @@ class TiledSource(IoSource):
 
         self._node_cache[cache_key] = node
         return node
+
+    def clear_cache(self) -> None:
+        """Discard locally cached reads before reading data changed on the server."""
+        self._node_cache.clear()
+        self._data_cache.clear()
+        self._attribute_cache.clear()
+        self._structure_cache.clear()
 
     def _prepare_slice(self, load_slice: ArraySlice) -> ArraySlice:
         if isinstance(load_slice, tuple):
@@ -355,6 +302,9 @@ class TiledSource(IoSource):
 
         structure = self._call_structure(node)
         if structure is not None:
+            dtype_attr = getattr(structure, "data_type", None)
+            if dtype_attr is not None and callable(getattr(dtype_attr, "to_numpy_dtype", None)):
+                return dtype_attr.to_numpy_dtype()
             dtype_attr = getattr(structure, "dtype", None)
             if dtype_attr is not None:
                 try:
@@ -366,14 +316,14 @@ class TiledSource(IoSource):
     def _extract_attributes(self, node: Any) -> dict[str, Any]:
         attributes: dict[str, Any] = {}
         metadata = getattr(node, "metadata", None)
-        if isinstance(metadata, dict):
-            if isinstance(metadata.get("attrs"), dict):
+        if isinstance(metadata, Mapping):
+            if isinstance(metadata.get("attrs"), Mapping):
                 attributes.update(metadata["attrs"])
             else:
                 attributes.update(metadata)
 
         attrs_obj = getattr(node, "attrs", None)
-        if isinstance(attrs_obj, dict):
+        if isinstance(attrs_obj, Mapping):
             attributes.update(attrs_obj)
 
         return attributes
@@ -389,7 +339,7 @@ class TiledSource(IoSource):
             try:
                 return structure()
             except Exception as exc:  # noqa: BLE001
-                self.logger.debug("Failed to obtain structure for node %s: %s", node, exc)
+                self.logger.debug(f"Failed to obtain structure: {exc}")
                 return None
         return None
 

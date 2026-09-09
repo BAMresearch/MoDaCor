@@ -310,6 +310,20 @@ def test_cli_session_set_sample_calls_shortcut_endpoint(monkeypatch, tmp_path: P
     assert captured["payload"]["type"] == "hdf"
 
 
+def test_cli_session_set_sample_preserves_tiled_url(monkeypatch):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):  # noqa: ARG001
+        captured["payload"] = payload
+        return {"source": {"ref": "sample"}}
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    url = "https://tiled.example/api/v1"
+
+    assert main(["session", "set-sample", "--session-id", "s1", "--type", "tiled", "--location", url]) == 0
+    assert captured["payload"]["location"] == url
+
+
 def test_cli_session_set_sink_calls_api(monkeypatch, tmp_path: Path):
     captured = {}
 
@@ -348,6 +362,33 @@ def test_cli_session_set_sink_calls_api(monkeypatch, tmp_path: Path):
             "kwargs": {"delimiter": ","},
         }
     ]
+
+
+@pytest.mark.parametrize(("kind", "endpoint"), [("set-source", "sources"), ("set-sink", "sinks")])
+def test_cli_session_registration_preserves_tiled_url(monkeypatch, kind: str, endpoint: str):
+    captured = {}
+
+    def fake_http(base_url, method, path, payload=None):  # noqa: ARG001
+        captured["payload"] = payload
+        return {}
+
+    monkeypatch.setattr("modacor.cli._http_request_json", fake_http)
+    url = "https://tiled.example/api/v1"
+    args = [
+        "session",
+        kind,
+        "--session-id",
+        "s1",
+        "--ref",
+        "catalog",
+        "--type",
+        "tiled",
+        "--location",
+        url,
+    ]
+
+    assert main(args) == 0
+    assert captured["payload"][endpoint][0]["location"] == url
 
 
 def test_cli_session_delete_sink_calls_api(monkeypatch):

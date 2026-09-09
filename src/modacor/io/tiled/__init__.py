@@ -11,6 +11,7 @@ __date__ = "20/01/2026"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-__all__ = ["TiledSource"]
+__all__ = ["TiledSource", "TiledSink"]
 
+from .tiled_sink import TiledSink
 from .tiled_source import TiledSource
