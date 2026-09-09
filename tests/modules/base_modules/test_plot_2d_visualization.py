@@ -56,13 +56,15 @@ def test_plot_2d_visualization_publishes_first_frame_for_higher_rank_data():
     assert payload["metadata"]["finite_pixels"] == 11
     assert payload["metadata"]["positive_pixels"] == 10
     assert payload["metadata"]["color_scale"]["scale"] == "log10"
-    assert payload["metadata"]["color_scale"]["source_zmin"] == 1.0
+    assert payload["metadata"]["color_scale"]["source_zmin"] == pytest.approx(1.45)
     assert payload["metadata"]["color_scale"]["source_zmax"] == pytest.approx(10.91)
+    assert payload["metadata"]["color_scale"]["auto_zmin_percentile"] == 5.0
+    assert payload["metadata"]["color_scale"]["auto_zmax_percentile"] == 99.0
     assert payload["data"][0]["colorscale"] == "Plasma"
     assert payload["metadata"]["colormap"] == "Plasma"
     assert payload["data"][0]["z"][0] == [None, 0.0, pytest.approx(np.log10(2.0)), pytest.approx(np.log10(3.0))]
     assert payload["data"][0]["z"][1][2] is None
-    assert payload["data"][0]["zmin"] == 0.0
+    assert payload["data"][0]["zmin"] == pytest.approx(np.log10(1.45))
     assert payload["data"][0]["zmax"] == pytest.approx(np.log10(10.91))
     assert payload["layout"]["yaxis"]["autorange"] == "reversed"
     assert payload["layout"]["uirevision"] == "plots::detector"
@@ -89,3 +91,96 @@ def test_plot_2d_visualization_accepts_colormap_configuration():
     payload = store.get_metadata("s1", "sink", "plots", "detector")
     assert payload["data"][0]["colorscale"] == "Cividis"
     assert payload["metadata"]["colormap"] == "Cividis"
+
+
+def test_plot_2d_visualization_uses_configured_lower_and_upper_percentiles():
+    processing = ProcessingData()
+    sample = DataBundle()
+    sample["image"] = BaseData(
+        signal=np.array([[np.nan, -100.0, 0.0], [10.0, 20.0, 1000.0]]),
+        units=ureg.Unit("count"),
+        rank_of_data=2,
+    )
+    processing["sample"] = sample
+    store = RuntimeBufferStore()
+
+    step = Plot2DVisualization(processing_data=processing, io_sinks=_sinks(store), step_id="plot2d")
+    step.modify_config_by_dict(
+        {
+            "target": "plots::detector",
+            "data_path": "/sample/image",
+            "scale": "linear",
+            "auto_zmin_percentile": 20.0,
+            "auto_zmax_percentile": 80.0,
+        }
+    )
+
+    step.calculate()
+
+    payload = store.get_metadata("s1", "sink", "plots", "detector")
+    assert payload["data"][0]["zmin"] == pytest.approx(-20.0)
+    assert payload["data"][0]["zmax"] == pytest.approx(216.0)
+    assert payload["metadata"]["color_scale"] == {
+        "scale": "linear",
+        "auto_zmin_percentile": 20.0,
+        "auto_zmax_percentile": 80.0,
+    }
+
+
+def test_plot_2d_visualization_excludes_masked_values_from_auto_range():
+    processing = ProcessingData()
+    processing["sample"] = DataBundle(
+        image=BaseData(
+            signal=np.ma.array(
+                [[1.0, 2.0], [1000.0, 4.0]],
+                mask=[[False, False], [True, False]],
+            ),
+            units=ureg.Unit("count"),
+            rank_of_data=2,
+        )
+    )
+    store = RuntimeBufferStore()
+    step = Plot2DVisualization(processing_data=processing, io_sinks=_sinks(store), step_id="plot2d")
+    step.modify_config_by_dict(
+        {
+            "target": "plots::detector",
+            "data_path": "/sample/image",
+            "scale": "linear",
+            "auto_zmin_percentile": 0.0,
+            "auto_zmax_percentile": 100.0,
+        }
+    )
+
+    step.calculate()
+
+    payload = store.get_metadata("s1", "sink", "plots", "detector")
+    assert payload["data"][0]["zmin"] == 1.0
+    assert payload["data"][0]["zmax"] == 4.0
+    assert payload["data"][0]["z"][1][0] is None
+    assert payload["metadata"]["finite_pixels"] == 3
+
+
+@pytest.mark.parametrize(
+    ("configuration", "message"),
+    [
+        ({"auto_zmin_percentile": -1.0}, "auto_zmin_percentile"),
+        ({"auto_zmin_percentile": 100.0}, "auto_zmin_percentile"),
+        ({"auto_zmax_percentile": 0.0}, "auto_zmax_percentile"),
+        (
+            {"auto_zmin_percentile": 90.0, "auto_zmax_percentile": 10.0},
+            "must be below",
+        ),
+    ],
+)
+def test_plot_2d_visualization_rejects_invalid_percentiles(configuration, message):
+    processing = ProcessingData()
+    processing["sample"] = DataBundle(image=BaseData(signal=np.ones((2, 2)), units=ureg.Unit("count"), rank_of_data=2))
+    step = Plot2DVisualization(
+        processing_data=processing,
+        io_sinks=_sinks(RuntimeBufferStore()),
+        step_id="plot2d",
+    )
+    step.modify_config_by_dict({"target": "plots::detector", "data_path": "/sample/image", **configuration})
+
+    with pytest.raises(ValueError, match=message):
+        step.calculate()
