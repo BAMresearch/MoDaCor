@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v1.7.0 (2026-09-09)
+
+### Bug fixes
+
+* fix: small enhancement in the 2D plotting to allow lower percentile to be set too ([`93448bc`](https://github.com/BAMresearch/MoDaCor/commit/93448bc67f1b4994b5b25715f6fc622d77e30ae2))
+
+### Enh
+
+* enh: reorganistion of methods for clarity ([`b5da736`](https://github.com/BAMresearch/MoDaCor/commit/b5da7365638da353394cbfed0837b0caf50c9632))
+
+* enh: improved uncertatinties handling in capillary sample container correction ([`43db304`](https://github.com/BAMresearch/MoDaCor/commit/43db3042fa32566e00f24c8e5a65b253d810f503))
+
+* enh: this is how much it takes to add capillary-sample corrections ([`cd18d38`](https://github.com/BAMresearch/MoDaCor/commit/cd18d38b2cdae6cbb9bb123f2e9ab4410928454f))
+
 ## v1.6.0 (2026-09-09)
 
 ### Enh
