@@ -24,12 +24,14 @@ from modacor.models.attenuation import (
     beam_chord_quadrature,
     direct_beam_transmission,
 )
+from modacor.models.uncertainty import (
+    combine_uncertainty_component,
+    nominal_and_finite_difference,
+    uncertainties_from_derivative,
+)
 from modacor.modules.helpers import get_first_present
 from modacor.modules.technique_modules.scattering.capillary_self_absorption_correction import (
     CapillarySelfAbsorptionCorrection,
-    _add_uncertainty_component,
-    _nominal_and_derivative,
-    _uncertainties_from_derivative,
 )
 
 _ARGUMENTS = deepcopy(CapillarySelfAbsorptionCorrection.documentation.arguments)
@@ -323,7 +325,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             - numerator * sample_factor_mu_derivative / sample_factor**2
         )
         for name, uncertainty in sample_mu_uncertainties.items():
-            _add_uncertainty_component(
+            combine_uncertainty_component(
                 corrected.uncertainties,
                 name,
                 np.abs(corrected_mu_derivative) * uncertainty,
@@ -409,7 +411,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             active=active,
             incident_direction=incident_direction,
         )
-        sample_factor, sample_factor_mu_derivative = _nominal_and_derivative(
+        sample_factor, sample_factor_mu_derivative = nominal_and_finite_difference(
             sample_factor_values, mu_delta, central_mu_difference
         )
         filled_rows = (
@@ -434,7 +436,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         if mu_delta is None:
             wall_filled_mu_derivative = None
         else:
-            _wall_nominal, wall_filled_mu_derivative = _nominal_and_derivative(
+            _wall_nominal, wall_filled_mu_derivative = nominal_and_finite_difference(
                 np.concatenate((wall_factors[:1], wall_factors[2:])),
                 mu_delta,
                 central_mu_difference,
@@ -454,10 +456,10 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
 
         rank = min(filled_signal.rank_of_data, sample_factor.ndim)
 
-        sample_factor_uncertainties = _uncertainties_from_derivative(
+        sample_factor_uncertainties = uncertainties_from_derivative(
             sample_factor_mu_derivative, resolved_sample_mu.uncertainties
         )
-        wall_filled_uncertainties = _uncertainties_from_derivative(
+        wall_filled_uncertainties = uncertainties_from_derivative(
             wall_filled_mu_derivative, resolved_sample_mu.uncertainties
         )
         wall_scale_uncertainties = {
@@ -509,10 +511,10 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             filled_transmission = filled_transmission_values[0]
             filled_transmission_mu_derivative = None
         else:
-            filled_transmission, filled_transmission_mu_derivative = _nominal_and_derivative(
+            filled_transmission, filled_transmission_mu_derivative = nominal_and_finite_difference(
                 filled_transmission_values, mu_delta, central_mu_difference
             )
-        filled_transmission_uncertainties = _uncertainties_from_derivative(
+        filled_transmission_uncertainties = uncertainties_from_derivative(
             filled_transmission_mu_derivative, resolved_sample_mu.uncertainties
         )
 

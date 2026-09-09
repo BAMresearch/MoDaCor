@@ -21,7 +21,7 @@ from modacor.dataclasses.process_step import (
     source_refs_from_references,
 )
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
-from modacor.modules.technique_modules.scattering.material_attenuation import (
+from modacor.modules.helpers.scattering.material_attenuation import (
     material_attenuation_from_config,
     positive_cos_alpha,
     thickness_m_from_config,

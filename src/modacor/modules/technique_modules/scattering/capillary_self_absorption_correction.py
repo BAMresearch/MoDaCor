@@ -31,8 +31,12 @@ from modacor.models.attenuation import (
     image_beam_profile,
     trapezoid_beam_profile,
 )
+from modacor.models.uncertainty import (
+    combine_uncertainty_component,
+    nominal_and_finite_difference,
+)
 from modacor.modules.helpers import get_first_present
-from modacor.modules.technique_modules.scattering.material_attenuation import (
+from modacor.modules.helpers.scattering.material_attenuation import (
     scalar_in_units,
     scalar_quantity_from_config_or_source,
 )
@@ -64,32 +68,6 @@ def _rotation_radians(profile_config: dict[str, Any]) -> float:
 class _ResolvedSampleMu:
     value: float
     uncertainties: dict[str, float]
-
-
-def _add_uncertainty_component(target: dict[str, np.ndarray], name: str, values) -> None:
-    component = np.asarray(values, dtype=float)
-    if name in target:
-        component = np.hypot(target[name], component)
-    target[name] = component
-
-
-def _nominal_and_derivative(
-    values: np.ndarray, delta: float | None, central: bool
-) -> tuple[np.ndarray, np.ndarray | None]:
-    if delta is None:
-        return values, None
-    nominal = values[0]
-    if central:
-        return nominal, (values[1] - values[2]) / (2.0 * delta)
-    return nominal, (values[1] - nominal) / delta
-
-
-def _uncertainties_from_derivative(
-    derivative: np.ndarray | float | None, parameter_uncertainties: dict[str, float]
-) -> dict[str, np.ndarray]:
-    if derivative is None:
-        return {}
-    return {name: np.abs(derivative) * uncertainty for name, uncertainty in parameter_uncertainties.items()}
 
 
 class CapillarySelfAbsorptionCorrection(ProcessStep):
@@ -668,7 +646,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             calculated_transmission = calculated_transmission_values[0]
             transmission_mu_derivative = None
         else:
-            calculated_transmission, transmission_mu_derivative = _nominal_and_derivative(
+            calculated_transmission, transmission_mu_derivative = nominal_and_finite_difference(
                 calculated_transmission_values, mu_delta, central_mu_difference
             )
         measured_transmission = self._measured_transmission()
@@ -739,7 +717,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                     attenuation_values[:, active] = active_values
                 evaluated = active.copy()
 
-            attenuation, attenuation_mu_derivative = _nominal_and_derivative(
+            attenuation, attenuation_mu_derivative = nominal_and_finite_difference(
                 attenuation_values, mu_delta, central_mu_difference
             )
 
@@ -762,7 +740,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 for name, values in measured_transmission.uncertainties.items():
                     component = attenuation * np.asarray(values, dtype=float) / measured_value**2
                     component[~active] = 0.0
-                    _add_uncertainty_component(correction_uncertainties, name, component)
+                    combine_uncertainty_component(correction_uncertainties, name, component)
 
             transmission_uncertainties = {}
             if transmission_mu_derivative is not None:

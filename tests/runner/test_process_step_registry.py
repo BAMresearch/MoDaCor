@@ -80,3 +80,10 @@ def test_get_digit_named_plot_steps_with_filesystem_discovery():
 
     assert registry.get("Plot1DVisualization").__name__ == "Plot1DVisualization"
     assert registry.get("Plot2DVisualization").__name__ == "Plot2DVisualization"
+
+
+def test_deprecated_process_steps_are_not_discovered():
+    registry = ProcessStepRegistry(curated_module=None)
+
+    with pytest.raises(KeyError, match="XSGeometry"):
+        registry.get("XSGeometry")

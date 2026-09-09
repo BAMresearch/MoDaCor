@@ -25,7 +25,7 @@ from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 class SolidAngleCorrection(ProcessStep):
     """
-    Normalize a signal by a solid angle "Omega" calculated using XSGeometry
+    Normalize a signal by a solid angle "Omega" calculated by a geometry step.
     """
 
     documentation = ProcessStepDescriber(
@@ -47,7 +47,7 @@ class SolidAngleCorrection(ProcessStep):
         step_doc="Divide the pixels in a signal by their solid angle coverage",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
         step_note="""This divides the signal by the value previously calculated
-            using the XSGeometry module""",
+            using XSGeometryFromPixelCoordinates""",
     )
 
     def calculate(self) -> dict[str, DataBundle]:

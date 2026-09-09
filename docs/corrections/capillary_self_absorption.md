@@ -441,7 +441,9 @@ does not guess the input state from numeric values.
 
 Measured-transmission uncertainties configured through
 `transmission_uncertainties_sources` are propagated through the residual
-divisor and into the corrected signal. Uncertainties in $\mu$, radius, wall
+divisor and into the corrected signal. Sample-$\mu$ uncertainty derived from
+uncertain phase transmission/absorption and thickness is also propagated as
+described below. Uncertainties on a directly specified $\mu$, radius, wall
 thickness, detector geometry, and beam-profile calibration are not yet
 propagated by this process step.
 

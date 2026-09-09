@@ -1,7 +1,8 @@
 # Capillary self-absorption and container correction
 
-Status: staged implementation; Stage 1 geometry kernel complete and Stage 2
-numerical prototype substantially implemented.
+Status: staged implementation; Stages 1--5 have working implementations and
+tests, while their measured-data/convergence gates and Stage 6 performance
+hardening remain open.
 
 For configuration and operational guidance, see
 [Capillary sample self-absorption correction](../corrections/capillary_self_absorption.md).
@@ -10,16 +11,16 @@ Implementation progress:
 
 - Stage 1 completed on 2026-09-06 in
   `modacor.geometry.cylinders.ConcentricCylinderGeometry`.
-- Stage 2 is in progress: the detector-driven point-ray attenuation integrator
+- Stage 2 is implemented: the detector-driven point-ray attenuation integrator
   and uniform cross-section reference quadrature, beam-ray/chord quadrature,
   separate direct-transmission integral, and adaptive detector-grid evaluator
   are implemented in `modacor.models.attenuation.concentric_cylinder`.
-- Stage 3 is in progress: the general phase-origin API now calculates sample-
+- Stage 3 is implemented: the general phase-origin API calculates sample-
   and wall-origin factors with attenuation through every concentric phase.
-- Stage 4 is in progress: common normalized quadrature adapters for measured
+- Stage 4 is implemented: common normalized quadrature adapters for measured
   images, rotated 2D Gaussian profiles, and four-ramp 2D trapezoidal profiles
   are implemented in `modacor.models.attenuation.beam_profiles`.
-- Stage 5 is in progress: both the sample-origin
+- Stage 5 is implemented pending its measured-data stage gate: both the sample-origin
   `CapillarySelfAbsorptionCorrection` and attenuation-aware filled/empty
   `CapillarySampleContainerCorrection` process steps are implemented with
   their respective input contracts.
@@ -49,6 +50,7 @@ src/modacor/
 │   ├── cylinders.py
 │   └── frames.py
 ├── models/
+│   ├── uncertainty.py
 │   └── attenuation/
 │       ├── flat_plate.py
 │       ├── concentric_cylinder.py
@@ -57,6 +59,10 @@ src/modacor/
 │   └── nexus/
 │       └── geometry.py
 └── modules/
+    ├── helpers/
+    │   └── scattering/
+    │       ├── detector_data.py
+    │       └── material_attenuation.py
     └── technique_modules/
         └── scattering/
             └── capillary_sample_container_correction.py
@@ -69,19 +75,24 @@ ray, transform, and frame operations belong here.
 
 `modacor.models.attenuation` combines path lengths with material attenuation
 and numerical quadrature. Beer--Lambert integrals and their derivatives belong
-to this layer, not to pure geometry. The flat-plate numerical formula should
-eventually move here while its `ProcessStep` remains in the modules package.
+to this layer, not to pure geometry. The flat-plate numerical formula is kept
+here while its `ProcessStep` remains in the modules package. Generic numerical
+sensitivity helpers are in `modacor.models.uncertainty`.
 
 The NeXus hierarchical geometry resolver is split by responsibility. Pure
-affine transforms and format-independent frames belong in `modacor.geometry`;
-traversal of `depends_on`, NeXus attributes, source references, and units
-belongs in `modacor.io.nexus.geometry`. Compatibility imports should preserve
-current callers while this later refactor is performed.
+affine transforms belong in `modacor.geometry`; traversal of `depends_on`,
+NeXus attributes, source references, and units belongs in
+`modacor.io.nexus.geometry`. A compatibility import at the former module path
+is intentionally not retained because MoDaCor is not yet committed to that
+internal API.
 
 Pipeline modules remain responsible for configuration validation, source and
 `BaseData` loading, dependency contracts, uncertainty attachment, provenance,
 and modifying processing bundles. Neither geometry nor attenuation models may
-depend back on that pipeline layer.
+depend back on that pipeline layer. Detector-coordinate and material-source
+`BaseData` adapters therefore live under `modacor.modules.helpers.scattering`.
+The former `geometry_helpers`, `detector_data_helpers`, and
+`material_attenuation` module paths are intentionally not retained.
 
 ## Scope
 
@@ -598,9 +609,11 @@ ray tracing, including scan-shaped masks, and the filled output receives the
 three factors, wall scale, calculated transmissions, and exact-evaluation
 masks. BaseData arithmetic propagates filled- and empty-signal uncertainties.
 Synthetic raw and common-flux-normalized mixtures recover the known sample
-signal. Independent literature/brute-force validation, model-parameter
-uncertainties, and a measured-data pipeline example remain before the stage
-gate is complete.
+signal. Uncertainty in a sample coefficient derived from phase transmission or
+absorption and thickness is propagated through the coupled composite result.
+Independent literature/brute-force validation, remaining geometry/profile
+parameter uncertainties, and a measured-data pipeline example remain before
+the stage gate is complete.
 
 The two wall factors use identical scattering points and detector paths, so
 the kernel evaluates their two attenuation-coefficient vectors together. The

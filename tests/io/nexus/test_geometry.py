@@ -15,7 +15,7 @@ import pytest
 
 from modacor.io.hdf.hdf_source import HDFSource
 from modacor.io.io_sources import IoSources
-from modacor.modules.base_modules.nexus_transformations import (
+from modacor.io.nexus.geometry import (
     load_nexus_detector_frame_inputs,
     resolve_nexus_transform_chain,
 )

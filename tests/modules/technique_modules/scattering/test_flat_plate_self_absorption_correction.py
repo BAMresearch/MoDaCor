@@ -11,6 +11,7 @@ from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_source import IoSource
 from modacor.io.io_sources import IoSources
+from modacor.models.attenuation import flat_plate_relative_attenuation
 from modacor.modules.technique_modules.scattering.flat_plate_self_absorption_correction import (
     FlatPlateSelfAbsorptionCorrection,
 )
@@ -91,9 +92,9 @@ def test_flat_plate_factor_matches_depth_integral():
 
 
 def test_forward_angle_and_unit_transmission_limits_are_one():
-    assert FlatPlateSelfAbsorptionCorrection._relative_attenuation(0.2, np.array([1.0]))[0] == 1.0
+    assert flat_plate_relative_attenuation(0.2, np.array([1.0]))[0] == 1.0
     np.testing.assert_array_equal(
-        FlatPlateSelfAbsorptionCorrection._relative_attenuation(1.0, np.array([1.0, 0.5])),
+        flat_plate_relative_attenuation(1.0, np.array([1.0, 0.5])),
         np.ones(2),
     )
 

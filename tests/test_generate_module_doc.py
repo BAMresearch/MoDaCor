@@ -37,7 +37,8 @@ def _expected_process_step_targets() -> set[str]:
     targets: set[str] = set()
     modules_root = PROJECT_ROOT / "src" / "modacor" / "modules"
     for py_file in sorted(modules_root.rglob("*.py")):
-        if py_file.name == "__init__.py":
+        relative_parts = py_file.relative_to(modules_root).parts
+        if py_file.name == "__init__.py" or {"deprecated", "helpers"}.intersection(relative_parts):
             continue
 
         module_name = ".".join(py_file.relative_to(PROJECT_ROOT / "src").with_suffix("").parts)

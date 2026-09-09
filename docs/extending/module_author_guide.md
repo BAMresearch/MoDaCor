@@ -5,6 +5,57 @@ from pipeline YAML, resolved by name through `modacor.modules` and the
 `ProcessStepRegistry`, and documented through their
 `ProcessStepDescriber` metadata.
 
+## Package boundaries
+
+The main distinction is whether code describes reusable mathematics, a
+scientific model, an external format, or pipeline orchestration. Dependencies
+should point in this direction:
+
+```text
+modules -> models -> geometry
+   |                   ^
+   +------> io --------+
+```
+
+The arrow means “may import”. `geometry` and `models` must not import pipeline
+modules.
+
+| Package | Put this here | Keep this out |
+| --- | --- | --- |
+| `modacor.geometry` | Unit-vector, ray/shape intersection, affine-transform, and coordinate-frame primitives whose inputs and outputs are ordinary numerical arrays | `BaseData`, `ProcessStep`, `IoSources`, NeXus/HDF5 paths, configuration keys, or attenuation coefficients |
+| `modacor.models` | Reusable scientific equations, numerical integration, sensitivity calculations, and physics kernels; for example flat-plate or concentric-cylinder attenuation | Pipeline selection, source resolution, `DataBundle` mutation, YAML semantics, or format traversal |
+| `modacor.io` | File- or protocol-specific reading and writing, metadata traversal, and adapters such as the NeXus `depends_on` resolver | Technique correction policy or pipeline mutation |
+| `modacor.modules` | `ProcessStep` classes and their configuration, dependency contracts, source resolution, units/metadata adaptation, masking, uncertainty attachment, and `ProcessingData` mutation | A reusable numerical kernel embedded as a private method merely because one step currently calls it |
+
+A useful test is whether a function can be exercised using only NumPy arrays
+and scientific parameters. Pure shape and coordinate mathematics normally
+belongs in `geometry`; a physical equation or quadrature normally belongs in
+`models`. If it needs `BaseData`, an IO source reference, or pipeline
+configuration, it belongs in the adapter or module layer.
+
+Shared code should be promoted before one process-step module imports a private
+helper from another. Mirror the source boundary in tests: `tests/geometry`,
+`tests/models`, `tests/io`, and `tests/modules` respectively.
+
+Current examples include:
+
+- `modacor.geometry.cylinders` and `modacor.geometry.transforms` for pure
+  intersections and homogeneous transforms;
+- `modacor.models.attenuation` for beam-profile quadrature and attenuation
+  factors;
+- `modacor.io.nexus.geometry` for NeXus transformation-chain traversal; and
+- `modacor.modules.helpers.scattering.detector_data` for `BaseData` preparation
+  used by detector-coordinate process steps. Those helpers remain in the
+  module layer because they adapt MoDaCor data containers rather than
+  implement geometry.
+
+Non-step implementation support belongs below `modacor.modules.helpers`, with
+technique-specific helpers in a matching subpackage such as
+`modacor.modules.helpers.scattering`. Filesystem discovery excludes every
+`helpers` and `deprecated` tree. A retired step may be kept under a
+`deprecated` package for source reference and direct tests, but it must not be
+exported from `modacor.modules` and cannot be selected by a pipeline.
+
 ## Where modules live
 
 - Put broadly reusable steps in `src/modacor/modules/base_modules/`.
@@ -15,6 +66,8 @@ from pipeline YAML, resolved by name through `modacor.modules` and the
 `src/modacor/modules/instrument_modules/DLS/I22/`.
 - Export any public step from `src/modacor/modules/__init__.py` so the curated
   registry and generated reference docs stay aligned.
+- Put shared non-step adapters under `src/modacor/modules/helpers/`, not beside
+  discoverable `ProcessStep` modules.
 
 ## Required class structure
 

@@ -18,6 +18,8 @@ from typing import Dict, Type
 
 from ..dataclasses.process_step import ProcessStep
 
+_NON_DISCOVERABLE_DIRECTORIES = frozenset({"deprecated", "helpers"})
+
 # ---------------------------------------------------------------------------
 # Name / path helpers
 # ---------------------------------------------------------------------------
@@ -29,7 +31,7 @@ def _pascal_to_snake(name: str) -> str:
 
     Examples
     --------
-    XSGeometry  -> xs_geometry
+    PixelCoordinates3D -> pixel_coordinates_3d
     Divide      -> divide
     Q2Mapper    -> q2_mapper
     Plot1DVisualization -> plot_1d_visualization
@@ -45,10 +47,10 @@ def _path_to_module_name(py_file: Path, package_root: Path) -> str:
 
     Example
     -------
-    py_file      = /.../modacor/modules/technique_modules/scattering/xs_geometry.py
+    py_file      = /.../modacor/modules/technique_modules/scattering/pixel_coordinates_3d.py
     package_root = /.../modacor
 
-    -> "modacor.modules.technique_modules.scattering.xs_geometry"
+    -> "modacor.modules.technique_modules.scattering.pixel_coordinates_3d"
     """
     rel = py_file.with_suffix("").relative_to(package_root)
     return ".".join((package_root.name, *rel.parts))
@@ -58,7 +60,8 @@ def find_module(modules_root: Path, module_name: str) -> str:
     """
     Find the fully-qualified module path for a snake_case module name.
 
-    Searches under:  modules/**/<module_name>.py
+    Searches under:  modules/**/<module_name>.py, excluding ``helpers`` and
+    ``deprecated`` package trees.
 
     Parameters
     ----------
@@ -71,7 +74,7 @@ def find_module(modules_root: Path, module_name: str) -> str:
     -------
     str
         Fully-qualified module path, e.g.
-        "modacor.modules.technique_modules.scattering.xs_geometry".
+        "modacor.modules.technique_modules.scattering.pixel_coordinates_3d".
 
     Raises
     ------
@@ -82,7 +85,11 @@ def find_module(modules_root: Path, module_name: str) -> str:
     """
     package_root = modules_root.parent  # e.g. .../modacor
 
-    candidates = [p for p in modules_root.rglob(f"{module_name}.py") if p.is_file()]
+    candidates = [
+        path
+        for path in modules_root.rglob(f"{module_name}.py")
+        if path.is_file() and not _NON_DISCOVERABLE_DIRECTORIES.intersection(path.relative_to(modules_root).parts)
+    ]
 
     if not candidates:
         raise ModuleNotFoundError(f"No module file '{module_name}.py' found under {modules_root}.")

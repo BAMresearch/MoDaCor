@@ -27,6 +27,7 @@ import numpy as np
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
+from modacor.geometry import identity_matrix4, rotation_matrix4, translation_matrix4, unit_vector3
 from modacor.io.io_sources import IoSources
 
 
@@ -85,11 +86,7 @@ def _quantity(value: Any, units: Any, target_units: str) -> float:
 
 
 def _vector3(value: Any, *, name: str) -> np.ndarray:
-    vector = np.asarray(_decode(value), dtype=float).reshape(3)
-    norm = float(np.linalg.norm(vector))
-    if norm == 0.0:
-        raise ValueError(f"{name} must be non-zero.")
-    return vector / norm
+    return unit_vector3(np.asarray(_decode(value), dtype=float).reshape(3), name=name)
 
 
 def _optional_vector3(value: Any, *, name: str) -> np.ndarray | None:
@@ -106,33 +103,6 @@ def _offset3(attrs: dict[str, Any]) -> np.ndarray:
     offset = np.asarray(_decode(attrs["offset"]), dtype=float).reshape(3)
     units = attrs.get("offset_units", attrs.get("units", "m"))
     return np.asarray(ureg.Quantity(offset, str(_decode(units))).to("m").magnitude, dtype=float)
-
-
-def _identity() -> np.ndarray:
-    return np.eye(4, dtype=float)
-
-
-def _translation(vector: np.ndarray) -> np.ndarray:
-    matrix = _identity()
-    matrix[:3, 3] = vector
-    return matrix
-
-
-def _rotation(axis: np.ndarray, angle_radians: float) -> np.ndarray:
-    x, y, z = axis
-    c = float(np.cos(angle_radians))
-    s = float(np.sin(angle_radians))
-    c1 = 1.0 - c
-    matrix = _identity()
-    matrix[:3, :3] = np.array(
-        [
-            [c + x * x * c1, x * y * c1 - z * s, x * z * c1 + y * s],
-            [y * x * c1 + z * s, c + y * y * c1, y * z * c1 - x * s],
-            [z * x * c1 - y * s, z * y * c1 + x * s, c + z * z * c1],
-        ],
-        dtype=float,
-    )
-    return matrix
 
 
 def _normalise_path(path: str) -> str:
@@ -181,15 +151,15 @@ def _transform_matrix(value: Any, attrs: dict[str, Any], *, path: str) -> np.nda
         vector = _optional_vector3(attrs.get("vector", [0.0, 0.0, 1.0]), name=f"{path}@vector")
         if vector is None:
             if distance == 0.0:
-                return _identity()
+                return identity_matrix4()
             raise ValueError(f"{path}@vector must be non-zero.")
-        return _translation(distance * vector)
+        return translation_matrix4(distance * vector)
 
     if transform_type == "rotation":
         vector = _vector3(attrs.get("vector", [0.0, 0.0, 1.0]), name=f"{path}@vector")
         offset = _offset3(attrs)
         angle = _quantity(value, attrs.get("units", "radian"), "radian")
-        return _translation(offset) @ _rotation(vector, angle) @ _translation(-offset)
+        return translation_matrix4(offset) @ rotation_matrix4(vector, angle) @ translation_matrix4(-offset)
 
     raise ValueError(
         f"Unsupported NeXus transformation_type {transform_type!r} at {path!r}; "
@@ -229,7 +199,7 @@ def resolve_nexus_transform_chain(
         )
 
     paths = tuple(reversed(reverse_paths))
-    matrix = _identity()
+    matrix = identity_matrix4()
     for path in paths:
         matrix = matrix @ _transform_matrix(
             _data(io_sources, source_reference, path),

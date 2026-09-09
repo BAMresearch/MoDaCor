@@ -49,6 +49,14 @@ python -m sphinx -E -b html docs dist/docs
 ## Review points
 
 - Keep `modacor.modules.__all__` aligned with the intended public step surface.
+- Keep package dependencies one-way: modules may use models, geometry, and IO;
+  models may use geometry; geometry must remain format- and pipeline-independent.
+- Promote reusable mathematics out of `ProcessStep` methods, and do not import
+  private helpers from one process-step module into another.
+- Keep non-step pipeline adapters under `modacor.modules.helpers`; keep retired
+  steps under `deprecated` and out of `modacor.modules.__all__`.
+- Keep NeXus/HDF5 traversal in `modacor.io`, even when the values it resolves
+  ultimately describe geometry.
 - Keep CLI and runtime-service paths aligned when they share request or IO
   behavior.
 - Preserve docstrings and type hints when simplifying code.

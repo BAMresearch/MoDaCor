@@ -29,13 +29,13 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
-from modacor.modules.base_modules.nexus_transformations import load_nexus_detector_frame_inputs
+from modacor.geometry import unit_vector3
+from modacor.io.nexus.geometry import load_nexus_detector_frame_inputs
 from modacor.modules.helpers import attach_prepared_data, normalize_str_list
-from modacor.modules.technique_modules.scattering.geometry_helpers import (
+from modacor.modules.helpers.scattering.detector_data import (
     detector_index_basedata,
     prepare_static_scalar,
     require_scalar,
-    unit_vec3,
 )
 
 logger = MessageHandler(name=__name__)
@@ -287,9 +287,9 @@ class PixelCoordinates3D(ProcessStep):
             uncertainty_key="pixel_pitch_jitter",
         )  # scalar length
 
-        e_fast = unit_vec3(self.configuration.get("basis_fast", (1.0, 0.0, 0.0)), name="basis_fast")
-        e_slow = unit_vec3(self.configuration.get("basis_slow", (0.0, 1.0, 0.0)), name="basis_slow")
-        e_norm = unit_vec3(self.configuration.get("basis_normal", (0.0, 0.0, 1.0)), name="basis_normal")
+        e_fast = unit_vector3(self.configuration.get("basis_fast", (1.0, 0.0, 0.0)), name="basis_fast")
+        e_slow = unit_vector3(self.configuration.get("basis_slow", (0.0, 1.0, 0.0)), name="basis_slow")
+        e_norm = unit_vector3(self.configuration.get("basis_normal", (0.0, 0.0, 1.0)), name="basis_normal")
 
         return CanonicalDetectorFrame(
             det_coord_z=det_coord_z,
@@ -309,19 +309,6 @@ class PixelCoordinates3D(ProcessStep):
     @staticmethod
     def _detector_shape(signal_bd: BaseData, RoD: int) -> Tuple[int, ...]:
         return () if RoD <= 0 else tuple(signal_bd.signal.shape[-RoD:])
-
-    @staticmethod
-    def _require_scalar(name: str, bd: BaseData) -> None:
-        if np.size(bd.signal) != 1:
-            raise ValueError(f"{name} must be scalar (size==1). Got shape={np.shape(bd.signal)}.")
-
-    @staticmethod
-    def _unit(v: np.ndarray | Tuple[float, float, float]) -> np.ndarray:
-        v = np.asarray(v, dtype=float).reshape(3)
-        n = float(np.linalg.norm(v))
-        if n == 0.0:
-            raise ValueError("basis vector must be non-zero")
-        return v / n
 
     # ----------------------------
     # broadcast-friendly detector indices (center-of-element convention)
@@ -368,8 +355,8 @@ class PixelCoordinates3D(ProcessStep):
         pitch_fast = require_scalar("pixel_pitch_fast", frame.pixel_pitch_fast)
         pitch_slow = require_scalar("pixel_pitch_slow", frame.pixel_pitch_slow)
 
-        e_fast = unit_vec3(frame.e_fast, name="e_fast")
-        e_slow = unit_vec3(frame.e_slow, name="e_slow")
+        e_fast = unit_vector3(frame.e_fast, name="e_fast")
+        e_slow = unit_vector3(frame.e_slow, name="e_slow")
         # e_normal kept for future tilt support
 
         # RoD==0: no detector axes, just return the detector origin position as scalars

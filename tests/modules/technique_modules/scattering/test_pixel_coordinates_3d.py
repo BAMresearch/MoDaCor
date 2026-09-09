@@ -21,7 +21,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.hdf.hdf_source import HDFSource
 from modacor.io.io_sources import IoSources
-from modacor.modules.technique_modules.scattering.geometry_helpers import prepare_static_scalar
+from modacor.modules.helpers.scattering.detector_data import prepare_static_scalar
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import CanonicalDetectorFrame, PixelCoordinates3D
 
 # ----------------------------

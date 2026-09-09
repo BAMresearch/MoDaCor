@@ -11,21 +11,13 @@ __date__ = "06/01/2026"
 __status__ = "Development"  # "Development", "Production"
 
 __version__ = "20260106.1"
-__all__ = ["unit_vec3", "require_scalar", "prepare_static_scalar", "detector_index_basedata"]
-
-from typing import Tuple
+__all__ = ["require_scalar", "prepare_static_scalar", "detector_index_basedata"]
 
 import numpy as np
 import pint
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
-from modacor.geometry import unit_vector3
-
-
-def unit_vec3(v: Tuple[float, float, float] | np.ndarray, *, name: str = "vector") -> np.ndarray:
-    """Compatibility wrapper for :func:`modacor.geometry.unit_vector3`."""
-    return unit_vector3(np.asarray(v, dtype=float).reshape(3), name=name)
 
 
 def require_scalar(name: str, bd: BaseData) -> BaseData:

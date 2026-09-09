@@ -5,6 +5,9 @@ codebase:
 
 - `ProcessStep` subclasses under `src/modacor/modules/...` for pipeline
   computation.
+- reusable, format-independent geometry primitives under
+  `src/modacor/geometry/...`.
+- reusable scientific and numerical models under `src/modacor/models/...`.
 - `IoSource` and `IoSink` subclasses under `src/modacor/io/...` for external
   data access and export.
 - the contributor workflow expected for tests, linting, and docs updates.

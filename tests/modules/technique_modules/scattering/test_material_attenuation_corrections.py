@@ -13,13 +13,13 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
-from modacor.modules.technique_modules.scattering.attenuator_plate_correction import AttenuatorPlateCorrection
-from modacor.modules.technique_modules.scattering.detector_efficiency_correction import DetectorEfficiencyCorrection
-from modacor.modules.technique_modules.scattering.material_attenuation import (
+from modacor.modules.helpers.scattering.material_attenuation import (
     HC_KEV_ANGSTROM,
     _decode_scalar,
     energy_kev_from_config_or_wavelength,
 )
+from modacor.modules.technique_modules.scattering.attenuator_plate_correction import AttenuatorPlateCorrection
+from modacor.modules.technique_modules.scattering.detector_efficiency_correction import DetectorEfficiencyCorrection
 
 
 def _processing_data() -> ProcessingData:
