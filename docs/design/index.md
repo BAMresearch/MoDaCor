@@ -12,4 +12,8 @@ io-sink-runtime-api
 pixel-unit-removal
 architecture-upgrade-plan
 tiled-io-upgrade
+chunked-processing-handoff
+chunked-operation
+chunked-sink-implementation-plan
+external-parallel-runner
 ```
