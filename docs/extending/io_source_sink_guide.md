@@ -69,8 +69,10 @@ The shared CLI/runtime builder currently supports:
 - sink types: `csv`, `hdf`, `hdf_chunked`, `hdf_processing`, `buffer`,
   `plotly_json`, `tiled`, and `custom`
 
-`hdf_chunked` is currently a programmatic, signal-only lifecycle. The runtime
-builder can construct it, but the server endpoints that coordinate its
+`hdf_chunked` currently provides the complete programmatic `BaseData`
+lifecycle, including weights, uncertainties, and static or batch-dependent
+axes. Destination selections must currently be contiguous. The runtime builder
+can construct it, but the server endpoints that coordinate its
 initialize/write/finalize operations are not implemented yet; track that work
 in `docs/design/chunked-sink-implementation-plan.md`.
 

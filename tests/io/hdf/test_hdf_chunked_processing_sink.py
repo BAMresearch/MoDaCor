@@ -20,6 +20,7 @@ from modacor.io.chunking import (
     ChunkPlacement,
     ChunkPlan,
     ChunkSpec,
+    PlacementBinding,
     UnsupportedSinkCapability,
 )
 from modacor.io.hdf import HDFChunkedProcessingSink, HDFProcessingSink
@@ -218,9 +219,9 @@ def test_hdf_chunked_sink_rejects_overlap_and_conflicting_retry(tmp_path: Path):
         )
 
 
-def test_hdf_chunked_sink_rejects_non_signal_components(tmp_path: Path):
+def test_hdf_chunked_sink_rejects_unknown_components(tmp_path: Path):
     signal = ChunkArrayLayout(component="signal", final_shape=(2,), dtype="float64")
-    weights = ChunkArrayLayout(component="weights", final_shape=(2,), dtype="float64")
+    unknown = ChunkArrayLayout(component="metadata/value", final_shape=(2,), dtype="float64")
     plan = ChunkPlan(
         schema_version="1.0",
         plan_id="unsupported-components",
@@ -233,13 +234,393 @@ def test_hdf_chunked_sink_rejects_non_signal_components(tmp_path: Path):
                 destination_path="sample/signal",
                 units="count",
                 rank_of_data=1,
-                arrays=(signal, weights),
+                arrays=(signal, unknown),
             ),
         ),
     )
 
-    with pytest.raises(NotImplementedError, match="signal arrays only"):
+    with pytest.raises(ValueError, match="Unsupported chunk array component"):
         HDFChunkedProcessingSink(resource_location=tmp_path / "out.h5").initialize_chunked("run", plan)
+
+
+def _complete_plan() -> ChunkPlan:
+    return ChunkPlan(
+        schema_version="1.0",
+        plan_id="complete-basedata",
+        total_chunks=3,
+        expected_chunk_ids=("c0", "c1", "c2"),
+        outputs=(
+            ChunkOutputLayout(
+                output_id="corrected_signal",
+                processing_path="/sample/signal",
+                destination_path="sample/signal",
+                units="count",
+                rank_of_data=1,
+                arrays=(
+                    ChunkArrayLayout(component="signal", final_shape=(5, 3), dtype="float32"),
+                    ChunkArrayLayout(
+                        component="weights",
+                        final_shape=(5, 3),
+                        dtype="float32",
+                        placement_binding=PlacementBinding(kind="broadcast"),
+                    ),
+                    ChunkArrayLayout(
+                        component="uncertainties/poisson",
+                        final_shape=(5, 3),
+                        dtype="float32",
+                    ),
+                    ChunkArrayLayout(
+                        component="uncertainties/calibration",
+                        final_shape=(5, 3),
+                        dtype="float32",
+                    ),
+                    ChunkArrayLayout(
+                        component="axes/frame",
+                        final_shape=(5,),
+                        dtype="float64",
+                        placement_binding=PlacementBinding(kind="axis_map", axis_map=(0,)),
+                        units=str(ureg.Unit("second")),
+                        rank_of_data=1,
+                    ),
+                    ChunkArrayLayout(
+                        component="axes/Q",
+                        final_shape=(3,),
+                        dtype="float64",
+                        placement_binding=PlacementBinding(kind="static"),
+                        units=str(ureg.Unit("1/nm")),
+                        rank_of_data=1,
+                    ),
+                ),
+                axis_names=("frame", "Q"),
+            ),
+        ),
+        driver={"full_shape": [5, 3]},
+        batch_axes=(0,),
+        data_axes=(1,),
+    )
+
+
+def _complete_processing_data(
+    signal: np.ndarray,
+    uncertainty: np.ndarray,
+    frames: np.ndarray,
+    q_values: np.ndarray,
+    *,
+    weights: np.ndarray,
+) -> ProcessingData:
+    frame_axis = BaseData(signal=frames, units=ureg.Unit("second"), rank_of_data=1)
+    q_axis = BaseData(signal=q_values, units=ureg.Unit("1/nm"), rank_of_data=1)
+    signal_data = BaseData(
+        signal=signal,
+        units=ureg.Unit("count"),
+        uncertainties={"poisson": uncertainty, "calibration": uncertainty * np.float32(2.0)},
+        weights=weights,
+        axes=[frame_axis, q_axis],
+        rank_of_data=1,
+    )
+    bundle = DataBundle({"signal": signal_data, "frame": frame_axis, "Q": q_axis})
+    bundle.default_plot = "signal"
+    return ProcessingData({"sample": bundle})
+
+
+def _assert_hdf_nodes_equal(left: h5py.Group | h5py.Dataset, right: h5py.Group | h5py.Dataset) -> None:
+    assert type(left) is type(right)
+    assert set(left.attrs) == set(right.attrs)
+    for name in left.attrs:
+        left_value = np.asarray(left.attrs[name])
+        right_value = np.asarray(right.attrs[name])
+        np.testing.assert_array_equal(left_value, right_value)
+    if isinstance(left, h5py.Dataset):
+        assert left.dtype == right.dtype
+        np.testing.assert_array_equal(left[()], right[()])
+        return
+    assert set(left) == set(right)
+    for name in left:
+        _assert_hdf_nodes_equal(left[name], right[name])
+
+
+def test_hdf_chunked_sink_matches_complete_basedata_tree(tmp_path: Path):
+    chunked_file = tmp_path / "complete-chunked.h5"
+    ordinary_file = tmp_path / "complete-ordinary.h5"
+    plan = _complete_plan()
+    signal = np.arange(15, dtype=np.float32).reshape(5, 3)
+    uncertainty = np.linspace(0.1, 1.5, 15, dtype=np.float32).reshape(5, 3)
+    frames = np.linspace(0.0, 0.4, 5, dtype=np.float64)
+    q_values = np.linspace(0.01, 0.03, 3, dtype=np.float64)
+    weight_row = np.array([[0.5, 1.0, 2.0]], dtype=np.float32)
+    ranges = ((0, 2), (2, 4), (4, 5))
+
+    sink = HDFChunkedProcessingSink(resource_location=chunked_file)
+    sink.initialize_chunked("run", plan)
+    chunk_payloads = []
+    for ordinal, (start, stop) in enumerate(ranges):
+        selectors = (AxisSelector.sliced(start, stop), AxisSelector.all())
+        spec = ChunkSpec(
+            schema_version=plan.schema_version,
+            plan_id=plan.plan_id,
+            plan_hash=plan.plan_hash,
+            chunk_id=plan.expected_chunk_ids[ordinal],
+            ordinal=ordinal,
+            grid_index=(ordinal,),
+            source_selection=selectors,
+            expected_input_shape=(stop - start, 3),
+            placements=(ChunkPlacement("corrected_signal", selectors, (stop - start, 3)),),
+        )
+        payload = _complete_processing_data(
+            signal[start:stop],
+            uncertainty[start:stop],
+            frames[start:stop],
+            q_values,
+            weights=weight_row,
+        )
+        chunk_payloads.append((spec, payload))
+
+    first_spec, first_payload = chunk_payloads[-1]
+    sink.write_chunk("run", first_payload, plan=plan, chunk=first_spec)
+    sink = HDFChunkedProcessingSink(resource_location=chunked_file)
+    resumed = sink.initialize_chunked("run", plan, collision="resume")
+    assert resumed.completed_chunks == 1
+
+    for spec, payload in reversed(chunk_payloads[:-1]):
+        sink.write_chunk("run", payload, plan=plan, chunk=spec)
+    sink.finalize_chunked("run", plan=plan)
+
+    complete = _complete_processing_data(
+        signal,
+        uncertainty,
+        frames,
+        q_values,
+        weights=np.broadcast_to(weight_row, signal.shape).copy(),
+    )
+    HDFProcessingSink(resource_location=ordinary_file).write("run", complete, data_paths=["/sample/signal"])
+
+    with h5py.File(chunked_file, "r") as chunked, h5py.File(ordinary_file, "r") as ordinary:
+        _assert_hdf_nodes_equal(
+            chunked["processing/result/run"],
+            ordinary["processing/result/run"],
+        )
+        assert (
+            _read_text(chunked["processing/chunk_plans/complete-basedata/components/" "corrected_signal/axes/Q/status"])
+            == "complete"
+        )
+
+
+def test_hdf_chunked_sink_rejects_changed_static_axis(tmp_path: Path):
+    plan = _complete_plan()
+    sink = HDFChunkedProcessingSink(resource_location=tmp_path / "static-axis.h5")
+    sink.initialize_chunked("run", plan)
+    first = ChunkSpec(
+        schema_version="1.0",
+        plan_id=plan.plan_id,
+        plan_hash=plan.plan_hash,
+        chunk_id="c0",
+        ordinal=0,
+        grid_index=(0,),
+        source_selection=(AxisSelector.sliced(0, 2), AxisSelector.all()),
+        expected_input_shape=(2, 3),
+        placements=(
+            ChunkPlacement(
+                "corrected_signal",
+                (AxisSelector.sliced(0, 2), AxisSelector.all()),
+                (2, 3),
+            ),
+        ),
+    )
+    second = ChunkSpec(
+        schema_version="1.0",
+        plan_id=plan.plan_id,
+        plan_hash=plan.plan_hash,
+        chunk_id="c1",
+        ordinal=1,
+        grid_index=(1,),
+        source_selection=(AxisSelector.sliced(2, 4), AxisSelector.all()),
+        expected_input_shape=(2, 3),
+        placements=(
+            ChunkPlacement(
+                "corrected_signal",
+                (AxisSelector.sliced(2, 4), AxisSelector.all()),
+                (2, 3),
+            ),
+        ),
+    )
+    signal = np.ones((2, 3), dtype=np.float32)
+    uncertainty = np.ones((2, 3), dtype=np.float32)
+    weights = np.ones((1, 3), dtype=np.float32)
+    sink.write_chunk(
+        "run",
+        _complete_processing_data(
+            signal,
+            uncertainty,
+            np.array([0.0, 0.1]),
+            np.array([0.01, 0.02, 0.03]),
+            weights=weights,
+        ),
+        plan=plan,
+        chunk=first,
+    )
+
+    with pytest.raises(ValueError, match="Static component.*changed"):
+        sink.write_chunk(
+            "run",
+            _complete_processing_data(
+                signal,
+                uncertainty,
+                np.array([0.2, 0.3]),
+                np.array([0.01, 0.02, 0.04]),
+                weights=weights,
+            ),
+            plan=plan,
+            chunk=second,
+        )
+
+
+def test_hdf_chunked_sink_preserves_invariant_scalar_weight(tmp_path: Path):
+    chunked_file = tmp_path / "scalar-weight-chunked.h5"
+    ordinary_file = tmp_path / "scalar-weight-ordinary.h5"
+    plan = ChunkPlan(
+        schema_version="1.0",
+        plan_id="scalar-weight",
+        total_chunks=2,
+        expected_chunk_ids=("c0", "c1"),
+        outputs=(
+            ChunkOutputLayout(
+                output_id="signal",
+                processing_path="/sample/signal",
+                destination_path="sample/signal",
+                units="count",
+                rank_of_data=1,
+                arrays=(
+                    ChunkArrayLayout(component="signal", final_shape=(4,), dtype="float32"),
+                    ChunkArrayLayout(
+                        component="weights",
+                        final_shape=(),
+                        dtype="float32",
+                        placement_binding=PlacementBinding(kind="static"),
+                    ),
+                ),
+            ),
+        ),
+        driver={"full_shape": [4]},
+        batch_axes=(0,),
+    )
+    sink = HDFChunkedProcessingSink(resource_location=chunked_file)
+    sink.initialize_chunked("run", plan)
+    full_signal = np.arange(4, dtype=np.float32)
+    for ordinal, (start, stop) in enumerate(((0, 2), (2, 4))):
+        selector = (AxisSelector.sliced(start, stop),)
+        spec = ChunkSpec(
+            schema_version="1.0",
+            plan_id=plan.plan_id,
+            plan_hash=plan.plan_hash,
+            chunk_id=plan.expected_chunk_ids[ordinal],
+            ordinal=ordinal,
+            grid_index=(ordinal,),
+            source_selection=selector,
+            expected_input_shape=(2,),
+            placements=(ChunkPlacement("signal", selector, (2,)),),
+        )
+        data = _processing_data(full_signal[start:stop])
+        data["sample"]["signal"].weights = np.asarray(2.0, dtype=np.float32)
+        sink.write_chunk("run", data, plan=plan, chunk=spec)
+    sink.finalize_chunked("run", plan=plan)
+
+    complete = _processing_data(full_signal)
+    complete["sample"]["signal"].weights = np.asarray(2.0, dtype=np.float32)
+    HDFProcessingSink(resource_location=ordinary_file).write("run", complete, data_paths=["/sample/signal"])
+
+    with h5py.File(chunked_file, "r") as chunked, h5py.File(ordinary_file, "r") as ordinary:
+        _assert_hdf_nodes_equal(
+            chunked["processing/result/run/sample/signal"],
+            ordinary["processing/result/run/sample/signal"],
+        )
+
+
+def test_axis_map_supports_indexed_signal_dimension(tmp_path: Path):
+    out_file = tmp_path / "indexed-axis.h5"
+    plan = ChunkPlan(
+        schema_version="1.0",
+        plan_id="indexed-axis",
+        total_chunks=2,
+        expected_chunk_ids=("c0", "c1"),
+        outputs=(
+            ChunkOutputLayout(
+                output_id="signal",
+                processing_path="/sample/signal",
+                destination_path="sample/signal",
+                units="count",
+                rank_of_data=1,
+                arrays=(
+                    ChunkArrayLayout(component="signal", final_shape=(2, 3), dtype="float32"),
+                    ChunkArrayLayout(
+                        component="axes/frame",
+                        final_shape=(2,),
+                        dtype="float64",
+                        placement_binding=PlacementBinding(kind="axis_map", axis_map=(0,)),
+                        units=str(ureg.Unit("second")),
+                        rank_of_data=0,
+                    ),
+                    ChunkArrayLayout(
+                        component="axes/Q",
+                        final_shape=(3,),
+                        dtype="float64",
+                        placement_binding=PlacementBinding(kind="static"),
+                        units=str(ureg.Unit("1/nm")),
+                        rank_of_data=1,
+                    ),
+                ),
+                axis_names=("frame", "Q"),
+            ),
+        ),
+        driver={"full_shape": [2, 3]},
+        batch_axes=(0,),
+        data_axes=(1,),
+    )
+    full_signal = np.arange(6, dtype=np.float32).reshape(2, 3)
+    frame_values = np.array([0.0, 0.1], dtype=np.float64)
+    q_values = np.array([0.01, 0.02, 0.03], dtype=np.float64)
+    sink = HDFChunkedProcessingSink(resource_location=out_file)
+    sink.initialize_chunked("run", plan)
+
+    for ordinal in range(2):
+        selection = (AxisSelector.index(ordinal), AxisSelector.all())
+        spec = ChunkSpec(
+            schema_version="1.0",
+            plan_id=plan.plan_id,
+            plan_hash=plan.plan_hash,
+            chunk_id=plan.expected_chunk_ids[ordinal],
+            ordinal=ordinal,
+            grid_index=(ordinal,),
+            source_selection=selection,
+            expected_input_shape=(3,),
+            placements=(ChunkPlacement("signal", selection, (3,)),),
+        )
+        frame = BaseData(
+            signal=np.asarray(frame_values[ordinal]),
+            units=ureg.Unit("second"),
+            rank_of_data=0,
+        )
+        q_axis = BaseData(signal=q_values, units=ureg.Unit("1/nm"), rank_of_data=1)
+        signal = BaseData(
+            signal=full_signal[ordinal],
+            units=ureg.Unit("count"),
+            axes=[q_axis],
+            rank_of_data=1,
+        )
+        bundle = DataBundle({"signal": signal, "frame": frame, "Q": q_axis})
+        bundle.default_plot = "signal"
+        sink.write_chunk(
+            "run",
+            ProcessingData({"sample": bundle}),
+            plan=plan,
+            chunk=spec,
+        )
+
+    sink.finalize_chunked("run", plan=plan)
+    with h5py.File(out_file, "r") as h5:
+        group = h5["processing/result/run/sample/signal"]
+        np.testing.assert_array_equal(group["signal"], full_signal)
+        np.testing.assert_array_equal(group["frame"], frame_values)
+        np.testing.assert_array_equal(group["Q"], q_values)
 
 
 @pytest.mark.parametrize(
@@ -291,6 +672,71 @@ def test_hdf_chunked_sink_validates_chunk_metadata(
 
     with pytest.raises(ValueError, match=message):
         sink.write_chunk("run", processing_data, plan=plan, chunk=_chunk(plan, 0, 0, 2))
+
+
+def test_signal_only_plan_rejects_undeclared_basedata_components(tmp_path: Path):
+    values = np.ones((2, 2), dtype=np.float32)
+    axis = BaseData(signal=np.arange(2, dtype=np.float32), units=ureg.dimensionless, rank_of_data=1)
+    payloads = (
+        (
+            ProcessingData(
+                {
+                    "sample": DataBundle(
+                        {
+                            "signal": BaseData(
+                                signal=values,
+                                units=ureg.Unit("count"),
+                                uncertainties={"poisson": values},
+                                rank_of_data=1,
+                            )
+                        }
+                    )
+                }
+            ),
+            "uncertainty keys",
+        ),
+        (
+            ProcessingData(
+                {
+                    "sample": DataBundle(
+                        {
+                            "signal": BaseData(
+                                signal=values,
+                                units=ureg.Unit("count"),
+                                weights=np.full_like(values, 2.0),
+                                rank_of_data=1,
+                            )
+                        }
+                    )
+                }
+            ),
+            "no weights layout",
+        ),
+        (
+            ProcessingData(
+                {
+                    "sample": DataBundle(
+                        {
+                            "signal": BaseData(
+                                signal=values,
+                                units=ureg.Unit("count"),
+                                axes=[axis, None],
+                                rank_of_data=1,
+                            )
+                        }
+                    )
+                }
+            ),
+            "axes not declared",
+        ),
+    )
+
+    for index, (payload, message) in enumerate(payloads):
+        plan = _plan()
+        sink = HDFChunkedProcessingSink(resource_location=tmp_path / f"undeclared-{index}.h5")
+        sink.initialize_chunked("run", plan)
+        with pytest.raises(ValueError, match=message):
+            sink.write_chunk("run", payload, plan=plan, chunk=_chunk(plan, 0, 0, 2))
 
 
 def test_hdf_chunked_sink_places_chunks_across_multiple_batch_axes(tmp_path: Path):

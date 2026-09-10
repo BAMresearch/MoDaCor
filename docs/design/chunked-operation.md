@@ -132,6 +132,12 @@ kept in the plan when destination placement is known before execution. This
 avoids repeating static shape, dtype, units, and component-mapping information
 in every chunk record.
 
+Each output layout also carries ordered `axis_names`, with `.` for signal
+dimensions that do not have a named axis. Array layouts for `axes/<name>` carry
+the axis dataset's own `units` and `rank_of_data`; signal and uncertainty units
+remain output-level invariants. This separates axis identity and metadata from
+the `PlacementBinding` that controls how its values are placed.
+
 ### ChunkSpec
 
 A compact chunk record contains:

@@ -237,6 +237,8 @@ class ChunkArrayLayout:
     final_shape: tuple[int, ...]
     dtype: str
     placement_binding: PlacementBinding = field(default_factory=PlacementBinding)
+    units: str | None = None
+    rank_of_data: int | None = None
 
     def __post_init__(self) -> None:
         component = str(self.component).strip().strip("/")
@@ -249,9 +251,17 @@ class ChunkArrayLayout:
             dtype = np.dtype(self.dtype).str
         except (TypeError, ValueError) as exc:
             raise ValueError(f"Invalid ChunkArrayLayout dtype {self.dtype!r}.") from exc
+        units = None if self.units is None else str(self.units)
+        rank = self.rank_of_data
+        if rank is not None:
+            rank = _require_non_negative_int(rank, "ChunkArrayLayout.rank_of_data")
+            if rank > len(shape):
+                raise ValueError("ChunkArrayLayout.rank_of_data cannot exceed the component array rank.")
         object.__setattr__(self, "component", component)
         object.__setattr__(self, "final_shape", shape)
         object.__setattr__(self, "dtype", dtype)
+        object.__setattr__(self, "units", units)
+        object.__setattr__(self, "rank_of_data", rank)
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> ChunkArrayLayout:
@@ -260,15 +270,73 @@ class ChunkArrayLayout:
             final_shape=tuple(payload["final_shape"]),
             dtype=str(payload["dtype"]),
             placement_binding=PlacementBinding.from_dict(payload.get("placement_binding", {})),
+            units=payload.get("units"),
+            rank_of_data=payload.get("rank_of_data"),
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "component": self.component,
             "final_shape": list(self.final_shape),
             "dtype": self.dtype,
             "placement_binding": self.placement_binding.to_dict(),
         }
+        if self.units is not None:
+            payload["units"] = self.units
+        if self.rank_of_data is not None:
+            payload["rank_of_data"] = self.rank_of_data
+        return payload
+
+
+def _normalise_output_axis_names(
+    axis_names: Sequence[str],
+    signal: ChunkArrayLayout,
+    arrays: tuple[ChunkArrayLayout, ...],
+) -> tuple[str, ...]:
+    normalized = tuple(str(name).strip() for name in axis_names)
+    if normalized and len(normalized) != len(signal.final_shape):
+        raise ValueError("ChunkOutputLayout.axis_names must match the signal array rank.")
+    if any(not name or "/" in name for name in normalized):
+        raise ValueError("ChunkOutputLayout.axis_names must contain non-empty HDF field names or '.'.")
+    declared = {array.component.removeprefix("axes/") for array in arrays if array.component.startswith("axes/")}
+    referenced = {name for name in normalized if name != "."}
+    reserved = referenced & {"signal", "weights", "uncertainties"}
+    if reserved:
+        raise ValueError(f"ChunkOutputLayout.axis_names contain reserved fields: {sorted(reserved)}.")
+    if declared != referenced:
+        raise ValueError("ChunkOutputLayout axis components and non-'.' axis_names must identify the same fields.")
+    return normalized
+
+
+def _validate_component_layout(
+    array: ChunkArrayLayout,
+    signal: ChunkArrayLayout,
+    axis_names: tuple[str, ...],
+) -> None:
+    is_axis = array.component.startswith("axes/")
+    if is_axis and (array.units is None or array.rank_of_data is None):
+        raise ValueError("Axis array layouts require component-level units and rank_of_data.")
+    if not is_axis and (array.units is not None or array.rank_of_data is not None):
+        raise ValueError(
+            "Component-level units and rank_of_data are reserved for axis array layouts; "
+            "signal and uncertainty units/rank come from ChunkOutputLayout."
+        )
+
+    binding = array.placement_binding
+    if binding.kind in {"direct", "broadcast"} and array.final_shape != signal.final_shape:
+        raise ValueError(f"A {binding.kind!r} component must have the same final shape as the signal array.")
+    if binding.kind == "axis_map":
+        if len(binding.axis_map) != len(array.final_shape):
+            raise ValueError("An axis_map must contain one signal axis for each component dimension.")
+        if any(axis >= len(signal.final_shape) for axis in binding.axis_map):
+            raise ValueError("A component axis_map references an axis outside the signal array rank.")
+    if array.component == "weights" and not array.final_shape and binding.kind != "static":
+        raise ValueError("Scalar weights must use a static placement binding.")
+    if is_axis and binding.kind == "axis_map":
+        axis_name = array.component.removeprefix("axes/")
+        mapped_axes = {index for index, name in enumerate(axis_names) if name == axis_name}
+        if not set(binding.axis_map).issubset(mapped_axes):
+            raise ValueError("An axis component axis_map must refer to signal dimensions bearing its name.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -281,6 +349,7 @@ class ChunkOutputLayout:
     units: str
     rank_of_data: int
     arrays: tuple[ChunkArrayLayout, ...]
+    axis_names: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         output_id = _require_identifier(self.output_id, "ChunkOutputLayout.output_id")
@@ -302,12 +371,16 @@ class ChunkOutputLayout:
             raise ValueError("The signal array must use direct placement.")
         if rank > len(signal_arrays[0].final_shape):
             raise ValueError("rank_of_data cannot exceed the signal array rank.")
+        axis_names = _normalise_output_axis_names(self.axis_names, signal_arrays[0], arrays)
+        for array in arrays:
+            _validate_component_layout(array, signal_arrays[0], axis_names)
         object.__setattr__(self, "output_id", output_id)
         object.__setattr__(self, "processing_path", processing_path)
         object.__setattr__(self, "destination_path", destination_path)
         object.__setattr__(self, "units", str(self.units))
         object.__setattr__(self, "rank_of_data", rank)
         object.__setattr__(self, "arrays", arrays)
+        object.__setattr__(self, "axis_names", axis_names)
 
     @property
     def signal(self) -> ChunkArrayLayout:
@@ -322,10 +395,11 @@ class ChunkOutputLayout:
             units=str(payload["units"]),
             rank_of_data=payload["rank_of_data"],
             arrays=tuple(ChunkArrayLayout.from_dict(item) for item in payload["arrays"]),
+            axis_names=tuple(payload.get("axis_names", ())),
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "output_id": self.output_id,
             "processing_path": self.processing_path,
             "destination_path": self.destination_path,
@@ -333,6 +407,9 @@ class ChunkOutputLayout:
             "rank_of_data": self.rank_of_data,
             "arrays": [array.to_dict() for array in self.arrays],
         }
+        if self.axis_names:
+            payload["axis_names"] = list(self.axis_names)
+        return payload
 
 
 @dataclass(frozen=True, slots=True)

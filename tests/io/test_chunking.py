@@ -13,6 +13,7 @@ from modacor.io.chunking import (
     ChunkPlacement,
     ChunkPlan,
     ChunkSpec,
+    PlacementBinding,
     selection_shape,
 )
 
@@ -102,6 +103,65 @@ def test_chunk_plan_rejects_tampered_serialized_hash():
     payload["driver"]["source"] = "other::/data"
     with pytest.raises(ValueError, match="plan_hash"):
         ChunkPlan.from_dict(payload)
+
+
+def test_chunk_output_layout_preserves_explicit_axis_metadata():
+    output = ChunkOutputLayout(
+        output_id="signal",
+        processing_path="/sample/signal",
+        destination_path="sample/signal",
+        units="count",
+        rank_of_data=1,
+        arrays=(
+            ChunkArrayLayout(component="signal", final_shape=(5,), dtype="float32"),
+            ChunkArrayLayout(
+                component="axes/Q",
+                final_shape=(5,),
+                dtype="float64",
+                placement_binding=PlacementBinding(kind="axis_map", axis_map=(0,)),
+                units="1/nm",
+                rank_of_data=1,
+            ),
+        ),
+        axis_names=("Q",),
+    )
+
+    assert ChunkOutputLayout.from_dict(output.to_dict()) == output
+    assert output.to_dict()["arrays"][1]["units"] == "1/nm"
+
+
+def test_chunk_output_layout_rejects_ambiguous_axis_schema():
+    axis = ChunkArrayLayout(
+        component="axes/Q",
+        final_shape=(5,),
+        dtype="float64",
+        placement_binding=PlacementBinding(kind="static"),
+        units="1/nm",
+        rank_of_data=1,
+    )
+    with pytest.raises(ValueError, match="axis components"):
+        ChunkOutputLayout(
+            output_id="signal",
+            processing_path="/sample/signal",
+            destination_path="sample/signal",
+            units="count",
+            rank_of_data=1,
+            arrays=(ChunkArrayLayout(component="signal", final_shape=(5,), dtype="float32"), axis),
+        )
+
+    with pytest.raises(ValueError, match="require component-level"):
+        ChunkOutputLayout(
+            output_id="signal",
+            processing_path="/sample/signal",
+            destination_path="sample/signal",
+            units="count",
+            rank_of_data=1,
+            arrays=(
+                ChunkArrayLayout(component="signal", final_shape=(5,), dtype="float32"),
+                ChunkArrayLayout(component="axes/Q", final_shape=(5,), dtype="float64"),
+            ),
+            axis_names=("Q",),
+        )
 
 
 def test_chunk_spec_validates_plan_identity_shapes_and_ordinal():

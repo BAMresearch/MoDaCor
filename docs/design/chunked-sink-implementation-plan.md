@@ -10,32 +10,32 @@ As of 2026-09-10:
   canonical plan hashing and serialization, optional `IoSink` capability
   routing, `hdf_chunked` registration, and ordinary HDF5 MoDaCor-version
   provenance are covered by focused tests.
-- Phase 2 is implemented as a signal-only vertical slice. It preallocates
+- Phase 2 established the initial signal-only vertical slice. It preallocates
   fixed-shape HDF5 datasets, writes contiguous destination slices across one
   or more batch axes, accepts smaller edge chunks and out-of-order delivery,
   detects overlap, supports idempotent retry and resume, validates complete
   coverage, and finalizes the NeXus default chain.
-- Phase 3 and the server integration in Phase 4 have not started. In
-  particular, chunked weights, uncertainties, axes, server-level `output_id`
-  management, API endpoints, and server-side locking are not yet available.
-- Phase 3 preparation identified one required schema extension: array layouts
-  need optional component-level units and `rank_of_data`, and output layouts
-  need an ordered `axis_names` tuple. `PlacementBinding` determines storage
-  selection, but cannot by itself preserve the NeXus axis association. These
-  fields should be explicit rather than inferred from matching shapes.
+- Phase 3 is implemented: layouts now carry explicit component-level axis
+  units/rank and ordered axis names, and the HDF5 writer supports direct,
+  broadcast, static, and axis-mapped placement for weights, all declared
+  uncertainties, invariant axes, and batch-dependent axes. It rejects
+  undeclared `BaseData` components and changes to static values. Finalized
+  complete `BaseData` trees are tested against the ordinary writer.
+- The server integration in Phase 4 has not started. Server-level `output_id`
+  management, API lifecycle endpoints, and server-side locking are not yet
+  available.
 - The generic runtime sink builder and server registration model recognize
   `hdf_chunked`, including normal write-root enforcement. This is capability
   discovery and configuration only: ordinary process requests cannot drive the
   lifecycle until Phase 4 is implemented.
-- Verification at this checkpoint passes the full 743-test suite, focused
-  Flake8 and import-order checks, and a warnings-as-errors Sphinx build. The
+- Verification at the Phase 3 checkpoint passes the full 750-test suite, all
+  changed-file pre-commit hooks, and a warnings-as-errors Sphinx build. The
   three reported test warnings are pre-existing numerical-domain warnings in
   `BaseData` tests.
 
-The current HDF chunk writer deliberately rejects plans containing components
-other than `signal`, and it currently requires contiguous destination slices
-with stride 1. These limitations keep the implemented capability narrower than
-the eventual contract and are enforced rather than silently ignored.
+The current HDF chunk writer requires contiguous destination slices with
+stride 1. Strided destination writes remain deliberately unsupported and are
+rejected rather than silently reinterpreted.
 
 ## Decision summary
 
@@ -279,7 +279,6 @@ class ChunkArrayLayout:
     final_shape: tuple[int, ...]
     dtype: str
     placement_binding: PlacementBinding
-    # Added in Phase 3 for components with their own metadata, notably axes.
     units: str | None = None
     rank_of_data: int | None = None
 
@@ -292,7 +291,6 @@ class ChunkOutputLayout:
     units: str
     rank_of_data: int
     arrays: tuple[ChunkArrayLayout, ...]
-    # Ordered names for the signal dimensions; "." denotes no named axis.
     axis_names: tuple[str, ...] = ()
 ```
 
@@ -338,9 +336,10 @@ so their numerical and metadata contract cannot be split accidentally.
 - Static axes are stored once and validated when repeated.
 - Batch-dependent axes require their own layout and destination placement.
 
-The first vertical slice may support signal plus array-valued uncertainties
-before adding batch-dependent axes, but it must not claim complete `BaseData`
-support until all these rules are implemented.
+Phase 3 implements all of these rules. Signal-only plans remain valid for
+pipelines whose results contain only the signal plus the default scalar weight;
+non-default weights, uncertainties, or axes must be declared and are rejected
+if omitted from the plan.
 
 ## HDF5 layout
 
@@ -641,12 +640,12 @@ server capabilities.
 
 ### Phase 3: complete `BaseData`
 
-- [ ] Extend and test array layouts with component units/rank and output layouts
+- [x] Extend and test array layouts with component units/rank and output layouts
   with ordered axis names.
-- [ ] Add weights, all uncertainties, units, `rank_of_data`, and static axes.
-- [ ] Add batch-dependent axis layouts.
-- [ ] Extract shared HDF layout helpers only where duplication is demonstrated.
-- [ ] Extend whole-versus-chunked equivalence tests to the complete result tree.
+- [x] Add weights, all uncertainties, units, `rank_of_data`, and static axes.
+- [x] Add batch-dependent axis layouts.
+- [x] Extract shared HDF layout helpers only where duplication is demonstrated.
+- [x] Extend whole-versus-chunked equivalence tests to the complete result tree.
 
 ### Phase 4: runtime integration
 
