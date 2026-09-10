@@ -74,12 +74,44 @@ class TestHDFSource(unittest.TestCase):
         self.assertTrue(isinstance(data_array, np.ndarray))
         self.assertEqual((5, 2), data_array.shape)
 
-    def test_get_data_cache_keeps_sliced_and_full_reads_separate(self):
-        sliced = self.test_hdf_source.get_data(self.temp_dataset_name, load_slice=(slice(0, 5), slice(None)))
+    def test_get_data_with_none_reads_complete_dataset(self):
+        data_array = self.test_hdf_source.get_data(self.temp_dataset_name, load_slice=None)
+
+        self.assertEqual(self.temp_dataset_shape, data_array.shape)
+
+    def test_explicit_slices_bypass_cache_while_complete_reads_are_cached(self):
+        self.test_hdf_source.get_data(self.temp_dataset_name, load_slice=(slice(0, 5), slice(None)))
+        self.assertEqual({}, self.test_hdf_source._data_cache)
+
         full = self.test_hdf_source.get_data(self.temp_dataset_name)
 
-        self.assertEqual((5, 2), sliced.shape)
         self.assertEqual(self.temp_dataset_shape, full.shape)
+        self.assertEqual([self.temp_dataset_name], list(self.test_hdf_source._data_cache))
+
+    def test_repeated_explicit_slice_reads_current_file_contents(self):
+        load_slice = (slice(0, 1), slice(None))
+        first = self.test_hdf_source.get_data(self.temp_dataset_name, load_slice=load_slice)
+
+        with h5py.File(self.temp_file_path, "r+") as hdf_file:
+            hdf_file[self.temp_dataset_name][load_slice] = 7.0
+
+        second = self.test_hdf_source.get_data(self.temp_dataset_name, load_slice=load_slice)
+
+        self.assertFalse(np.any(first))
+        np.testing.assert_array_equal(second, np.full((1, 2), 7.0))
+
+    def test_clear_cache_can_refresh_one_complete_dataset(self):
+        first = self.test_hdf_source.get_data(self.temp_dataset_name)
+
+        with h5py.File(self.temp_file_path, "r+") as hdf_file:
+            hdf_file[self.temp_dataset_name][0, 0] = 9.0
+
+        cached = self.test_hdf_source.get_data(self.temp_dataset_name)
+        self.test_hdf_source.clear_cache(self.temp_dataset_name)
+        refreshed = self.test_hdf_source.get_data(self.temp_dataset_name)
+
+        np.testing.assert_array_equal(cached, first)
+        self.assertEqual(9.0, refreshed[0, 0])
 
     def test_get_data_shape(self):
         self.test_hdf_source._file_path = Path(self.temp_file_path)
