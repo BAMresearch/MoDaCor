@@ -36,22 +36,6 @@ else:
     _HDF5PLUGIN_IMPORT_ERROR = None
 
 
-def _slice_cache_key(load_slice: ArraySlice) -> Any:
-    if load_slice is Ellipsis:
-        return ("ellipsis",)
-    if load_slice is None:
-        return ("none",)
-    if isinstance(load_slice, slice):
-        return ("slice", load_slice.start, load_slice.stop, load_slice.step)
-    if isinstance(load_slice, tuple):
-        return tuple(_slice_cache_key(item) for item in load_slice)
-    try:
-        hash(load_slice)
-    except TypeError:
-        return repr(load_slice)
-    return load_slice
-
-
 def _decode_hdf_value(value: Any) -> Any:
     if isinstance(value, (bytes, np.bytes_)):
         return value.decode("utf-8")
@@ -83,7 +67,7 @@ class HDFSource(IoSource):
     resource_location: Path | str | None = field(
         init=True, default=None, validator=validators.optional(validators.instance_of((Path, str)))
     )
-    _data_cache: dict[Any, np.ndarray] = field(init=False, factory=dict, validator=validators.instance_of(dict))
+    _data_cache: dict[str, np.ndarray] = field(init=False, factory=dict, validator=validators.instance_of(dict))
     _file_path: Path | None = field(
         init=False, default=None, validator=validators.optional(validators.instance_of(Path))
     )
@@ -142,15 +126,44 @@ class HDFSource(IoSource):
         return self._static_metadata_cache[data_key]
 
     def get_data(self, data_key: str, load_slice: ArraySlice = ...) -> np.ndarray:
-        cache_key = (data_key, _slice_cache_key(load_slice))
-        if cache_key not in self._data_cache:
+        # Complete reads are cached because configuration and calibration arrays
+        # are commonly reused. Explicit slices deliberately bypass the cache so
+        # sequential chunk processing does not retain every chunk in memory.
+        is_complete_read = load_slice is None or load_slice is Ellipsis
+        if not is_complete_read:
             try:
                 with h5py.File(self._file_path, "r") as f:
-                    data_array = f[data_key][load_slice]  # if load_slice is not None else f[data_key][()]
-                    self._data_cache[cache_key] = np.array(data_array)
+                    return np.array(f[data_key][load_slice])
             except OSError as error:
                 _raise_hdf5_read_error(error)
-        return np.array(self._data_cache[cache_key], copy=True)
+
+        if data_key not in self._data_cache:
+            try:
+                with h5py.File(self._file_path, "r") as f:
+                    self._data_cache[data_key] = np.array(f[data_key][()])
+            except OSError as error:
+                _raise_hdf5_read_error(error)
+        return np.array(self._data_cache[data_key], copy=True)
+
+    def clear_cache(self, data_key: str | None = None, *, include_metadata: bool = False) -> None:
+        """Discard cached complete reads, optionally for one dataset only.
+
+        Explicitly sliced reads are never cached. Metadata remains cached by
+        default because it is normally static and small.
+        """
+        if data_key is None:
+            self._data_cache.clear()
+            if include_metadata:
+                self._static_metadata_cache.clear()
+            return
+
+        self._data_cache.pop(data_key, None)
+        if include_metadata:
+            self._static_metadata_cache.pop(data_key, None)
+            attribute_prefix = f"{data_key}@"
+            for metadata_key in tuple(self._static_metadata_cache):
+                if metadata_key.startswith(attribute_prefix):
+                    self._static_metadata_cache.pop(metadata_key, None)
 
     def get_data_shape(self, data_key: str) -> tuple[int, ...]:
         if data_key in self._file_datasets_shapes:
