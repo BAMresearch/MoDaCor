@@ -25,10 +25,38 @@
 __license__ = "BSD-3-Clause"
 __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
-__all__ = ["BufferSink", "BufferSource", "IoSource", "IoSources", "RuntimeBufferStore", "TiledSource", "TiledSink"]
+__all__ = [
+    "AxisSelector",
+    "BufferSink",
+    "BufferSource",
+    "ChunkArrayLayout",
+    "ChunkOutputLayout",
+    "ChunkPlacement",
+    "ChunkPlan",
+    "ChunkSpec",
+    "ChunkWriteResult",
+    "IoSource",
+    "IoSources",
+    "PlacementBinding",
+    "RuntimeBufferStore",
+    "TiledSink",
+    "TiledSource",
+    "UnsupportedSinkCapability",
+]
 
 
 from .buffer import BufferSink, BufferSource, RuntimeBufferStore
+from .chunking import (
+    AxisSelector,
+    ChunkArrayLayout,
+    ChunkOutputLayout,
+    ChunkPlacement,
+    ChunkPlan,
+    ChunkSpec,
+    ChunkWriteResult,
+    PlacementBinding,
+    UnsupportedSinkCapability,
+)
 from .io_source import IoSource
 from .io_sources import IoSources
 from .tiled import TiledSink, TiledSource

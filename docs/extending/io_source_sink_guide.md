@@ -38,11 +38,17 @@ Subclass `modacor.io.io_sink.IoSink` and implement:
 
 - `write(subpath, *args, **kwargs)`
 
+Sinks that support incremental assembly may additionally set
+`supports_chunked_writes = True` and implement `initialize_chunked(...)`,
+`write_chunk(...)`, and `finalize_chunked(...)`. Ordinary sinks inherit clear
+unsupported-capability errors for these optional methods.
+
 `IoSinks` routes writes through `sink_ref::subpath`. The current built-in sink
 examples are:
 
 - `src/modacor/io/csv/csv_sink.py`
 - `src/modacor/io/hdf/hdf_processing_sink.py`
+- `src/modacor/io/hdf/hdf_chunked_processing_sink.py`
 - `src/modacor/io/tiled/tiled_sink.py`
 
 ## Registration paths
@@ -60,7 +66,13 @@ There are three supported ways to add sources or sinks:
 The shared CLI/runtime builder currently supports:
 
 - source types: `hdf`, `yaml`, `csv`, `buffer`, `tiled`, and `custom`
-- sink types: `csv`, `hdf`, `hdf_processing`, `buffer`, `plotly_json`, `tiled`, and `custom`
+- sink types: `csv`, `hdf`, `hdf_chunked`, `hdf_processing`, `buffer`,
+  `plotly_json`, `tiled`, and `custom`
+
+`hdf_chunked` is currently a programmatic, signal-only lifecycle. The runtime
+builder can construct it, but the server endpoints that coordinate its
+initialize/write/finalize operations are not implemented yet; track that work
+in `docs/design/chunked-sink-implementation-plan.md`.
 
 For `custom` sources or sinks, trusted/local builders can use
 `kwargs.class_path` with the fully qualified class import path. Runtime services

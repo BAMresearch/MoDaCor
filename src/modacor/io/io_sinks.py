@@ -17,6 +17,8 @@ from typing import Any
 
 from attrs import define, field
 
+from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.chunking import ChunkPlan, ChunkSpec, ChunkWriteResult, UnsupportedSinkCapability
 from modacor.io.io_sink import IoSink
 
 
@@ -59,3 +61,41 @@ class IoSinks:
         sink_ref, subpath = self.split_target_reference(target_reference)
         sink = self.get_sink(sink_ref)
         return sink.write(subpath, *args, **kwargs)
+
+    def _get_chunked_sink(self, target_reference: str) -> tuple[IoSink, str]:
+        sink_ref, subpath = self.split_target_reference(target_reference)
+        sink = self.get_sink(sink_ref)
+        if not sink.supports_chunked_writes:
+            raise UnsupportedSinkCapability(type(sink), "chunked_writes")
+        return sink, subpath
+
+    def initialize_chunked(
+        self,
+        target_reference: str,
+        plan: ChunkPlan,
+        **kwargs: Any,
+    ) -> ChunkWriteResult:
+        sink, subpath = self._get_chunked_sink(target_reference)
+        return sink.initialize_chunked(subpath, plan, **kwargs)
+
+    def write_chunk(
+        self,
+        target_reference: str,
+        processing_data: ProcessingData,
+        *,
+        plan: ChunkPlan,
+        chunk: ChunkSpec,
+        **kwargs: Any,
+    ) -> ChunkWriteResult:
+        sink, subpath = self._get_chunked_sink(target_reference)
+        return sink.write_chunk(subpath, processing_data, plan=plan, chunk=chunk, **kwargs)
+
+    def finalize_chunked(
+        self,
+        target_reference: str,
+        *,
+        plan: ChunkPlan,
+        **kwargs: Any,
+    ) -> ChunkWriteResult:
+        sink, subpath = self._get_chunked_sink(target_reference)
+        return sink.finalize_chunked(subpath, plan=plan, **kwargs)

@@ -21,6 +21,7 @@ import h5py
 import numpy as np
 from attrs import define, field, validators
 
+from modacor import __version__
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.processing_data import ProcessingData
@@ -544,6 +545,7 @@ def _set_nexus_default_chain(
     _write_text_field(processing_group, "run", run_name)
     _write_text_field(processing_group, "title", f"MoDaCor processing result {run_name}")
     _write_text_field(processing_group, "program_name", "MoDaCor")
+    _write_text_field(processing_group, "program_version", __version__)
 
     result_root = processing_group["result"]
     result_root.attrs["NX_class"] = "NXcollection"
@@ -552,6 +554,7 @@ def _set_nexus_default_chain(
     run_result_group = result_root[run_name]
     run_result_group.attrs["NX_class"] = "NXcollection"
     run_result_group.attrs["default"] = bundle_key
+    run_result_group.attrs["modacor_version"] = __version__
 
     bundle_group = run_result_group[bundle_key]
     bundle_group.attrs["NX_class"] = "NXcollection"

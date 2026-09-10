@@ -993,6 +993,13 @@ def test_api_policy_rejects_source_and_sink_paths_outside_roots(tmp_path: Path):
     )
     assert sink_accepted.status_code == 200, sink_accepted.text
 
+    chunked_sink_rejected = client.post(
+        "/v1/sessions/sess-roots/sinks/patch",
+        json={"ref": "chunks", "type": "hdf_chunked", "location": str(tmp_path / "outside.h5")},
+    )
+    assert chunked_sink_rejected.status_code == 422
+    assert "outside allowed write roots" in chunked_sink_rejected.text
+
 
 def test_api_restricted_policy_rejects_file_source_when_no_roots_configured():
     manager = SessionManager()

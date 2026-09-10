@@ -65,7 +65,7 @@ This preserves flexibility for pipelines with 2 to 6+ source files.
 Sinks are dynamic output targets bound to stable refs:
 
 - `sink_ref` (e.g. `export_csv`, `export_hdf`)
-- `type` (e.g. `csv`, `hdf`, `hdf_processing`, `custom`)
+- `type` (e.g. `csv`, `hdf`, `hdf_chunked`, `hdf_processing`, `custom`)
 - `resource_location` (path/URI)
 - optional constructor kwargs
 
@@ -347,10 +347,15 @@ Request:
 
 Response includes accepted refs and the current sink map.
 
-In restricted runtime policy, file-backed sink locations (`csv`, `hdf`, and
-`hdf_processing`) must resolve under one of the configured `--write-root`
+In restricted runtime policy, file-backed sink locations (`csv`, `hdf`,
+`hdf_chunked`, and `hdf_processing`) must resolve under one of the configured `--write-root`
 directories. Custom sinks using `kwargs.class_path` are rejected; use built-in
 sink types or a programmatically registered `kwargs.class_alias`.
+
+The server can retain an `hdf_chunked` registration, but ordinary process
+requests do not yet invoke its initialize/write/finalize lifecycle. The
+dedicated chunked-output endpoints are tracked as Phase 4 in the chunked sink
+implementation plan.
 
 ### `POST /sessions/{session_id}/sinks/patch`
 

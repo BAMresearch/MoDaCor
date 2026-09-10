@@ -112,7 +112,9 @@ Required plan fields are:
 - `batch_axes` and `data_axes`: original source-axis numbers;
 - `axis_rules`: normalized selection and partition rules;
 - `bindings`: other inputs and how the driver selection projects onto them;
-- `total_chunks`: number of generated chunks; and
+- `total_chunks`: number of generated chunks;
+- `expected_chunk_ids`: stable chunk ids in ordinal order, used to initialize
+  and validate the completion manifest; and
 - `plan_hash`: hash of the canonical plan representation.
 
 Bindings should use explicit roles:
@@ -169,8 +171,9 @@ Supported selector records are:
 `source_selection`; it is therefore smaller for an edge chunk when necessary.
 Each placement identifies one declared output and its expected chunk-result
 shape. Output-keyed placements are required because pipeline outputs may have
-different shapes. A placement is optional when an output is an independent
-per-chunk artifact rather than part of an assembled array.
+different shapes. The implemented assembly contract requires one placement
+for every declared output. A future output kind may make placement optional
+for independent per-chunk artifacts that are not part of an assembled array.
 
 Weights, uncertainties, and axes do not each need to repeat selectors in the
 `ChunkSpec`. Their static output-layout records in the `ChunkPlan` define how

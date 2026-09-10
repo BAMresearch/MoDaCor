@@ -1,6 +1,41 @@
 # Chunked Sink Implementation Plan
 
-Status: proposed design for review before implementation.
+Status: implementation in progress.
+
+## Implementation progress
+
+As of 2026-09-10:
+
+- Phase 1 is implemented: immutable chunk contracts, normalized selectors,
+  canonical plan hashing and serialization, optional `IoSink` capability
+  routing, `hdf_chunked` registration, and ordinary HDF5 MoDaCor-version
+  provenance are covered by focused tests.
+- Phase 2 is implemented as a signal-only vertical slice. It preallocates
+  fixed-shape HDF5 datasets, writes contiguous destination slices across one
+  or more batch axes, accepts smaller edge chunks and out-of-order delivery,
+  detects overlap, supports idempotent retry and resume, validates complete
+  coverage, and finalizes the NeXus default chain.
+- Phase 3 and the server integration in Phase 4 have not started. In
+  particular, chunked weights, uncertainties, axes, server-level `output_id`
+  management, API endpoints, and server-side locking are not yet available.
+- Phase 3 preparation identified one required schema extension: array layouts
+  need optional component-level units and `rank_of_data`, and output layouts
+  need an ordered `axis_names` tuple. `PlacementBinding` determines storage
+  selection, but cannot by itself preserve the NeXus axis association. These
+  fields should be explicit rather than inferred from matching shapes.
+- The generic runtime sink builder and server registration model recognize
+  `hdf_chunked`, including normal write-root enforcement. This is capability
+  discovery and configuration only: ordinary process requests cannot drive the
+  lifecycle until Phase 4 is implemented.
+- Verification at this checkpoint passes the full 743-test suite, focused
+  Flake8 and import-order checks, and a warnings-as-errors Sphinx build. The
+  three reported test warnings are pre-existing numerical-domain warnings in
+  `BaseData` tests.
+
+The current HDF chunk writer deliberately rejects plans containing components
+other than `signal`, and it currently requires contiguous destination slices
+with stride 1. These limitations keep the implemented capability narrower than
+the eventual contract and are enforced rather than silently ignored.
 
 ## Decision summary
 
@@ -211,9 +246,8 @@ does not require the original per-chunk `ProcessingData` objects.
 compact immutable record for one unit of work. Their selection semantics are
 defined in [Chunked Operation](chunked-operation.md).
 
-Before implementation, destination placement in `ChunkSpec` should be changed
-from one optional selector to output-keyed placements, because pipeline outputs
-may have different shapes:
+The implemented contract uses output-keyed placements rather than one optional
+destination selector, because pipeline outputs may have different shapes:
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -245,6 +279,9 @@ class ChunkArrayLayout:
     final_shape: tuple[int, ...]
     dtype: str
     placement_binding: PlacementBinding
+    # Added in Phase 3 for components with their own metadata, notably axes.
+    units: str | None = None
+    rank_of_data: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,6 +292,8 @@ class ChunkOutputLayout:
     units: str
     rank_of_data: int
     arrays: tuple[ChunkArrayLayout, ...]
+    # Ordered names for the signal dimensions; "." denotes no named axis.
+    axis_names: tuple[str, ...] = ()
 ```
 
 `ChunkPlacement.destination_selection` describes the output signal's
@@ -265,6 +304,14 @@ each `ChunkSpec` compact while still making placement of weights,
 uncertainties, and batch-dependent axes deterministic. A component that
 cannot be related to the signal selection must use an explicit binding in the
 plan; shape inference is not sufficient when it is ambiguous.
+
+For an `axes/<name>` component, `axis_names` records which signal dimension or
+dimensions refer to that dataset, including repeated names for a
+multidimensional coordinate. Component-level `units` and `rank_of_data`
+describe the axis dataset itself. The tuple must have the signal's final rank,
+and every non-`.` name must have one corresponding declared axis component.
+This separates axis identity from placement and avoids guessing from array
+lengths.
 
 The first implementation should use a complete declared output schema when it
 is available. When dtype, units, uncertainties, or axes are not predictable
@@ -577,42 +624,44 @@ server capabilities.
 
 ### Phase 1: contracts and version provenance
 
-- Implement and test immutable `ChunkPlan`, `ChunkSpec`, selectors, placements,
+- [x] Implement and test immutable `ChunkPlan`, `ChunkSpec`, selectors, placements,
   serialization, normalization, and hashing.
-- Add `supports_chunked_writes` to `IoSink`.
-- Add capability-checked routing methods to `IoSinks`.
-- Add MoDaCor version metadata to ordinary HDF5 output.
-- Keep all existing non-chunked tests and public behavior unchanged.
+- [x] Add `supports_chunked_writes` to `IoSink`.
+- [x] Add capability-checked routing methods to `IoSinks`.
+- [x] Add MoDaCor version metadata to ordinary HDF5 output.
+- [x] Keep all existing non-chunked tests and public behavior unchanged.
 
 ### Phase 2: signal-only vertical slice
 
-- Add `HDFChunkedProcessingSink` registration as `hdf_chunked`.
-- Implement initialize, fixed-shape signal allocation, slice writes, manifest,
+- [x] Add `HDFChunkedProcessingSink` registration as `hdf_chunked`.
+- [x] Implement initialize, fixed-shape signal allocation, slice writes, manifest,
   resume, and finalize.
-- Cover multiple batch axes, out-of-order writes, and smaller edge chunks.
-- Compare finalized signal output directly with `HDFProcessingSink` output.
+- [x] Cover multiple batch axes, out-of-order writes, and smaller edge chunks.
+- [x] Compare finalized signal output directly with `HDFProcessingSink` output.
 
 ### Phase 3: complete `BaseData`
 
-- Add weights, all uncertainties, units, `rank_of_data`, and static axes.
-- Add batch-dependent axis layouts.
-- Extract shared HDF layout helpers only where duplication is demonstrated.
-- Extend whole-versus-chunked equivalence tests to the complete result tree.
+- [ ] Extend and test array layouts with component units/rank and output layouts
+  with ordered axis names.
+- [ ] Add weights, all uncertainties, units, `rank_of_data`, and static axes.
+- [ ] Add batch-dependent axis layouts.
+- [ ] Extract shared HDF layout helpers only where duplication is demonstrated.
+- [ ] Extend whole-versus-chunked equivalence tests to the complete result tree.
 
 ### Phase 4: runtime integration
 
-- Carry optional `ChunkSpec` through `run_pipeline_job` and `RunResult`.
-- Attach chunk identity to trace events without copying plan-wide metadata into
+- [ ] Carry optional `ChunkSpec` through `run_pipeline_job` and `RunResult`.
+- [ ] Attach chunk identity to trace events without copying plan-wide metadata into
   every event.
-- Add a server-level chunked-output manager and opaque `output_id`.
-- Add initialize, inspect, and finalize API operations.
-- Add `chunk_output` to process requests and call `write_chunk(...)` as a
+- [ ] Add a server-level chunked-output manager and opaque `output_id`.
+- [ ] Add initialize, inspect, and finalize API operations.
+- [ ] Add `chunk_output` to process requests and call `write_chunk(...)` as a
   post-run action using the session's in-memory `ProcessingData`.
-- Distinguish pipeline failures from chunk-publication failures and acknowledge
+- [ ] Distinguish pipeline failures from chunk-publication failures and acknowledge
   success only after the chunk manifest is durable.
-- Support the `awaiting_schema` pilot-chunk transition when layouts cannot be
+- [ ] Support the `awaiting_schema` pilot-chunk transition when layouts cannot be
   declared completely in advance.
-- Preserve full and partial pipeline-run behavior.
+- [ ] Preserve full and partial pipeline-run behavior.
 
 ### Phase 5: beamline readiness
 
