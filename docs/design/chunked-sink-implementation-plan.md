@@ -30,11 +30,17 @@ As of 2026-09-11:
   `hdf_chunked`, including normal write-root enforcement. This is capability
   discovery and configuration, and requests containing `chunk_output` now drive
   the post-run write lifecycle. Requests without `chunk_output` are unchanged.
-- Verification at the complete-schema Phase 4 checkpoint passes the full
-  755-test suite, all changed-file pre-commit hooks, OpenAPI YAML parsing, and a
-  warnings-as-errors Sphinx build. The
-  three reported test warnings are pre-existing numerical-domain warnings in
-  `BaseData` tests.
+- The fixture-independent part of Phase 5 is implemented: a new server can
+  reconstruct an output handle from the persisted HDF plan, operators can
+  reconcile, abandon, resume, or detach assemblies without deleting data,
+  target-level locks are exercised with concurrent handles, and an opt-in
+  subprocess benchmark measures HDF layout, throughput, validation, and peak
+  RSS for generated or external HDF datasets.
+- Verification at the current Phase 5 checkpoint passes 761 tests, with the
+  opt-in RSS regression skipped by default; running that check explicitly also
+  passes. The three reported test warnings are pre-existing numerical-domain
+  warnings in `BaseData` tests. The documentation builds cleanly with Sphinx
+  warnings treated as errors, and the OpenAPI YAML parses successfully.
 
 The optional `awaiting_schema` path is deliberately still open. The current
 immutable `ChunkPlan` hash includes dtype, units, uncertainty, axis, and
@@ -689,12 +695,22 @@ server capabilities.
 
 ### Phase 5: beamline readiness
 
-- Verify bounded memory on representative I22-scale data.
-- Demonstrate numerical and metadata equivalence with a whole-array run.
-- Test interruption, retry, resume, missing chunks, and duplicate requests.
-- Measure HDF5 layout and compression performance.
-- Validate serialized concurrent writes on the target filesystem separately.
-- Define operational cleanup and incomplete-plan recovery procedures.
+- [x] Add an opt-in subprocess RSS scaling regression using generated data.
+- [x] Add an external-HDF benchmark harness and machine-readable report format.
+- [x] Test interruption, retry, restart reconstruction, recovery actions,
+  missing chunks, duplicate requests, and in-process target serialization with
+  small deterministic data.
+- [x] Define non-destructive operational detach, abandon, resume, and
+  incomplete-plan reconciliation procedures.
+- [ ] Verify bounded memory on representative I22-scale data.
+- [ ] Demonstrate numerical and metadata equivalence with a whole-array run.
+- [ ] Measure and select HDF5 layout and compression defaults on representative
+  data and storage.
+- [ ] Validate serialized concurrent writes on the target filesystem separately.
+
+The executable workflow and the boundary between repository tests and external
+beamline data are documented in
+[Chunked Beamline Validation](chunked-beamline-validation.md).
 
 ### Phase 6: Tiled implementation
 

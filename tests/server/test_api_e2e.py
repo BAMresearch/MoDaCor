@@ -1453,3 +1453,129 @@ def test_chunked_output_api_enforces_sink_policy_and_plan_hash(tmp_path: Path):
         json={"plan_hash": "sha256:not-the-plan"},
     )
     assert mismatch.status_code == 409
+
+
+def test_chunked_output_reopens_after_server_restart_and_detaches_safely(monkeypatch, tmp_path: Path):
+    plan = _server_chunk_plan()
+    out_file = tmp_path / "restart.h5"
+    sink_registration = {"ref": "out", "type": "hdf_chunked", "location": str(out_file)}
+
+    def fake_run_pipeline_job(pipeline, **kwargs):
+        chunk = kwargs["chunk_spec"]
+        values = np.arange(chunk.ordinal * 4, chunk.ordinal * 4 + 4, dtype=np.float32).reshape(2, 2)
+        return RunResult(
+            processing_data=_server_processing_data(values),
+            pipeline=pipeline,
+            tracer=None,
+            step_durations={},
+            executed_steps=[],
+            stopped_after_step=None,
+            chunk_spec=chunk,
+        )
+
+    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    first_client = TestClient(create_app())
+    _post_json(
+        first_client,
+        "/v1/sessions",
+        {"session_id": "first-worker", "pipeline": {"yaml_text": "name: first\nsteps: {}\n"}},
+    )
+    initialized = _post_json(
+        first_client,
+        "/v1/chunked-outputs",
+        {"sink": sink_registration, "subpath": "run1", "plan": plan.to_dict()},
+    )
+    _post_json(
+        first_client,
+        "/v1/sessions/first-worker/process",
+        {
+            "mode": "full",
+            "chunk_output": {
+                "output_id": initialized["output_id"],
+                "chunk_spec": _server_chunk(plan, 0).to_dict(),
+            },
+        },
+    )
+    detached = first_client.delete(f"/v1/chunked-outputs/{initialized['output_id']}")
+    assert detached.status_code == 204
+    assert out_file.exists()
+    assert first_client.get(f"/v1/chunked-outputs/{initialized['output_id']}").status_code == 404
+
+    second_client = TestClient(create_app())
+    reopened = _post_json(
+        second_client,
+        "/v1/chunked-outputs/reopen",
+        {"sink": sink_registration, "plan_id": plan.plan_id, "plan_hash": plan.plan_hash},
+    )
+    assert reopened["reopened"] is True
+    assert reopened["completed_chunks"] == 1
+    assert reopened["output_id"] != initialized["output_id"]
+    _post_json(
+        second_client,
+        "/v1/sessions",
+        {"session_id": "second-worker", "pipeline": {"yaml_text": "name: second\nsteps: {}\n"}},
+    )
+    _post_json(
+        second_client,
+        "/v1/sessions/second-worker/process",
+        {
+            "mode": "full",
+            "chunk_output": {
+                "output_id": reopened["output_id"],
+                "chunk_spec": _server_chunk(plan, 1).to_dict(),
+            },
+        },
+    )
+
+    third_client = TestClient(create_app())
+    reopened_again = _post_json(
+        third_client,
+        "/v1/chunked-outputs/reopen",
+        {"sink": sink_registration, "plan_id": plan.plan_id},
+    )
+    finalized = _post_json(
+        third_client,
+        f"/v1/chunked-outputs/{reopened_again['output_id']}/finalize",
+        {"plan_hash": plan.plan_hash},
+    )
+    assert finalized["status"] == "complete"
+    with h5py.File(out_file, "r") as h5:
+        pipeline = json.loads(h5["processing/pipeline/run1/spec"][()].decode())
+        assert pipeline["name"] == "second"
+
+
+def test_chunked_output_recovery_api_reconciles_abandons_and_resumes(tmp_path: Path):
+    plan = _server_chunk_plan()
+    out_file = tmp_path / "recovery-api.h5"
+    client = TestClient(create_app())
+    initialized = _post_json(
+        client,
+        "/v1/chunked-outputs",
+        {
+            "sink": {"ref": "out", "type": "hdf_chunked", "location": str(out_file)},
+            "subpath": "run1",
+            "plan": plan.to_dict(),
+        },
+    )
+    output_id = initialized["output_id"]
+    with h5py.File(out_file, "r+") as h5:
+        h5["processing/chunk_plans/server-plan/chunks/c0/status"][()] = "writing"
+
+    reconciled = _post_json(
+        client,
+        f"/v1/chunked-outputs/{output_id}/recover",
+        {"action": "reconcile"},
+    )
+    assert reconciled["failed_chunks"] == 1
+    abandoned = _post_json(
+        client,
+        f"/v1/chunked-outputs/{output_id}/recover",
+        {"action": "abandon"},
+    )
+    assert abandoned["status"] == "abandoned"
+    resumed = _post_json(
+        client,
+        f"/v1/chunked-outputs/{output_id}/recover",
+        {"action": "resume"},
+    )
+    assert resumed["status"] == "writing"

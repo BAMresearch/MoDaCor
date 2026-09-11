@@ -15,5 +15,6 @@ tiled-io-upgrade
 chunked-processing-handoff
 chunked-operation
 chunked-sink-implementation-plan
+chunked-beamline-validation
 external-parallel-runner
 ```

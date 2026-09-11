@@ -91,6 +91,10 @@ def test_chunk_capability_routing_rejects_ordinary_sink(tmp_path: Path):
     assert sinks.get_sink("ordinary").supports_chunked_writes is False
     with pytest.raises(UnsupportedSinkCapability, match="HDFProcessingSink"):
         sinks.initialize_chunked("ordinary::run", _plan())
+    with pytest.raises(UnsupportedSinkCapability, match="HDFProcessingSink"):
+        sinks.load_chunked_plan("ordinary", "assembly-1")
+    with pytest.raises(UnsupportedSinkCapability, match="HDFProcessingSink"):
+        sinks.recover_chunked("ordinary::run", plan=_plan(), action="reconcile")
 
 
 def test_hdf_chunked_sink_writes_edge_chunks_out_of_order_and_finalizes(tmp_path: Path):
@@ -206,6 +210,39 @@ def test_hdf_chunked_sink_inspects_failed_write_and_retries(monkeypatch, tmp_pat
     inspected = sink.inspect_chunked("run1", plan=plan)
     assert inspected.completed_chunks == 1
     assert inspected.failed_chunks == 0
+
+
+def test_hdf_chunked_sink_loads_and_recovers_persisted_plan(tmp_path: Path):
+    out_file = tmp_path / "recover.h5"
+    plan = _plan()
+    sink = HDFChunkedProcessingSink(resource_location=out_file)
+    sinks = IoSinks()
+    sinks.register_sink(sink, "chunked")
+    sink.initialize_chunked("run1", plan)
+
+    with h5py.File(out_file, "r+") as h5:
+        h5["processing/chunk_plans/assembly-1/chunks/c000000/status"][()] = "writing"
+        h5["processing/chunk_plans/assembly-1/status"][()] = "finalizing"
+
+    subpath, loaded = sinks.load_chunked_plan("chunked", "assembly-1")
+    assert subpath == "run1"
+    assert loaded == plan
+
+    reconciled = sinks.recover_chunked("chunked::run1", plan=loaded, action="reconcile")
+    assert reconciled.status == "writing"
+    assert reconciled.failed_chunks == 1
+
+    abandoned = sink.recover_chunked("run1", plan=loaded, action="abandon")
+    assert abandoned.status == "abandoned"
+    with pytest.raises(RuntimeError, match="not writable"):
+        sink.write_chunk(
+            "run1",
+            _processing_data(np.ones((2, 2), dtype=np.float32)),
+            plan=loaded,
+            chunk=_chunk(plan, 0, 0, 2),
+        )
+    resumed = sink.recover_chunked("run1", plan=loaded, action="resume")
+    assert resumed.status == "writing"
 
 
 def test_hdf_chunked_sink_rejects_overlap_and_conflicting_retry(tmp_path: Path):

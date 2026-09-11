@@ -50,6 +50,10 @@ def _read_text(value: h5py.Dataset) -> str:
     return str(payload)
 
 
+def _as_text(value: Any) -> str:
+    return value.decode("utf-8") if isinstance(value, bytes) else str(value)
+
+
 def _status(group: h5py.Group) -> str:
     if "status" not in group:
         return "unknown"
@@ -174,6 +178,7 @@ def _create_component_dataset(
     layout: ChunkArrayLayout,
     *,
     compression: str | None,
+    compression_opts: Any,
     configured_chunks: Any,
 ) -> h5py.Dataset | None:
     kind, name = _component_parts(layout.component)
@@ -201,6 +206,7 @@ def _create_component_dataset(
         dtype=np.dtype(layout.dtype),
         chunks=chunks,
         compression=None if scalar else compression,
+        compression_opts=None if scalar or compression is None else compression_opts,
         fillvalue=None if scalar else _fill_value(np.dtype(layout.dtype)),
     )
     if kind == "signal":
@@ -736,6 +742,7 @@ class HDFChunkedProcessingSink(IoSink):
             run_group.attrs["NX_class"] = "NXcollection"
             run_group.attrs["modacor_version"] = __version__
             compression = self.iosink_method_kwargs.get("compression")
+            compression_opts = self.iosink_method_kwargs.get("compression_opts")
             hdf_chunks = self.iosink_method_kwargs.get("chunks", True)
             for output in plan.outputs:
                 bundle_key, basedata_name = _destination_parts(output.destination_path)
@@ -753,6 +760,7 @@ class HDFChunkedProcessingSink(IoSink):
                         output,
                         layout,
                         compression=compression,
+                        compression_opts=compression_opts,
                         configured_chunks=hdf_chunks,
                     )
                     if layout.placement_binding.kind == "static":
@@ -765,6 +773,30 @@ class HDFChunkedProcessingSink(IoSink):
             h5.flush()
             return self._result(plan_group, plan, resource_location=out_path)
 
+    def load_chunked_plan(
+        self,
+        plan_id: str,
+        *,
+        override_resource_location: Path | None = None,
+    ) -> tuple[str, ChunkPlan]:
+        """Load a persisted plan and run subpath for server reconstruction."""
+
+        if not plan_id or "/" in plan_id or plan_id in {".", ".."}:
+            raise ValueError("plan_id must be a non-empty chunk-plan identifier.")
+        out_path = self._path(override_resource_location)
+        with h5py.File(out_path, "r") as h5:
+            path = f"processing/chunk_plans/{plan_id}"
+            if path not in h5 or not isinstance(h5[path], h5py.Group):
+                raise KeyError(f"Chunk plan {plan_id!r} was not found in {out_path}.")
+            plan_group = h5[path]
+            if "plan_json" not in plan_group or "run_name" not in plan_group.attrs:
+                raise ValueError(f"Stored chunk plan {plan_id!r} is missing reconstruction metadata.")
+            plan = ChunkPlan.from_dict(json.loads(_read_text(plan_group["plan_json"])))
+            run_name = _as_text(plan_group.attrs["run_name"])
+            self._plan_group(h5, plan)
+            self._validate_stored_layout(h5, run_name, plan)
+            return run_name, plan
+
     def write_chunk(
         self,
         subpath: str,
@@ -773,6 +805,8 @@ class HDFChunkedProcessingSink(IoSink):
         plan: ChunkPlan,
         chunk: ChunkSpec,
         execution_metadata: dict[str, Any] | None = None,
+        pipeline_spec: dict[str, Any] | None = None,
+        pipeline_yaml: str | None = None,
         override_resource_location: Path | None = None,
     ) -> ChunkWriteResult:
         self._validate_supported_plan(plan)
@@ -843,6 +877,11 @@ class HDFChunkedProcessingSink(IoSink):
                 _set_status(manifest_entry, "failed")
                 h5.flush()
                 raise
+            provenance = plan_group.require_group("provenance")
+            if pipeline_spec is not None:
+                _write_text_field(provenance, "pipeline_spec_json", _json_dumps_bytes(pipeline_spec).decode("utf-8"))
+            if pipeline_yaml is not None:
+                _write_text_field(provenance, "pipeline_yaml", pipeline_yaml)
             for pending in pending_writes:
                 if pending.static_state is not None:
                     _set_status(pending.static_state, "complete")
@@ -900,6 +939,59 @@ class HDFChunkedProcessingSink(IoSink):
                 resource_location=str(out_path),
             )
 
+    def recover_chunked(
+        self,
+        subpath: str,
+        *,
+        plan: ChunkPlan,
+        action: str,
+        override_resource_location: Path | None = None,
+    ) -> ChunkOutputStatus:
+        """Reconcile interrupted state, abandon an output, or resume it."""
+
+        if action not in {"reconcile", "abandon", "resume"}:
+            raise ValueError("action must be one of: reconcile, abandon, resume.")
+        out_path = self._path(override_resource_location)
+        run_name = _normalise_subpath(subpath)
+        with h5py.File(out_path, "r+") as h5:
+            plan_group = self._plan_group(h5, plan)
+            self._validate_stored_layout(h5, run_name, plan)
+            current = _status(plan_group)
+            if current == "complete":
+                if action != "reconcile":
+                    raise RuntimeError("A completed chunk plan cannot be abandoned or resumed.")
+            elif action == "reconcile":
+                if current == "initializing":
+                    raise RuntimeError("An interrupted initialization must be replaced, not reconciled.")
+                if current not in {"writing", "finalizing"}:
+                    raise RuntimeError(f"Chunk plan cannot be reconciled from status {current!r}.")
+                for chunk_id in plan.expected_chunk_ids:
+                    entry = _chunk_group(plan_group, chunk_id)
+                    if _status(entry) == "writing":
+                        _set_status(entry, "failed")
+                components = plan_group.get("components")
+                if isinstance(components, h5py.Group):
+                    interrupted_components: list[h5py.Group] = []
+
+                    def collect_interrupted(_name: str, item: Any) -> None:
+                        if isinstance(item, h5py.Group) and _status(item) == "writing":
+                            interrupted_components.append(item)
+
+                    components.visititems(collect_interrupted)
+                    for component in interrupted_components:
+                        _set_status(component, "failed")
+                _set_status(plan_group, "writing")
+            elif action == "abandon":
+                if current not in {"writing", "finalizing"}:
+                    raise RuntimeError(f"Chunk plan cannot be abandoned from status {current!r}.")
+                _set_status(plan_group, "abandoned")
+            else:
+                if current != "abandoned":
+                    raise RuntimeError(f"Chunk plan cannot be resumed from status {current!r}.")
+                _set_status(plan_group, "writing")
+            h5.flush()
+        return self.inspect_chunked(subpath, plan=plan, override_resource_location=out_path)
+
     def finalize_chunked(
         self,
         subpath: str,
@@ -935,6 +1027,13 @@ class HDFChunkedProcessingSink(IoSink):
             if len(completed_specs) != plan.total_chunks:
                 raise ValueError("Completed chunk manifest is missing one or more stored ChunkSpec records.")
             self._validate_complete_coverage(plan_group, plan, completed_specs)
+
+            provenance = plan_group.get("provenance")
+            if isinstance(provenance, h5py.Group):
+                if pipeline_spec is None and "pipeline_spec_json" in provenance:
+                    pipeline_spec = json.loads(_read_text(provenance["pipeline_spec_json"]))
+                if pipeline_yaml is None and "pipeline_yaml" in provenance:
+                    pipeline_yaml = _read_text(provenance["pipeline_yaml"])
 
             _set_status(plan_group, "finalizing")
             h5.flush()

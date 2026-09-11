@@ -67,14 +67,7 @@ class ChunkedOutputManager:
             raise ValueError("Sink registration ref, type, and location must be non-empty.")
         return normalized
 
-    def initialize(
-        self,
-        *,
-        sink_spec: Mapping[str, Any],
-        subpath: str,
-        plan: ChunkPlan,
-        collision: str = "error",
-    ) -> tuple[ChunkedOutputResource, ChunkWriteResult]:
+    def _prepare_sink(self, sink_spec: Mapping[str, Any]) -> tuple[dict[str, Any], IoSink, tuple[str, str], RLock]:
         normalized = self._normalize_sink_spec(sink_spec)
         self._policy.validate_sink_registration(normalized)
         sink = build_sink_from_spec(normalized, **self._policy.sink_builder_kwargs())
@@ -88,6 +81,17 @@ class ChunkedOutputManager:
         target_key = (sink_type, location)
         with self._lock:
             target_lock = self._target_locks.setdefault(target_key, RLock())
+        return normalized, sink, target_key, target_lock
+
+    def initialize(
+        self,
+        *,
+        sink_spec: Mapping[str, Any],
+        subpath: str,
+        plan: ChunkPlan,
+        collision: str = "error",
+    ) -> tuple[ChunkedOutputResource, ChunkWriteResult]:
+        normalized, sink, target_key, target_lock = self._prepare_sink(sink_spec)
 
         with target_lock:
             result = sink.initialize_chunked(str(subpath), plan, collision=collision)
@@ -111,6 +115,35 @@ class ChunkedOutputManager:
                         del self._resources[output_id]
                 self._resources[resource.output_id] = resource
         return resource, result
+
+    def reopen(
+        self,
+        *,
+        sink_spec: Mapping[str, Any],
+        plan_id: str,
+        plan_hash: str | None = None,
+    ) -> tuple[ChunkedOutputResource, ChunkOutputStatus]:
+        """Reconstruct a server mapping from an authoritative sink manifest."""
+
+        normalized, sink, target_key, target_lock = self._prepare_sink(sink_spec)
+        with target_lock:
+            subpath, plan = sink.load_chunked_plan(plan_id)
+            if plan_hash is not None and str(plan_hash) != plan.plan_hash:
+                raise ValueError("plan_hash does not match the persisted chunk plan.")
+            sink.initialize_chunked(subpath, plan, collision="resume")
+            resource = ChunkedOutputResource(
+                output_id=f"out-{uuid4().hex[:12]}",
+                sink_spec=normalized,
+                target_key=target_key,
+                subpath=subpath,
+                plan=plan,
+                sink=sink,
+                lock=target_lock,
+            )
+            with self._lock:
+                self._resources[resource.output_id] = resource
+            status = sink.inspect_chunked(subpath, plan=plan)
+        return resource, status
 
     def get(self, output_id: str) -> ChunkedOutputResource:
         with self._lock:
@@ -148,12 +181,25 @@ class ChunkedOutputManager:
                 plan=resource.plan,
                 chunk=chunk,
                 execution_metadata=execution_metadata,
+                pipeline_spec=pipeline_spec,
+                pipeline_yaml=pipeline_yaml,
             )
             if pipeline_spec is not None:
                 resource.pipeline_spec = deepcopy(pipeline_spec)
             if pipeline_yaml is not None:
                 resource.pipeline_yaml = str(pipeline_yaml)
             return result
+
+    def recover(self, output_id: str, *, action: str) -> ChunkOutputStatus:
+        resource = self.get(output_id)
+        with resource.lock:
+            return resource.sink.recover_chunked(resource.subpath, plan=resource.plan, action=action)
+
+    def detach(self, output_id: str) -> bool:
+        """Forget one opaque mapping without deleting its persistent output."""
+
+        with self._lock:
+            return self._resources.pop(str(output_id), None) is not None
 
     def finalize(self, output_id: str, *, plan_hash: str) -> ChunkWriteResult:
         resource = self.get(output_id)

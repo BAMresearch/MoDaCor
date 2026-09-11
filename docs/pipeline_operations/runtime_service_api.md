@@ -383,9 +383,23 @@ counts and accepts `offset` and `limit` for chunk-entry pagination.
 
 `POST /chunked-outputs/{output_id}/finalize` takes `{"plan_hash":
 "sha256:..."}`. Missing chunks or a hash mismatch return `409`; repeating a
-successful finalization with the same hash is idempotent. Output ids are
-currently held in server memory, while the plan and manifest are persisted in
-the backend.
+successful finalization with the same hash is idempotent.
+
+Output ids are held in server memory, while the plan, run subpath, manifest,
+and staged pipeline provenance are persisted in the backend. After a restart,
+`POST /chunked-outputs/reopen` accepts a sink registration, `plan_id`, and
+optional `plan_hash`, validates the stored layout, and returns a new output id.
+It does not require the original worker session or a copy of the complete plan.
+The `session_id` plus `sink_ref` convenience form is also accepted when that
+session is still present, but an explicit sink registration is the
+restart-independent form.
+
+`POST /chunked-outputs/{output_id}/recover` accepts `reconcile`, `abandon`, or
+`resume`. Reconciliation marks stale `writing` entries as retryable `failed`
+entries and returns an interrupted finalization to `writing`. Deleting an
+output id only detaches the server mapping; it never deletes backend content.
+The complete recovery runbook is in
+[Chunked Beamline Validation](../design/chunked-beamline-validation.md).
 
 ### `POST /sessions/{session_id}/sinks/patch`
 

@@ -80,6 +80,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ChunkedOutputStatus"
 
+  /chunked-outputs/reopen:
+    post:
+      tags: [Chunked Outputs]
+      summary: Reconstruct an output handle from a persistent manifest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReopenChunkedOutputRequest"
+      responses:
+        "201":
+          description: Output handle reconstructed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChunkedOutputStatus"
+
   /chunked-outputs/{output_id}:
     parameters:
       - $ref: "#/components/parameters/OutputId"
@@ -100,6 +118,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChunkedOutputStatus"
+    delete:
+      tags: [Chunked Outputs]
+      summary: Detach the process-local handle without deleting backend data
+      responses:
+        "204":
+          description: Handle detached
+
+  /chunked-outputs/{output_id}/recover:
+    parameters:
+      - $ref: "#/components/parameters/OutputId"
+    post:
+      tags: [Chunked Outputs]
+      summary: Reconcile, abandon, or resume an incomplete assembly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoverChunkedOutputRequest"
+      responses:
+        "200":
+          description: Recovery action applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChunkedOutputStatus"
+        "409":
+          description: Recovery action is invalid for the current state
 
   /chunked-outputs/{output_id}/finalize:
     parameters:
@@ -763,6 +809,32 @@ components:
       oneOf:
         - required: [sink]
         - required: [session_id, sink_ref]
+
+    ReopenChunkedOutputRequest:
+      type: object
+      required: [plan_id]
+      properties:
+        sink:
+          $ref: "#/components/schemas/SinkRegistration"
+        session_id:
+          type: string
+        sink_ref:
+          type: string
+        plan_id:
+          type: string
+        plan_hash:
+          type: string
+      oneOf:
+        - required: [sink]
+        - required: [session_id, sink_ref]
+
+    RecoverChunkedOutputRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [reconcile, abandon, resume]
 
     ChunkedOutputStatus:
       type: object

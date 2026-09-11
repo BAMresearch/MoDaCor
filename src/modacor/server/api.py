@@ -167,9 +167,21 @@ def create_app(  # noqa: C901
     def initialize_chunked_output(payload: dict[str, Any]) -> dict[str, Any]:
         return _call(service.initialize_chunked_output, payload)
 
+    @app.post("/v1/chunked-outputs/reopen", status_code=201)
+    def reopen_chunked_output(payload: dict[str, Any]) -> dict[str, Any]:
+        return _call(service.reopen_chunked_output, payload)
+
     @app.get("/v1/chunked-outputs/{output_id}")
     def inspect_chunked_output(output_id: str, offset: int = 0, limit: int = 100) -> dict[str, Any]:
         return _call(service.inspect_chunked_output, output_id, offset=offset, limit=limit)
+
+    @app.delete("/v1/chunked-outputs/{output_id}", status_code=204)
+    def detach_chunked_output(output_id: str) -> None:
+        _call(service.detach_chunked_output, output_id)
+
+    @app.post("/v1/chunked-outputs/{output_id}/recover")
+    def recover_chunked_output(output_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return _call(service.recover_chunked_output, output_id, payload)
 
     @app.post("/v1/chunked-outputs/{output_id}/finalize")
     def finalize_chunked_output(output_id: str, payload: dict[str, Any] = Body(default_factory=dict)) -> dict[str, Any]:

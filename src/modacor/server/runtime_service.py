@@ -95,18 +95,7 @@ class RuntimeService:
         self.process_step_registry = self.policy.create_process_step_registry()
         self.chunked_outputs = ChunkedOutputManager(policy=self.policy)
 
-    def initialize_chunked_output(self, payload: dict[str, Any]) -> dict[str, Any]:
-        plan_raw = payload.get("plan")
-        if not isinstance(plan_raw, dict):
-            raise ApiError(status_code=422, detail="plan must be a complete ChunkPlan object.")
-        try:
-            plan = ChunkPlan.from_dict(plan_raw)
-        except (KeyError, TypeError, ValueError) as exc:
-            raise ApiError(
-                status_code=422,
-                detail=f"Invalid complete ChunkPlan: {exc}. Pilot schema discovery requires a future provisional-plan contract.",
-            ) from exc
-
+    def _chunk_sink_registration(self, payload: dict[str, Any]) -> dict[str, Any]:
         sink_raw = payload.get("sink")
         if sink_raw is None:
             session_id = str(payload.get("session_id", "")).strip()
@@ -120,6 +109,21 @@ class RuntimeService:
                 raise ApiError(status_code=404, detail=f"Sink {sink_ref!r} is not registered in the session.") from exc
         if not isinstance(sink_raw, dict):
             raise ApiError(status_code=422, detail="sink must be an I/O registration object.")
+        return sink_raw
+
+    def initialize_chunked_output(self, payload: dict[str, Any]) -> dict[str, Any]:
+        plan_raw = payload.get("plan")
+        if not isinstance(plan_raw, dict):
+            raise ApiError(status_code=422, detail="plan must be a complete ChunkPlan object.")
+        try:
+            plan = ChunkPlan.from_dict(plan_raw)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ApiError(
+                status_code=422,
+                detail=f"Invalid complete ChunkPlan: {exc}. Pilot schema discovery requires a future provisional-plan contract.",
+            ) from exc
+
+        sink_raw = self._chunk_sink_registration(payload)
 
         collision = str(payload.get("collision", "error"))
         try:
@@ -142,6 +146,32 @@ class RuntimeService:
             "subpath": resource.subpath,
             **result.to_dict(),
             **progress,
+        }
+
+    def reopen_chunked_output(self, payload: dict[str, Any]) -> dict[str, Any]:
+        plan_id = str(payload.get("plan_id", "")).strip()
+        if not plan_id:
+            raise ApiError(status_code=422, detail="plan_id is required.")
+        sink_raw = self._chunk_sink_registration(payload)
+        plan_hash_raw = payload.get("plan_hash")
+        plan_hash = None if plan_hash_raw is None else str(plan_hash_raw)
+        try:
+            resource, status = self.chunked_outputs.reopen(
+                sink_spec=sink_raw,
+                plan_id=plan_id,
+                plan_hash=plan_hash,
+            )
+        except KeyError as exc:
+            raise ApiError(status_code=404, detail=str(exc)) from exc
+        except (TypeError, ValueError) as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+        return {
+            "output_id": resource.output_id,
+            "created_utc": resource.created_utc,
+            "sink_type": resource.sink_spec["type"],
+            "subpath": resource.subpath,
+            "reopened": True,
+            **status.to_dict(),
         }
 
     def inspect_chunked_output(self, output_id: str, *, offset: int = 0, limit: int = 100) -> dict[str, Any]:
@@ -182,6 +212,24 @@ class RuntimeService:
                 detail={"code": "CHUNK_FINALIZE_CONFLICT", "message": str(exc), "progress": progress},
             ) from exc
         return {"output_id": output_id, **result.to_dict()}
+
+    def recover_chunked_output(self, output_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        action = str(payload.get("action", "")).strip()
+        if action not in {"reconcile", "abandon", "resume"}:
+            raise ApiError(status_code=422, detail="action must be one of: reconcile, abandon, resume.")
+        try:
+            status = self.chunked_outputs.recover(output_id, action=action)
+        except KeyError as exc:
+            raise ApiError(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise ApiError(status_code=409, detail=str(exc)) from exc
+        return {"output_id": output_id, "action": action, **status.to_dict()}
+
+    def detach_chunked_output(self, output_id: str) -> None:
+        if not self.chunked_outputs.detach(output_id):
+            raise ApiError(status_code=404, detail="Chunked output not found.")
 
     def health(self) -> dict[str, str]:
         """Return a lightweight liveness payload for process health checks."""

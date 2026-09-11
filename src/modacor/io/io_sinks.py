@@ -100,6 +100,23 @@ class IoSinks:
         sink, subpath = self._get_chunked_sink(target_reference)
         return sink.inspect_chunked(subpath, plan=plan, **kwargs)
 
+    def load_chunked_plan(self, sink_reference: str, plan_id: str, **kwargs: Any) -> tuple[str, ChunkPlan]:
+        sink = self.get_sink(sink_reference)
+        if not sink.supports_chunked_writes:
+            raise UnsupportedSinkCapability(type(sink), "chunked_writes")
+        return sink.load_chunked_plan(plan_id, **kwargs)
+
+    def recover_chunked(
+        self,
+        target_reference: str,
+        *,
+        plan: ChunkPlan,
+        action: str,
+        **kwargs: Any,
+    ) -> ChunkOutputStatus:
+        sink, subpath = self._get_chunked_sink(target_reference)
+        return sink.recover_chunked(subpath, plan=plan, action=action, **kwargs)
+
     def finalize_chunked(
         self,
         target_reference: str,
