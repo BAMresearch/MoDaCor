@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import h5py
@@ -15,6 +16,7 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.buffer import decode_npy, encode_npy
+from modacor.io.chunking import AxisSelector, ChunkArrayLayout, ChunkOutputLayout, ChunkPlacement, ChunkPlan, ChunkSpec
 from modacor.runner.pipeline import Pipeline
 from modacor.runner.pipeline_runner import PipelineRunError, RunResult
 from modacor.server.api import create_app
@@ -24,6 +26,58 @@ from modacor.server.session_manager import SessionManager
 fastapi = pytest.importorskip("fastapi")
 testclient_mod = pytest.importorskip("fastapi.testclient")
 TestClient = testclient_mod.TestClient
+
+
+def _server_chunk_plan() -> ChunkPlan:
+    return ChunkPlan(
+        schema_version="1.0",
+        plan_id="server-plan",
+        total_chunks=2,
+        expected_chunk_ids=("c0", "c1"),
+        outputs=(
+            ChunkOutputLayout(
+                output_id="signal",
+                processing_path="/sample/signal",
+                destination_path="sample/signal",
+                units="count",
+                rank_of_data=1,
+                arrays=(ChunkArrayLayout(component="signal", final_shape=(4, 2), dtype="float32"),),
+            ),
+        ),
+        driver={"full_shape": [4, 2]},
+        batch_axes=(0,),
+        data_axes=(1,),
+    )
+
+
+def _server_chunk(plan: ChunkPlan, ordinal: int) -> ChunkSpec:
+    start = ordinal * 2
+    stop = start + 2
+    return ChunkSpec(
+        schema_version=plan.schema_version,
+        plan_id=plan.plan_id,
+        plan_hash=plan.plan_hash,
+        chunk_id=plan.expected_chunk_ids[ordinal],
+        ordinal=ordinal,
+        grid_index=(ordinal,),
+        source_selection=(AxisSelector.sliced(start, stop), AxisSelector.all()),
+        expected_input_shape=(2, 2),
+        placements=(
+            ChunkPlacement(
+                output_id="signal",
+                destination_selection=(AxisSelector.sliced(start, stop), AxisSelector.all()),
+                expected_shape=(2, 2),
+            ),
+        ),
+    )
+
+
+def _server_processing_data(values: np.ndarray) -> ProcessingData:
+    processing_data = ProcessingData()
+    bundle = DataBundle()
+    bundle["signal"] = BaseData(signal=values, units=ureg.Unit("count"), rank_of_data=1)
+    processing_data["sample"] = bundle
+    return processing_data
 
 
 def _trusted_policy_summary() -> dict:
@@ -1187,3 +1241,215 @@ steps:
     assert "fallback_reason" in result
     assert call_count["n"] == 2
     assert seen_sink_locations == [tmp_path / "auto.csv", tmp_path / "auto.csv"]
+
+
+def test_chunked_output_api_lifecycle_survives_worker_session_deletion(monkeypatch, tmp_path: Path):
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+    plan = _server_chunk_plan()
+    out_file = tmp_path / "server-chunked.h5"
+
+    worker_pipelines = {
+        "worker-0": "name: worker-0\nsteps: {}\n",
+        "worker-1": (
+            """
+name: worker-1
+steps:
+  poisson:
+    module: PoissonUncertainties
+    requires_steps: []
+    configuration:
+      with_processing_keys: [sample]
+"""
+        ),
+    }
+    for session_id in ("worker-0", "worker-1"):
+        _post_json(
+            client,
+            "/v1/sessions",
+            {"session_id": session_id, "pipeline": {"yaml_text": worker_pipelines[session_id]}},
+        )
+    manager.upsert_sinks(
+        "worker-0",
+        [{"ref": "assembled", "type": "hdf_chunked", "location": str(out_file)}],
+    )
+    initialized = _post_json(
+        client,
+        "/v1/chunked-outputs",
+        {
+            "session_id": "worker-0",
+            "sink_ref": "assembled",
+            "subpath": "run1",
+            "plan": plan.to_dict(),
+        },
+    )
+    output_id = initialized["output_id"]
+    assert output_id.startswith("out-")
+    assert initialized["status"] == "writing"
+    assert initialized["missing_chunks"] == 2
+
+    manager.delete_session("worker-0")
+    status = client.get(f"/v1/chunked-outputs/{output_id}?offset=1&limit=1")
+    assert status.status_code == 200
+    assert status.json()["missing_chunks"] == 2
+    assert [item["chunk_id"] for item in status.json()["chunks"]] == ["c1"]
+
+    incomplete = client.post(
+        f"/v1/chunked-outputs/{output_id}/finalize",
+        json={"plan_hash": plan.plan_hash},
+    )
+    assert incomplete.status_code == 409
+    assert incomplete.json()["detail"]["code"] == "CHUNK_FINALIZE_CONFLICT"
+
+    calls = {"ordinal": 0}
+
+    def fake_run_pipeline_job(pipeline, **kwargs):
+        ordinal = calls["ordinal"]
+        calls["ordinal"] += 1
+        values = np.arange(ordinal * 4, ordinal * 4 + 4, dtype=np.float32).reshape(2, 2)
+        return RunResult(
+            processing_data=_server_processing_data(values),
+            pipeline=pipeline,
+            tracer=None,
+            step_durations={},
+            executed_steps=[],
+            stopped_after_step=None,
+            chunk_spec=kwargs.get("chunk_spec"),
+        )
+
+    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    for ordinal in (0, 1):
+        process_payload = {
+            "mode": "full" if ordinal == 0 else "partial",
+            "chunk_output": {
+                "output_id": output_id,
+                "chunk_spec": _server_chunk(plan, ordinal).to_dict(),
+            },
+        }
+        if ordinal == 1:
+            process_payload["changed_keys"] = ["sample.signal"]
+        response = _post_json(
+            client,
+            "/v1/sessions/worker-1/process",
+            process_payload,
+        )
+        assert response["chunk_output"]["chunk_id"] == f"c{ordinal}"
+        assert response["chunk_output"]["completed_chunks"] == ordinal + 1
+
+    complete_status = client.get(f"/v1/chunked-outputs/{output_id}").json()
+    assert complete_status["completed_chunks"] == 2
+    assert complete_status["missing_chunks"] == 0
+
+    finalized = _post_json(
+        client,
+        f"/v1/chunked-outputs/{output_id}/finalize",
+        {"plan_hash": plan.plan_hash},
+    )
+    assert finalized["status"] == "complete"
+    repeated = _post_json(
+        client,
+        f"/v1/chunked-outputs/{output_id}/finalize",
+        {"plan_hash": plan.plan_hash},
+    )
+    assert repeated["status"] == "complete"
+    with h5py.File(out_file, "r") as h5:
+        np.testing.assert_array_equal(
+            h5["processing/result/run1/sample/signal/signal"],
+            np.arange(8, dtype=np.float32).reshape(4, 2),
+        )
+        assert "spec" in h5["processing/pipeline/run1"]
+        execution = json.loads(h5["processing/chunk_plans/server-plan/chunks/c1/execution_json"][()].decode())
+        assert execution["effective_mode"] == "partial"
+        assert execution["session_id"] == "worker-1"
+        assert execution["chunk_id"] == "c1"
+        assert execution["sources"] == []
+
+
+def test_chunk_publication_failure_is_distinct_from_pipeline_failure(monkeypatch, tmp_path: Path):
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+    plan = _server_chunk_plan()
+    _post_json(
+        client,
+        "/v1/sessions",
+        {"session_id": "bad-writer", "pipeline": {"yaml_text": "name: bad\nsteps: {}\n"}},
+    )
+    initialized = _post_json(
+        client,
+        "/v1/chunked-outputs",
+        {
+            "sink": {
+                "ref": "assembled",
+                "type": "hdf_chunked",
+                "location": str(tmp_path / "bad-write.h5"),
+            },
+            "subpath": "run1",
+            "plan": plan.to_dict(),
+        },
+    )
+
+    def fake_run_pipeline_job(pipeline, **kwargs):
+        return RunResult(
+            processing_data=_server_processing_data(np.ones((2, 2), dtype=np.float64)),
+            pipeline=pipeline,
+            tracer=None,
+            step_durations={},
+            executed_steps=[],
+            stopped_after_step=None,
+            chunk_spec=kwargs.get("chunk_spec"),
+        )
+
+    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    response = client.post(
+        "/v1/sessions/bad-writer/process",
+        json={
+            "mode": "full",
+            "chunk_output": {
+                "output_id": initialized["output_id"],
+                "chunk_spec": _server_chunk(plan, 0).to_dict(),
+            },
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"]["code"] == "CHUNK_WRITE_FAILED"
+    latest = client.get("/v1/sessions/bad-writer/errors/latest").json()["latest_error"]
+    assert latest["code"] == "CHUNK_WRITE_FAILED"
+    assert latest["details"]["processing_succeeded"] is True
+    assert manager.get_session("bad-writer").processing_data is not None
+
+
+def test_chunked_output_api_enforces_sink_policy_and_plan_hash(tmp_path: Path):
+    allowed = tmp_path / "allowed"
+    allowed.mkdir()
+    policy = RuntimePolicy.restricted(sink_write_roots=(allowed,))
+    app = create_app(runtime_policy=policy)
+    client = TestClient(app)
+    plan = _server_chunk_plan()
+
+    outside = client.post(
+        "/v1/chunked-outputs",
+        json={
+            "sink": {"ref": "out", "type": "hdf_chunked", "location": str(tmp_path / "outside.h5")},
+            "subpath": "run1",
+            "plan": plan.to_dict(),
+        },
+    )
+    assert outside.status_code == 422
+
+    initialized = _post_json(
+        client,
+        "/v1/chunked-outputs",
+        {
+            "sink": {"ref": "out", "type": "hdf_chunked", "location": str(allowed / "inside.h5")},
+            "subpath": "run1",
+            "plan": plan.to_dict(),
+        },
+    )
+    mismatch = client.post(
+        f"/v1/chunked-outputs/{initialized['output_id']}/finalize",
+        json={"plan_hash": "sha256:not-the-plan"},
+    )
+    assert mismatch.status_code == 409

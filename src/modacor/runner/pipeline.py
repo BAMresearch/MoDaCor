@@ -705,6 +705,7 @@ class Pipeline:
         include_rendered_trace: bool = False,
         include_rendered_config: bool = False,
         rendered_format: str = "text/html",
+        chunk_identity: dict[str, Any] | None = None,
     ) -> TraceEvent:
         """
         Create & attach a TraceEvent for `node`, using `tracer.events` if available.
@@ -826,6 +827,7 @@ class Pipeline:
             datasets=datasets,
             duration_s=duration_s,
             messages=messages,
+            chunk_identity=chunk_identity,
         )
 
         self.add_trace_event(event)

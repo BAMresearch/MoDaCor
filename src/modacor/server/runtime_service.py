@@ -13,6 +13,7 @@ from typing import Any
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.debug.pipeline_tracer import PlainUnicodeRenderer
 from modacor.io.buffer.codec import decode_npy, encode_npy
+from modacor.io.chunking import ChunkPlan, ChunkSpec
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.runner import run_pipeline_job
@@ -20,6 +21,7 @@ from modacor.runner.pipeline import Pipeline
 from modacor.runner.pipeline_runner import PipelineRunError, RunResult
 from modacor.runner.process_step_registry import ProcessStepRegistry
 
+from .chunked_outputs import ChunkedOutputManager
 from .errors import ApiError
 from .execution import find_dirty_step_ids
 from .io_utils import build_sinks_from_session, build_sources_from_session, write_hdf_output
@@ -33,6 +35,21 @@ __all__ = ["RuntimeService"]
 TRACE_REPORT_LINES = 500
 
 
+def _source_provenance(session: PipelineSession) -> list[dict[str, str]]:
+    """Record source identity without persisting constructor kwargs or credentials."""
+
+    return [
+        {name: str(registration[name]) for name in ("ref", "type", "location")}
+        for registration in session.sources.values()
+    ]
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkPublishRequest:
+    output_id: str
+    chunk_spec: ChunkSpec
+
+
 @dataclass(slots=True)
 class ProcessRequest:
     """Normalized process request payload used by runtime service methods."""
@@ -43,6 +60,15 @@ class ProcessRequest:
     write_hdf: dict[str, Any] | None = None
     run_name: str | None = None
     rollback_snapshot: bool = True
+    chunk_output: ChunkPublishRequest | None = None
+
+
+class _ChunkPublicationError(RuntimeError):
+    def __init__(self, output_id: str, chunk_spec: ChunkSpec, original_exception: Exception) -> None:
+        super().__init__(str(original_exception))
+        self.output_id = output_id
+        self.chunk_spec = chunk_spec
+        self.original_exception = original_exception
 
 
 @dataclass(slots=True)
@@ -63,9 +89,99 @@ class RuntimeService:
     manager: SessionManager
     policy: RuntimePolicy = field(default_factory=RuntimePolicy.trusted)
     process_step_registry: ProcessStepRegistry = field(init=False)
+    chunked_outputs: ChunkedOutputManager = field(init=False)
 
     def __post_init__(self) -> None:
         self.process_step_registry = self.policy.create_process_step_registry()
+        self.chunked_outputs = ChunkedOutputManager(policy=self.policy)
+
+    def initialize_chunked_output(self, payload: dict[str, Any]) -> dict[str, Any]:
+        plan_raw = payload.get("plan")
+        if not isinstance(plan_raw, dict):
+            raise ApiError(status_code=422, detail="plan must be a complete ChunkPlan object.")
+        try:
+            plan = ChunkPlan.from_dict(plan_raw)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ApiError(
+                status_code=422,
+                detail=f"Invalid complete ChunkPlan: {exc}. Pilot schema discovery requires a future provisional-plan contract.",
+            ) from exc
+
+        sink_raw = payload.get("sink")
+        if sink_raw is None:
+            session_id = str(payload.get("session_id", "")).strip()
+            sink_ref = str(payload.get("sink_ref", "")).strip()
+            if not session_id or not sink_ref:
+                raise ApiError(status_code=422, detail="Provide sink or both session_id and sink_ref.")
+            session = self._require_session(session_id)
+            try:
+                sink_raw = session.sinks[sink_ref]
+            except KeyError as exc:
+                raise ApiError(status_code=404, detail=f"Sink {sink_ref!r} is not registered in the session.") from exc
+        if not isinstance(sink_raw, dict):
+            raise ApiError(status_code=422, detail="sink must be an I/O registration object.")
+
+        collision = str(payload.get("collision", "error"))
+        try:
+            resource, result = self.chunked_outputs.initialize(
+                sink_spec=sink_raw,
+                subpath=str(payload.get("subpath", "")),
+                plan=plan,
+                collision=collision,
+            )
+        except FileExistsError as exc:
+            raise ApiError(status_code=409, detail=str(exc)) from exc
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+        progress = self.chunked_outputs.inspect(resource.output_id, offset=0, limit=1).to_dict()
+        progress.pop("chunks", None)
+        return {
+            "output_id": resource.output_id,
+            "created_utc": resource.created_utc,
+            "sink_type": resource.sink_spec["type"],
+            "subpath": resource.subpath,
+            **result.to_dict(),
+            **progress,
+        }
+
+    def inspect_chunked_output(self, output_id: str, *, offset: int = 0, limit: int = 100) -> dict[str, Any]:
+        try:
+            resource = self.chunked_outputs.get(output_id)
+            status = self.chunked_outputs.inspect(output_id, offset=offset, limit=limit)
+        except KeyError as exc:
+            raise ApiError(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise ApiError(status_code=422, detail=str(exc)) from exc
+        return {
+            "output_id": resource.output_id,
+            "created_utc": resource.created_utc,
+            "sink_type": resource.sink_spec["type"],
+            "subpath": resource.subpath,
+            "offset": offset,
+            "limit": limit,
+            **status.to_dict(),
+        }
+
+    def finalize_chunked_output(self, output_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        plan_hash = str(payload.get("plan_hash", "")).strip()
+        if not plan_hash:
+            raise ApiError(status_code=422, detail="plan_hash is required.")
+        try:
+            result = self.chunked_outputs.finalize(output_id, plan_hash=plan_hash)
+        except KeyError as exc:
+            raise ApiError(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise ApiError(status_code=409, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            try:
+                progress = self.inspect_chunked_output(output_id)
+            except ApiError:
+                progress = None
+            raise ApiError(
+                status_code=409,
+                detail={"code": "CHUNK_FINALIZE_CONFLICT", "message": str(exc), "progress": progress},
+            ) from exc
+        return {"output_id": output_id, **result.to_dict()}
 
     def health(self) -> dict[str, str]:
         """Return a lightweight liveness payload for process health checks."""
@@ -554,6 +670,7 @@ class RuntimeService:
                 sinks=sinks,
                 effective_mode=effective_mode,
                 preparation=preparation,
+                chunk_spec=None if request.chunk_output is None else request.chunk_output.chunk_spec,
             )
             return self._finalize_process_run(
                 session_id=session_id,
@@ -701,6 +818,24 @@ class RuntimeService:
                 raise ApiError(status_code=422, detail=str(exc)) from exc
         run_name_raw = payload.get("run_name")
         run_name = str(run_name_raw) if run_name_raw is not None else None
+        chunk_output: ChunkPublishRequest | None = None
+        chunk_output_raw = payload.get("chunk_output")
+        if chunk_output_raw is not None:
+            if not isinstance(chunk_output_raw, dict):
+                raise ApiError(status_code=422, detail="chunk_output must be an object.")
+            output_id = str(chunk_output_raw.get("output_id", "")).strip()
+            spec_raw = chunk_output_raw.get("chunk_spec")
+            if not output_id or not isinstance(spec_raw, dict):
+                raise ApiError(status_code=422, detail="chunk_output requires output_id and chunk_spec.")
+            try:
+                chunk_spec = ChunkSpec.from_dict(spec_raw)
+                resource = self.chunked_outputs.get(output_id)
+                chunk_spec.validate_for_plan(resource.plan)
+            except KeyError as exc:
+                raise ApiError(status_code=404, detail=str(exc)) from exc
+            except (TypeError, ValueError) as exc:
+                raise ApiError(status_code=422, detail=str(exc)) from exc
+            chunk_output = ChunkPublishRequest(output_id=output_id, chunk_spec=chunk_spec)
         return ProcessRequest(
             mode=mode,
             changed_sources=changed_sources,
@@ -708,6 +843,7 @@ class RuntimeService:
             write_hdf=write_hdf,
             run_name=run_name,
             rollback_snapshot=bool(payload.get("rollback_snapshot", True)),
+            chunk_output=chunk_output,
         )
 
     def _resolve_process_mode(self, session: PipelineSession, request: ProcessRequest) -> tuple[str, str | None]:
@@ -764,6 +900,8 @@ class RuntimeService:
         boundary_step_id = dirty_step_ids_ordered[0] if dirty_step_ids_ordered else None
 
         if not selected_step_ids:
+            if request.chunk_output is not None:
+                raise RuntimeError("A chunk_output request cannot publish a partial run with no dirty steps.")
             return ProcessPreparation(
                 early_response=self._mark_noop_process_run(
                     session_id=session_id,
@@ -826,6 +964,7 @@ class RuntimeService:
         sinks: IoSinks,
         effective_mode: str,
         preparation: ProcessPreparation,
+        chunk_spec: ChunkSpec | None = None,
     ) -> tuple[RunResult, float]:
         reuse_processing_data = effective_mode == "partial" and session.processing_data is not None
         run_t0 = perf_counter()
@@ -842,6 +981,7 @@ class RuntimeService:
             },
             selected_step_ids=preparation.selected_step_ids,
             capture_partial_on_error=True,
+            chunk_spec=chunk_spec,
         )
         elapsed_s = perf_counter() - run_t0
         session.processing_data = result.processing_data
@@ -869,6 +1009,30 @@ class RuntimeService:
             runtime_policy=self.policy,
         )
 
+        chunk_write = None
+        if request.chunk_output is not None:
+            try:
+                chunk_write = self.chunked_outputs.write_chunk(
+                    request.chunk_output.output_id,
+                    result.processing_data,
+                    chunk=request.chunk_output.chunk_spec,
+                    execution_metadata={
+                        "session_id": session_id,
+                        "run_id": run_id,
+                        "effective_mode": effective_mode,
+                        "sources": _source_provenance(session),
+                        **request.chunk_output.chunk_spec.identity_dict(),
+                    },
+                    pipeline_spec=result.pipeline.to_spec(),
+                    pipeline_yaml=session.pipeline_yaml or "",
+                )
+            except Exception as exc:
+                raise _ChunkPublicationError(
+                    request.chunk_output.output_id,
+                    request.chunk_output.chunk_spec,
+                    exc,
+                ) from exc
+
         topo_ids = ordered_step_ids(pipeline)
         executed_set = set(result.executed_steps)
         skipped_steps = [step_id for step_id in topo_ids if step_id not in executed_set]
@@ -891,12 +1055,18 @@ class RuntimeService:
             details["checkpoint_boundary_step"] = preparation.boundary_step_id
         if hdf_out_path is not None:
             details["hdf_output"] = hdf_out_path
+        if chunk_write is not None:
+            details["chunk_output"] = {
+                "output_id": request.chunk_output.output_id,
+                **request.chunk_output.chunk_spec.identity_dict(),
+                **chunk_write.to_dict(),
+            }
         trace_report = self._trace_report(result)
         if trace_report is not None:
             details["trace_report"] = trace_report
 
         run_meta = self.manager.mark_run_succeeded(session_id, run_id, details=details)
-        return {
+        response = {
             "session_id": session_id,
             "run_id": run_id,
             "state": "idle",
@@ -905,6 +1075,9 @@ class RuntimeService:
             "note": run_meta.get("note"),
             "hdf_output": run_meta.get("hdf_output"),
         }
+        if chunk_write is not None:
+            response["chunk_output"] = run_meta["chunk_output"]
+        return response
 
     def _handle_process_failure(
         self,
@@ -919,11 +1092,18 @@ class RuntimeService:
         sinks: IoSinks | None,
         exc: Exception,
     ) -> dict[str, Any]:
-        if effective_mode == "partial" and preparation.snapshot_before_partial is not None:
+        publication_failure = isinstance(exc, _ChunkPublicationError)
+        if not publication_failure and effective_mode == "partial" and preparation.snapshot_before_partial is not None:
             session.processing_data = preparation.snapshot_before_partial
 
-        original_exception = exc.original_exception if isinstance(exc, PipelineRunError) else exc
-        error_code = "PARTIAL_RUN_FAILED" if effective_mode == "partial" else "RUN_FAILED"
+        original_exception = (
+            exc.original_exception if isinstance(exc, (PipelineRunError, _ChunkPublicationError)) else exc
+        )
+        error_code = (
+            "CHUNK_WRITE_FAILED"
+            if publication_failure
+            else ("PARTIAL_RUN_FAILED" if effective_mode == "partial" else "RUN_FAILED")
+        )
         error_details: dict[str, Any] = {
             "exception_type": type(original_exception).__name__,
             "traceback": traceback.format_exc(),
@@ -934,6 +1114,21 @@ class RuntimeService:
             trace_report = self._trace_report(exc.result)
             if trace_report is not None:
                 error_details["trace_report"] = trace_report
+        if isinstance(exc, _ChunkPublicationError):
+            error_details.update(
+                {
+                    "processing_succeeded": True,
+                    "output_id": exc.output_id,
+                    "chunk_identity": exc.chunk_spec.identity_dict(),
+                }
+            )
+        elif request.chunk_output is not None:
+            error_details.update(
+                {
+                    "output_id": request.chunk_output.output_id,
+                    "chunk_identity": request.chunk_output.chunk_spec.identity_dict(),
+                }
+            )
 
         self.manager.mark_run_failed(
             session_id,
@@ -942,7 +1137,13 @@ class RuntimeService:
             message=str(exc),
             details=error_details,
         )
-        if request.mode == "auto" and effective_mode == "partial" and sources is not None and sinks is not None:
+        if (
+            not publication_failure
+            and request.mode == "auto"
+            and effective_mode == "partial"
+            and sources is not None
+            and sinks is not None
+        ):
             return self._run_auto_fallback(
                 session=session,
                 session_id=session_id,
@@ -994,6 +1195,7 @@ class RuntimeService:
                     "snapshot_step_ids": set(session.trace_snapshot_step_ids),
                 },
                 capture_partial_on_error=True,
+                chunk_spec=None if request.chunk_output is None else request.chunk_output.chunk_spec,
             )
             fallback_elapsed = perf_counter() - fallback_t0
             session.processing_data = fallback_result.processing_data
@@ -1005,6 +1207,30 @@ class RuntimeService:
                 pipeline_yaml=session.pipeline_yaml or "",
                 runtime_policy=self.policy,
             )
+
+            chunk_write = None
+            if request.chunk_output is not None:
+                try:
+                    chunk_write = self.chunked_outputs.write_chunk(
+                        request.chunk_output.output_id,
+                        fallback_result.processing_data,
+                        chunk=request.chunk_output.chunk_spec,
+                        execution_metadata={
+                            "session_id": session_id,
+                            "run_id": fallback_id,
+                            "effective_mode": "full",
+                            "sources": _source_provenance(session),
+                            **request.chunk_output.chunk_spec.identity_dict(),
+                        },
+                        pipeline_spec=fallback_result.pipeline.to_spec(),
+                        pipeline_yaml=session.pipeline_yaml or "",
+                    )
+                except Exception as exc:
+                    raise _ChunkPublicationError(
+                        request.chunk_output.output_id,
+                        request.chunk_output.chunk_spec,
+                        exc,
+                    ) from exc
 
             fallback_topo_ids = ordered_step_ids(fallback_result.pipeline)
             fallback_executed_set = set(fallback_result.executed_steps)
@@ -1027,13 +1253,19 @@ class RuntimeService:
                 details["trace_report"] = trace_report
             if hdf_out_path:
                 details["hdf_output"] = hdf_out_path
+            if chunk_write is not None:
+                details["chunk_output"] = {
+                    "output_id": request.chunk_output.output_id,
+                    **request.chunk_output.chunk_spec.identity_dict(),
+                    **chunk_write.to_dict(),
+                }
 
             done = self.manager.mark_run_succeeded(
                 session_id,
                 fallback_id,
                 details=details,
             )
-            return {
+            response = {
                 "session_id": session_id,
                 "run_id": fallback_id,
                 "state": "idle",
@@ -1044,9 +1276,14 @@ class RuntimeService:
                 "fallback_reason": done.get("fallback_reason"),
                 "hdf_output": done.get("hdf_output"),
             }
+            if chunk_write is not None:
+                response["chunk_output"] = done["chunk_output"]
+            return response
         except Exception as fallback_exc:
             original_exception = (
-                fallback_exc.original_exception if isinstance(fallback_exc, PipelineRunError) else fallback_exc
+                fallback_exc.original_exception
+                if isinstance(fallback_exc, (PipelineRunError, _ChunkPublicationError))
+                else fallback_exc
             )
             error_details: dict[str, Any] = {
                 "exception_type": type(original_exception).__name__,
@@ -1060,17 +1297,27 @@ class RuntimeService:
                 if trace_report is not None:
                     error_details["trace_report"] = trace_report
 
+            publication_failure = isinstance(fallback_exc, _ChunkPublicationError)
+            if publication_failure:
+                error_details.update(
+                    {
+                        "processing_succeeded": True,
+                        "output_id": fallback_exc.output_id,
+                        "chunk_identity": fallback_exc.chunk_spec.identity_dict(),
+                    }
+                )
+            failure_code = "CHUNK_WRITE_FAILED" if publication_failure else "FULL_RUN_FAILED"
             self.manager.mark_run_failed(
                 session_id,
                 fallback_id,
-                code="FULL_RUN_FAILED",
+                code=failure_code,
                 message=str(fallback_exc),
                 details=error_details,
             )
             raise ApiError(
                 status_code=500,
                 detail={
-                    "code": "FULL_RUN_FAILED",
+                    "code": failure_code,
                     "message": str(fallback_exc),
                     "details": {"session_id": session_id, "run_id": fallback_id},
                 },

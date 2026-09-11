@@ -176,6 +176,38 @@ def test_hdf_chunked_sink_rejects_incomplete_finalize_and_resumes(tmp_path: Path
     assert resumed.completed_chunks == 1
 
 
+def test_hdf_chunked_sink_inspects_failed_write_and_retries(monkeypatch, tmp_path: Path):
+    from modacor.io.hdf import hdf_chunked_processing_sink as sink_module
+
+    out_file = tmp_path / "failed-retry.h5"
+    plan = _plan()
+    chunk = _chunk(plan, 0, 0, 2)
+    data = _processing_data(np.ones((2, 2), dtype=np.float32))
+    sink = HDFChunkedProcessingSink(resource_location=out_file)
+    sink.initialize_chunked("run1", plan)
+
+    original_write = sink_module._PendingWrite.write
+
+    def fail_write(self):  # noqa: ANN001
+        raise OSError("synthetic storage failure")
+
+    monkeypatch.setattr(sink_module._PendingWrite, "write", fail_write)
+    with pytest.raises(OSError, match="synthetic storage failure"):
+        sink.write_chunk("run1", data, plan=plan, chunk=chunk)
+
+    failed = sink.inspect_chunked("run1", plan=plan, offset=0, limit=1)
+    assert failed.failed_chunks == 1
+    assert failed.missing_chunks == 2
+    assert failed.chunks == ({"chunk_id": "c000000", "ordinal": 0, "status": "failed"},)
+
+    monkeypatch.setattr(sink_module._PendingWrite, "write", original_write)
+    retried = sink.write_chunk("run1", data, plan=plan, chunk=chunk)
+    assert retried.completed_chunks == 1
+    inspected = sink.inspect_chunked("run1", plan=plan)
+    assert inspected.completed_chunks == 1
+    assert inspected.failed_chunks == 0
+
+
 def test_hdf_chunked_sink_rejects_overlap_and_conflicting_retry(tmp_path: Path):
     out_file = tmp_path / "overlap.h5"
     plan = _plan()

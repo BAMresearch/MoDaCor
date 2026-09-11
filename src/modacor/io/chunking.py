@@ -21,6 +21,7 @@ __all__ = [
     "ChunkPlacement",
     "ChunkPlan",
     "ChunkSpec",
+    "ChunkOutputStatus",
     "ChunkWriteResult",
     "PlacementBinding",
     "UnsupportedSinkCapability",
@@ -617,6 +618,16 @@ class ChunkSpec:
     def to_json(self) -> str:
         return _canonical_json(self.to_dict())
 
+    def identity_dict(self) -> dict[str, Any]:
+        """Return the compact execution identity suitable for logs and traces."""
+
+        return {
+            "plan_id": self.plan_id,
+            "plan_hash": self.plan_hash,
+            "chunk_id": self.chunk_id,
+            "ordinal": self.ordinal,
+        }
+
     def validate_for_plan(self, plan: ChunkPlan) -> None:
         if self.schema_version != plan.schema_version:
             raise ValueError("ChunkSpec schema_version does not match ChunkPlan.")
@@ -670,5 +681,35 @@ class ChunkWriteResult:
             "expected_chunks": self.expected_chunks,
             "completed_chunks": self.completed_chunks,
             "chunk_id": self.chunk_id,
+            "resource_location": self.resource_location,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkOutputStatus:
+    """Serializable authoritative status of a chunked output manifest."""
+
+    status: str
+    plan_id: str
+    plan_hash: str
+    expected_chunks: int
+    completed_chunks: int
+    writing_chunks: int
+    failed_chunks: int
+    missing_chunks: int
+    chunks: tuple[Mapping[str, Any], ...] = ()
+    resource_location: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "plan_id": self.plan_id,
+            "plan_hash": self.plan_hash,
+            "expected_chunks": self.expected_chunks,
+            "completed_chunks": self.completed_chunks,
+            "writing_chunks": self.writing_chunks,
+            "failed_chunks": self.failed_chunks,
+            "missing_chunks": self.missing_chunks,
+            "chunks": [_json_ready(item) for item in self.chunks],
             "resource_location": self.resource_location,
         }

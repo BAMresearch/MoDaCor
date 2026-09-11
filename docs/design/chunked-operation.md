@@ -234,6 +234,16 @@ orchestrator. The orchestrator initializes, inspects, and finalizes a
 server-level output resource without accessing `ProcessingData` or the storage
 backend directly.
 
+This complete-schema workflow is now available through
+`POST /v1/chunked-outputs`, `GET /v1/chunked-outputs/<output_id>`, the optional
+`chunk_output` process-request field, and
+`POST /v1/chunked-outputs/<output_id>/finalize`. The initialized resource owns a
+snapshot of the sink registration, so it is not invalidated or redirected by
+later worker-session changes. At present these opaque server mappings are
+in-process; the HDF5 plan and chunk manifest remain persistent and
+authoritative, while reconstruction of mappings after a server restart remains
+an operational follow-up.
+
 Retries use the same `ChunkSpec`. The result collector should place or replace
 that chunk idempotently using its output placements. Global reductions need
 mergeable reducer state; averaging already averaged chunk results is not a

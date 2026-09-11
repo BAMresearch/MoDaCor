@@ -20,6 +20,7 @@ from modacor.io.chunking import (
     AxisSelector,
     ChunkArrayLayout,
     ChunkOutputLayout,
+    ChunkOutputStatus,
     ChunkPlan,
     ChunkSpec,
     ChunkWriteResult,
@@ -597,7 +598,7 @@ class HDFChunkedProcessingSink(IoSink):
             if chunk_id == exclude_chunk_id:
                 continue
             entry = chunks_group[chunk_id]
-            if _status(entry) not in {"writing", "complete"} or "spec_json" not in entry:
+            if _status(entry) not in {"writing", "failed", "complete"} or "spec_json" not in entry:
                 continue
             specs.append(ChunkSpec.from_dict(json.loads(_read_text(entry["spec_json"]))))
         return specs
@@ -797,9 +798,9 @@ class HDFChunkedProcessingSink(IoSink):
                     chunk_id=chunk.chunk_id,
                     resource_location=out_path,
                 )
-            if entry_status not in {"pending", "writing"}:
+            if entry_status not in {"pending", "writing", "failed"}:
                 raise RuntimeError(f"Chunk {chunk.chunk_id!r} cannot be written from status {entry_status!r}.")
-            if entry_status == "writing" and "spec_json" in manifest_entry:
+            if entry_status in {"writing", "failed"} and "spec_json" in manifest_entry:
                 if _read_text(manifest_entry["spec_json"]) != chunk.to_json():
                     raise ValueError(f"Interrupted chunk {chunk.chunk_id!r} has a conflicting ChunkSpec.")
 
@@ -834,9 +835,14 @@ class HDFChunkedProcessingSink(IoSink):
                 if pending.static_state is not None:
                     _set_status(pending.static_state, "writing")
             h5.flush()
-            for pending in pending_writes:
-                pending.write()
-            h5.flush()
+            try:
+                for pending in pending_writes:
+                    pending.write()
+                h5.flush()
+            except Exception:
+                _set_status(manifest_entry, "failed")
+                h5.flush()
+                raise
             for pending in pending_writes:
                 if pending.static_state is not None:
                     _set_status(pending.static_state, "complete")
@@ -848,6 +854,50 @@ class HDFChunkedProcessingSink(IoSink):
                 plan,
                 chunk_id=chunk.chunk_id,
                 resource_location=out_path,
+            )
+
+    def inspect_chunked(
+        self,
+        subpath: str,
+        *,
+        plan: ChunkPlan,
+        offset: int = 0,
+        limit: int | None = None,
+        override_resource_location: Path | None = None,
+    ) -> ChunkOutputStatus:
+        """Read progress from the persisted manifest without changing it."""
+
+        self._validate_supported_plan(plan)
+        if offset < 0 or (limit is not None and limit < 1):
+            raise ValueError("offset must be non-negative and limit must be positive when provided.")
+        out_path = self._path(override_resource_location)
+        run_name = _normalise_subpath(subpath)
+        with h5py.File(out_path, "r") as h5:
+            plan_group = self._plan_group(h5, plan)
+            self._validate_stored_layout(h5, run_name, plan)
+            all_entries = []
+            for chunk_id in plan.expected_chunk_ids:
+                entry = _chunk_group(plan_group, chunk_id)
+                all_entries.append(
+                    {
+                        "chunk_id": chunk_id,
+                        "ordinal": int(entry.attrs["ordinal"]),
+                        "status": _status(entry),
+                    }
+                )
+            statuses = [entry["status"] for entry in all_entries]
+            end = None if limit is None else offset + limit
+            return ChunkOutputStatus(
+                status=_status(plan_group),
+                plan_id=plan.plan_id,
+                plan_hash=plan.plan_hash,
+                expected_chunks=plan.total_chunks,
+                completed_chunks=statuses.count("complete"),
+                writing_chunks=statuses.count("writing"),
+                failed_chunks=statuses.count("failed"),
+                missing_chunks=sum(status not in {"complete", "writing", "failed"} for status in statuses),
+                chunks=tuple(all_entries[offset:end]),
+                resource_location=str(out_path),
             )
 
     def finalize_chunked(

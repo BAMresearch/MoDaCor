@@ -143,6 +143,7 @@ def create_app(  # noqa: C901
         version="0.1.0-draft",
         description="Scaffold API for long-lived MoDaCor pipeline sessions.",
     )
+    app.state.runtime_service = service
 
     def _call(handler, *args, **kwargs):
         try:
@@ -161,6 +162,18 @@ def create_app(  # noqa: C901
     @app.get("/v1/source-templates")
     def source_templates() -> dict[str, Any]:
         return _call(service.source_templates)
+
+    @app.post("/v1/chunked-outputs", status_code=201)
+    def initialize_chunked_output(payload: dict[str, Any]) -> dict[str, Any]:
+        return _call(service.initialize_chunked_output, payload)
+
+    @app.get("/v1/chunked-outputs/{output_id}")
+    def inspect_chunked_output(output_id: str, offset: int = 0, limit: int = 100) -> dict[str, Any]:
+        return _call(service.inspect_chunked_output, output_id, offset=offset, limit=limit)
+
+    @app.post("/v1/chunked-outputs/{output_id}/finalize")
+    def finalize_chunked_output(output_id: str, payload: dict[str, Any] = Body(default_factory=dict)) -> dict[str, Any]:
+        return _call(service.finalize_chunked_output, output_id, payload)
 
     @app.get("/v1/assets/plotting/plotly.min.js")
     def get_plotly_js() -> Response:

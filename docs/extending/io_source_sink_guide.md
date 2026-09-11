@@ -40,8 +40,9 @@ Subclass `modacor.io.io_sink.IoSink` and implement:
 
 Sinks that support incremental assembly may additionally set
 `supports_chunked_writes = True` and implement `initialize_chunked(...)`,
-`write_chunk(...)`, and `finalize_chunked(...)`. Ordinary sinks inherit clear
-unsupported-capability errors for these optional methods.
+`write_chunk(...)`, `inspect_chunked(...)`, and `finalize_chunked(...)`.
+Ordinary sinks inherit clear unsupported-capability errors for these optional
+methods.
 
 `IoSinks` routes writes through `sink_ref::subpath`. The current built-in sink
 examples are:

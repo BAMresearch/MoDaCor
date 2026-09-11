@@ -18,7 +18,7 @@ from typing import Any
 from attrs import define, field
 
 from modacor.dataclasses.processing_data import ProcessingData
-from modacor.io.chunking import ChunkPlan, ChunkSpec, ChunkWriteResult, UnsupportedSinkCapability
+from modacor.io.chunking import ChunkOutputStatus, ChunkPlan, ChunkSpec, ChunkWriteResult, UnsupportedSinkCapability
 from modacor.io.io_sink import IoSink
 
 
@@ -89,6 +89,16 @@ class IoSinks:
     ) -> ChunkWriteResult:
         sink, subpath = self._get_chunked_sink(target_reference)
         return sink.write_chunk(subpath, processing_data, plan=plan, chunk=chunk, **kwargs)
+
+    def inspect_chunked(
+        self,
+        target_reference: str,
+        *,
+        plan: ChunkPlan,
+        **kwargs: Any,
+    ) -> ChunkOutputStatus:
+        sink, subpath = self._get_chunked_sink(target_reference)
+        return sink.inspect_chunked(subpath, plan=plan, **kwargs)
 
     def finalize_chunked(
         self,

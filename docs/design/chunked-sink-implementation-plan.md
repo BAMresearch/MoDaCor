@@ -4,7 +4,7 @@ Status: implementation in progress.
 
 ## Implementation progress
 
-As of 2026-09-10:
+As of 2026-09-11:
 
 - Phase 1 is implemented: immutable chunk contracts, normalized selectors,
   canonical plan hashing and serialization, optional `IoSink` capability
@@ -21,17 +21,27 @@ As of 2026-09-10:
   uncertainties, invariant axes, and batch-dependent axes. It rejects
   undeclared `BaseData` components and changes to static values. Finalized
   complete `BaseData` trees are tested against the ordinary writer.
-- The server integration in Phase 4 has not started. Server-level `output_id`
-  management, API lifecycle endpoints, and server-side locking are not yet
-  available.
+- The complete-schema server path in Phase 4 is implemented. Server-level
+  output resources snapshot sink registrations, use opaque `output_id` values
+  and destination locks, expose initialize/inspect/finalize operations, and
+  publish each successful run's in-memory `ProcessingData` before acknowledging
+  the request. Outputs remain usable after a worker session is deleted.
 - The generic runtime sink builder and server registration model recognize
   `hdf_chunked`, including normal write-root enforcement. This is capability
-  discovery and configuration only: ordinary process requests cannot drive the
-  lifecycle until Phase 4 is implemented.
-- Verification at the Phase 3 checkpoint passes the full 750-test suite, all
-  changed-file pre-commit hooks, and a warnings-as-errors Sphinx build. The
+  discovery and configuration, and requests containing `chunk_output` now drive
+  the post-run write lifecycle. Requests without `chunk_output` are unchanged.
+- Verification at the complete-schema Phase 4 checkpoint passes the full
+  755-test suite, all changed-file pre-commit hooks, OpenAPI YAML parsing, and a
+  warnings-as-errors Sphinx build. The
   three reported test warnings are pre-existing numerical-domain warnings in
   `BaseData` tests.
+
+The optional `awaiting_schema` path is deliberately still open. The current
+immutable `ChunkPlan` hash includes dtype, units, uncertainty, axis, and
+component layout. Deriving those fields from a pilot chunk would therefore
+change the plan identity after chunks had already been issued. Supporting this
+cleanly needs a separate provisional-plan/schema-resolution contract; the
+server rejects incomplete plans instead of mutating their identity.
 
 The current HDF chunk writer requires contiguous destination slices with
 stride 1. Strided destination writes remain deliberately unsupported and are
@@ -113,7 +123,10 @@ class IoSink:
     ):
         raise UnsupportedSinkCapability(type(self), "chunked_writes")
 
-    def finalize_chunked(self, subpath: str, plan: ChunkPlan, **kwargs):
+    def inspect_chunked(self, subpath: str, *, plan: ChunkPlan, **kwargs):
+        raise UnsupportedSinkCapability(type(self), "chunked_writes")
+
+    def finalize_chunked(self, subpath: str, *, plan: ChunkPlan, **kwargs):
         raise UnsupportedSinkCapability(type(self), "chunked_writes")
 ```
 
@@ -138,6 +151,7 @@ io_sinks.initialize_chunked("result::run1", plan)
 io_sinks.write_chunk(
     "result::run1", processing_data, plan=plan, chunk=chunk
 )
+io_sinks.inspect_chunked("result::run1", plan=plan)
 io_sinks.finalize_chunked("result::run1", plan=plan)
 ```
 
@@ -147,7 +161,7 @@ capabilities or require chunk metadata.
 
 ## Public lifecycle
 
-`HDFChunkedProcessingSink` implements three explicit operations.
+`HDFChunkedProcessingSink` implements four explicit operations.
 
 ### Initialize
 
@@ -210,9 +224,20 @@ A smaller edge chunk is valid because its expected shape is derived from the
 resolved selector, not compared with the plan's nominal `chunk_size`.
 
 Retries are idempotent. A chunk left in `writing` is rewritten completely. A
+storage exception after the manifest enters `writing` changes that entry to
+`failed`; it retains its placement ownership and is also rewritten completely
+on retry. A
 chunk already marked `complete` with the same spec and execution identity may
 return a no-op result; a conflicting spec is rejected. Reprocessing completed
 data requires an explicit replacement policy.
+
+### Inspect
+
+`inspect_chunked(...)` opens the backend read-only and reports overall state;
+expected, complete, writing, failed, and missing counts; and a pageable range
+of compact chunk entries. It validates the requested plan and initialized
+layout before returning, so the API does not treat server memory as the
+authoritative manifest.
 
 ### Finalize
 
@@ -649,18 +674,18 @@ server capabilities.
 
 ### Phase 4: runtime integration
 
-- [ ] Carry optional `ChunkSpec` through `run_pipeline_job` and `RunResult`.
-- [ ] Attach chunk identity to trace events without copying plan-wide metadata into
+- [x] Carry optional `ChunkSpec` through `run_pipeline_job` and `RunResult`.
+- [x] Attach chunk identity to trace events without copying plan-wide metadata into
   every event.
-- [ ] Add a server-level chunked-output manager and opaque `output_id`.
-- [ ] Add initialize, inspect, and finalize API operations.
-- [ ] Add `chunk_output` to process requests and call `write_chunk(...)` as a
+- [x] Add a server-level chunked-output manager and opaque `output_id`.
+- [x] Add initialize, inspect, and finalize API operations.
+- [x] Add `chunk_output` to process requests and call `write_chunk(...)` as a
   post-run action using the session's in-memory `ProcessingData`.
-- [ ] Distinguish pipeline failures from chunk-publication failures and acknowledge
+- [x] Distinguish pipeline failures from chunk-publication failures and acknowledge
   success only after the chunk manifest is durable.
 - [ ] Support the `awaiting_schema` pilot-chunk transition when layouts cannot be
   declared completely in advance.
-- [ ] Preserve full and partial pipeline-run behavior.
+- [x] Preserve full and partial pipeline-run behavior.
 
 ### Phase 5: beamline readiness
 

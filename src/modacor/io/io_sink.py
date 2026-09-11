@@ -21,7 +21,7 @@ from modacor.io.chunking import UnsupportedSinkCapability
 
 if TYPE_CHECKING:
     from modacor.dataclasses.processing_data import ProcessingData
-    from modacor.io.chunking import ChunkPlan, ChunkSpec, ChunkWriteResult
+    from modacor.io.chunking import ChunkOutputStatus, ChunkPlan, ChunkSpec, ChunkWriteResult
 
 
 def default_config() -> dict[str, Any]:
@@ -60,6 +60,9 @@ class IoSink:
         chunk: ChunkSpec,
         **kwargs: Any,
     ) -> ChunkWriteResult:
+        raise UnsupportedSinkCapability(type(self), "chunked_writes")
+
+    def inspect_chunked(self, subpath: str, *, plan: ChunkPlan, **kwargs: Any) -> ChunkOutputStatus:
         raise UnsupportedSinkCapability(type(self), "chunked_writes")
 
     def finalize_chunked(self, subpath: str, *, plan: ChunkPlan, **kwargs: Any) -> ChunkWriteResult:
