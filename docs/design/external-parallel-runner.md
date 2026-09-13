@@ -4,8 +4,11 @@ Status: recommended orchestration approach; implementation is deferred.
 
 ## Responsibility boundary
 
-An external runner should own chunk planning, source slicing, worker
-scheduling, retries, backpressure, and the decision to finalize. The MoDaCor
+An external runner should own worker scheduling, retries, backpressure, and
+the decision to finalize. It may construct complete `ChunkPlan`/`ChunkSpec`
+contracts itself, or submit a `ProvisionalChunkPlan` and let the server discover
+source extents, build the deterministic work grid, and resolve output schema
+from the pilot result. The MoDaCor
 server owns the output assembly mechanics: it initializes a chunked-output
 resource, processes one already resolved chunk per worker request, writes the
 successful result directly to the registered sink, and finalizes only when
@@ -21,8 +24,9 @@ or a facility scheduler without changing the correction graph.
 Workers may push already resolved chunks into session `BufferSource`
 registrations, or ask the server to pull slices directly from registered
 `HDFSource` and `TiledSource` inputs. These are complementary operating modes,
-not different output protocols: both submit the same `ChunkSpec` and publish
-through the same server-managed chunked-output resource.
+not different output protocols. Complete plans submit `ChunkSpec`; provisional
+plans use server-managed `chunk_id` values before and after the pilot. Both
+publish through the same server-managed chunked-output resource.
 
 Buffer delivery is suitable for remote runners or
 storage that is inaccessible to the server. It incurs HTTP serialization and
@@ -38,8 +42,10 @@ part of beamline readiness. The binding contract is specified in
 A deployment may use both modes. For example, a facility server may read raw
 detector frames directly from Tiled while receiving a runner-generated dynamic
 mask through a buffer. The plan must give every input an explicit `aligned`,
-`static`, or `explicit` binding and the execution record must preserve the
-effective source selection or uploaded-source identity.
+`static`, or `explicit` binding. For the simple driver-only case, the complete
+binding list may be omitted and the server applies the exact driver's aligned
+selection automatically. The execution record must preserve the effective
+source selection or uploaded-source identity.
 
 ## Recommended worker model
 
@@ -53,7 +59,8 @@ chunk planner -> bounded work queue -> independent sessions -> server-managed ou
 
 One active run is allowed per runtime session. Reuse one session per worker
 rather than creating one session per chunk. Replace or clear its buffer input,
-run the required pipeline portion with its `output_id` and `ChunkSpec`, and
+run the required pipeline portion with its `output_id` and `ChunkSpec` or
+server-managed `chunk_id`, and
 release large input-buffer entries before accepting another chunk. The server
 writes the in-memory result as a post-run action, so the orchestrator does not
 normally download `ProcessingData`. The first chunk normally uses a complete
@@ -176,7 +183,9 @@ provides a verified destination-slice workflow.
 
 ## Correctness and retries
 
-Each submitted job should contain the immutable `ChunkSpec`. The execution
+Each complete-plan job should contain the immutable `ChunkSpec`; a provisional
+job contains the `output_id` and server-managed `chunk_id`, which resolves to an
+immutable spec at publication time. The execution
 record adds attempt number, worker identity, timestamps, pipeline hash, source
 registration or revision, outcome, and error details.
 

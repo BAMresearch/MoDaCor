@@ -16,12 +16,17 @@ import numpy as np
 
 __all__ = [
     "AxisSelector",
+    "ChunkAxisRule",
     "ChunkArrayLayout",
+    "ChunkInputPlan",
     "ChunkOutputLayout",
     "ChunkPlacement",
     "ChunkPlan",
     "ChunkSourceBinding",
     "ChunkSpec",
+    "ProvisionalChunkOutput",
+    "ProvisionalChunkPlan",
+    "ProvisionalChunkSpec",
     "ChunkOutputStatus",
     "ChunkWriteResult",
     "PlacementBinding",
@@ -300,6 +305,407 @@ class ChunkSourceBinding:
 
         selection_shape(source_shape, selection)
         return selection
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkAxisRule:
+    """Partition one source axis into chunks of selected elements."""
+
+    axis: int
+    chunk_size: int
+    start: int | None = None
+    stop: int | None = None
+    stride: int = 1
+
+    def __post_init__(self) -> None:
+        axis = _require_non_negative_int(self.axis, "ChunkAxisRule.axis")
+        chunk_size = _require_non_negative_int(self.chunk_size, "ChunkAxisRule.chunk_size")
+        if chunk_size < 1:
+            raise ValueError("ChunkAxisRule.chunk_size must be positive.")
+        start = None if self.start is None else _require_non_negative_int(self.start, "ChunkAxisRule.start")
+        stop = None if self.stop is None else _require_non_negative_int(self.stop, "ChunkAxisRule.stop")
+        if isinstance(self.stride, bool) or not isinstance(self.stride, Integral):
+            raise TypeError("ChunkAxisRule.stride must be an integer.")
+        stride = int(self.stride)
+        if stride < 1:
+            raise ValueError("ChunkAxisRule.stride must be positive.")
+        if start is not None and stop is not None and stop <= start:
+            raise ValueError("ChunkAxisRule.stop must be greater than start.")
+        object.__setattr__(self, "axis", axis)
+        object.__setattr__(self, "chunk_size", chunk_size)
+        object.__setattr__(self, "start", start)
+        object.__setattr__(self, "stop", stop)
+        object.__setattr__(self, "stride", stride)
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> ChunkAxisRule:
+        return cls(
+            axis=payload["axis"],
+            chunk_size=payload["chunk_size"],
+            start=payload.get("start"),
+            stop=payload.get("stop"),
+            stride=payload.get("stride", 1),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "axis": self.axis,
+            "chunk_size": self.chunk_size,
+            "stride": self.stride,
+        }
+        if self.start is not None:
+            payload["start"] = self.start
+        if self.stop is not None:
+            payload["stop"] = self.stop
+        return payload
+
+
+@dataclass(frozen=True, slots=True)
+class ProvisionalChunkOutput:
+    """Output identity whose numerical and metadata schema comes from a pilot."""
+
+    output_id: str
+    processing_path: str
+    destination_path: str
+
+    def __post_init__(self) -> None:
+        output_id = _require_identifier(self.output_id, "ProvisionalChunkOutput.output_id")
+        processing_path = "/" + str(self.processing_path).strip().strip("/")
+        destination_path = str(self.destination_path).strip().strip("/")
+        if len([part for part in processing_path.split("/") if part]) != 2:
+            raise ValueError("ProvisionalChunkOutput.processing_path must identify one BaseData root.")
+        if len([part for part in destination_path.split("/") if part]) != 2:
+            raise ValueError("ProvisionalChunkOutput.destination_path must contain '<bundle>/<basedata>'.")
+        object.__setattr__(self, "output_id", output_id)
+        object.__setattr__(self, "processing_path", processing_path)
+        object.__setattr__(self, "destination_path", destination_path)
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> ProvisionalChunkOutput:
+        return cls(
+            output_id=str(payload["output_id"]),
+            processing_path=str(payload["processing_path"]),
+            destination_path=str(payload["destination_path"]),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "output_id": self.output_id,
+            "processing_path": self.processing_path,
+            "destination_path": self.destination_path,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ProvisionalChunkPlan:
+    """Immutable request for server-resolved input extents and output schema.
+
+    The constrained provisional workflow chunks only batch dimensions. Data
+    dimensions are the trailing ``driver.rank_of_data`` axes and are always
+    read in full.
+    """
+
+    schema_version: str
+    plan_id: str
+    driver: Mapping[str, Any]
+    axis_rules: tuple[ChunkAxisRule, ...]
+    outputs: tuple[ProvisionalChunkOutput, ...]
+    source_bindings: tuple[ChunkSourceBinding, ...] = ()
+    bindings: tuple[Mapping[str, Any], ...] = ()
+    provisional_hash: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        schema_version = str(self.schema_version).strip()
+        if not schema_version:
+            raise ValueError("ProvisionalChunkPlan.schema_version must be non-empty.")
+        plan_id = _require_identifier(self.plan_id, "ProvisionalChunkPlan.plan_id")
+        driver = _freeze_json(self.driver, "ProvisionalChunkPlan.driver")
+        source = str(driver.get("source", "")).strip()
+        source_ref, separator, data_key = source.partition("::")
+        if not separator or not source_ref.strip() or not data_key.strip():
+            raise ValueError("ProvisionalChunkPlan.driver.source must use '<source_ref>::<data_key>'.")
+        rank_of_data = _require_non_negative_int(
+            driver.get("rank_of_data"),
+            "ProvisionalChunkPlan.driver.rank_of_data",
+        )
+        if rank_of_data > 3:
+            raise ValueError("ProvisionalChunkPlan.driver.rank_of_data cannot exceed 3.")
+        if "full_shape" in driver:
+            full_shape = tuple(
+                _require_non_negative_int(size, "ProvisionalChunkPlan.driver.full_shape")
+                for size in driver["full_shape"]
+            )
+            if not full_shape or any(size == 0 for size in full_shape):
+                raise ValueError("ProvisionalChunkPlan.driver.full_shape must contain positive dimensions.")
+            if rank_of_data > len(full_shape):
+                raise ValueError("driver.rank_of_data cannot exceed driver.full_shape rank.")
+
+        axis_rules = tuple(
+            rule if isinstance(rule, ChunkAxisRule) else ChunkAxisRule.from_dict(rule) for rule in self.axis_rules
+        )
+        if not axis_rules:
+            raise ValueError("ProvisionalChunkPlan.axis_rules must contain at least one batch-axis rule.")
+        axes = [rule.axis for rule in axis_rules]
+        if len(set(axes)) != len(axes):
+            raise ValueError("ProvisionalChunkPlan.axis_rules must identify unique axes.")
+
+        outputs = tuple(
+            output if isinstance(output, ProvisionalChunkOutput) else ProvisionalChunkOutput.from_dict(output)
+            for output in self.outputs
+        )
+        if not outputs:
+            raise ValueError("ProvisionalChunkPlan.outputs must not be empty.")
+        output_ids = [output.output_id for output in outputs]
+        if len(set(output_ids)) != len(output_ids):
+            raise ValueError("ProvisionalChunkPlan output ids must be unique.")
+
+        source_bindings = tuple(
+            binding if isinstance(binding, ChunkSourceBinding) else ChunkSourceBinding.from_dict(binding)
+            for binding in self.source_bindings
+        )
+        normalized_driver = f"{source_ref.strip()}::/{data_key.strip().strip('/')}"
+        matches = [binding for binding in source_bindings if binding.data_reference == normalized_driver]
+        if source_bindings and (len(matches) != 1 or matches[0].role != "aligned"):
+            raise ValueError("ProvisionalChunkPlan driver.source requires exactly one aligned source binding.")
+
+        object.__setattr__(self, "schema_version", schema_version)
+        object.__setattr__(self, "plan_id", plan_id)
+        object.__setattr__(self, "driver", driver)
+        object.__setattr__(self, "axis_rules", axis_rules)
+        object.__setattr__(self, "outputs", outputs)
+        object.__setattr__(self, "source_bindings", source_bindings)
+        object.__setattr__(self, "bindings", _freeze_json(self.bindings, "ProvisionalChunkPlan.bindings"))
+        digest = sha256(_canonical_json(self.to_dict(include_hash=False)).encode("utf-8")).hexdigest()
+        object.__setattr__(self, "provisional_hash", f"sha256:{digest}")
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> ProvisionalChunkPlan:
+        plan = cls(
+            schema_version=str(payload["schema_version"]),
+            plan_id=str(payload["plan_id"]),
+            driver=payload["driver"],
+            axis_rules=tuple(ChunkAxisRule.from_dict(item) for item in payload["axis_rules"]),
+            outputs=tuple(ProvisionalChunkOutput.from_dict(item) for item in payload["outputs"]),
+            source_bindings=tuple(ChunkSourceBinding.from_dict(item) for item in payload.get("source_bindings", ())),
+            bindings=tuple(payload.get("bindings", ())),
+        )
+        expected_hash = payload.get("provisional_hash")
+        if expected_hash is not None and str(expected_hash) != plan.provisional_hash:
+            raise ValueError("Serialized provisional_hash does not match canonical content.")
+        return plan
+
+    def to_dict(self, *, include_hash: bool = True) -> dict[str, Any]:
+        payload = {
+            "schema_version": self.schema_version,
+            "plan_id": self.plan_id,
+            "driver": _json_ready(self.driver),
+            "axis_rules": [rule.to_dict() for rule in self.axis_rules],
+            "outputs": [output.to_dict() for output in self.outputs],
+            "source_bindings": [binding.to_dict() for binding in self.source_bindings],
+            "bindings": _json_ready(self.bindings),
+        }
+        if include_hash:
+            payload["provisional_hash"] = self.provisional_hash
+        return payload
+
+    def to_json(self) -> str:
+        return _canonical_json(self.to_dict())
+
+
+@dataclass(frozen=True, slots=True)
+class ProvisionalChunkSpec:
+    """One source-side work item before processed output layouts are known."""
+
+    schema_version: str
+    plan_id: str
+    provisional_hash: str
+    chunk_id: str
+    ordinal: int
+    grid_index: tuple[int, ...]
+    source_selection: tuple[AxisSelector, ...]
+    expected_input_shape: tuple[int, ...]
+    destination_batch_selection: tuple[AxisSelector, ...]
+    expected_batch_shape: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        schema_version = str(self.schema_version).strip()
+        if not schema_version:
+            raise ValueError("ProvisionalChunkSpec.schema_version must be non-empty.")
+        object.__setattr__(self, "schema_version", schema_version)
+        object.__setattr__(self, "plan_id", _require_identifier(self.plan_id, "ProvisionalChunkSpec.plan_id"))
+        provisional_hash = str(self.provisional_hash).strip()
+        if not provisional_hash.startswith("sha256:"):
+            raise ValueError("ProvisionalChunkSpec.provisional_hash must use the 'sha256:' prefix.")
+        object.__setattr__(self, "provisional_hash", provisional_hash)
+        object.__setattr__(self, "chunk_id", _require_identifier(self.chunk_id, "ProvisionalChunkSpec.chunk_id"))
+        object.__setattr__(self, "ordinal", _require_non_negative_int(self.ordinal, "ProvisionalChunkSpec.ordinal"))
+        object.__setattr__(
+            self,
+            "grid_index",
+            tuple(_require_non_negative_int(value, "ProvisionalChunkSpec.grid_index") for value in self.grid_index),
+        )
+        object.__setattr__(self, "source_selection", tuple(self.source_selection))
+        input_shape = tuple(
+            _require_non_negative_int(value, "ProvisionalChunkSpec.expected_input_shape")
+            for value in self.expected_input_shape
+        )
+        batch_shape = tuple(
+            _require_non_negative_int(value, "ProvisionalChunkSpec.expected_batch_shape")
+            for value in self.expected_batch_shape
+        )
+        if any(value == 0 for value in (*input_shape, *batch_shape)):
+            raise ValueError("Provisional chunk shapes must contain positive dimensions.")
+        object.__setattr__(self, "expected_input_shape", input_shape)
+        object.__setattr__(self, "destination_batch_selection", tuple(self.destination_batch_selection))
+        object.__setattr__(self, "expected_batch_shape", batch_shape)
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> ProvisionalChunkSpec:
+        return cls(
+            schema_version=str(payload["schema_version"]),
+            plan_id=str(payload["plan_id"]),
+            provisional_hash=str(payload["provisional_hash"]),
+            chunk_id=str(payload["chunk_id"]),
+            ordinal=payload["ordinal"],
+            grid_index=tuple(payload.get("grid_index", ())),
+            source_selection=tuple(AxisSelector.from_dict(item) for item in payload["source_selection"]),
+            expected_input_shape=tuple(payload["expected_input_shape"]),
+            destination_batch_selection=tuple(
+                AxisSelector.from_dict(item) for item in payload["destination_batch_selection"]
+            ),
+            expected_batch_shape=tuple(payload["expected_batch_shape"]),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "plan_id": self.plan_id,
+            "provisional_hash": self.provisional_hash,
+            "chunk_id": self.chunk_id,
+            "ordinal": self.ordinal,
+            "grid_index": list(self.grid_index),
+            "source_selection": [selector.to_dict() for selector in self.source_selection],
+            "expected_input_shape": list(self.expected_input_shape),
+            "destination_batch_selection": [selector.to_dict() for selector in self.destination_batch_selection],
+            "expected_batch_shape": list(self.expected_batch_shape),
+        }
+
+    def to_json(self) -> str:
+        return _canonical_json(self.to_dict())
+
+    def identity_dict(self) -> dict[str, Any]:
+        return {
+            "plan_id": self.plan_id,
+            "provisional_hash": self.provisional_hash,
+            "chunk_id": self.chunk_id,
+            "ordinal": self.ordinal,
+            "provisional": True,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkInputPlan:
+    """Resolved driver extent and source-side work for a provisional plan."""
+
+    schema_version: str
+    plan_id: str
+    provisional_hash: str
+    full_shape: tuple[int, ...]
+    dtype: str | None
+    batch_axes: tuple[int, ...]
+    data_axes: tuple[int, ...]
+    final_batch_shape: tuple[int, ...]
+    chunks: tuple[ProvisionalChunkSpec, ...]
+    resolution_hash: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        schema_version = str(self.schema_version).strip()
+        if not schema_version:
+            raise ValueError("ChunkInputPlan.schema_version must be non-empty.")
+        plan_id = _require_identifier(self.plan_id, "ChunkInputPlan.plan_id")
+        provisional_hash = str(self.provisional_hash).strip()
+        if not provisional_hash.startswith("sha256:"):
+            raise ValueError("ChunkInputPlan.provisional_hash must use the 'sha256:' prefix.")
+        full_shape = tuple(_require_non_negative_int(value, "ChunkInputPlan.full_shape") for value in self.full_shape)
+        if not full_shape or any(value == 0 for value in full_shape):
+            raise ValueError("ChunkInputPlan.full_shape must contain positive dimensions.")
+        batch_axes = tuple(_require_non_negative_int(value, "ChunkInputPlan.batch_axes") for value in self.batch_axes)
+        data_axes = tuple(_require_non_negative_int(value, "ChunkInputPlan.data_axes") for value in self.data_axes)
+        if batch_axes + data_axes != tuple(range(len(full_shape))):
+            raise ValueError("ChunkInputPlan supports leading batch axes followed by trailing data axes.")
+        final_batch_shape = tuple(
+            _require_non_negative_int(value, "ChunkInputPlan.final_batch_shape") for value in self.final_batch_shape
+        )
+        chunks = tuple(self.chunks)
+        if not chunks:
+            raise ValueError("ChunkInputPlan.chunks must not be empty.")
+        for ordinal, chunk in enumerate(chunks):
+            if (
+                chunk.schema_version != schema_version
+                or chunk.plan_id != plan_id
+                or chunk.provisional_hash != provisional_hash
+                or chunk.ordinal != ordinal
+            ):
+                raise ValueError("ChunkInputPlan contains a chunk with a conflicting provisional identity.")
+            if selection_shape(full_shape, chunk.source_selection) != chunk.expected_input_shape:
+                raise ValueError("ChunkInputPlan contains a chunk with an invalid source selection.")
+            if selection_shape(final_batch_shape, chunk.destination_batch_selection) != chunk.expected_batch_shape:
+                raise ValueError("ChunkInputPlan contains a chunk with an invalid batch destination selection.")
+        dtype = None if self.dtype is None else np.dtype(self.dtype).str
+        object.__setattr__(self, "schema_version", schema_version)
+        object.__setattr__(self, "plan_id", plan_id)
+        object.__setattr__(self, "provisional_hash", provisional_hash)
+        object.__setattr__(self, "full_shape", full_shape)
+        object.__setattr__(self, "dtype", dtype)
+        object.__setattr__(self, "batch_axes", batch_axes)
+        object.__setattr__(self, "data_axes", data_axes)
+        object.__setattr__(self, "final_batch_shape", final_batch_shape)
+        object.__setattr__(self, "chunks", chunks)
+        digest = sha256(_canonical_json(self.to_dict(include_hash=False)).encode("utf-8")).hexdigest()
+        object.__setattr__(self, "resolution_hash", f"sha256:{digest}")
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> ChunkInputPlan:
+        result = cls(
+            schema_version=str(payload["schema_version"]),
+            plan_id=str(payload["plan_id"]),
+            provisional_hash=str(payload["provisional_hash"]),
+            full_shape=tuple(payload["full_shape"]),
+            dtype=payload.get("dtype"),
+            batch_axes=tuple(payload["batch_axes"]),
+            data_axes=tuple(payload["data_axes"]),
+            final_batch_shape=tuple(payload["final_batch_shape"]),
+            chunks=tuple(ProvisionalChunkSpec.from_dict(item) for item in payload["chunks"]),
+        )
+        expected_hash = payload.get("resolution_hash")
+        if expected_hash is not None and str(expected_hash) != result.resolution_hash:
+            raise ValueError("Serialized resolution_hash does not match canonical content.")
+        return result
+
+    def to_dict(self, *, include_hash: bool = True) -> dict[str, Any]:
+        payload = {
+            "schema_version": self.schema_version,
+            "plan_id": self.plan_id,
+            "provisional_hash": self.provisional_hash,
+            "full_shape": list(self.full_shape),
+            "dtype": self.dtype,
+            "batch_axes": list(self.batch_axes),
+            "data_axes": list(self.data_axes),
+            "final_batch_shape": list(self.final_batch_shape),
+            "chunks": [chunk.to_dict() for chunk in self.chunks],
+        }
+        if include_hash:
+            payload["resolution_hash"] = self.resolution_hash
+        return payload
+
+    def to_json(self) -> str:
+        return _canonical_json(self.to_dict())
+
+    def chunk(self, chunk_id: str) -> ProvisionalChunkSpec:
+        for chunk in self.chunks:
+            if chunk.chunk_id == chunk_id:
+                return chunk
+        raise KeyError(f"ChunkInputPlan has no chunk {chunk_id!r}.")
 
 
 @dataclass(frozen=True, slots=True)

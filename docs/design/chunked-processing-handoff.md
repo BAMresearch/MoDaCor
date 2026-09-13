@@ -62,7 +62,7 @@ For example, capillary self-absorption calculations have a
 calculation, but it is not a general file or pipeline chunking mechanism: the
 input detector data may still have been loaded in full.
 
-## Missing pipeline support
+## Pipeline-level support
 
 Ordinary pipeline YAML does not contain execution-specific source intervals.
 Chunked server requests can now coordinate slices across exact HDF5 or Tiled
@@ -72,12 +72,16 @@ the current contract. Direct Python callers can also use source slicing.
 
 MoDaCor also has no general:
 
-- chunk planner or scheduler;
-- shared chunk descriptor passed to pipeline steps;
+- graph-native loop or scheduler construct;
 - lazy or Dask-backed `BaseData` representation;
-- incremental sink append/reassembly contract;
-- retry, resume, or completion manifest for a multi-chunk run; or
 - reducer protocol for combining chunk-level statistics.
+
+Server-managed chunking now provides normalized source work, a shared chunk
+descriptor, incremental HDF5 reassembly, retry/resume, completion manifests,
+and finalization. A `ProvisionalChunkPlan` can discover HDF5/Tiled source
+extents and use the first processed result to resolve output schema. This is an
+external execution lifecycle rather than a loop embedded in the processing
+graph.
 
 `TiledSink` writes complete arrays one at a time. It can overwrite an existing
 array only when shape and dtype are unchanged; it does not append, resize, or

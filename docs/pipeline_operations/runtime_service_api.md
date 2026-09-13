@@ -360,8 +360,9 @@ resource. Ordinary process requests remain unchanged; requests that include
 
 ## Chunked outputs
 
-`POST /chunked-outputs` initializes a complete declared `ChunkPlan` and returns
-an opaque `output_id`. The request may contain a complete sink registration:
+`POST /chunked-outputs` initializes either a complete declared `ChunkPlan` or a
+`ProvisionalChunkPlan` and returns an opaque `output_id`. A complete request may
+contain a complete sink registration:
 
 ```json
 {
@@ -375,6 +376,45 @@ an opaque `output_id`. The request may contain a complete sink registration:
   "plan": {"schema_version": "1.0", "plan_id": "scan-42", "...": "..."}
 }
 ```
+
+For server-discovered input extents and pilot-discovered output schema, send
+`provisional_plan` instead of `plan` and include the worker `session_id` so the
+server can inspect its registered driver source:
+
+```json
+{
+  "session_id": "i22-worker",
+  "sink": {
+    "ref": "assembled",
+    "type": "hdf_chunked",
+    "location": "/data/out/assembled.h5"
+  },
+  "subpath": "saxs",
+  "provisional_plan": {
+    "schema_version": "1.0",
+    "plan_id": "i22-saxs",
+    "driver": {"source": "raw::/entry/data", "rank_of_data": 2},
+    "axis_rules": [
+      {"axis": 0, "chunk_size": 1},
+      {"axis": 1, "chunk_size": 10}
+    ],
+    "outputs": [
+      {
+        "output_id": "reduced",
+        "processing_path": "/sample/I",
+        "destination_path": "sample/I"
+      }
+    ]
+  }
+}
+```
+
+The response status is `awaiting_schema` and includes `provisional_hash`,
+`resolution_hash`, `expected_chunks`, and `pilot_chunk_id`. Submit work using
+`{"chunk_output": {"output_id": "...", "chunk_id": "c000000"}}`. The pilot
+response contains the resolved final `plan_hash`; later chunks use the same
+compact `chunk_id` form. Both provisional and resolved resources can be
+reopened from HDF5 after a server restart.
 
 For convenience, `session_id` and `sink_ref` may replace `sink`; the
 registration is copied at initialization and thereafter belongs to the output

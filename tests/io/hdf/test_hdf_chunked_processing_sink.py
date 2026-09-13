@@ -13,6 +13,7 @@ from modacor import __version__, ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.chunk_planning import resolve_chunk_input_plan, resolve_provisional_chunk_plan
 from modacor.io.chunking import (
     AxisSelector,
     ChunkArrayLayout,
@@ -21,6 +22,8 @@ from modacor.io.chunking import (
     ChunkPlan,
     ChunkSpec,
     PlacementBinding,
+    ProvisionalChunkOutput,
+    ProvisionalChunkPlan,
     UnsupportedSinkCapability,
 )
 from modacor.io.hdf import HDFChunkedProcessingSink, HDFProcessingSink
@@ -39,6 +42,16 @@ def _processing_data(values: np.ndarray) -> ProcessingData:
     bundle.default_plot = "signal"
     processing_data["sample"] = bundle
     return processing_data
+
+
+def _provisional_plan() -> ProvisionalChunkPlan:
+    return ProvisionalChunkPlan(
+        schema_version="1.0",
+        plan_id="provisional-assembly",
+        driver={"source": "sample::/entry/data", "rank_of_data": 1},
+        axis_rules=({"axis": 0, "chunk_size": 2},),
+        outputs=(ProvisionalChunkOutput("signal", "/sample/signal", "sample/signal"),),
+    )
 
 
 def _plan() -> ChunkPlan:
@@ -932,3 +945,106 @@ def test_hdf_chunked_sink_rejects_incomplete_destination_coverage(tmp_path: Path
 
     with pytest.raises(ValueError, match="cover 6 elements.*expected 10"):
         sink.finalize_chunked("run", plan=plan)
+
+
+def test_hdf_provisional_pilot_resolves_schema_and_writes_without_second_run(tmp_path: Path):
+    out_file = tmp_path / "provisional.h5"
+    provisional = _provisional_plan()
+    input_plan = resolve_chunk_input_plan(provisional, (5, 2), np.float32)
+    pilot_work = input_plan.chunks[0]
+    pilot_data = _processing_data(np.arange(4, dtype=np.float32).reshape(2, 2))
+    plan, specs = resolve_provisional_chunk_plan(
+        provisional,
+        input_plan,
+        pilot_data,
+        pilot_work.chunk_id,
+    )
+    sink = HDFChunkedProcessingSink(resource_location=out_file)
+
+    initialized = sink.initialize_provisional_chunked("run", provisional, input_plan=input_plan)
+    assert initialized.status == "awaiting_schema"
+    assert sink.inspect_provisional_chunked("run", plan=provisional, input_plan=input_plan).missing_chunks == 3
+    assert sink.load_provisional_chunked(provisional.plan_id) == ("run", provisional, input_plan)
+
+    pilot_result = sink.resolve_provisional_chunked(
+        "run",
+        pilot_data,
+        provisional_plan=provisional,
+        input_plan=input_plan,
+        plan=plan,
+        chunk=specs[0],
+        execution_metadata={"pilot": True},
+    )
+    assert pilot_result.status == "writing"
+    assert pilot_result.completed_chunks == 1
+
+    sink.write_chunk(
+        "run",
+        _processing_data(np.arange(4, 8, dtype=np.float32).reshape(2, 2)),
+        plan=plan,
+        chunk=specs[1],
+    )
+    sink.write_chunk(
+        "run",
+        _processing_data(np.arange(8, 10, dtype=np.float32).reshape(1, 2)),
+        plan=plan,
+        chunk=specs[2],
+    )
+    assert sink.finalize_chunked("run", plan=plan).status == "complete"
+
+    with h5py.File(out_file, "r") as h5:
+        plan_group = h5["processing/chunk_plans/provisional-assembly"]
+        assert _read_text(plan_group["status"]) == "complete"
+        assert "provisional-assembly.__awaiting_schema__" not in h5["processing/chunk_plans"]
+        assert _read_text(plan_group["provisional_plan_json"]) == provisional.to_json()
+        assert _read_text(plan_group["input_plan_json"]) == input_plan.to_json()
+        np.testing.assert_array_equal(
+            h5["processing/result/run/sample/signal/signal"],
+            np.arange(10, dtype=np.float32).reshape(5, 2),
+        )
+
+
+def test_hdf_provisional_transition_retries_after_interrupted_pilot_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    out_file = tmp_path / "provisional-retry.h5"
+    provisional = _provisional_plan()
+    input_plan = resolve_chunk_input_plan(provisional, (5, 2), np.float32)
+    pilot_data = _processing_data(np.arange(4, dtype=np.float32).reshape(2, 2))
+    plan, specs = resolve_provisional_chunk_plan(
+        provisional,
+        input_plan,
+        pilot_data,
+        input_plan.chunks[0].chunk_id,
+    )
+    sink = HDFChunkedProcessingSink(resource_location=out_file)
+    sink.initialize_provisional_chunked("run", provisional, input_plan=input_plan)
+    original_write = HDFChunkedProcessingSink.write_chunk
+
+    def interrupted_write(*args, **kwargs):
+        raise OSError("synthetic pilot interruption")
+
+    monkeypatch.setattr(HDFChunkedProcessingSink, "write_chunk", interrupted_write)
+    with pytest.raises(OSError, match="synthetic pilot interruption"):
+        sink.resolve_provisional_chunked(
+            "run",
+            pilot_data,
+            provisional_plan=provisional,
+            input_plan=input_plan,
+            plan=plan,
+            chunk=specs[0],
+        )
+
+    monkeypatch.setattr(HDFChunkedProcessingSink, "write_chunk", original_write)
+    retried = sink.resolve_provisional_chunked(
+        "run",
+        pilot_data,
+        provisional_plan=provisional,
+        input_plan=input_plan,
+        plan=plan,
+        chunk=specs[0],
+    )
+    assert retried.completed_chunks == 1
+    with h5py.File(out_file, "r") as h5:
+        assert "provisional-assembly.__awaiting_schema__" not in h5["processing/chunk_plans"]

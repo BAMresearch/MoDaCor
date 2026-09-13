@@ -19,11 +19,13 @@ from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.chunking import (
     AxisSelector,
     ChunkArrayLayout,
+    ChunkInputPlan,
     ChunkOutputLayout,
     ChunkOutputStatus,
     ChunkPlan,
     ChunkSpec,
     ChunkWriteResult,
+    ProvisionalChunkPlan,
     selection_shape,
 )
 from modacor.io.hdf.hdf_processing_sink import (
@@ -43,6 +45,7 @@ from modacor.io.io_sink import IoSink
 __all__ = ["HDFChunkedProcessingSink"]
 
 CollisionPolicy = Literal["error", "resume", "replace"]
+_PROVISIONAL_SUFFIX = ".__awaiting_schema__"
 
 
 def _read_text(value: h5py.Dataset) -> str:
@@ -288,6 +291,13 @@ def _resolve_axis_basedata(
             for index, axis in enumerate(basedata.axes)
             if index in final_axis_indices and isinstance(axis, BaseData)
         )
+    elif len(basedata.axes) == basedata.rank_of_data:
+        offset = len(output.axis_names) - basedata.rank_of_data
+        candidates.extend(
+            axis
+            for index, axis in enumerate(basedata.axes)
+            if index + offset in final_axis_indices and isinstance(axis, BaseData)
+        )
     elif len(basedata.axes) == len(retained_axes):
         candidates.extend(
             axis
@@ -529,6 +539,124 @@ def _write_chunk_trace(
     _write_trace_indexed(trace_chunk_group, normalised_trace_events)
 
 
+def _manifest_entry_is_complete(manifest_entry: h5py.Group, chunk: ChunkSpec) -> bool:
+    """Validate an existing manifest entry and report an idempotent retry."""
+
+    entry_status = _status(manifest_entry)
+    if entry_status == "complete":
+        stored_spec = _read_text(manifest_entry["spec_json"])
+        if stored_spec != chunk.to_json():
+            raise ValueError(f"Completed chunk {chunk.chunk_id!r} has a conflicting ChunkSpec.")
+        return True
+    if entry_status not in {"pending", "writing", "failed"}:
+        raise RuntimeError(f"Chunk {chunk.chunk_id!r} cannot be written from status {entry_status!r}.")
+    if entry_status in {"writing", "failed"} and "spec_json" in manifest_entry:
+        if _read_text(manifest_entry["spec_json"]) != chunk.to_json():
+            raise ValueError(f"Interrupted chunk {chunk.chunk_id!r} has a conflicting ChunkSpec.")
+    return False
+
+
+def _prepare_chunk_writes(
+    h5: h5py.File,
+    plan_group: h5py.Group,
+    run_name: str,
+    processing_data: ProcessingData,
+    plan: ChunkPlan,
+    chunk: ChunkSpec,
+) -> list[_PendingWrite]:
+    pending_writes: list[_PendingWrite] = []
+    for placement in chunk.placements:
+        output = plan.output(placement.output_id)
+        pending_writes.extend(
+            _prepare_output_writes(
+                h5,
+                plan_group,
+                run_name,
+                processing_data,
+                output,
+                placement.destination_selection,
+            )
+        )
+    return pending_writes
+
+
+def _stage_chunk_write(
+    manifest_entry: h5py.Group,
+    chunk: ChunkSpec,
+    pending_writes: list[_PendingWrite],
+    execution_metadata: dict[str, Any] | None,
+) -> None:
+    _write_text_field(manifest_entry, "spec_json", chunk.to_json())
+    if execution_metadata is not None:
+        _write_text_field(
+            manifest_entry,
+            "execution_json",
+            json.dumps(execution_metadata, sort_keys=True, separators=(",", ":"), ensure_ascii=False),
+        )
+    _set_status(manifest_entry, "writing")
+    for pending in pending_writes:
+        if pending.static_state is not None:
+            _set_status(pending.static_state, "writing")
+
+
+def _write_chunk_payload(
+    h5: h5py.File,
+    manifest_entry: h5py.Group,
+    pending_writes: list[_PendingWrite],
+    *,
+    run_name: str,
+    chunk_id: str,
+    trace_events: Any | None,
+) -> None:
+    try:
+        for pending in pending_writes:
+            pending.write()
+        _write_chunk_trace(
+            h5,
+            run_name=run_name,
+            chunk_id=chunk_id,
+            trace_events=trace_events,
+        )
+        h5.flush()
+    except Exception:
+        _set_status(manifest_entry, "failed")
+        h5.flush()
+        raise
+
+
+def _write_chunk_provenance(
+    plan_group: h5py.Group,
+    *,
+    pipeline_spec: dict[str, Any] | None,
+    pipeline_yaml: str | None,
+) -> None:
+    provenance = plan_group.require_group("provenance")
+    if pipeline_spec is not None:
+        _write_text_field(provenance, "pipeline_spec_json", _json_dumps_bytes(pipeline_spec).decode("utf-8"))
+    if pipeline_yaml is not None:
+        _write_text_field(provenance, "pipeline_yaml", pipeline_yaml)
+
+
+def _complete_chunk_write(
+    h5: h5py.File,
+    plan_group: h5py.Group,
+    manifest_entry: h5py.Group,
+    pending_writes: list[_PendingWrite],
+    *,
+    plan_id: str,
+) -> None:
+    for pending in pending_writes:
+        if pending.static_state is not None:
+            _set_status(pending.static_state, "complete")
+    _set_status(manifest_entry, "complete")
+    plan_group.attrs["completed_chunks"] = _completed_chunk_count(plan_group)
+    hidden_name = f"{plan_id}{_PROVISIONAL_SUFFIX}"
+    plans_root = h5["processing/chunk_plans"]
+    if hidden_name in plans_root:
+        del plans_root[hidden_name]
+    h5.flush()
+
+
 @define(kw_only=True)
 class HDFChunkedProcessingSink(IoSink):
     """Assemble signal arrays into fixed-shape HDF5 destinations."""
@@ -707,6 +835,262 @@ class HDFChunkedProcessingSink(IoSink):
             resource_location=str(resource_location or self.resource_location),
         )
 
+    def _provisional_result(
+        self,
+        plan_group: h5py.Group,
+        plan: ProvisionalChunkPlan,
+        input_plan: ChunkInputPlan,
+        *,
+        resource_location: Path | None = None,
+    ) -> ChunkWriteResult:
+        return ChunkWriteResult(
+            status=_status(plan_group),
+            plan_id=plan.plan_id,
+            plan_hash=plan.provisional_hash,
+            expected_chunks=len(input_plan.chunks),
+            completed_chunks=_completed_chunk_count(plan_group),
+            resource_location=str(resource_location or self.resource_location),
+        )
+
+    @staticmethod
+    def _provisional_group(
+        h5: h5py.File,
+        plan: ProvisionalChunkPlan,
+        input_plan: ChunkInputPlan,
+    ) -> h5py.Group:
+        plans_root = h5.get("processing/chunk_plans")
+        if not isinstance(plans_root, h5py.Group):
+            raise ValueError(f"Provisional chunk plan {plan.plan_id!r} has not been initialized.")
+        names = (plan.plan_id, f"{plan.plan_id}{_PROVISIONAL_SUFFIX}")
+        candidates = [plans_root[name] for name in names if name in plans_root]
+        groups = [item for item in candidates if isinstance(item, h5py.Group) and "provisional_plan_json" in item]
+        if len(groups) != 1:
+            raise ValueError(f"Provisional chunk plan {plan.plan_id!r} is missing or ambiguous.")
+        group = groups[0]
+        if str(group.attrs.get("plan_hash", "")) != plan.provisional_hash:
+            raise ValueError("Stored provisional plan hash does not match the requested plan.")
+        if str(group.attrs.get("resolution_hash", "")) != input_plan.resolution_hash:
+            raise ValueError("Stored input resolution hash does not match the requested input plan.")
+        if ProvisionalChunkPlan.from_dict(json.loads(_read_text(group["provisional_plan_json"]))) != plan:
+            raise ValueError("Stored provisional plan content does not match the requested plan.")
+        if ChunkInputPlan.from_dict(json.loads(_read_text(group["input_plan_json"]))) != input_plan:
+            raise ValueError("Stored input plan content does not match the requested input plan.")
+        return group
+
+    def initialize_provisional_chunked(
+        self,
+        subpath: str,
+        plan: ProvisionalChunkPlan,
+        *,
+        input_plan: ChunkInputPlan,
+        collision: CollisionPolicy = "error",
+        override_resource_location: Path | None = None,
+    ) -> ChunkWriteResult:
+        """Persist source work while deferring result datasets until a pilot."""
+
+        if input_plan.provisional_hash != plan.provisional_hash:
+            raise ValueError("ChunkInputPlan does not belong to the provisional plan.")
+        if collision not in {"error", "resume", "replace"}:
+            raise ValueError("collision must be 'error', 'resume', or 'replace'.")
+        out_path = self._path(override_resource_location)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        run_name = _normalise_subpath(subpath)
+
+        with h5py.File(out_path, "a") as h5:
+            processing_group = h5.require_group("processing")
+            result_root = processing_group.require_group("result")
+            plans_root = processing_group.require_group("chunk_plans")
+            hidden_name = f"{plan.plan_id}{_PROVISIONAL_SUFFIX}"
+            has_run = run_name in result_root
+            has_plan = plan.plan_id in plans_root
+            has_hidden = hidden_name in plans_root
+            if has_run or has_plan or has_hidden:
+                if collision == "error":
+                    raise FileExistsError(f"Chunked output run {run_name!r} or plan {plan.plan_id!r} already exists.")
+                if collision == "resume":
+                    group = self._provisional_group(h5, plan, input_plan)
+                    if _status(group) != "awaiting_schema":
+                        raise ValueError("Provisional output is not awaiting schema.")
+                    return self._provisional_result(group, plan, input_plan, resource_location=out_path)
+                if has_run:
+                    del result_root[run_name]
+                if has_plan:
+                    del plans_root[plan.plan_id]
+                if has_hidden:
+                    del plans_root[hidden_name]
+
+            plan_group = plans_root.create_group(plan.plan_id)
+            plan_group.attrs["plan_id"] = plan.plan_id
+            plan_group.attrs["plan_hash"] = plan.provisional_hash
+            plan_group.attrs["resolution_hash"] = input_plan.resolution_hash
+            plan_group.attrs["run_name"] = run_name
+            plan_group.attrs["schema_version"] = plan.schema_version
+            plan_group.attrs["modacor_version"] = __version__
+            plan_group.attrs["expected_chunks"] = len(input_plan.chunks)
+            plan_group.attrs["completed_chunks"] = 0
+            _write_text_field(plan_group, "provisional_plan_json", plan.to_json())
+            _write_text_field(plan_group, "input_plan_json", input_plan.to_json())
+            chunks_group = plan_group.create_group("chunks")
+            for chunk in input_plan.chunks:
+                entry = chunks_group.create_group(chunk.chunk_id)
+                entry.attrs["ordinal"] = chunk.ordinal
+                _write_text_field(entry, "input_spec_json", chunk.to_json())
+                _set_status(entry, "pending")
+            _write_text_field(processing_group, "program_name", "MoDaCor")
+            _write_text_field(processing_group, "program_version", __version__)
+            _set_status(plan_group, "awaiting_schema")
+            h5.flush()
+            return self._provisional_result(plan_group, plan, input_plan, resource_location=out_path)
+
+    def inspect_provisional_chunked(
+        self,
+        subpath: str,
+        *,
+        plan: ProvisionalChunkPlan,
+        input_plan: ChunkInputPlan,
+        offset: int = 0,
+        limit: int | None = None,
+        override_resource_location: Path | None = None,
+    ) -> ChunkOutputStatus:
+        if offset < 0 or (limit is not None and limit < 1):
+            raise ValueError("offset must be non-negative and limit must be positive when provided.")
+        out_path = self._path(override_resource_location)
+        with h5py.File(out_path, "r") as h5:
+            group = self._provisional_group(h5, plan, input_plan)
+            entries = [
+                {
+                    "chunk_id": chunk.chunk_id,
+                    "ordinal": chunk.ordinal,
+                    "status": _status(_chunk_group(group, chunk.chunk_id)),
+                }
+                for chunk in input_plan.chunks
+            ]
+            statuses = [entry["status"] for entry in entries]
+            end = None if limit is None else offset + limit
+            return ChunkOutputStatus(
+                status=_status(group),
+                plan_id=plan.plan_id,
+                plan_hash=plan.provisional_hash,
+                expected_chunks=len(input_plan.chunks),
+                completed_chunks=statuses.count("complete"),
+                writing_chunks=statuses.count("writing"),
+                failed_chunks=statuses.count("failed"),
+                missing_chunks=statuses.count("pending"),
+                chunks=tuple(entries[offset:end]),
+                resource_location=str(out_path),
+            )
+
+    def load_provisional_chunked(
+        self,
+        plan_id: str,
+        *,
+        override_resource_location: Path | None = None,
+    ) -> tuple[str, ProvisionalChunkPlan, ChunkInputPlan]:
+        if not plan_id or "/" in plan_id or plan_id in {".", ".."}:
+            raise ValueError("plan_id must be a non-empty chunk-plan identifier.")
+        out_path = self._path(override_resource_location)
+        with h5py.File(out_path, "r") as h5:
+            plans_root = h5.get("processing/chunk_plans")
+            hidden_name = f"{plan_id}{_PROVISIONAL_SUFFIX}"
+            if not isinstance(plans_root, h5py.Group) or (plan_id not in plans_root and hidden_name not in plans_root):
+                raise KeyError(f"Provisional chunk plan {plan_id!r} was not found in {out_path}.")
+            group = plans_root[plan_id] if plan_id in plans_root else plans_root[hidden_name]
+            if not isinstance(group, h5py.Group) or "provisional_plan_json" not in group:
+                raise ValueError(f"Stored chunk plan {plan_id!r} is not provisional.")
+            plan = ProvisionalChunkPlan.from_dict(json.loads(_read_text(group["provisional_plan_json"])))
+            input_plan = ChunkInputPlan.from_dict(json.loads(_read_text(group["input_plan_json"])))
+            self._provisional_group(h5, plan, input_plan)
+            return _as_text(group.attrs["run_name"]), plan, input_plan
+
+    def load_chunked_resolution(
+        self,
+        plan_id: str,
+        *,
+        override_resource_location: Path | None = None,
+    ) -> tuple[ProvisionalChunkPlan, ChunkInputPlan] | None:
+        """Load the provisional ancestry retained by a resolved plan."""
+
+        out_path = self._path(override_resource_location)
+        with h5py.File(out_path, "r") as h5:
+            path = f"processing/chunk_plans/{plan_id}"
+            if path not in h5 or not isinstance(h5[path], h5py.Group):
+                raise KeyError(f"Chunk plan {plan_id!r} was not found in {out_path}.")
+            group = h5[path]
+            if "provisional_plan_json" not in group or "input_plan_json" not in group:
+                hidden_path = f"processing/chunk_plans/{plan_id}{_PROVISIONAL_SUFFIX}"
+                if hidden_path not in h5 or not isinstance(h5[hidden_path], h5py.Group):
+                    return None
+                group = h5[hidden_path]
+                if "provisional_plan_json" not in group or "input_plan_json" not in group:
+                    return None
+            return (
+                ProvisionalChunkPlan.from_dict(json.loads(_read_text(group["provisional_plan_json"]))),
+                ChunkInputPlan.from_dict(json.loads(_read_text(group["input_plan_json"]))),
+            )
+
+    def resolve_provisional_chunked(
+        self,
+        subpath: str,
+        processing_data: ProcessingData,
+        *,
+        provisional_plan: ProvisionalChunkPlan,
+        input_plan: ChunkInputPlan,
+        plan: ChunkPlan,
+        chunk: ChunkSpec,
+        override_resource_location: Path | None = None,
+        **write_kwargs: Any,
+    ) -> ChunkWriteResult:
+        """Promote a persisted provisional manifest and write its pilot chunk."""
+
+        chunk.validate_for_plan(plan)
+        out_path = self._path(override_resource_location)
+        hidden_name = f"{plan.plan_id}{_PROVISIONAL_SUFFIX}"
+        with h5py.File(out_path, "r+") as h5:
+            plans_root = h5["processing/chunk_plans"]
+            current = plans_root.get(plan.plan_id)
+            if (
+                isinstance(current, h5py.Group)
+                and "provisional_plan_json" in current
+                and _status(current) == "awaiting_schema"
+            ):
+                if hidden_name in plans_root:
+                    raise ValueError("A previous provisional schema transition is already present.")
+                self._provisional_group(h5, provisional_plan, input_plan)
+                plans_root.move(plan.plan_id, hidden_name)
+                h5.flush()
+            elif hidden_name not in plans_root:
+                raise ValueError("The provisional manifest is missing during schema resolution.")
+            final_exists = plan.plan_id in plans_root
+
+        self.initialize_chunked(
+            subpath,
+            plan,
+            collision="resume" if final_exists else "error",
+            override_resource_location=out_path,
+        )
+        with h5py.File(out_path, "r+") as h5:
+            final_group = self._plan_group(h5, plan)
+            final_group.attrs["provisional_hash"] = provisional_plan.provisional_hash
+            final_group.attrs["resolution_hash"] = input_plan.resolution_hash
+            _write_text_field(final_group, "provisional_plan_json", provisional_plan.to_json())
+            _write_text_field(final_group, "input_plan_json", input_plan.to_json())
+            h5.flush()
+
+        result = self.write_chunk(
+            subpath,
+            processing_data,
+            plan=plan,
+            chunk=chunk,
+            override_resource_location=out_path,
+            **write_kwargs,
+        )
+        with h5py.File(out_path, "r+") as h5:
+            plans_root = h5["processing/chunk_plans"]
+            if hidden_name in plans_root:
+                del plans_root[hidden_name]
+            h5.flush()
+        return result
+
     def initialize_chunked(
         self,
         subpath: str,
@@ -842,86 +1226,38 @@ class HDFChunkedProcessingSink(IoSink):
         out_path = self._path(override_resource_location)
         run_name = _normalise_subpath(subpath)
 
-        pending_writes: list[_PendingWrite] = []
         with h5py.File(out_path, "r+") as h5:
             plan_group = self._plan_group(h5, plan)
             if _status(plan_group) != "writing":
                 raise RuntimeError(f"Chunk plan {plan.plan_id!r} is not writable (status={_status(plan_group)!r}).")
             self._validate_stored_layout(h5, run_name, plan)
             manifest_entry = _chunk_group(plan_group, chunk.chunk_id)
-            entry_status = _status(manifest_entry)
-            if entry_status == "complete":
-                stored_spec = _read_text(manifest_entry["spec_json"])
-                if stored_spec != chunk.to_json():
-                    raise ValueError(f"Completed chunk {chunk.chunk_id!r} has a conflicting ChunkSpec.")
+            if _manifest_entry_is_complete(manifest_entry, chunk):
                 return self._result(
                     plan_group,
                     plan,
                     chunk_id=chunk.chunk_id,
                     resource_location=out_path,
                 )
-            if entry_status not in {"pending", "writing", "failed"}:
-                raise RuntimeError(f"Chunk {chunk.chunk_id!r} cannot be written from status {entry_status!r}.")
-            if entry_status in {"writing", "failed"} and "spec_json" in manifest_entry:
-                if _read_text(manifest_entry["spec_json"]) != chunk.to_json():
-                    raise ValueError(f"Interrupted chunk {chunk.chunk_id!r} has a conflicting ChunkSpec.")
 
             self._validate_disjoint_placements(
                 plan,
                 chunk,
                 self._stored_specs(plan_group, exclude_chunk_id=chunk.chunk_id),
             )
-
-            for placement in chunk.placements:
-                output = plan.output(placement.output_id)
-                pending_writes.extend(
-                    _prepare_output_writes(
-                        h5,
-                        plan_group,
-                        run_name,
-                        processing_data,
-                        output,
-                        placement.destination_selection,
-                    )
-                )
-
-            _write_text_field(manifest_entry, "spec_json", chunk.to_json())
-            if execution_metadata is not None:
-                _write_text_field(
-                    manifest_entry,
-                    "execution_json",
-                    json.dumps(execution_metadata, sort_keys=True, separators=(",", ":"), ensure_ascii=False),
-                )
-            _set_status(manifest_entry, "writing")
-            for pending in pending_writes:
-                if pending.static_state is not None:
-                    _set_status(pending.static_state, "writing")
+            pending_writes = _prepare_chunk_writes(h5, plan_group, run_name, processing_data, plan, chunk)
+            _stage_chunk_write(manifest_entry, chunk, pending_writes, execution_metadata)
             h5.flush()
-            try:
-                for pending in pending_writes:
-                    pending.write()
-                _write_chunk_trace(
-                    h5,
-                    run_name=run_name,
-                    chunk_id=chunk.chunk_id,
-                    trace_events=trace_events,
-                )
-                h5.flush()
-            except Exception:
-                _set_status(manifest_entry, "failed")
-                h5.flush()
-                raise
-            provenance = plan_group.require_group("provenance")
-            if pipeline_spec is not None:
-                _write_text_field(provenance, "pipeline_spec_json", _json_dumps_bytes(pipeline_spec).decode("utf-8"))
-            if pipeline_yaml is not None:
-                _write_text_field(provenance, "pipeline_yaml", pipeline_yaml)
-            for pending in pending_writes:
-                if pending.static_state is not None:
-                    _set_status(pending.static_state, "complete")
-            _set_status(manifest_entry, "complete")
-            plan_group.attrs["completed_chunks"] = _completed_chunk_count(plan_group)
-            h5.flush()
+            _write_chunk_payload(
+                h5,
+                manifest_entry,
+                pending_writes,
+                run_name=run_name,
+                chunk_id=chunk.chunk_id,
+                trace_events=trace_events,
+            )
+            _write_chunk_provenance(plan_group, pipeline_spec=pipeline_spec, pipeline_yaml=pipeline_yaml)
+            _complete_chunk_write(h5, plan_group, manifest_entry, pending_writes, plan_id=plan.plan_id)
             return self._result(
                 plan_group,
                 plan,

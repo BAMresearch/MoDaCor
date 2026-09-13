@@ -29,7 +29,9 @@ __all__ = [
     "AxisSelector",
     "BufferSink",
     "BufferSource",
+    "ChunkAxisRule",
     "ChunkArrayLayout",
+    "ChunkInputPlan",
     "ChunkOutputLayout",
     "ChunkOutputStatus",
     "ChunkPlacement",
@@ -40,17 +42,26 @@ __all__ = [
     "IoSource",
     "IoSources",
     "PlacementBinding",
+    "ProvisionalChunkOutput",
+    "ProvisionalChunkPlan",
+    "ProvisionalChunkSpec",
     "RuntimeBufferStore",
     "TiledSink",
     "TiledSource",
     "UnsupportedSinkCapability",
+    "materialize_chunk_specs",
+    "resolve_chunk_input_plan",
+    "resolve_provisional_chunk_plan",
 ]
 
 
 from .buffer import BufferSink, BufferSource, RuntimeBufferStore
+from .chunk_planning import materialize_chunk_specs, resolve_chunk_input_plan, resolve_provisional_chunk_plan
 from .chunking import (
     AxisSelector,
     ChunkArrayLayout,
+    ChunkAxisRule,
+    ChunkInputPlan,
     ChunkOutputLayout,
     ChunkOutputStatus,
     ChunkPlacement,
@@ -59,6 +70,9 @@ from .chunking import (
     ChunkSpec,
     ChunkWriteResult,
     PlacementBinding,
+    ProvisionalChunkOutput,
+    ProvisionalChunkPlan,
+    ProvisionalChunkSpec,
     UnsupportedSinkCapability,
 )
 from .io_source import IoSource

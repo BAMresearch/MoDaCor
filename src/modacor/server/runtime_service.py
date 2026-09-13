@@ -13,7 +13,8 @@ from typing import Any
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.debug.pipeline_tracer import PlainUnicodeRenderer
 from modacor.io.buffer.codec import decode_npy, encode_npy
-from modacor.io.chunking import ChunkPlan, ChunkSpec
+from modacor.io.chunk_planning import resolve_chunk_input_plan
+from modacor.io.chunking import ChunkPlan, ChunkSpec, ProvisionalChunkPlan, ProvisionalChunkSpec
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.runner import run_pipeline_job
@@ -62,7 +63,7 @@ def _pipeline_provenance_spec(pipeline: Pipeline) -> dict[str, Any]:
 @dataclass(frozen=True, slots=True)
 class ChunkPublishRequest:
     output_id: str
-    chunk_spec: ChunkSpec
+    chunk_spec: ChunkSpec | ProvisionalChunkSpec
 
 
 @dataclass(slots=True)
@@ -80,7 +81,12 @@ class ProcessRequest:
 
 
 class _ChunkPublicationError(RuntimeError):
-    def __init__(self, output_id: str, chunk_spec: ChunkSpec, original_exception: Exception) -> None:
+    def __init__(
+        self,
+        output_id: str,
+        chunk_spec: ChunkSpec | ProvisionalChunkSpec,
+        original_exception: Exception,
+    ) -> None:
         super().__init__(str(original_exception))
         self.output_id = output_id
         self.chunk_spec = chunk_spec
@@ -129,20 +135,76 @@ class RuntimeService:
 
     def initialize_chunked_output(self, payload: dict[str, Any]) -> dict[str, Any]:
         plan_raw = payload.get("plan")
-        if not isinstance(plan_raw, dict):
-            raise ApiError(status_code=422, detail="plan must be a complete ChunkPlan object.")
+        provisional_raw = payload.get("provisional_plan")
+        if isinstance(plan_raw, dict) == isinstance(provisional_raw, dict):
+            raise ApiError(status_code=422, detail="Provide exactly one of plan or provisional_plan.")
+        sink_raw = self._chunk_sink_registration(payload)
+        collision = str(payload.get("collision", "error"))
+
+        if isinstance(provisional_raw, dict):
+            try:
+                provisional = ProvisionalChunkPlan.from_dict(provisional_raw)
+                session_id = str(payload.get("session_id", "")).strip()
+                if not session_id:
+                    raise ValueError("session_id is required for provisional source discovery.")
+                session = self._require_session(session_id)
+                driver_reference = IoSources.normalize_data_reference(str(provisional.driver["source"]))
+                source_ref, data_key = driver_reference.split("::", 1)
+                try:
+                    registration = session.sources[source_ref]
+                except KeyError as exc:
+                    raise ValueError(
+                        f"Provisional driver source {source_ref!r} is not registered in the session."
+                    ) from exc
+                source_type = str(registration["type"]).strip().lower()
+                declared_shape = provisional.driver.get("full_shape")
+                if source_type == "buffer" and declared_shape is None:
+                    raise ValueError("BufferSource provisional plans require driver.full_shape.")
+                if source_type == "buffer":
+                    source_shape = tuple(int(size) for size in declared_shape)
+                    source_dtype = provisional.driver.get("dtype")
+                else:
+                    sources = build_sources_from_session(
+                        session,
+                        buffer_store=self.manager.buffer_store,
+                        runtime_policy=self.policy,
+                    )
+                    source = sources.get_source(source_ref)
+                    source_shape = tuple(source.get_data_shape(data_key))
+                    source_dtype = source.get_data_dtype(data_key)
+                    if not source_shape and declared_shape is not None:
+                        source_shape = tuple(int(size) for size in declared_shape)
+                input_plan = resolve_chunk_input_plan(provisional, source_shape, source_dtype)
+                resource, result = self.chunked_outputs.initialize_provisional(
+                    sink_spec=sink_raw,
+                    subpath=str(payload.get("subpath", "")),
+                    provisional_plan=provisional,
+                    input_plan=input_plan,
+                    collision=collision,
+                )
+            except ApiError:
+                raise
+            except FileExistsError as exc:
+                raise ApiError(status_code=409, detail=str(exc)) from exc
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ApiError(status_code=422, detail=f"Invalid provisional chunk plan: {exc}") from exc
+            progress = self.chunked_outputs.inspect(resource.output_id, offset=0, limit=1).to_dict()
+            progress.pop("chunks", None)
+            return {
+                "output_id": resource.output_id,
+                "created_utc": resource.created_utc,
+                "sink_type": resource.sink_spec["type"],
+                "subpath": resource.subpath,
+                "provisional_hash": provisional.provisional_hash,
+                "resolution_hash": input_plan.resolution_hash,
+                "pilot_chunk_id": input_plan.chunks[0].chunk_id,
+                **result.to_dict(),
+                **progress,
+            }
+
+        assert isinstance(plan_raw, dict)
         try:
             plan = ChunkPlan.from_dict(plan_raw)
-        except (KeyError, TypeError, ValueError) as exc:
-            raise ApiError(
-                status_code=422,
-                detail=f"Invalid complete ChunkPlan: {exc}. Pilot schema discovery requires a future provisional-plan contract.",
-            ) from exc
-
-        sink_raw = self._chunk_sink_registration(payload)
-
-        collision = str(payload.get("collision", "error"))
-        try:
             resource, result = self.chunked_outputs.initialize(
                 sink_spec=sink_raw,
                 subpath=str(payload.get("subpath", "")),
@@ -152,7 +214,7 @@ class RuntimeService:
         except FileExistsError as exc:
             raise ApiError(status_code=409, detail=str(exc)) from exc
         except (KeyError, TypeError, ValueError) as exc:
-            raise ApiError(status_code=422, detail=str(exc)) from exc
+            raise ApiError(status_code=422, detail=f"Invalid complete ChunkPlan: {exc}") from exc
         progress = self.chunked_outputs.inspect(resource.output_id, offset=0, limit=1).to_dict()
         progress.pop("chunks", None)
         return {
@@ -712,10 +774,12 @@ class RuntimeService:
             )
             if request.chunk_output is not None:
                 resource = self.chunked_outputs.get(request.chunk_output.output_id)
+                active_plan = resource.plan or resource.provisional_plan
+                assert active_plan is not None
                 request.resolved_source_slices = bind_chunk_source_slices(
                     sources,
                     session,
-                    resource.plan,
+                    active_plan,
                     request.chunk_output.chunk_spec,
                 )
             sinks = build_sinks_from_session(
@@ -895,20 +959,35 @@ class RuntimeService:
                 raise ApiError(status_code=422, detail="chunk_output must be an object.")
             output_id = str(chunk_output_raw.get("output_id", "")).strip()
             spec_raw = chunk_output_raw.get("chunk_spec")
-            if not output_id or not isinstance(spec_raw, dict):
-                raise ApiError(status_code=422, detail="chunk_output requires output_id and chunk_spec.")
+            chunk_id = str(chunk_output_raw.get("chunk_id", "")).strip()
+            if not output_id or (isinstance(spec_raw, dict) == bool(chunk_id)):
+                raise ApiError(
+                    status_code=422,
+                    detail="chunk_output requires output_id and exactly one of chunk_spec or chunk_id.",
+                )
             try:
-                chunk_spec = ChunkSpec.from_dict(spec_raw)
                 resource = self.chunked_outputs.get(output_id)
-                chunk_spec.validate_for_plan(resource.plan)
+                if isinstance(spec_raw, dict):
+                    if resource.plan is None:
+                        raise ValueError("An awaiting-schema output accepts chunk_id, not a complete chunk_spec.")
+                    chunk_spec: ChunkSpec | ProvisionalChunkSpec = ChunkSpec.from_dict(spec_raw)
+                    chunk_spec.validate_for_plan(resource.plan)
+                else:
+                    chunk_spec = self.chunked_outputs.execution_chunk(output_id, chunk_id)
             except KeyError as exc:
                 raise ApiError(status_code=404, detail=str(exc)) from exc
             except (TypeError, ValueError) as exc:
                 raise ApiError(status_code=422, detail=str(exc)) from exc
             chunk_output = ChunkPublishRequest(output_id=output_id, chunk_spec=chunk_spec)
-            for binding in resource.plan.source_bindings:
+            active_plan = resource.plan or resource.provisional_plan
+            assert active_plan is not None
+            for binding in active_plan.source_bindings:
                 if binding.role != "static" and binding.source_ref not in changed_sources:
                     changed_sources.append(binding.source_ref)
+            if not active_plan.source_bindings:
+                driver_ref = str(active_plan.driver.get("source", "")).partition("::")[0].strip()
+                if driver_ref and driver_ref not in changed_sources:
+                    changed_sources.append(driver_ref)
         if mode == "partial" and not changed_sources and not changed_keys:
             raise ApiError(status_code=422, detail="partial mode requires changed_sources or changed_keys.")
         return ProcessRequest(
@@ -1039,7 +1118,7 @@ class RuntimeService:
         sinks: IoSinks,
         effective_mode: str,
         preparation: ProcessPreparation,
-        chunk_spec: ChunkSpec | None = None,
+        chunk_spec: ChunkSpec | ProvisionalChunkSpec | None = None,
     ) -> tuple[RunResult, float]:
         reuse_processing_data = effective_mode == "partial" and session.processing_data is not None
         run_t0 = perf_counter()
@@ -1085,6 +1164,7 @@ class RuntimeService:
         )
 
         chunk_write = None
+        published_chunk_spec: ChunkSpec | None = None
         if request.chunk_output is not None:
             try:
                 chunk_write = self.chunked_outputs.write_chunk(
@@ -1103,6 +1183,15 @@ class RuntimeService:
                     pipeline_yaml=session.pipeline_yaml or "",
                     trace_events=_pipeline_trace_events(result.pipeline) if session.trace_enabled else None,
                 )
+                if isinstance(request.chunk_output.chunk_spec, ProvisionalChunkSpec):
+                    resolved = self.chunked_outputs.execution_chunk(
+                        request.chunk_output.output_id,
+                        request.chunk_output.chunk_spec.chunk_id,
+                    )
+                    assert isinstance(resolved, ChunkSpec)
+                    published_chunk_spec = resolved
+                else:
+                    published_chunk_spec = request.chunk_output.chunk_spec
             except Exception as exc:
                 raise _ChunkPublicationError(
                     request.chunk_output.output_id,
@@ -1133,11 +1222,14 @@ class RuntimeService:
         if hdf_out_path is not None:
             details["hdf_output"] = hdf_out_path
         if chunk_write is not None:
+            assert published_chunk_spec is not None
             details["chunk_output"] = {
                 "output_id": request.chunk_output.output_id,
-                **request.chunk_output.chunk_spec.identity_dict(),
+                **published_chunk_spec.identity_dict(),
                 **chunk_write.to_dict(),
             }
+            if isinstance(request.chunk_output.chunk_spec, ProvisionalChunkSpec):
+                details["chunk_output"]["provisional_hash"] = request.chunk_output.chunk_spec.provisional_hash
         if request.resolved_source_slices:
             details["source_slices"] = request.resolved_source_slices
         trace_report = self._trace_report(result)
@@ -1288,6 +1380,7 @@ class RuntimeService:
             )
 
             chunk_write = None
+            published_chunk_spec: ChunkSpec | None = None
             if request.chunk_output is not None:
                 try:
                     chunk_write = self.chunked_outputs.write_chunk(
@@ -1305,6 +1398,15 @@ class RuntimeService:
                         pipeline_spec=fallback_result.pipeline.to_spec(),
                         pipeline_yaml=session.pipeline_yaml or "",
                     )
+                    if isinstance(request.chunk_output.chunk_spec, ProvisionalChunkSpec):
+                        resolved = self.chunked_outputs.execution_chunk(
+                            request.chunk_output.output_id,
+                            request.chunk_output.chunk_spec.chunk_id,
+                        )
+                        assert isinstance(resolved, ChunkSpec)
+                        published_chunk_spec = resolved
+                    else:
+                        published_chunk_spec = request.chunk_output.chunk_spec
                 except Exception as exc:
                     raise _ChunkPublicationError(
                         request.chunk_output.output_id,
@@ -1334,11 +1436,14 @@ class RuntimeService:
             if hdf_out_path:
                 details["hdf_output"] = hdf_out_path
             if chunk_write is not None:
+                assert published_chunk_spec is not None
                 details["chunk_output"] = {
                     "output_id": request.chunk_output.output_id,
-                    **request.chunk_output.chunk_spec.identity_dict(),
+                    **published_chunk_spec.identity_dict(),
                     **chunk_write.to_dict(),
                 }
+                if isinstance(request.chunk_output.chunk_spec, ProvisionalChunkSpec):
+                    details["chunk_output"]["provisional_hash"] = request.chunk_output.chunk_spec.provisional_hash
             if request.resolved_source_slices:
                 details["source_slices"] = request.resolved_source_slices
 

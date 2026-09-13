@@ -4,7 +4,7 @@ Status: implementation in progress.
 
 ## Implementation progress
 
-As of 2026-09-12:
+As of 2026-09-13:
 
 - Phase 1 is implemented: immutable chunk contracts, normalized selectors,
   canonical plan hashing and serialization, optional `IoSink` capability
@@ -67,18 +67,28 @@ As of 2026-09-12:
   deterministic Tiled test reaches backend sliced reads without filling its
   complete-array cache; validation against a deployed Tiled service remains
   open.
-- Verification at the current Phase 5 checkpoint passes 770 tests, with the
+- The constrained `awaiting_schema` workflow is implemented for HDF5 chunked
+  output. `ProvisionalChunkPlan` declares only the driver, batch-axis partition
+  rules, source bindings, and output identities. The server discovers HDF5 or
+  Tiled source shape/dtype without reading the arrays, creates a persistent
+  `ChunkInputPlan`, and accepts server-managed `chunk_id` work requests. The
+  first successful result resolves complete `BaseData` layouts, preallocates
+  output datasets, and writes that pilot without rerunning it. Both the
+  provisional and resolved identities survive server reopen. BufferSource uses
+  the same pilot path when the external runner declares `driver.full_shape`
+  and uploads already sliced chunks.
+- Verification at the current Phase 5 checkpoint passes 778 tests, with the
   opt-in RSS regression skipped by default; running that check explicitly also
   passes. The three reported test warnings are pre-existing numerical-domain
   warnings in `BaseData` tests. The documentation builds cleanly with Sphinx
   warnings treated as errors, and the OpenAPI YAML parses successfully.
 
-The optional `awaiting_schema` path is deliberately still open. The current
-immutable `ChunkPlan` hash includes dtype, units, uncertainty, axis, and
-component layout. Deriving those fields from a pilot chunk would therefore
-change the plan identity after chunks had already been issued. Supporting this
-cleanly needs a separate provisional-plan/schema-resolution contract; the
-server rejects incomplete plans instead of mutating their identity.
+The provisional contract deliberately has a separate `provisional_hash`. Source
+inspection produces a `resolution_hash`, and pilot schema extraction produces
+the existing final immutable `ChunkPlan.plan_hash`. A `ChunkSpec` is created
+only after the final plan exists; prior to that, a `ProvisionalChunkSpec`
+contains source and packed batch-destination selections but no output schema.
+This avoids changing the identity of an existing plan after work has begun.
 
 The current HDF chunk writer requires contiguous destination slices with
 stride 1. Strided destination writes remain deliberately unsupported and are
@@ -386,14 +396,23 @@ and every non-`.` name must have one corresponding declared axis component.
 This separates axis identity from placement and avoids guessing from array
 lengths.
 
-The first implementation should use a complete declared output schema when it
-is available. When dtype, units, uncertainties, or axes are not predictable
-from pipeline configuration, the server may create the output in an
+The implementation uses a complete declared output schema when it is
+available. When dtype, units, uncertainties, or axes are not predictable from
+pipeline configuration, the server may instead create the output in an
 `awaiting_schema` state. The first successful chunk then acts as a pilot: under
 the output lock, the server derives and validates the component schema,
-preallocates the datasets using the final shapes from the plan, writes the
-pilot, and changes the state to `writing`. Only one worker may perform this
-transition.
+constructs the immutable final plan, preallocates its datasets, writes the
+pilot, and changes the externally visible state to `writing`. Only one worker
+may perform this transition. An interrupted pilot publication retains the
+resolved plan and a retryable chunk entry rather than requiring schema
+discovery again.
+
+This first contract is intentionally constrained: the driver uses leading
+batch axes followed by `rank_of_data` trailing detector axes, chunk rules may
+select only batch axes, and each processed output must preserve those batch
+dimensions. Detector dimensions and processed data dimensions may be inferred.
+Unknown BufferSource stream lengths, batch-axis aggregation/reordering, and
+extendible outputs remain separate future contracts.
 
 ## `BaseData` storage rules
 
@@ -739,7 +758,7 @@ server capabilities.
   post-run action using the session's in-memory `ProcessingData`.
 - [x] Distinguish pipeline failures from chunk-publication failures and acknowledge
   success only after the chunk manifest is durable.
-- [ ] Support the `awaiting_schema` pilot-chunk transition when layouts cannot be
+- [x] Support the `awaiting_schema` pilot-chunk transition when layouts cannot be
   declared completely in advance.
 - [x] Preserve full and partial pipeline-run behavior.
 

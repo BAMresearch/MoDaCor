@@ -8,7 +8,14 @@ from pathlib import Path
 from typing import Any
 
 from modacor.io.buffer.runtime_buffer_store import RuntimeBufferStore
-from modacor.io.chunking import ChunkPlan, ChunkSpec, selection_shape
+from modacor.io.chunking import (
+    ChunkPlan,
+    ChunkSourceBinding,
+    ChunkSpec,
+    ProvisionalChunkPlan,
+    ProvisionalChunkSpec,
+    selection_shape,
+)
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.io.runtime_support import build_sink_from_spec, build_source_from_spec, write_processing_data_hdf
@@ -178,8 +185,8 @@ def build_sources_from_session(
 def bind_chunk_source_slices(
     sources: IoSources,
     session: PipelineSession,
-    plan: ChunkPlan,
-    chunk: ChunkSpec,
+    plan: ChunkPlan | ProvisionalChunkPlan,
+    chunk: ChunkSpec | ProvisionalChunkSpec,
 ) -> list[dict[str, Any]]:
     """Bind one chunk selection to direct HDF5 or Tiled source reads.
 
@@ -187,14 +194,20 @@ def bind_chunk_source_slices(
     deliberately excluded because their uploaded values are already sliced.
     """
 
-    if not plan.source_bindings:
-        return []
-
     bound_slices: dict[str, Any] = {}
     resolved: list[dict[str, Any]] = []
-    driver_reference = IoSources.normalize_data_reference(str(plan.driver["source"]))
+    bindings = plan.source_bindings
+    driver_raw = str(plan.driver.get("source", "")).strip()
+    if not bindings and not driver_raw:
+        return []
+    driver_reference = IoSources.normalize_data_reference(driver_raw)
+    if not bindings:
+        driver_ref, driver_key = driver_reference.split("::", 1)
+        registration = session.sources.get(driver_ref)
+        if registration is not None and str(registration["type"]).strip().lower() in {"hdf", "tiled"}:
+            bindings = (ChunkSourceBinding(driver_ref, driver_key, "aligned"),)
 
-    for binding in plan.source_bindings:
+    for binding in bindings:
         try:
             registration = session.sources[binding.source_ref]
         except KeyError as exc:

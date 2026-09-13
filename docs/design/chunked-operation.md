@@ -25,6 +25,58 @@ For an array shaped `(measurement, frame, slow, fast)` with
 Spatial detector tiling is a separate extension because it requires geometry
 offsets, halos, and module-specific correctness rules.
 
+When source extents or processed output layouts are not known in advance, use
+the provisional workflow described below. Users then specify only the driver,
+its `rank_of_data`, batch-axis chunk rules, and output paths. This avoids manual
+construction of `ChunkSpec` and complete `ChunkOutputLayout` records.
+
+## Provisional plans and pilot schema resolution
+
+`ProvisionalChunkPlan` resolves unknown input extents and unknown processed
+output schema in two separate steps. For HDF5 and Tiled drivers, the server
+reads dataset shape and dtype metadata and derives the batch/data axes,
+complete chunk grid, edge chunks, and packed destination batch selections. It
+does not read the detector arrays during initialization. BufferSource cannot
+reveal a complete acquisition extent from one uploaded chunk, so its
+provisional driver must declare `full_shape` and normally `dtype`.
+
+The first submitted `chunk_id` is the schema pilot. Its successful in-memory
+`ProcessingData` determines signal and component dtypes, units,
+`rank_of_data`, uncertainties, weights, and axes. The server requires every
+output to preserve the driver's leading batch dimensions; processed data
+dimensions may change, for example from 2D detector images to 1D Q curves.
+The server then creates the final immutable `ChunkPlan`, preallocates the HDF5
+datasets, writes the pilot result once, and returns the final `plan_hash`.
+Subsequent requests need only the `output_id` and `chunk_id`.
+
+```yaml
+schema_version: "1.0"
+plan_id: i22-saxs
+driver:
+  source: raw::/entry/data
+  rank_of_data: 2
+axis_rules:
+  - {axis: 0, chunk_size: 1}
+  - {axis: 1, chunk_size: 10}
+outputs:
+  - output_id: reduced
+    processing_path: /sample/I
+    destination_path: sample/I
+```
+
+For a direct driver, the server automatically applies the driver's selection
+when `source_bindings` is omitted entirely. Companion arrays still require
+exact `aligned`, `static`, or `explicit` bindings because their relationship
+cannot be inferred safely; once such bindings are supplied, include the driver
+as an `aligned` binding as well. BufferSource values are treated as already
+sliced.
+
+Three immutable identities are retained for provenance: the user request's
+`provisional_hash`, the discovered input work's `resolution_hash`, and the
+final output schema's `plan_hash`. The complete-plan API remains available and
+unchanged when dimensions and layouts are known in advance, including live
+processing deployments that do not need a pilot.
+
 ## Source-ingestion modes
 
 Chunked operation must support two complementary deployment modes. They share

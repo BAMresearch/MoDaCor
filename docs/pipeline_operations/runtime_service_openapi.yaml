@@ -788,7 +788,7 @@ components:
 
     InitializeChunkedOutputRequest:
       type: object
-      required: [subpath, plan]
+      required: [subpath]
       properties:
         sink:
           $ref: "#/components/schemas/SinkRegistration"
@@ -806,9 +806,17 @@ components:
           type: object
           description: Complete serialized ChunkPlan, including its declared output layouts.
           additionalProperties: true
-      oneOf:
-        - required: [sink]
-        - required: [session_id, sink_ref]
+        provisional_plan:
+          type: object
+          description: ProvisionalChunkPlan for source discovery and pilot output-schema resolution.
+          additionalProperties: true
+      allOf:
+        - oneOf:
+            - required: [sink]
+            - required: [session_id, sink_ref]
+        - oneOf:
+            - required: [plan]
+            - required: [provisional_plan, session_id]
 
     ReopenChunkedOutputRequest:
       type: object
@@ -844,6 +852,9 @@ components:
         status: {type: string}
         plan_id: {type: string}
         plan_hash: {type: string}
+        provisional_hash: {type: string}
+        resolution_hash: {type: string}
+        pilot_chunk_id: {type: string}
         expected_chunks: {type: integer, minimum: 1}
         completed_chunks: {type: integer, minimum: 0}
         writing_chunks: {type: integer, minimum: 0}
@@ -860,13 +871,19 @@ components:
 
     ChunkPublishRequest:
       type: object
-      required: [output_id, chunk_spec]
+      required: [output_id]
       properties:
         output_id: {type: string}
+        chunk_id:
+          type: string
+          description: Server-managed work id for a provisional or resolved provisional plan.
         chunk_spec:
           type: object
           description: Complete serialized ChunkSpec for this run.
           additionalProperties: true
+      oneOf:
+        - required: [chunk_id]
+        - required: [chunk_spec]
 
     UpsertSourcesRequest:
       type: object

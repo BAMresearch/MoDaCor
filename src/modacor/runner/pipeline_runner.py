@@ -11,7 +11,7 @@ from typing import Any
 
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.debug.pipeline_tracer import PipelineTracer
-from modacor.io.chunking import ChunkSpec
+from modacor.io.chunking import ChunkSpec, ProvisionalChunkSpec
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.runner.pipeline import Pipeline
@@ -29,7 +29,7 @@ class RunResult:
     step_durations: dict[str, float]
     executed_steps: list[str]
     stopped_after_step: str | None
-    chunk_spec: ChunkSpec | None = None
+    chunk_spec: ChunkSpec | ProvisionalChunkSpec | None = None
 
 
 class PipelineRunError(RuntimeError):
@@ -67,7 +67,7 @@ def run_pipeline_job(
     stop_after: str | None = None,
     selected_step_ids: set[str] | list[str] | tuple[str, ...] | None = None,
     capture_partial_on_error: bool = False,
-    chunk_spec: ChunkSpec | None = None,
+    chunk_spec: ChunkSpec | ProvisionalChunkSpec | None = None,
 ) -> RunResult:
     """
     Execute a pipeline end-to-end.

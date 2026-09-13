@@ -10,7 +10,10 @@ tests, and the expected report contract.
 The lightweight suite covers manifest interruption, retry, restart
 reconstruction, missing chunks, duplicate delivery, abandoning and resuming an
 assembly, and serialization of two server output ids targeting the same HDF5
-file. These tests use small generated arrays and run in normal CI.
+file. They also cover provisional input discovery, pilot schema resolution,
+pre-sliced BufferSource delivery, interruption of the pilot transition, and
+reopen both before and after schema resolution. These tests use small generated
+arrays and run in normal CI.
 
 The optional RSS test runs two fresh benchmark subprocesses with the same chunk
 shape and an eightfold difference in total frame count:
@@ -85,9 +88,11 @@ POST /v1/chunked-outputs/reopen
 ```
 
 The request supplies the chunk-capable sink registration, `plan_id`, and an
-optional expected `plan_hash`. The server reads and validates the stored plan
-and returns a new output id. It does not need a worker session or the original
-complete plan document.
+optional expected plan or provisional hash. The server reads and validates the
+stored complete or provisional plan and returns a new output id. It does not
+need a worker session or the original plan document. A resolved provisional
+plan retains enough ancestry to reconstruct its server-managed `chunk_id`
+work items after restart.
 
 Recovery uses:
 
@@ -103,8 +108,9 @@ with one of these actions:
 - `abandon`: persistently stop writes to an incomplete assembly; or
 - `resume`: return an explicitly abandoned assembly to `writing`.
 
-A chunk marked `failed` is retried by submitting the same `ChunkSpec`; every
-component is rewritten before the manifest returns to `complete`.
+A chunk marked `failed` is retried by submitting the same `ChunkSpec`, or the
+same server-managed `chunk_id` for a provisional workflow; every component is
+rewritten before the manifest returns to `complete`.
 Initialization interrupted before layout creation is not reconciled because
 the fixed dataset schema may be incomplete. Inspect it and explicitly
 initialize with `collision: replace` if discarding that partial assembly is

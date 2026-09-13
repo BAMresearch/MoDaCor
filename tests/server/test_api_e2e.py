@@ -25,6 +25,8 @@ from modacor.io.chunking import (
     ChunkPlan,
     ChunkSourceBinding,
     ChunkSpec,
+    ProvisionalChunkOutput,
+    ProvisionalChunkPlan,
 )
 from modacor.runner.pipeline import Pipeline
 from modacor.runner.pipeline_runner import PipelineRunError, RunResult
@@ -1354,6 +1356,210 @@ steps:
     assert session is not None
     assert session.run_history[-1]["changed_sources"] == ["sample"]
     assert session.source_cache["sample"]["source"]._data_cache == {}
+
+
+def test_server_resolves_provisional_hdf_plan_from_source_and_pilot(tmp_path: Path):
+    source_file = tmp_path / "provisional-source.h5"
+    output_file = tmp_path / "provisional-result.h5"
+    values = np.arange(10, dtype=np.float32).reshape(5, 2)
+    with h5py.File(source_file, "w") as h5:
+        h5.create_dataset("data", data=values)
+
+    manager = SessionManager()
+    client = TestClient(create_app(session_manager=manager))
+    pipeline_yaml = """
+name: provisional_hdf_chunks
+steps:
+  load:
+    module: AppendProcessingData
+    requires_steps: []
+    configuration:
+      processing_key: sample
+      databundle_output_key: signal
+      signal_location: sample::/data
+      units_override: count
+      rank_of_data: 1
+"""
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "provisional-worker",
+            "pipeline": {"yaml_text": pipeline_yaml},
+            "trace": {"enabled": True},
+        },
+    )
+    _post_json(
+        client,
+        "/v1/sessions/provisional-worker/sources/patch",
+        {"ref": "sample", "type": "hdf", "location": str(source_file)},
+    )
+    provisional = ProvisionalChunkPlan(
+        schema_version="1.0",
+        plan_id="server-pilot-plan",
+        driver={"source": "sample::/data", "rank_of_data": 1},
+        axis_rules=({"axis": 0, "chunk_size": 2},),
+        outputs=(ProvisionalChunkOutput("signal", "/sample/signal", "sample/signal"),),
+    )
+    initialized = _post_json(
+        client,
+        "/v1/chunked-outputs",
+        {
+            "session_id": "provisional-worker",
+            "sink": {"ref": "result", "type": "hdf_chunked", "location": str(output_file)},
+            "subpath": "pilot",
+            "provisional_plan": provisional.to_dict(),
+        },
+    )
+    assert initialized["status"] == "awaiting_schema"
+    assert initialized["expected_chunks"] == 3
+    assert initialized["pilot_chunk_id"] == "c000000"
+
+    assert client.delete(f"/v1/chunked-outputs/{initialized['output_id']}").status_code == 204
+    reopened = _post_json(
+        client,
+        "/v1/chunked-outputs/reopen",
+        {
+            "sink": {"ref": "result", "type": "hdf_chunked", "location": str(output_file)},
+            "plan_id": provisional.plan_id,
+            "plan_hash": provisional.provisional_hash,
+        },
+    )
+    assert reopened["status"] == "awaiting_schema"
+    output_id = reopened["output_id"]
+
+    final_hash = None
+    for ordinal in range(3):
+        response = _post_json(
+            client,
+            "/v1/sessions/provisional-worker/process",
+            {
+                "mode": "full" if ordinal == 0 else "partial",
+                "rollback_snapshot": False,
+                "chunk_output": {
+                    "output_id": output_id,
+                    "chunk_id": f"c{ordinal:06d}",
+                },
+            },
+        )
+        assert response["status"] == "succeeded"
+        final_hash = response["chunk_output"]["plan_hash"]
+        if ordinal == 0:
+            assert response["chunk_output"]["provisional_hash"] == provisional.provisional_hash
+            assert client.delete(f"/v1/chunked-outputs/{output_id}").status_code == 204
+            resolved_reopen = _post_json(
+                client,
+                "/v1/chunked-outputs/reopen",
+                {
+                    "sink": {"ref": "result", "type": "hdf_chunked", "location": str(output_file)},
+                    "plan_id": provisional.plan_id,
+                    "plan_hash": final_hash,
+                },
+            )
+            output_id = resolved_reopen["output_id"]
+
+    assert final_hash is not None and final_hash != provisional.provisional_hash
+    progress = client.get(f"/v1/chunked-outputs/{output_id}").json()
+    assert progress["status"] == "writing"
+    assert progress["completed_chunks"] == 3
+    finalized = _post_json(
+        client,
+        f"/v1/chunked-outputs/{output_id}/finalize",
+        {"plan_hash": final_hash},
+    )
+    assert finalized["status"] == "complete"
+
+    with h5py.File(output_file, "r") as h5:
+        np.testing.assert_array_equal(h5["processing/result/pilot/sample/signal/signal"], values)
+        plan_group = h5["processing/chunk_plans/server-pilot-plan"]
+        assert plan_group.attrs["provisional_hash"] == provisional.provisional_hash
+        first_execution = json.loads(plan_group["chunks/c000000/execution_json"][()].decode())
+        assert first_execution["plan_hash"] == final_hash
+        pilot_trace = json.loads(h5["processing/tracer/pilot/chunks/c000000/events"][()].decode())
+        assert pilot_trace[0]["chunk_identity"]["plan_hash"] == final_hash
+        assert pilot_trace[0]["chunk_identity"]["provisional_hash"] == provisional.provisional_hash
+
+
+def test_server_provisional_plan_accepts_pre_sliced_buffer_chunks(tmp_path: Path):
+    output_file = tmp_path / "provisional-buffer-result.h5"
+    values = np.arange(10, dtype=np.float32).reshape(5, 2)
+    manager = SessionManager()
+    client = TestClient(create_app(session_manager=manager))
+    pipeline_yaml = """
+name: provisional_buffer_chunks
+steps:
+  load:
+    module: AppendProcessingData
+    requires_steps: []
+    configuration:
+      processing_key: sample
+      databundle_output_key: signal
+      signal_location: staged::/data
+      units_override: count
+      rank_of_data: 1
+"""
+    _post_json(
+        client,
+        "/v1/sessions",
+        {"session_id": "buffer-pilot-worker", "pipeline": {"yaml_text": pipeline_yaml}},
+    )
+    _post_json(
+        client,
+        "/v1/sessions/buffer-pilot-worker/sources/patch",
+        {"ref": "staged", "type": "buffer", "location": "buffer://session"},
+    )
+    provisional = ProvisionalChunkPlan(
+        schema_version="1.0",
+        plan_id="buffer-pilot-plan",
+        driver={
+            "source": "staged::/data",
+            "rank_of_data": 1,
+            "full_shape": list(values.shape),
+            "dtype": values.dtype.str,
+        },
+        axis_rules=({"axis": 0, "chunk_size": 2},),
+        outputs=(ProvisionalChunkOutput("signal", "/sample/signal", "sample/signal"),),
+    )
+    initialized = _post_json(
+        client,
+        "/v1/chunked-outputs",
+        {
+            "session_id": "buffer-pilot-worker",
+            "sink": {"ref": "result", "type": "hdf_chunked", "location": str(output_file)},
+            "subpath": "buffer-pilot",
+            "provisional_plan": provisional.to_dict(),
+        },
+    )
+
+    final_hash = None
+    for ordinal, (start, stop) in enumerate(((0, 2), (2, 4), (4, 5))):
+        _put_npy(
+            client,
+            "/v1/sessions/buffer-pilot-worker/buffers/sources/staged/arrays/data",
+            values[start:stop],
+        )
+        response = _post_json(
+            client,
+            "/v1/sessions/buffer-pilot-worker/process",
+            {
+                "mode": "full" if ordinal == 0 else "partial",
+                "rollback_snapshot": False,
+                "chunk_output": {
+                    "output_id": initialized["output_id"],
+                    "chunk_id": f"c{ordinal:06d}",
+                },
+            },
+        )
+        final_hash = response["chunk_output"]["plan_hash"]
+
+    assert final_hash is not None
+    _post_json(
+        client,
+        f"/v1/chunked-outputs/{initialized['output_id']}/finalize",
+        {"plan_hash": final_hash},
+    )
+    with h5py.File(output_file, "r") as h5:
+        np.testing.assert_array_equal(h5["processing/result/buffer-pilot/sample/signal/signal"], values)
 
 
 def test_chunked_process_reads_bound_tiled_slice(monkeypatch, tmp_path: Path):

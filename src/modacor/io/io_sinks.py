@@ -18,7 +18,15 @@ from typing import Any
 from attrs import define, field
 
 from modacor.dataclasses.processing_data import ProcessingData
-from modacor.io.chunking import ChunkOutputStatus, ChunkPlan, ChunkSpec, ChunkWriteResult, UnsupportedSinkCapability
+from modacor.io.chunking import (
+    ChunkInputPlan,
+    ChunkOutputStatus,
+    ChunkPlan,
+    ChunkSpec,
+    ChunkWriteResult,
+    ProvisionalChunkPlan,
+    UnsupportedSinkCapability,
+)
 from modacor.io.io_sink import IoSink
 
 
@@ -77,6 +85,61 @@ class IoSinks:
     ) -> ChunkWriteResult:
         sink, subpath = self._get_chunked_sink(target_reference)
         return sink.initialize_chunked(subpath, plan, **kwargs)
+
+    def initialize_provisional_chunked(
+        self,
+        target_reference: str,
+        plan: ProvisionalChunkPlan,
+        *,
+        input_plan: ChunkInputPlan,
+        **kwargs: Any,
+    ) -> ChunkWriteResult:
+        sink, subpath = self._get_chunked_sink(target_reference)
+        return sink.initialize_provisional_chunked(subpath, plan, input_plan=input_plan, **kwargs)
+
+    def inspect_provisional_chunked(
+        self,
+        target_reference: str,
+        *,
+        plan: ProvisionalChunkPlan,
+        input_plan: ChunkInputPlan,
+        **kwargs: Any,
+    ) -> ChunkOutputStatus:
+        sink, subpath = self._get_chunked_sink(target_reference)
+        return sink.inspect_provisional_chunked(subpath, plan=plan, input_plan=input_plan, **kwargs)
+
+    def resolve_provisional_chunked(
+        self,
+        target_reference: str,
+        processing_data: ProcessingData,
+        *,
+        provisional_plan: ProvisionalChunkPlan,
+        input_plan: ChunkInputPlan,
+        plan: ChunkPlan,
+        chunk: ChunkSpec,
+        **kwargs: Any,
+    ) -> ChunkWriteResult:
+        sink, subpath = self._get_chunked_sink(target_reference)
+        return sink.resolve_provisional_chunked(
+            subpath,
+            processing_data,
+            provisional_plan=provisional_plan,
+            input_plan=input_plan,
+            plan=plan,
+            chunk=chunk,
+            **kwargs,
+        )
+
+    def load_provisional_chunked(
+        self,
+        sink_reference: str,
+        plan_id: str,
+        **kwargs: Any,
+    ) -> tuple[str, ProvisionalChunkPlan, ChunkInputPlan]:
+        sink = self.get_sink(sink_reference)
+        if not sink.supports_chunked_writes:
+            raise UnsupportedSinkCapability(type(sink), "provisional_chunked_writes")
+        return sink.load_provisional_chunked(plan_id, **kwargs)
 
     def write_chunk(
         self,
