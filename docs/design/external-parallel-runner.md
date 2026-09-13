@@ -16,6 +16,29 @@ This keeps pipeline modules independent of execution policy and allows the
 runner to choose local processes, runtime API sessions, distributed workers,
 or a facility scheduler without changing the correction graph.
 
+## Source delivery modes
+
+Workers may push already resolved chunks into session `BufferSource`
+registrations, or ask the server to pull slices directly from registered
+`HDFSource` and `TiledSource` inputs. These are complementary operating modes,
+not different output protocols: both submit the same `ChunkSpec` and publish
+through the same server-managed chunked-output resource.
+
+Buffer delivery is implemented now and is suitable for remote runners or
+storage that is inaccessible to the server. It incurs HTTP serialization and
+memory copies, and the runner is responsible for uploading mutually aligned
+arrays. Direct HDF5 or Tiled access avoids transporting chunk arrays through
+the orchestrator and keeps storage identity closer to the read, but normal
+server execution does not yet project a `ChunkSpec` onto source reads. That
+mode depends on the dedicated server-side slice-binding contract specified in
+[Chunked Operation](chunked-operation.md).
+
+A deployment may use both modes. For example, a facility server may read raw
+detector frames directly from Tiled while receiving a runner-generated dynamic
+mask through a buffer. The plan must give every input an explicit `aligned`,
+`static`, or `explicit` binding and the execution record must preserve the
+effective source selection or uploaded-source identity.
+
 ## Recommended worker model
 
 Use a fixed number of long-lived workers. Each worker owns an independent
@@ -181,4 +204,6 @@ sessions and one server-managed chunked output. Once numerical equivalence,
 memory bounds, and idempotent assembly are demonstrated, add a bounded pool of
 sessions. Keep server-side writes serialized initially, then validate
 concurrent HDF5 or Tiled publication separately against representative
-facility infrastructure.
+facility infrastructure. Use `BufferSource` delivery until server-side slice
+binding is available; then validate direct HDF5 and direct Tiled reads as
+separate beamline deployment profiles.

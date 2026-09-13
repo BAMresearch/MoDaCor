@@ -15,6 +15,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
+from modacor.dataclasses.trace_event import TraceEvent
 from modacor.io.buffer import decode_npy, encode_npy
 from modacor.io.chunking import AxisSelector, ChunkArrayLayout, ChunkOutputLayout, ChunkPlacement, ChunkPlan, ChunkSpec
 from modacor.runner.pipeline import Pipeline
@@ -1268,7 +1269,11 @@ steps:
         _post_json(
             client,
             "/v1/sessions",
-            {"session_id": session_id, "pipeline": {"yaml_text": worker_pipelines[session_id]}},
+            {
+                "session_id": session_id,
+                "pipeline": {"yaml_text": worker_pipelines[session_id]},
+                "trace": {"enabled": session_id == "worker-1"},
+            },
         )
     manager.upsert_sinks(
         "worker-0",
@@ -1308,6 +1313,16 @@ steps:
         ordinal = calls["ordinal"]
         calls["ordinal"] += 1
         values = np.arange(ordinal * 4, ordinal * 4 + 4, dtype=np.float32).reshape(2, 2)
+        chunk_spec = kwargs.get("chunk_spec")
+        pipeline.clear_trace_events()
+        pipeline.trace_events["poisson"] = [
+            TraceEvent(
+                step_id="poisson",
+                module="PoissonUncertainties",
+                duration_s=0.01,
+                chunk_identity=chunk_spec.identity_dict(),
+            )
+        ]
         return RunResult(
             processing_data=_server_processing_data(values),
             pipeline=pipeline,
@@ -1315,7 +1330,7 @@ steps:
             step_durations={},
             executed_steps=[],
             stopped_after_step=None,
-            chunk_spec=kwargs.get("chunk_spec"),
+            chunk_spec=chunk_spec,
         )
 
     monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
@@ -1358,12 +1373,18 @@ steps:
             h5["processing/result/run1/sample/signal/signal"],
             np.arange(8, dtype=np.float32).reshape(4, 2),
         )
-        assert "spec" in h5["processing/pipeline/run1"]
+        pipeline_spec = json.loads(h5["processing/pipeline/run1/spec"][()].decode())
+        assert all("trace_events" not in node for node in pipeline_spec["nodes"])
         execution = json.loads(h5["processing/chunk_plans/server-plan/chunks/c1/execution_json"][()].decode())
         assert execution["effective_mode"] == "partial"
         assert execution["session_id"] == "worker-1"
         assert execution["chunk_id"] == "c1"
         assert execution["sources"] == []
+        for ordinal in (0, 1):
+            trace_group = h5[f"processing/tracer/run1/chunks/c{ordinal}"]
+            events = json.loads(trace_group["events"][()].decode())
+            assert events[0]["step_id"] == "poisson"
+            assert events[0]["chunk_identity"]["chunk_id"] == f"c{ordinal}"
 
 
 def test_chunk_publication_failure_is_distinct_from_pipeline_failure(monkeypatch, tmp_path: Path):

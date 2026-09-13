@@ -44,6 +44,21 @@ def _source_provenance(session: PipelineSession) -> list[dict[str, str]]:
     ]
 
 
+def _pipeline_trace_events(pipeline: Pipeline) -> list[Any]:
+    """Flatten lightweight, array-free step events in execution order."""
+
+    return [event for step_events in pipeline.trace_events.values() for event in step_events]
+
+
+def _pipeline_provenance_spec(pipeline: Pipeline) -> dict[str, Any]:
+    """Keep run-specific trace events out of the plan-level pipeline record."""
+
+    pipeline_spec = pipeline.to_spec()
+    for node in pipeline_spec.get("nodes", []):
+        node.pop("trace_events", None)
+    return pipeline_spec
+
+
 @dataclass(frozen=True, slots=True)
 class ChunkPublishRequest:
     output_id: str
@@ -1071,8 +1086,9 @@ class RuntimeService:
                         "sources": _source_provenance(session),
                         **request.chunk_output.chunk_spec.identity_dict(),
                     },
-                    pipeline_spec=result.pipeline.to_spec(),
+                    pipeline_spec=_pipeline_provenance_spec(result.pipeline),
                     pipeline_yaml=session.pipeline_yaml or "",
+                    trace_events=_pipeline_trace_events(result.pipeline) if session.trace_enabled else None,
                 )
             except Exception as exc:
                 raise _ChunkPublicationError(

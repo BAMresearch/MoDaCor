@@ -8,22 +8,96 @@ MoDaCor's array sources already support explicit reads through
 `IoSources.get_data(..., load_slice=...)`. In particular, `HDFSource`,
 `TiledSource`, and `BufferSource` accept NumPy-compatible integer and slice
 selectors. HDF and Tiled can perform the selection at the storage backend, so
-the caller does not need to materialize the complete source array and slice it
-locally.
+the complete source array does not need to be materialized and sliced locally.
 
 MoDaCor does not currently schedule those reads or pass a slice from ordinary
-pipeline YAML into `AppendProcessingData`. An external runner should plan the
-slices and request them through `IoSources`, supply the resulting chunk to the
-normal pipeline, and assemble the results. It should not need to implement
-HDF5 or Tiled slicing itself. MoDaCor should receive the resolved chunk
-description so traces and outputs retain enough information to identify and
-reproduce the operation.
+pipeline YAML or a runtime process request into `AppendProcessingData`. The
+working server route therefore has an external runner upload each already
+sliced chunk to a `BufferSource`. Direct server-side reads from registered HDF5
+or Tiled sources need the dedicated slice-binding mechanism described below.
+In both modes MoDaCor receives the resolved chunk description so traces and
+outputs retain enough information to identify and reproduce the operation.
 
 This design initially covers chunks along non-image, or batch, dimensions.
 For an array shaped `(measurement, frame, slow, fast)` with
 `rank_of_data: 2`, axes 0 and 1 are batch axes and axes 2 and 3 are data axes.
 Spatial detector tiling is a separate extension because it requires geometry
 offsets, halos, and module-specific correctness rules.
+
+## Source-ingestion modes
+
+Chunked operation must support two complementary deployment modes. They share
+the same `ChunkPlan`, `ChunkSpec`, pipeline execution, chunked-output, retry,
+and finalization contracts; only ownership of the source read differs.
+
+### Externally staged chunks with `BufferSource`
+
+The external runner reads and slices the source, then uploads the resolved
+signal and every chunk-dependent companion array through the runtime buffer
+API. The session registers that logical input as a `BufferSource`. MoDaCor
+must treat these arrays as already sliced and must not apply the
+`ChunkSpec.source_selection` a second time.
+
+This is the appropriate mode when the runner owns source credentials, the
+server cannot access the raw storage, a nonstandard source needs custom
+decoding, or chunks are sent to the server over HTTP. It also makes arbitrary
+source-specific preprocessing possible before submission.
+
+The costs are HTTP serialization, additional memory copies, and external
+responsibility for keeping signal, weights, uncertainties, normalization data,
+and other frame-dependent inputs aligned. A buffer registration does not by
+itself identify an immutable source file or catalog revision, so the runner
+must include that identity in plan and execution provenance.
+
+Replacing a buffer value gives bounded latest-value retention within the
+session, but the runner must still bound queued uploads and release any
+client-side copies. Partial reruns should identify the changed buffer source so
+that reusable static branches are not recalculated.
+
+### Server-side reads with `HDFSource` or `TiledSource`
+
+In a pull deployment, the server registers the original HDF5 or Tiled source
+and reads only the source selections needed for the current chunk. This avoids
+uploading detector arrays through the client and naturally associates reads
+with a file path, dataset path, or Tiled node and revision. It is the preferred
+mode when the server has direct storage access and suitable credentials.
+
+The low-level source operations already support these reads. Explicit
+`HDFSource` slices bypass its complete-array cache, and Tiled requests slices
+from the remote node and bypasses its local full-array cache. Complete reads
+remain cacheable for genuinely static inputs such as compact calibration data.
+
+Normal server pipeline execution cannot yet bind a process request's
+`ChunkSpec` to all `AppendProcessingData` reads. Direct HDF5 or Tiled chunk
+ingestion therefore requires a dedicated server-side slice-binding feature;
+support in the source classes alone is not sufficient.
+
+### Required server-side slice-binding contract
+
+The future runtime extension should:
+
+- accept structured selectors in the process request without evaluating Python
+  slice expressions;
+- resolve the driver selection through the plan's `aligned`, `static`, and
+  `explicit` input bindings, producing one effective selector per registered
+  source dataset;
+- validate ranks, bounds, edge-chunk shapes, plan identity, and ambiguous axis
+  mappings before reading data;
+- apply selectors at source-read time without mutating pipeline YAML or
+  re-registering an `IoSource` for every chunk;
+- mark the affected source references or processing keys as changed so partial
+  execution invalidates the correct dependency subgraph;
+- preserve cache policy: explicit HDF5 and Tiled slices are not accumulated,
+  while explicitly static complete reads may be reused;
+- persist the resolved source reference, dataset or node, selection, and source
+  revision alongside the chunk execution record; and
+- distinguish direct-source inputs from already staged `BufferSource` inputs,
+  preventing accidental double slicing.
+
+This is most naturally a process-request extension coupled to `ChunkSpec`, but
+the public request shape should be fixed only after the binding projection has
+been prototyped with both HDF5 and Tiled. It must not make ordinary,
+non-chunked sessions require a `ChunkPlan` or additional source configuration.
 
 ## Separate selection from chunk size
 
@@ -239,10 +313,11 @@ This complete-schema workflow is now available through
 `chunk_output` process-request field, and
 `POST /v1/chunked-outputs/<output_id>/finalize`. The initialized resource owns a
 snapshot of the sink registration, so it is not invalidated or redirected by
-later worker-session changes. At present these opaque server mappings are
-in-process; the HDF5 plan and chunk manifest remain persistent and
-authoritative, while reconstruction of mappings after a server restart remains
-an operational follow-up.
+later worker-session changes. Opaque output ids remain in-process handles,
+while the HDF5 plan and chunk manifest are persistent and authoritative. A new
+server process can reconstruct a handle with
+`POST /v1/chunked-outputs/reopen`; recovery operations can reconcile, abandon,
+or resume an incomplete assembly.
 
 Retries use the same `ChunkSpec`. The result collector should place or replace
 that chunk idempotently using its output placements. Global reductions need
@@ -252,6 +327,33 @@ correct substitute.
 Explicit HDF source slices bypass the complete-array cache, so sequential
 external reads do not accumulate all previously processed chunks. Complete
 reads remain cached for reusable static data.
+
+## Reusable background working set
+
+A source reused unchanged by partial runs is not automatically chunked. In the
+I22 correction pipelines, the pilot run reads the complete background detector
+stack, applies its normalization and uncertainty steps, and reduces its leading
+measurement/frame axes. Later sample-chunk runs reuse that reduced
+`ProcessingData` branch.
+
+Consequently, the detector stack and the intermediate arrays needed by the
+background branch must fit comfortably in worker memory. The HDF source also
+retains the complete raw read in its reusable full-array cache for the life of
+the session. Account for that cached array, the processing copy, propagated
+uncertainties and masks, and numerical temporaries rather than budgeting only
+the on-disk dataset size.
+
+Large backgrounds need an explicit policy. Recommended options are:
+
+- prepare one corrected, reduced background product with a mergeable weighted
+  reduction and reuse that compact product; or
+- define a scientifically meaningful sample-to-background chunk mapping,
+  stage both sources, and invalidate both branches for each run.
+
+Do not combine background chunk means with an unweighted mean unless the
+weights, valid counts, masks, and uncertainty propagation make that operation
+mathematically equivalent. A full-background aggregate and frame-paired
+subtraction are different experimental policies and should remain explicit.
 
 The proposed output capability and HDF5 implementation are specified in
 [Chunked Sink Implementation Plan](chunked-sink-implementation-plan.md).

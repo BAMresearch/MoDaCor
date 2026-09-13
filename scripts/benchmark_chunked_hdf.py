@@ -18,6 +18,11 @@ import h5py
 import numpy as np
 
 try:
+    import hdf5plugin  # noqa: F401
+except ImportError:  # pragma: no cover - needed only for externally filtered files
+    pass
+
+try:
     import resource
 except ImportError:  # pragma: no cover - Windows does not provide resource
     resource = None  # type: ignore[assignment]

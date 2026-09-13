@@ -74,12 +74,27 @@ class TestHDFSource(unittest.TestCase):
         self.assertTrue(isinstance(data_array, np.ndarray))
         self.assertEqual((5, 2), data_array.shape)
 
-    def test_get_data_cache_keeps_sliced_and_full_reads_separate(self):
-        sliced = self.test_hdf_source.get_data(self.temp_dataset_name, load_slice=(slice(0, 5), slice(None)))
-        full = self.test_hdf_source.get_data(self.temp_dataset_name)
+    def test_get_data_explicit_slices_bypass_cache(self):
+        selection = (slice(0, 5), slice(None))
+        first = self.test_hdf_source.get_data(self.temp_dataset_name, load_slice=selection)
+        with h5py.File(self.temp_file_path, "r+") as hdf_file:
+            hdf_file[self.temp_dataset_name][selection] = 2.0
 
-        self.assertEqual((5, 2), sliced.shape)
-        self.assertEqual(self.temp_dataset_shape, full.shape)
+        second = self.test_hdf_source.get_data(self.temp_dataset_name, load_slice=selection)
+
+        self.assertFalse(np.any(first))
+        np.testing.assert_array_equal(second, np.full((5, 2), 2.0))
+        self.assertEqual({}, self.test_hdf_source._data_cache)
+
+    def test_get_data_full_reads_remain_cached(self):
+        first = self.test_hdf_source.get_data(self.temp_dataset_name)
+        with h5py.File(self.temp_file_path, "r+") as hdf_file:
+            hdf_file[self.temp_dataset_name][...] = 3.0
+
+        second = self.test_hdf_source.get_data(self.temp_dataset_name)
+
+        np.testing.assert_array_equal(first, np.zeros(self.temp_dataset_shape))
+        np.testing.assert_array_equal(second, first)
 
     def test_get_data_shape(self):
         self.test_hdf_source._file_path = Path(self.temp_file_path)

@@ -30,11 +30,13 @@ from modacor.io.hdf.hdf_processing_sink import (
     _as_hdf_str_list,
     _json_dumps_bytes,
     _normalise_subpath,
+    _normalise_trace_events,
     _recreate_group,
     _set_array_metadata,
     _set_nexus_default_chain,
     _write_text_dataset,
     _write_text_field,
+    _write_trace_indexed,
 )
 from modacor.io.io_sink import IoSink
 
@@ -506,6 +508,27 @@ def _prepare_output_writes(
     return pending_writes
 
 
+def _write_chunk_trace(
+    h5: h5py.File,
+    *,
+    run_name: str,
+    chunk_id: str,
+    trace_events: Any | None,
+) -> None:
+    if trace_events is None:
+        return
+    tracer_root = h5["processing"].require_group("tracer")
+    tracer_run_group = tracer_root.require_group(run_name)
+    tracer_run_group.attrs["schema_version"] = "1.1"
+    if "empty" in tracer_run_group.attrs:
+        del tracer_run_group.attrs["empty"]
+    trace_chunks = tracer_run_group.require_group("chunks")
+    trace_chunk_group = _recreate_group(trace_chunks, chunk_id)
+    normalised_trace_events = _normalise_trace_events(trace_events)
+    trace_chunk_group.create_dataset("events", data=_json_dumps_bytes(normalised_trace_events))
+    _write_trace_indexed(trace_chunk_group, normalised_trace_events)
+
+
 @define(kw_only=True)
 class HDFChunkedProcessingSink(IoSink):
     """Assemble signal arrays into fixed-shape HDF5 destinations."""
@@ -720,6 +743,10 @@ class HDFChunkedProcessingSink(IoSink):
                     del result_root[run_name]
                 if has_plan:
                     del plans_root[plan.plan_id]
+                for metadata_root_name in ("pipeline", "tracer"):
+                    metadata_root = processing_group.get(metadata_root_name)
+                    if isinstance(metadata_root, h5py.Group) and run_name in metadata_root:
+                        del metadata_root[run_name]
 
             plan_group = plans_root.create_group(plan.plan_id)
             plan_group.attrs["plan_id"] = plan.plan_id
@@ -807,6 +834,7 @@ class HDFChunkedProcessingSink(IoSink):
         execution_metadata: dict[str, Any] | None = None,
         pipeline_spec: dict[str, Any] | None = None,
         pipeline_yaml: str | None = None,
+        trace_events: Any | None = None,
         override_resource_location: Path | None = None,
     ) -> ChunkWriteResult:
         self._validate_supported_plan(plan)
@@ -872,6 +900,12 @@ class HDFChunkedProcessingSink(IoSink):
             try:
                 for pending in pending_writes:
                     pending.write()
+                _write_chunk_trace(
+                    h5,
+                    run_name=run_name,
+                    chunk_id=chunk.chunk_id,
+                    trace_events=trace_events,
+                )
                 h5.flush()
             except Exception:
                 _set_status(manifest_entry, "failed")
@@ -1051,8 +1085,13 @@ class HDFChunkedProcessingSink(IoSink):
                     _write_text_dataset(pipeline_group, "yaml", pipeline_yaml)
 
             tracer_root = processing_group.require_group("tracer")
-            tracer_group = _recreate_group(tracer_root, run_name)
-            tracer_group.attrs["empty"] = True
+            tracer_group = tracer_root.require_group(run_name)
+            if "chunks" in tracer_group:
+                tracer_group.attrs["schema_version"] = "1.1"
+                if "empty" in tracer_group.attrs:
+                    del tracer_group.attrs["empty"]
+            else:
+                tracer_group.attrs["empty"] = True
 
             first_output = plan.outputs[0]
             default_path = _destination_parts(first_output.destination_path)

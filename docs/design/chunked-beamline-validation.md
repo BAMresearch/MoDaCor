@@ -131,6 +131,28 @@ The remaining validation must then:
 5. validate HDF5 locking with the deployed library and filesystem; and
 6. record the chosen operational defaults and performance evidence.
 
+The initial real-data checkpoint is maintained in
+`MoDaCor_examples/DLS/I22/I22_solids_server_operando_preprocessed.ipynb`.
+It compares ordinary and five-part chunked HDF storage for a ten-frame virtual
+view of the packaged SAXS measurement. That exact comparison is intentionally
+smaller than the full-scale and pipeline-level checks listed above.
+
+The same notebook contains a server workflow configured to process SAXS and
+WAXS for all four 100-frame sample measurements in ten-frame chunks. Two
+detector-specific 40-chunk plans append distinct run groups to one physical
+HDF5 file, including per-chunk lightweight trace records. A reduced real-data
+smoke check completes and finalizes two chunks for each detector in one shared
+file; running and assessing the complete 80-pipeline-run workflow remains an
+explicit interactive validation step.
+
+The example intentionally processes the detector sessions sequentially. Each
+pilot holds one complete detector-specific background working set in memory,
+then partial sample reruns reuse its reduced background branch. The complete
+background array, source cache, processing copy, uncertainties, masks, and
+temporaries must fit comfortably in a worker. Validation at larger background
+scales requires either a separately verified mergeable background reducer or
+an explicit sample-to-background chunk pairing policy.
+
 The in-process server lock is deliberately the supported concurrency boundary
 for now. Multiple server processes or replicas still require a shared lock or a
 single designated HDF5 writer and must not be inferred safe from the local

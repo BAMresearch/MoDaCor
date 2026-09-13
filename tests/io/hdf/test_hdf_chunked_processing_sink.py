@@ -116,12 +116,22 @@ def test_hdf_chunked_sink_writes_edge_chunks_out_of_order_and_finalizes(tmp_path
         (_chunk(plan, 2, 4, 5), np.arange(8, 10, dtype=np.float32).reshape(1, 2)),
     ]
     for chunk, values in (chunks[2], chunks[0], chunks[1]):
+        trace_events = [
+            {
+                "step_id": "reduce",
+                "module": "ReduceDimensionality",
+                "duration_s": 0.01,
+                "datasets": {},
+                "chunk_identity": chunk.identity_dict(),
+            }
+        ]
         result = sink.write_chunk(
             "run1",
             _processing_data(values),
             plan=plan,
             chunk=chunk,
             execution_metadata={"attempt": 1},
+            trace_events=trace_events,
         )
         assert result.chunk_id == chunk.chunk_id
 
@@ -162,6 +172,12 @@ def test_hdf_chunked_sink_writes_edge_chunks_out_of_order_and_finalizes(tmp_path
         assert ChunkPlan.from_dict(json.loads(_read_text(plan_group["plan_json"]))) == plan
         assert _read_text(plan_group["chunks/c000002/status"]) == "complete"
         assert json.loads(_read_text(plan_group["chunks/c000002/execution_json"])) == {"attempt": 1}
+        for chunk, _values in chunks:
+            trace_group = chunked[f"processing/tracer/run1/chunks/{chunk.chunk_id}"]
+            events = json.loads(_read_text(trace_group["events"]))
+            assert events[0]["step_id"] == "reduce"
+            assert events[0]["chunk_identity"] == chunk.identity_dict()
+            assert trace_group["steps/0001_reduce"].attrs["module"] == "ReduceDimensionality"
 
 
 def test_hdf_chunked_sink_rejects_incomplete_finalize_and_resumes(tmp_path: Path):
@@ -178,6 +194,26 @@ def test_hdf_chunked_sink_rejects_incomplete_finalize_and_resumes(tmp_path: Path
     resumed = sink.initialize_chunked("run1", plan, collision="resume")
     assert resumed.status == "writing"
     assert resumed.completed_chunks == 1
+
+
+def test_hdf_chunked_sink_replace_clears_prior_run_trace(tmp_path: Path):
+    out_file = tmp_path / "replace-trace.h5"
+    plan = _plan()
+    sink = HDFChunkedProcessingSink(resource_location=out_file)
+    sink.initialize_chunked("run1", plan)
+    chunk = _chunk(plan, 0, 0, 2)
+    sink.write_chunk(
+        "run1",
+        _processing_data(np.ones((2, 2), dtype=np.float32)),
+        plan=plan,
+        chunk=chunk,
+        trace_events=[{"step_id": "load", "module": "AppendProcessingData"}],
+    )
+
+    sink.initialize_chunked("run1", plan, collision="replace")
+
+    with h5py.File(out_file, "r") as h5:
+        assert "processing/tracer/run1" not in h5
 
 
 def test_hdf_chunked_sink_inspects_failed_write_and_retries(monkeypatch, tmp_path: Path):

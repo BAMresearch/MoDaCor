@@ -4,7 +4,7 @@ Status: implementation in progress.
 
 ## Implementation progress
 
-As of 2026-09-11:
+As of 2026-09-12:
 
 - Phase 1 is implemented: immutable chunk contracts, normalized selectors,
   canonical plan hashing and serialization, optional `IoSink` capability
@@ -30,13 +30,35 @@ As of 2026-09-11:
   `hdf_chunked`, including normal write-root enforcement. This is capability
   discovery and configuration, and requests containing `chunk_output` now drive
   the post-run write lifecycle. Requests without `chunk_output` are unchanged.
+- Successful server publications persist lightweight, array-free trace events
+  per chunk under `/processing/tracer/<run_name>/chunks/<chunk_id>/`.
+  Finalization preserves those groups, and each event carries its chunk
+  identity. Processing-data snapshots remain opt-in and are not part of this
+  lightweight path.
+- `HDFSource` caches complete-array reads only. Explicit slice reads bypass the
+  cache so a sequential reader does not retain every previously delivered
+  chunk; focused tests distinguish this from the reusable full-read cache.
 - The fixture-independent part of Phase 5 is implemented: a new server can
   reconstruct an output handle from the persisted HDF plan, operators can
   reconcile, abandon, resume, or detach assemblies without deleting data,
   target-level locks are exercised with concurrent handles, and an opt-in
   subprocess benchmark measures HDF layout, throughput, validation, and peak
   RSS for generated or external HDF datasets.
-- Verification at the current Phase 5 checkpoint passes 761 tests, with the
+- The first external-data checkpoint is implemented in the I22 notebook in the
+  `MoDaCor_examples` repository. A zero-copy virtual view selects ten real SAXS
+  frames, the ordinary sink writes them in one operation, and the chunked sink
+  assembles five two-frame chunks. The stored arrays match exactly. This
+  validates representative input decoding and HDF assembly, but not yet
+  full-scale memory behavior or correction-pipeline equivalence.
+- The I22 notebook now includes a server-driven SAXS/WAXS example for four
+  100-frame measurements split into ten-frame chunks. Independent detector
+  plans store two run groups in one physical HDF5 file and retain lightweight
+  per-chunk traces. A reduced real-data run completes two chunks for each
+  detector in the shared file and exercises buffer replacement, pilot schema
+  extraction, initialization, partial reruns, publication, inspection, and
+  finalization. The configured 80-pipeline-run exercise remains an interactive
+  validation rather than a CI test.
+- Verification at the current Phase 5 checkpoint passes 763 tests, with the
   opt-in RSS regression skipped by default; running that check explicitly also
   passes. The three reported test warnings are pre-existing numerical-domain
   warnings in `BaseData` tests. The documentation builds cleanly with Sphinx
@@ -209,6 +231,7 @@ write_chunk(
     *,
     plan: ChunkPlan,
     chunk: ChunkSpec,
+    trace_events: list[TraceEvent] | None = None,
 ) -> ChunkWriteResult
 ```
 
@@ -221,8 +244,8 @@ One write:
 5. validates actual shape, dtype, units, `rank_of_data`, weights,
    uncertainties, and axes;
 6. marks the chunk `writing` and stores its `ChunkSpec`;
-7. writes all destination slices;
-8. flushes the arrays;
+7. writes all destination slices and any lightweight per-chunk trace events;
+8. flushes the arrays and trace record;
 9. marks the chunk `complete`; and
 10. flushes again before closing the file.
 
@@ -400,10 +423,15 @@ Chunk administration is stored separately:
             execution_json
 ```
 
-Pipeline metadata remains under `/processing/pipeline/<run_name>/`. Per-chunk
-trace data may be stored under
+Pipeline metadata remains under `/processing/pipeline/<run_name>/`. Lightweight
+per-chunk trace data is stored under
 `/processing/tracer/<run_name>/chunks/<chunk_id>/` so one chunk does not replace
-another's trace.
+another's trace. These groups contain array-free `TraceEvent` data and indexed
+step summaries. Processing-data snapshots are deliberately excluded from the
+default chunk publication path because their volume can defeat bounded
+operation. The plan-level pipeline specification omits run-specific trace
+events so the latest chunk is not duplicated or mistaken for a plan-wide
+trace.
 
 The plan JSON is stored once. Each chunk stores its compact spec plus execution
 status. Large arrays are never copied into the manifest.
@@ -683,6 +711,7 @@ server capabilities.
 - [x] Carry optional `ChunkSpec` through `run_pipeline_job` and `RunResult`.
 - [x] Attach chunk identity to trace events without copying plan-wide metadata into
   every event.
+- [x] Persist lightweight trace events at a stable per-run, per-chunk HDF5 path.
 - [x] Add a server-level chunked-output manager and opaque `output_id`.
 - [x] Add initialize, inspect, and finalize API operations.
 - [x] Add `chunk_output` to process requests and call `write_chunk(...)` as a
@@ -707,6 +736,27 @@ server capabilities.
 - [ ] Measure and select HDF5 layout and compression defaults on representative
   data and storage.
 - [ ] Validate serialized concurrent writes on the target filesystem separately.
+
+### Follow-up: server-side source slice binding
+
+The implemented runtime path accepts chunks staged through `BufferSource`.
+Production deployments must also support servers that directly access HDF5 or
+Tiled data. Add a process-request mechanism that projects a `ChunkSpec` through
+the plan's input bindings and passes the resulting selectors to registered
+sources at read time.
+
+- [ ] Prototype request-level slice bindings without mutating pipeline YAML or
+  re-registering sources for each chunk.
+- [ ] Resolve and validate `aligned`, `static`, and `explicit` bindings across
+  signal and all chunk-dependent companion arrays.
+- [ ] Integrate binding changes with partial-run dependency invalidation.
+- [ ] Preserve explicit-slice cache bypass for HDF5 and Tiled while retaining
+  reusable static reads.
+- [ ] Persist effective selectors plus HDF5 dataset or Tiled node/revision
+  identity in execution provenance.
+- [ ] Test direct HDF5, direct Tiled, buffer-fed, and mixed-source sessions
+  against the same output and retry lifecycle.
+- [ ] Keep non-chunked sessions configuration-free and behaviorally unchanged.
 
 The executable workflow and the boundary between repository tests and external
 beamline data are documented in

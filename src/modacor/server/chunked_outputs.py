@@ -171,6 +171,7 @@ class ChunkedOutputManager:
         execution_metadata: dict[str, Any] | None = None,
         pipeline_spec: dict[str, Any] | None = None,
         pipeline_yaml: str | None = None,
+        trace_events: Any | None = None,
     ) -> ChunkWriteResult:
         resource = self.get(output_id)
         chunk.validate_for_plan(resource.plan)
@@ -183,6 +184,7 @@ class ChunkedOutputManager:
                 execution_metadata=execution_metadata,
                 pipeline_spec=pipeline_spec,
                 pipeline_yaml=pipeline_yaml,
+                trace_events=trace_events,
             )
             if pipeline_spec is not None:
                 resource.pipeline_spec = deepcopy(pipeline_spec)
