@@ -7,8 +7,8 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from urllib import error, request
 
+from modacor.client import RuntimeClient
 from modacor.debug.pipeline_tracer import PlainUnicodeRenderer
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
@@ -42,25 +42,7 @@ def _parse_trace_watch(entries: list[str] | None) -> dict[str, list[str]]:
 
 
 def _http_request_json(base_url: str, method: str, path: str, payload: dict | None = None) -> dict | list | None:
-    url = base_url.rstrip("/") + path
-    data = None
-    headers = {}
-    if payload is not None:
-        data = json.dumps(payload).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-
-    req = request.Request(url, method=method.upper(), data=data, headers=headers)
-    try:
-        with request.urlopen(req) as resp:  # noqa: S310
-            raw = resp.read()
-            if not raw:
-                return None
-            return json.loads(raw.decode("utf-8"))
-    except error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {exc.code} {method.upper()} {path}: {body}") from exc
-    except error.URLError as exc:
-        raise RuntimeError(f"Request failed for {method.upper()} {path}: {exc.reason}") from exc
+    return RuntimeClient(base_url).request(method, path, payload=payload)
 
 
 def _build_sources(
