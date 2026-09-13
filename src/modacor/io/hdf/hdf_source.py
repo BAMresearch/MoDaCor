@@ -129,7 +129,7 @@ class HDFSource(IoSource):
         # Cache only complete-array reads. Explicit slices are commonly used for
         # streaming large datasets and retaining every distinct slice would make
         # memory consumption grow with the total dataset size.
-        if load_slice is not Ellipsis:
+        if load_slice is not Ellipsis and load_slice is not None:
             try:
                 with h5py.File(self._file_path, "r") as f:
                     return np.array(f[data_key][load_slice])
@@ -145,13 +145,15 @@ class HDFSource(IoSource):
         return np.array(self._data_cache[data_key], copy=True)
 
     def get_data_shape(self, data_key: str) -> tuple[int, ...]:
-        if data_key in self._file_datasets_shapes:
-            return self._file_datasets_shapes[data_key]
+        normalized_key = str(data_key).strip().lstrip("/")
+        if normalized_key in self._file_datasets_shapes:
+            return self._file_datasets_shapes[normalized_key]
         return ()
 
     def get_data_dtype(self, data_key: str) -> np.dtype | None:
-        if data_key in self._file_datasets_dtypes:
-            return self._file_datasets_dtypes[data_key]
+        normalized_key = str(data_key).strip().lstrip("/")
+        if normalized_key in self._file_datasets_dtypes:
+            return self._file_datasets_dtypes[normalized_key]
         return None
 
     def get_data_attributes(self, data_key: str) -> dict[str, Any]:

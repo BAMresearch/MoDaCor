@@ -24,7 +24,7 @@ from modacor.runner.process_step_registry import ProcessStepRegistry
 from .chunked_outputs import ChunkedOutputManager
 from .errors import ApiError
 from .execution import find_dirty_step_ids
-from .io_utils import build_sinks_from_session, build_sources_from_session, write_hdf_output
+from .io_utils import bind_chunk_source_slices, build_sinks_from_session, build_sources_from_session, write_hdf_output
 from .planning import build_dry_run_plan, missing_required_source_refs, ordered_step_ids, resolve_effective_mode
 from .runtime_policy import RuntimePolicy
 from .session_manager import PipelineSession, SessionManager
@@ -76,6 +76,7 @@ class ProcessRequest:
     run_name: str | None = None
     rollback_snapshot: bool = True
     chunk_output: ChunkPublishRequest | None = None
+    resolved_source_slices: list[dict[str, Any]] = field(default_factory=list)
 
 
 class _ChunkPublicationError(RuntimeError):
@@ -709,6 +710,14 @@ class RuntimeService:
                 buffer_store=self.manager.buffer_store,
                 runtime_policy=self.policy,
             )
+            if request.chunk_output is not None:
+                resource = self.chunked_outputs.get(request.chunk_output.output_id)
+                request.resolved_source_slices = bind_chunk_source_slices(
+                    sources,
+                    session,
+                    resource.plan,
+                    request.chunk_output.chunk_spec,
+                )
             sinks = build_sinks_from_session(
                 session,
                 pipeline=pipeline,
@@ -869,8 +878,6 @@ class RuntimeService:
 
         changed_sources = list(payload.get("changed_sources") or [])
         changed_keys = list(payload.get("changed_keys") or [])
-        if mode == "partial" and not changed_sources and not changed_keys:
-            raise ApiError(status_code=422, detail="partial mode requires changed_sources or changed_keys.")
 
         write_hdf_raw = payload.get("write_hdf")
         write_hdf = dict(write_hdf_raw) if isinstance(write_hdf_raw, dict) else None
@@ -899,6 +906,11 @@ class RuntimeService:
             except (TypeError, ValueError) as exc:
                 raise ApiError(status_code=422, detail=str(exc)) from exc
             chunk_output = ChunkPublishRequest(output_id=output_id, chunk_spec=chunk_spec)
+            for binding in resource.plan.source_bindings:
+                if binding.role != "static" and binding.source_ref not in changed_sources:
+                    changed_sources.append(binding.source_ref)
+        if mode == "partial" and not changed_sources and not changed_keys:
+            raise ApiError(status_code=422, detail="partial mode requires changed_sources or changed_keys.")
         return ProcessRequest(
             mode=mode,
             changed_sources=changed_sources,
@@ -1084,6 +1096,7 @@ class RuntimeService:
                         "run_id": run_id,
                         "effective_mode": effective_mode,
                         "sources": _source_provenance(session),
+                        "source_slices": request.resolved_source_slices,
                         **request.chunk_output.chunk_spec.identity_dict(),
                     },
                     pipeline_spec=_pipeline_provenance_spec(result.pipeline),
@@ -1125,6 +1138,8 @@ class RuntimeService:
                 **request.chunk_output.chunk_spec.identity_dict(),
                 **chunk_write.to_dict(),
             }
+        if request.resolved_source_slices:
+            details["source_slices"] = request.resolved_source_slices
         trace_report = self._trace_report(result)
         if trace_report is not None:
             details["trace_report"] = trace_report
@@ -1284,6 +1299,7 @@ class RuntimeService:
                             "run_id": fallback_id,
                             "effective_mode": "full",
                             "sources": _source_provenance(session),
+                            "source_slices": request.resolved_source_slices,
                             **request.chunk_output.chunk_spec.identity_dict(),
                         },
                         pipeline_spec=fallback_result.pipeline.to_spec(),
@@ -1323,6 +1339,8 @@ class RuntimeService:
                     **request.chunk_output.chunk_spec.identity_dict(),
                     **chunk_write.to_dict(),
                 }
+            if request.resolved_source_slices:
+                details["source_slices"] = request.resolved_source_slices
 
             done = self.manager.mark_run_succeeded(
                 session_id,

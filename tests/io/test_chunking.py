@@ -12,6 +12,7 @@ from modacor.io.chunking import (
     ChunkOutputLayout,
     ChunkPlacement,
     ChunkPlan,
+    ChunkSourceBinding,
     ChunkSpec,
     PlacementBinding,
     selection_shape,
@@ -96,6 +97,58 @@ def test_chunk_plan_hash_is_canonical_and_round_trips():
 
     with pytest.raises(TypeError):
         first.driver["source"] = "changed"  # type: ignore[index]
+
+
+def test_chunk_source_bindings_project_driver_selection_and_round_trip():
+    driver_selection = (
+        AxisSelector.index(0),
+        AxisSelector.sliced(1, 6, 2),
+        AxisSelector.all(),
+        AxisSelector.all(),
+    )
+    aligned = ChunkSourceBinding("sample", "entry/data", "aligned")
+    explicit = ChunkSourceBinding("sample", "/normalization", "explicit", axis_map=(0, 1))
+    static = ChunkSourceBinding("mask", "/mask", "static")
+
+    assert aligned.resolve_selection(driver_selection, (1, 10, 5, 4)) == driver_selection
+    assert explicit.resolve_selection(driver_selection, (1, 10)) == driver_selection[:2]
+    assert static.resolve_selection(driver_selection, (5, 4)) is None
+    assert ChunkSourceBinding.from_dict(explicit.to_dict()) == explicit
+    assert aligned.data_reference == "sample::/entry/data"
+
+
+def test_chunk_plan_preserves_typed_source_bindings_without_changing_legacy_shape():
+    legacy = _plan()
+    assert "source_bindings" not in legacy.to_dict()
+
+    plan = ChunkPlan(
+        schema_version="1.0",
+        plan_id="direct-source-plan",
+        total_chunks=1,
+        expected_chunk_ids=("c0",),
+        outputs=(_output_layout(),),
+        driver={"source": "sample::/data", "full_shape": [5, 2], "dtype": "float32"},
+        batch_axes=(0,),
+        data_axes=(1,),
+        source_bindings=(
+            ChunkSourceBinding("sample", "/data", "aligned"),
+            ChunkSourceBinding("calibration", "/factor", "static"),
+        ),
+    )
+
+    assert ChunkPlan.from_dict(plan.to_dict()) == plan
+    assert plan.to_dict()["source_bindings"][0]["role"] == "aligned"
+
+    with pytest.raises(ValueError, match="driver.source"):
+        ChunkPlan(
+            schema_version="1.0",
+            plan_id="missing-driver",
+            total_chunks=1,
+            expected_chunk_ids=("c0",),
+            outputs=(_output_layout(),),
+            driver={"full_shape": [5, 2]},
+            source_bindings=(ChunkSourceBinding("sample", "/data", "aligned"),),
+        )
 
 
 def test_chunk_plan_rejects_tampered_serialized_hash():

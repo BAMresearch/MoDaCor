@@ -58,7 +58,16 @@ As of 2026-09-12:
   extraction, initialization, partial reruns, publication, inspection, and
   finalization. The configured 80-pipeline-run exercise remains an interactive
   validation rather than a CI test.
-- Verification at the current Phase 5 checkpoint passes 763 tests, with the
+- `ChunkPlan.source_bindings` now provides typed `aligned`, `static`, and
+  `explicit` mappings from a chunk driver to registered source datasets. The
+  runtime applies request-scoped selectors to direct HDF5 or Tiled reads,
+  automatically invalidates affected partial-run branches, rejects double
+  slicing of staged buffers, and persists the effective selectors with chunk
+  execution metadata. Direct HDF5 assembly is covered end to end and a
+  deterministic Tiled test reaches backend sliced reads without filling its
+  complete-array cache; validation against a deployed Tiled service remains
+  open.
+- Verification at the current Phase 5 checkpoint passes 770 tests, with the
   opt-in RSS regression skipped by default; running that check explicitly also
   passes. The three reported test warnings are pre-existing numerical-domain
   warnings in `BaseData` tests. The documentation builds cleanly with Sphinx
@@ -322,7 +331,19 @@ class ChunkSpec:
     source_selection: tuple[AxisSelector, ...]
     expected_input_shape: tuple[int, ...]
     placements: tuple[ChunkPlacement, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkSourceBinding:
+    source_ref: str
+    data_key: str
+    role: Literal["aligned", "static", "explicit"]
+    axis_map: tuple[int | None, ...] = ()
 ```
+
+`ChunkPlan.source_bindings` stores these executable mappings once. The
+free-form `ChunkPlan.bindings` field remains planning provenance and is not
+used to drive source reads.
 
 Each plan output describes one `BaseData` root:
 
@@ -739,24 +760,24 @@ server capabilities.
 
 ### Follow-up: server-side source slice binding
 
-The implemented runtime path accepts chunks staged through `BufferSource`.
-Production deployments must also support servers that directly access HDF5 or
-Tiled data. Add a process-request mechanism that projects a `ChunkSpec` through
-the plan's input bindings and passes the resulting selectors to registered
-sources at read time.
+The runtime accepts chunks staged through `BufferSource` and can now project a
+`ChunkSpec` through typed plan bindings for direct HDF5 or Tiled reads.
 
-- [ ] Prototype request-level slice bindings without mutating pipeline YAML or
+- [x] Implement request-level slice bindings without mutating pipeline YAML or
   re-registering sources for each chunk.
-- [ ] Resolve and validate `aligned`, `static`, and `explicit` bindings across
+- [x] Resolve and validate `aligned`, `static`, and `explicit` bindings across
   signal and all chunk-dependent companion arrays.
-- [ ] Integrate binding changes with partial-run dependency invalidation.
-- [ ] Preserve explicit-slice cache bypass for HDF5 and Tiled while retaining
+- [x] Integrate binding changes with partial-run dependency invalidation.
+- [x] Preserve explicit-slice cache bypass for HDF5 and Tiled while retaining
   reusable static reads.
-- [ ] Persist effective selectors plus HDF5 dataset or Tiled node/revision
+- [x] Persist effective selectors plus source type, location, and dataset/node
   identity in execution provenance.
-- [ ] Test direct HDF5, direct Tiled, buffer-fed, and mixed-source sessions
-  against the same output and retry lifecycle.
-- [ ] Keep non-chunked sessions configuration-free and behaviorally unchanged.
+- [x] Test direct HDF5 reads against the server output and partial-rerun
+  lifecycle.
+- [x] Test direct Tiled reads through a deterministic server integration.
+- [ ] Test mixed-source sessions and a deployed Tiled service against the same
+  output and retry lifecycle, including a stable Tiled revision identifier.
+- [x] Keep non-chunked sessions configuration-free and behaviorally unchanged.
 
 The executable workflow and the boundary between repository tests and external
 beamline data are documented in

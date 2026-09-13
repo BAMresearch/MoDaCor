@@ -20,6 +20,7 @@ __all__ = [
     "ChunkOutputLayout",
     "ChunkPlacement",
     "ChunkPlan",
+    "ChunkSourceBinding",
     "ChunkSpec",
     "ChunkOutputStatus",
     "ChunkWriteResult",
@@ -31,6 +32,7 @@ __all__ = [
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")
 SelectorKind = Literal["all", "index", "slice"]
 PlacementKind = Literal["direct", "static", "broadcast", "axis_map"]
+SourceBindingRole = Literal["aligned", "static", "explicit"]
 
 
 class UnsupportedSinkCapability(RuntimeError):
@@ -198,6 +200,106 @@ def selection_shape(full_shape: Sequence[int], selectors: Sequence[AxisSelector]
             raise ValueError(f"Slice on axis {axis} selects no elements.")
         selected_shape.append(extent)
     return tuple(selected_shape)
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkSourceBinding:
+    """Project one chunk driver selection onto one registered source dataset.
+
+    ``aligned`` applies the driver selection unchanged and therefore requires
+    the source dataset to have the same rank as the driver. ``explicit`` maps
+    every source axis to a driver axis, with ``None`` selecting the complete
+    source axis. ``static`` records provenance but applies no slice.
+    """
+
+    source_ref: str
+    data_key: str
+    role: SourceBindingRole
+    axis_map: tuple[int | None, ...] = ()
+
+    def __post_init__(self) -> None:
+        source_ref = _require_identifier(self.source_ref, "ChunkSourceBinding.source_ref")
+        data_key = "/" + str(self.data_key).strip().strip("/")
+        if data_key == "/" or "/../" in data_key or data_key.endswith("/.."):
+            raise ValueError("ChunkSourceBinding.data_key must identify a source dataset.")
+        if self.role not in {"aligned", "static", "explicit"}:
+            raise ValueError("ChunkSourceBinding.role must be 'aligned', 'static', or 'explicit'.")
+
+        axis_map: list[int | None] = []
+        for axis in self.axis_map:
+            if axis is None:
+                axis_map.append(None)
+            else:
+                axis_map.append(_require_non_negative_int(axis, "ChunkSourceBinding.axis_map"))
+        mapped_axes = [axis for axis in axis_map if axis is not None]
+        if len(set(mapped_axes)) != len(mapped_axes):
+            raise ValueError("ChunkSourceBinding.axis_map must not map multiple source axes to one driver axis.")
+        if self.role == "explicit" and not axis_map:
+            raise ValueError("An explicit ChunkSourceBinding requires axis_map.")
+        if self.role != "explicit" and axis_map:
+            raise ValueError(f"A {self.role!r} ChunkSourceBinding cannot define axis_map.")
+
+        object.__setattr__(self, "source_ref", source_ref)
+        object.__setattr__(self, "data_key", data_key)
+        object.__setattr__(self, "axis_map", tuple(axis_map))
+
+    @property
+    def data_reference(self) -> str:
+        return f"{self.source_ref}::{self.data_key}"
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> ChunkSourceBinding:
+        return cls(
+            source_ref=str(payload["source_ref"]),
+            data_key=str(payload["data_key"]),
+            role=str(payload["role"]),  # type: ignore[arg-type]
+            axis_map=tuple(payload.get("axis_map", ())),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "source_ref": self.source_ref,
+            "data_key": self.data_key,
+            "role": self.role,
+        }
+        if self.axis_map:
+            payload["axis_map"] = list(self.axis_map)
+        return payload
+
+    def resolve_selection(
+        self,
+        driver_selection: Sequence[AxisSelector],
+        source_shape: Sequence[int],
+    ) -> tuple[AxisSelector, ...] | None:
+        """Return and validate the effective selector for this source dataset."""
+
+        if self.role == "static":
+            return None
+
+        driver_selection = tuple(driver_selection)
+        source_shape = tuple(int(size) for size in source_shape)
+        if self.role == "aligned":
+            if len(source_shape) != len(driver_selection):
+                raise ValueError(
+                    f"Aligned source {self.data_reference!r} has rank {len(source_shape)}, "
+                    f"but the chunk driver has rank {len(driver_selection)}."
+                )
+            selection = driver_selection
+        else:
+            if len(self.axis_map) != len(source_shape):
+                raise ValueError(
+                    f"Explicit source {self.data_reference!r} axis_map has {len(self.axis_map)} entries, "
+                    f"but the source dataset has rank {len(source_shape)}."
+                )
+            if any(axis is not None and axis >= len(driver_selection) for axis in self.axis_map):
+                raise ValueError(f"Explicit source {self.data_reference!r} maps outside the chunk driver rank.")
+            selection = tuple(
+                AxisSelector.all() if driver_axis is None else driver_selection[driver_axis]
+                for driver_axis in self.axis_map
+            )
+
+        selection_shape(source_shape, selection)
+        return selection
 
 
 @dataclass(frozen=True, slots=True)
@@ -459,6 +561,7 @@ class ChunkPlan:
     data_axes: tuple[int, ...] = ()
     axis_rules: tuple[Mapping[str, Any], ...] = ()
     bindings: tuple[Mapping[str, Any], ...] = ()
+    source_bindings: tuple[ChunkSourceBinding, ...] = ()
     plan_hash: str = field(init=False)
 
     def __post_init__(self) -> None:
@@ -484,6 +587,28 @@ class ChunkPlan:
         data_axes = tuple(_require_non_negative_int(axis, "ChunkPlan.data_axes") for axis in self.data_axes)
         if set(batch_axes) & set(data_axes):
             raise ValueError("ChunkPlan batch_axes and data_axes must not overlap.")
+        source_bindings = tuple(
+            binding if isinstance(binding, ChunkSourceBinding) else ChunkSourceBinding.from_dict(binding)
+            for binding in self.source_bindings
+        )
+        data_references = [binding.data_reference for binding in source_bindings]
+        if len(set(data_references)) != len(data_references):
+            raise ValueError("ChunkPlan source_bindings must identify unique source datasets.")
+        if source_bindings:
+            driver_reference = str(self.driver.get("source", "")).strip()
+            driver_ref, separator, driver_key = driver_reference.partition("::")
+            if not separator or not driver_ref.strip() or not driver_key.strip():
+                raise ValueError(
+                    "A ChunkPlan with source_bindings requires driver.source in '<source_ref>::<data_key>' form."
+                )
+            normalized_driver = f"{driver_ref.strip()}::/{driver_key.strip().strip('/')}"
+            matching_driver_bindings = [
+                binding for binding in source_bindings if binding.data_reference == normalized_driver
+            ]
+            if len(matching_driver_bindings) != 1 or matching_driver_bindings[0].role != "aligned":
+                raise ValueError("ChunkPlan driver.source requires exactly one aligned source binding.")
+            if "full_shape" not in self.driver:
+                raise ValueError("A ChunkPlan with source_bindings requires driver.full_shape.")
 
         object.__setattr__(self, "schema_version", schema_version)
         object.__setattr__(self, "plan_id", plan_id)
@@ -495,6 +620,7 @@ class ChunkPlan:
         object.__setattr__(self, "data_axes", data_axes)
         object.__setattr__(self, "axis_rules", _freeze_json(self.axis_rules, "ChunkPlan.axis_rules"))
         object.__setattr__(self, "bindings", _freeze_json(self.bindings, "ChunkPlan.bindings"))
+        object.__setattr__(self, "source_bindings", source_bindings)
         digest = sha256(_canonical_json(self.to_dict(include_hash=False)).encode("utf-8")).hexdigest()
         object.__setattr__(self, "plan_hash", f"sha256:{digest}")
 
@@ -511,6 +637,7 @@ class ChunkPlan:
             data_axes=tuple(payload.get("data_axes", ())),
             axis_rules=tuple(payload.get("axis_rules", ())),
             bindings=tuple(payload.get("bindings", ())),
+            source_bindings=tuple(ChunkSourceBinding.from_dict(item) for item in payload.get("source_bindings", ())),
         )
         expected_hash = payload.get("plan_hash")
         if expected_hash is not None and str(expected_hash) != plan.plan_hash:
@@ -530,6 +657,8 @@ class ChunkPlan:
             "expected_chunk_ids": list(self.expected_chunk_ids),
             "outputs": [output.to_dict() for output in self.outputs],
         }
+        if self.source_bindings:
+            payload["source_bindings"] = [binding.to_dict() for binding in self.source_bindings]
         if include_hash:
             payload["plan_hash"] = self.plan_hash
         return payload

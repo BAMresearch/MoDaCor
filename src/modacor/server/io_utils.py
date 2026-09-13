@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from modacor.io.buffer.runtime_buffer_store import RuntimeBufferStore
+from modacor.io.chunking import ChunkPlan, ChunkSpec, selection_shape
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.io.runtime_support import build_sink_from_spec, build_source_from_spec, write_processing_data_hdf
@@ -15,7 +16,12 @@ from modacor.io.runtime_support import build_sink_from_spec, build_source_from_s
 from .runtime_policy import RuntimePolicy
 from .session_manager import PipelineSession
 
-__all__ = ["build_sinks_from_session", "build_sources_from_session", "write_hdf_output"]
+__all__ = [
+    "bind_chunk_source_slices",
+    "build_sinks_from_session",
+    "build_sources_from_session",
+    "write_hdf_output",
+]
 
 
 def _runtime_metadata_flags(value: Any) -> dict[str, bool]:
@@ -103,16 +109,18 @@ def _hdf_file_fingerprint(location: str) -> tuple[Any, ...]:
 
 def _source_cache_fingerprint(spec: dict[str, Any]) -> tuple[Any, ...] | None:
     source_type = str(spec["type"]).strip().lower()
-    if source_type != "hdf":
+    if source_type not in {"hdf", "tiled"}:
         return None
 
-    return (
+    fingerprint = (
         str(spec["ref"]).strip(),
         source_type,
         str(spec["location"]),
         _cache_key_value(spec.get("kwargs", {}) or {}),
-        _hdf_file_fingerprint(str(spec["location"])),
     )
+    if source_type == "hdf":
+        return (*fingerprint, _hdf_file_fingerprint(str(spec["location"])))
+    return fingerprint
 
 
 def _source_from_session_cache(
@@ -165,6 +173,69 @@ def build_sources_from_session(
         )
         sources.register_source(source)
     return sources
+
+
+def bind_chunk_source_slices(
+    sources: IoSources,
+    session: PipelineSession,
+    plan: ChunkPlan,
+    chunk: ChunkSpec,
+) -> list[dict[str, Any]]:
+    """Bind one chunk selection to direct HDF5 or Tiled source reads.
+
+    The returned records are JSON-safe execution provenance. Buffer inputs are
+    deliberately excluded because their uploaded values are already sliced.
+    """
+
+    if not plan.source_bindings:
+        return []
+
+    bound_slices: dict[str, Any] = {}
+    resolved: list[dict[str, Any]] = []
+    driver_reference = IoSources.normalize_data_reference(str(plan.driver["source"]))
+
+    for binding in plan.source_bindings:
+        try:
+            registration = session.sources[binding.source_ref]
+        except KeyError as exc:
+            raise ValueError(f"Chunk source binding refers to unregistered source {binding.source_ref!r}.") from exc
+
+        source_type = str(registration["type"]).strip().lower()
+        record: dict[str, Any] = {
+            "source_ref": binding.source_ref,
+            "source_type": source_type,
+            "location": str(registration["location"]),
+            "data_key": binding.data_key,
+            "role": binding.role,
+            "selection": None,
+        }
+        if binding.role == "static":
+            resolved.append(record)
+            continue
+        if source_type not in {"hdf", "tiled"}:
+            raise ValueError(
+                f"Chunk source binding {binding.data_reference!r} targets source type {source_type!r}; "
+                "only direct HDF5 and Tiled sources may be sliced. Buffer values must be uploaded already sliced."
+            )
+
+        source = sources.get_source(binding.source_ref)
+        source_shape = tuple(int(size) for size in source.get_data_shape(binding.data_key))
+        selectors = binding.resolve_selection(chunk.source_selection, source_shape)
+        assert selectors is not None
+        if binding.data_reference == driver_reference:
+            selected_shape = selection_shape(source_shape, selectors)
+            if selected_shape != chunk.expected_input_shape:
+                raise ValueError(
+                    f"Driver source {binding.data_reference!r} resolves to shape {selected_shape}, "
+                    f"but ChunkSpec expects {chunk.expected_input_shape}."
+                )
+
+        bound_slices[binding.data_reference] = tuple(selector.to_index() for selector in selectors)
+        record["selection"] = [selector.to_dict() for selector in selectors]
+        resolved.append(record)
+
+    sources.set_data_slice_bindings(bound_slices)
+    return resolved
 
 
 def build_sinks_from_session(

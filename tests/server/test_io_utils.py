@@ -8,12 +8,23 @@ import os
 from pathlib import Path
 
 import h5py
+import numpy as np
 
 from modacor.io.buffer import BufferSink, BufferSource
+from modacor.io.chunking import (
+    AxisSelector,
+    ChunkArrayLayout,
+    ChunkOutputLayout,
+    ChunkPlacement,
+    ChunkPlan,
+    ChunkSourceBinding,
+    ChunkSpec,
+)
 from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 from modacor.io.hdf.hdf_source import HDFSource
+from modacor.io.tiled import TiledSource
 from modacor.runner.pipeline import Pipeline
-from modacor.server.io_utils import build_sinks_from_session, build_sources_from_session
+from modacor.server.io_utils import bind_chunk_source_slices, build_sinks_from_session, build_sources_from_session
 from modacor.server.runtime_policy import RuntimePolicy
 from modacor.server.session_manager import SessionManager
 
@@ -180,3 +191,95 @@ def test_build_sources_from_session_rebuilds_hdf_source_when_file_changes_in_pla
 
     assert second_source is not first_source
     assert "extra" in second_source._file_datasets_shapes
+
+
+def test_build_sources_from_session_reuses_unchanged_tiled_source(monkeypatch):
+    connections = []
+
+    def connect(resource_location, connection_kwargs):
+        connections.append((resource_location, connection_kwargs))
+        return {}
+
+    monkeypatch.setattr("modacor.io.tiled.tiled_source.connect_tiled", connect)
+    manager = SessionManager()
+    session = manager.create_session(session_id="s-tiled-cache", pipeline_yaml="name: tiled\nsteps: {}\n")
+    manager.upsert_sources(
+        session.session_id,
+        [{"ref": "sample", "type": "tiled", "location": "https://example.invalid/catalog"}],
+    )
+
+    first_source = build_sources_from_session(session).get_source("sample")
+    second_source = build_sources_from_session(session).get_source("sample")
+
+    assert isinstance(first_source, TiledSource)
+    assert second_source is first_source
+    assert len(connections) == 1
+
+
+def test_bind_chunk_source_slices_projects_direct_hdf_inputs_without_caching(tmp_path: Path):
+    hdf_file = tmp_path / "chunk-input.h5"
+    detector = np.arange(24, dtype=np.float32).reshape(4, 3, 2)
+    monitor = np.arange(4, dtype=np.float32)
+    with h5py.File(hdf_file, "w") as h5:
+        h5.create_dataset("detector", data=detector)
+        h5.create_dataset("monitor", data=monitor)
+        h5.create_dataset("calibration", data=np.array([10.0, 20.0]))
+
+    plan = ChunkPlan(
+        schema_version="1.0",
+        plan_id="direct-hdf",
+        total_chunks=2,
+        expected_chunk_ids=("c0", "c1"),
+        outputs=(
+            ChunkOutputLayout(
+                output_id="signal",
+                processing_path="/sample/signal",
+                destination_path="sample/signal",
+                units="count",
+                rank_of_data=2,
+                arrays=(ChunkArrayLayout("signal", detector.shape, detector.dtype.str),),
+            ),
+        ),
+        driver={"source": "sample::/detector", "full_shape": list(detector.shape)},
+        batch_axes=(0,),
+        data_axes=(1, 2),
+        source_bindings=(
+            ChunkSourceBinding("sample", "/detector", "aligned"),
+            ChunkSourceBinding("sample", "/monitor", "explicit", axis_map=(0,)),
+            ChunkSourceBinding("sample", "/calibration", "static"),
+        ),
+    )
+    chunk = ChunkSpec(
+        schema_version=plan.schema_version,
+        plan_id=plan.plan_id,
+        plan_hash=plan.plan_hash,
+        chunk_id="c1",
+        ordinal=1,
+        grid_index=(1,),
+        source_selection=(AxisSelector.sliced(2, 4), AxisSelector.all(), AxisSelector.all()),
+        expected_input_shape=(2, 3, 2),
+        placements=(
+            ChunkPlacement(
+                "signal",
+                (AxisSelector.sliced(2, 4), AxisSelector.all(), AxisSelector.all()),
+                (2, 3, 2),
+            ),
+        ),
+    )
+
+    manager = SessionManager()
+    session = manager.create_session(session_id="direct-hdf", pipeline_yaml="name: direct\nsteps: {}\n")
+    manager.upsert_sources(
+        session.session_id,
+        [{"ref": "sample", "type": "hdf", "location": str(hdf_file)}],
+    )
+    sources = build_sources_from_session(session, buffer_store=manager.buffer_store)
+
+    resolved = bind_chunk_source_slices(sources, session, plan, chunk)
+
+    np.testing.assert_array_equal(sources.get_data("sample::/detector"), detector[2:4])
+    np.testing.assert_array_equal(sources.get_data("sample::/monitor"), monitor[2:4])
+    np.testing.assert_array_equal(sources.get_data("sample::/calibration"), np.array([10.0, 20.0]))
+    assert resolved[0]["selection"][0] == {"kind": "slice", "start": 2, "stop": 4, "stride": 1}
+    assert resolved[2]["selection"] is None
+    assert set(sources.get_source("sample")._data_cache) == {"/calibration"}

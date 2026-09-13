@@ -10,13 +10,14 @@ MoDaCor's array sources already support explicit reads through
 selectors. HDF and Tiled can perform the selection at the storage backend, so
 the complete source array does not need to be materialized and sliced locally.
 
-MoDaCor does not currently schedule those reads or pass a slice from ordinary
-pipeline YAML or a runtime process request into `AppendProcessingData`. The
-working server route therefore has an external runner upload each already
-sliced chunk to a `BufferSource`. Direct server-side reads from registered HDF5
-or Tiled sources need the dedicated slice-binding mechanism described below.
-In both modes MoDaCor receives the resolved chunk description so traces and
-outputs retain enough information to identify and reproduce the operation.
+Ordinary pipeline YAML remains free of execution-specific slices. For chunked
+requests, however, a `ChunkPlan` can now declare typed source bindings. The
+server projects the submitted `ChunkSpec.source_selection` through those
+bindings and applies the resolved selectors when the pipeline reads registered
+HDF5 or Tiled inputs. The buffer route remains available when an external
+runner supplies arrays that are already sliced. In both modes MoDaCor receives
+the resolved chunk description so traces and outputs retain enough information to
+identify and reproduce the operation.
 
 This design initially covers chunks along non-image, or batch, dimensions.
 For an array shaped `(measurement, frame, slow, fast)` with
@@ -66,15 +67,21 @@ The low-level source operations already support these reads. Explicit
 `HDFSource` slices bypass its complete-array cache, and Tiled requests slices
 from the remote node and bypasses its local full-array cache. Complete reads
 remain cacheable for genuinely static inputs such as compact calibration data.
+Unchanged HDF5 and Tiled registrations reuse their source instances across
+session runs, including the Tiled connection; re-registration invalidates that
+session cache.
 
-Normal server pipeline execution cannot yet bind a process request's
-`ChunkSpec` to all `AppendProcessingData` reads. Direct HDF5 or Tiled chunk
-ingestion therefore requires a dedicated server-side slice-binding feature;
-support in the source classes alone is not sufficient.
+Chunked server execution now binds a process request's `ChunkSpec` to exact
+source datasets declared in `ChunkPlan.source_bindings`. This is deliberately
+request-scoped: it does not mutate pipeline YAML or source registrations, and
+ordinary processing remains unchanged. The HDF5 path is covered by an
+end-to-end server test. A deterministic server test also verifies that Tiled
+receives a backend slice and does not populate its full-array cache; validation
+against a representative deployed Tiled service remains outstanding.
 
-### Required server-side slice-binding contract
+### Server-side slice-binding contract
 
-The future runtime extension should:
+The implemented contract:
 
 - accept structured selectors in the process request without evaluating Python
   slice expressions;
@@ -89,15 +96,44 @@ The future runtime extension should:
   execution invalidates the correct dependency subgraph;
 - preserve cache policy: explicit HDF5 and Tiled slices are not accumulated,
   while explicitly static complete reads may be reused;
-- persist the resolved source reference, dataset or node, selection, and source
-  revision alongside the chunk execution record; and
+- persist the resolved source reference, type, location, dataset or node, and
+  selection alongside the chunk execution record; and
 - distinguish direct-source inputs from already staged `BufferSource` inputs,
   preventing accidental double slicing.
 
-This is most naturally a process-request extension coupled to `ChunkSpec`, but
-the public request shape should be fixed only after the binding projection has
-been prototyped with both HDF5 and Tiled. It must not make ordinary,
-non-chunked sessions require a `ChunkPlan` or additional source configuration.
+Bindings are plan-wide because their projection rules do not change between
+chunks. A driver and two companion inputs can be declared as:
+
+```yaml
+driver:
+  source: sample::/entry/data
+  full_shape: [1, 100, 1679, 1475]
+source_bindings:
+  - source_ref: sample
+    data_key: /entry/data
+    role: aligned
+  - source_ref: sample
+    data_key: /entry/monitor
+    role: explicit
+    axis_map: [0, 1]
+  - source_ref: mask
+    data_key: /entry/mask
+    role: static
+```
+
+`aligned` requires the input rank to equal the driver rank and applies the
+driver selectors unchanged. `explicit.axis_map` has one entry per source axis;
+each integer selects the corresponding driver axis and `null` leaves that
+source axis complete. `static` records the relationship but applies no slice.
+The driver dataset itself must have exactly one `aligned` binding. Bindings use
+exact source references and dataset keys rather than shape inference.
+
+Non-static bindings currently accept registered `hdf` and `tiled` sources.
+Targeting a `buffer` source is rejected because its values must already be
+sliced before upload. The server adds the affected source references to partial
+run invalidation automatically and records every effective selector in the run
+and chunk execution metadata. Ordinary, non-chunked sessions do not require a
+`ChunkPlan` or additional source configuration.
 
 ## Separate selection from chunk size
 
@@ -185,13 +221,15 @@ Required plan fields are:
 - `driver`: logical source reference, full shape, dtype, and `rank_of_data`;
 - `batch_axes` and `data_axes`: original source-axis numbers;
 - `axis_rules`: normalized selection and partition rules;
-- `bindings`: other inputs and how the driver selection projects onto them;
+- `bindings`: optional free-form planning provenance retained for compatibility;
+- `source_bindings`: optional typed, executable mappings from the driver
+  selection to exact registered source datasets;
 - `total_chunks`: number of generated chunks;
 - `expected_chunk_ids`: stable chunk ids in ordinal order, used to initialize
   and validate the completion manifest; and
 - `plan_hash`: hash of the canonical plan representation.
 
-Bindings should use explicit roles:
+Executable source bindings use explicit roles:
 
 - `aligned`: project applicable driver batch selectors onto the input;
 - `static`: always read the complete input; or
@@ -289,9 +327,11 @@ covering indices excluded by `stride`.
 
 ## MoDaCor handoff
 
-The external runner supplies already sliced arrays and passes the corresponding
-`ChunkSpec` as execution metadata. MoDaCor should not reinterpret the spec to
-perform another slice.
+For `BufferSource`, the external runner supplies already sliced arrays and
+MoDaCor does not reinterpret the `ChunkSpec` to perform another slice. For
+direct HDF5 or Tiled operation, the runner supplies only the `ChunkSpec`; the
+server resolves the plan's typed source bindings and applies them during source
+reads.
 
 The recommended server integration puts `output_id` and `chunk_spec` in the
 process request. `RunResult`, trace events, and persisted result metadata can

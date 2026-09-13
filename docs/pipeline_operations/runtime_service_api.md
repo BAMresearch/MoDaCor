@@ -381,6 +381,15 @@ registration is copied at initialization and thereafter belongs to the output
 resource. `GET /chunked-outputs/{output_id}` reads authoritative manifest
 counts and accepts `offset` and `limit` for chunk-entry pagination.
 
+For direct source reads, the plan may include `source_bindings`. Each binding
+identifies an exact registered source and dataset with role `aligned`, `static`,
+or `explicit`. When a process request supplies a chunk for that output, the
+server projects its `source_selection` onto the bound HDF5 or Tiled datasets.
+Explicit bindings provide one `axis_map` entry per source axis, using a driver
+axis number or `null` for a complete source axis. Buffer sources must omit these
+executable bindings because uploaded arrays are already sliced. The complete
+contract and examples are in [Chunked Operation](../design/chunked-operation.md).
+
 `POST /chunked-outputs/{output_id}/finalize` takes `{"plan_hash":
 "sha256:..."}`. Missing chunks or a hash mismatch return `409`; repeating a
 successful finalization with the same hash is idempotent.
@@ -480,6 +489,9 @@ Notes:
   run's `ProcessingData` to the initialized output and only responds with
   success after the chunk manifest has been flushed. Publication failures use
   `CHUNK_WRITE_FAILED` and are distinct from pipeline failures.
+- A plan's non-static `source_bindings` automatically add their source
+  references to partial-run invalidation. Callers do not need to repeat those
+  references in `changed_sources`.
 - In restricted runtime policy, `write_hdf.path` must resolve under one of the
   configured `--write-root` directories.
 - Full per-step `ProcessingData` snapshots are opt-in through the session trace

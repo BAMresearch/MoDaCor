@@ -17,7 +17,15 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.dataclasses.trace_event import TraceEvent
 from modacor.io.buffer import decode_npy, encode_npy
-from modacor.io.chunking import AxisSelector, ChunkArrayLayout, ChunkOutputLayout, ChunkPlacement, ChunkPlan, ChunkSpec
+from modacor.io.chunking import (
+    AxisSelector,
+    ChunkArrayLayout,
+    ChunkOutputLayout,
+    ChunkPlacement,
+    ChunkPlan,
+    ChunkSourceBinding,
+    ChunkSpec,
+)
 from modacor.runner.pipeline import Pipeline
 from modacor.runner.pipeline_runner import PipelineRunError, RunResult
 from modacor.server.api import create_app
@@ -1242,6 +1250,240 @@ steps:
     assert "fallback_reason" in result
     assert call_count["n"] == 2
     assert seen_sink_locations == [tmp_path / "auto.csv", tmp_path / "auto.csv"]
+
+
+def test_chunked_process_reads_bound_hdf_slices_and_persists_selection_provenance(tmp_path: Path):
+    source_file = tmp_path / "direct-source.h5"
+    output_file = tmp_path / "direct-result.h5"
+    values = np.arange(8, dtype=np.float32).reshape(4, 2)
+    with h5py.File(source_file, "w") as h5:
+        h5.create_dataset("data", data=values)
+
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+    pipeline_yaml = """
+name: direct_hdf_chunks
+steps:
+  load:
+    module: AppendProcessingData
+    requires_steps: []
+    configuration:
+      processing_key: sample
+      databundle_output_key: signal
+      signal_location: sample::/data
+      units_override: count
+      rank_of_data: 1
+"""
+    _post_json(
+        client,
+        "/v1/sessions",
+        {"session_id": "direct-worker", "pipeline": {"yaml_text": pipeline_yaml}},
+    )
+    _post_json(
+        client,
+        "/v1/sessions/direct-worker/sources/patch",
+        {"ref": "sample", "type": "hdf", "location": str(source_file)},
+    )
+
+    plan = ChunkPlan(
+        schema_version="1.0",
+        plan_id="direct-server-plan",
+        total_chunks=2,
+        expected_chunk_ids=("c0", "c1"),
+        outputs=(
+            ChunkOutputLayout(
+                output_id="signal",
+                processing_path="/sample/signal",
+                destination_path="sample/signal",
+                units="count",
+                rank_of_data=1,
+                arrays=(ChunkArrayLayout("signal", values.shape, values.dtype.str),),
+            ),
+        ),
+        driver={"source": "sample::/data", "full_shape": list(values.shape)},
+        batch_axes=(0,),
+        data_axes=(1,),
+        source_bindings=(ChunkSourceBinding("sample", "/data", "aligned"),),
+    )
+    initialized = _post_json(
+        client,
+        "/v1/chunked-outputs",
+        {
+            "sink": {"ref": "result", "type": "hdf_chunked", "location": str(output_file)},
+            "subpath": "direct",
+            "plan": plan.to_dict(),
+        },
+    )
+
+    for ordinal in range(2):
+        chunk = _server_chunk(plan, ordinal)
+        response = _post_json(
+            client,
+            "/v1/sessions/direct-worker/process",
+            {
+                "mode": "full" if ordinal == 0 else "partial",
+                "rollback_snapshot": False,
+                "chunk_output": {
+                    "output_id": initialized["output_id"],
+                    "chunk_spec": chunk.to_dict(),
+                },
+            },
+        )
+        assert response["status"] == "succeeded"
+        assert response["effective_mode"] == ("full" if ordinal == 0 else "partial")
+
+    finalized = _post_json(
+        client,
+        f"/v1/chunked-outputs/{initialized['output_id']}/finalize",
+        {"plan_hash": plan.plan_hash},
+    )
+    assert finalized["status"] == "complete"
+
+    with h5py.File(output_file, "r") as h5:
+        np.testing.assert_array_equal(h5["processing/result/direct/sample/signal/signal"][()], values)
+        execution = json.loads(h5["processing/chunk_plans/direct-server-plan/chunks/c1/execution_json"][()].decode())
+        assert execution["source_slices"][0]["selection"][0] == {
+            "kind": "slice",
+            "start": 2,
+            "stop": 4,
+            "stride": 1,
+        }
+
+    session = manager.get_session("direct-worker")
+    assert session is not None
+    assert session.run_history[-1]["changed_sources"] == ["sample"]
+    assert session.source_cache["sample"]["source"]._data_cache == {}
+
+
+def test_chunked_process_reads_bound_tiled_slice(monkeypatch, tmp_path: Path):
+    class TiledLeaf:
+        def __init__(self, data):
+            self._data = np.asarray(data)
+            self.received_slices = []
+
+        @property
+        def shape(self):
+            return self._data.shape
+
+        @property
+        def dtype(self):
+            return self._data.dtype
+
+        def read(self, slice=None):
+            self.received_slices.append(slice)
+            return self._data if slice is None else self._data[slice]
+
+    values = np.arange(8, dtype=np.float32).reshape(4, 2)
+    leaf = TiledLeaf(values)
+    monkeypatch.setattr(
+        "modacor.io.tiled.tiled_source.connect_tiled",
+        lambda resource_location, connection_kwargs: {"data": leaf},
+    )
+
+    manager = SessionManager()
+    app = create_app(session_manager=manager)
+    client = TestClient(app)
+    _post_json(
+        client,
+        "/v1/sessions",
+        {
+            "session_id": "tiled-worker",
+            "pipeline": {
+                "yaml_text": (
+                    """
+name: direct_tiled_chunk
+steps:
+  load:
+    module: AppendProcessingData
+    requires_steps: []
+    configuration:
+      processing_key: sample
+      databundle_output_key: signal
+      signal_location: sample::/data
+      units_override: count
+      rank_of_data: 1
+"""
+                )
+            },
+        },
+    )
+    _post_json(
+        client,
+        "/v1/sessions/tiled-worker/sources/patch",
+        {"ref": "sample", "type": "tiled", "location": "https://example.invalid/catalog"},
+    )
+    plan = ChunkPlan(
+        schema_version="1.0",
+        plan_id="direct-tiled-plan",
+        total_chunks=1,
+        expected_chunk_ids=("c0",),
+        outputs=(
+            ChunkOutputLayout(
+                output_id="signal",
+                processing_path="/sample/signal",
+                destination_path="sample/signal",
+                units="count",
+                rank_of_data=1,
+                arrays=(ChunkArrayLayout("signal", (2, 2), values.dtype.str),),
+            ),
+        ),
+        driver={"source": "sample::/data", "full_shape": list(values.shape)},
+        batch_axes=(0,),
+        data_axes=(1,),
+        source_bindings=(ChunkSourceBinding("sample", "/data", "aligned"),),
+    )
+    chunk = ChunkSpec(
+        schema_version=plan.schema_version,
+        plan_id=plan.plan_id,
+        plan_hash=plan.plan_hash,
+        chunk_id="c0",
+        ordinal=0,
+        grid_index=(0,),
+        source_selection=(AxisSelector.sliced(1, 3), AxisSelector.all()),
+        expected_input_shape=(2, 2),
+        placements=(
+            ChunkPlacement(
+                "signal",
+                (AxisSelector.all(), AxisSelector.all()),
+                (2, 2),
+            ),
+        ),
+    )
+    output_file = tmp_path / "tiled-result.h5"
+    initialized = _post_json(
+        client,
+        "/v1/chunked-outputs",
+        {
+            "sink": {"ref": "result", "type": "hdf_chunked", "location": str(output_file)},
+            "subpath": "direct",
+            "plan": plan.to_dict(),
+        },
+    )
+
+    response = _post_json(
+        client,
+        "/v1/sessions/tiled-worker/process",
+        {
+            "mode": "full",
+            "rollback_snapshot": False,
+            "chunk_output": {
+                "output_id": initialized["output_id"],
+                "chunk_spec": chunk.to_dict(),
+            },
+        },
+    )
+
+    assert response["status"] == "succeeded"
+    assert leaf.received_slices == [(slice(1, 3, 1), slice(None))]
+    session = manager.get_session("tiled-worker")
+    assert session is not None
+    assert session.source_cache["sample"]["source"]._data_cache == {}
+    with h5py.File(output_file, "r") as h5:
+        np.testing.assert_array_equal(
+            h5["processing/result/direct/sample/signal/signal"][()],
+            values[1:3],
+        )
 
 
 def test_chunked_output_api_lifecycle_survives_worker_session_deletion(monkeypatch, tmp_path: Path):

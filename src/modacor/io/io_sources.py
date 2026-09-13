@@ -14,6 +14,7 @@ __status__ = "Development"  # "Development", "Production"
 __all__ = ["IoSources"]
 
 
+from collections.abc import Mapping
 from typing import Any, Optional
 
 import numpy as np
@@ -32,6 +33,30 @@ class IoSources:
     """
 
     defined_sources: dict[str, IoSource] = field(factory=dict)
+    data_slice_bindings: dict[str, ArraySlice] = field(factory=dict, repr=False)
+
+    @staticmethod
+    def normalize_data_reference(data_reference: str) -> str:
+        source_ref, separator, data_key = str(data_reference).partition("::")
+        if not separator or not source_ref.strip() or not data_key.strip():
+            raise ValueError(
+                "data_reference must be in the format 'source_ref::data_key' with a "
+                "double colon separating both entries."
+            )
+        return f"{source_ref.strip()}::/{data_key.strip().strip('/')}"
+
+    def set_data_slice_bindings(self, bindings: Mapping[str, ArraySlice]) -> None:
+        """Replace request-scoped source slices applied by :meth:`get_data`."""
+
+        normalized: dict[str, ArraySlice] = {}
+        for data_reference, load_slice in bindings.items():
+            reference = self.normalize_data_reference(data_reference)
+            source_ref, _data_key = self.split_data_reference(reference)
+            self.get_source(source_ref)
+            if load_slice is None or load_slice is Ellipsis:
+                raise ValueError(f"Bound data slice for {reference!r} must be explicit.")
+            normalized[reference] = load_slice
+        self.data_slice_bindings = normalized
 
     def register_source(self, source: IoSource, source_reference: str | None = None) -> None:
         """
@@ -119,6 +144,11 @@ class IoSources:
         """
         _source_ref, _data_key = self.split_data_reference(data_reference)
         _source = self.get_source(_source_ref)
+        bound_slice = self.data_slice_bindings.get(self.normalize_data_reference(data_reference))
+        if bound_slice is not None:
+            if load_slice is not None and load_slice is not Ellipsis:
+                raise ValueError(f"Data reference {data_reference!r} has both a bound and an explicit slice.")
+            load_slice = bound_slice
         return _source.get_data(_data_key, load_slice=load_slice)
 
     def get_data_shape(self, data_reference: str) -> np.ndarray:

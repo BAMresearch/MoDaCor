@@ -24,13 +24,15 @@ registrations, or ask the server to pull slices directly from registered
 not different output protocols: both submit the same `ChunkSpec` and publish
 through the same server-managed chunked-output resource.
 
-Buffer delivery is implemented now and is suitable for remote runners or
+Buffer delivery is suitable for remote runners or
 storage that is inaccessible to the server. It incurs HTTP serialization and
 memory copies, and the runner is responsible for uploading mutually aligned
 arrays. Direct HDF5 or Tiled access avoids transporting chunk arrays through
-the orchestrator and keeps storage identity closer to the read, but normal
-server execution does not yet project a `ChunkSpec` onto source reads. That
-mode depends on the dedicated server-side slice-binding contract specified in
+the orchestrator and keeps storage identity closer to the read. The server now
+projects a `ChunkSpec` onto exact datasets declared by the plan's typed source
+bindings. The HDF5 route has end-to-end coverage and the Tiled route has
+deterministic server coverage; representative deployed-Tiled validation remains
+part of beamline readiness. The binding contract is specified in
 [Chunked Operation](chunked-operation.md).
 
 A deployment may use both modes. For example, a facility server may read raw
@@ -204,6 +206,6 @@ sessions and one server-managed chunked output. Once numerical equivalence,
 memory bounds, and idempotent assembly are demonstrated, add a bounded pool of
 sessions. Keep server-side writes serialized initially, then validate
 concurrent HDF5 or Tiled publication separately against representative
-facility infrastructure. Use `BufferSource` delivery until server-side slice
-binding is available; then validate direct HDF5 and direct Tiled reads as
-separate beamline deployment profiles.
+facility infrastructure. Buffer-fed and direct HDF5 reads are available;
+validate direct Tiled reads as a separate beamline deployment profile before
+relying on them operationally.

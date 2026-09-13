@@ -64,11 +64,11 @@ input detector data may still have been loaded in full.
 
 ## Missing pipeline support
 
-`AppendProcessingData` currently calls the source helper without passing a
-slice. Pipeline YAML therefore cannot request a source interval even though
-the underlying source can provide it. Direct Python callers can use source
-slicing, but the normal pipeline cannot yet coordinate slices across signal,
-weights, uncertainties, masks, geometry, and other inputs.
+Ordinary pipeline YAML does not contain execution-specific source intervals.
+Chunked server requests can now coordinate slices across exact HDF5 or Tiled
+datasets using typed `ChunkPlan.source_bindings`; staged `BufferSource` values
+remain already-sliced inputs. See [Chunked Operation](chunked-operation.md) for
+the current contract. Direct Python callers can also use source slicing.
 
 MoDaCor also has no general:
 
