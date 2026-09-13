@@ -151,6 +151,24 @@ smoke check completes and finalizes two chunks for each detector in one shared
 file; running and assessing the complete 80-pipeline-run workflow remains an
 explicit interactive validation step.
 
+Two additional opt-in notebook examples exercise server-owned reads with that
+same 80-run configuration. The HDFSource variant applies typed bindings to the
+detector and all sample-side frame-aligned normalizers, then compares its
+stored arrays with the BufferSource result. The TiledSource variant starts a
+loopback-only, read-only Tiled service over the packaged HDF5 files and compares
+its stored arrays with the HDFSource result. Both comparisons read one output
+chunk at a time. A one-chunk real SAXS smoke run has completed through both
+transports, including server-side input slicing, correction-pipeline execution,
+chunk publication, tracing, finalization, and cross-transport comparison. The
+complete SAXS/WAXS runs remain manual because they are deliberately excluded
+from CI.
+
+That smoke run exposed and closed one representative-data gap: HDF5's normal
+tree visitor does not descend into external links, so `HDFSource` now resolves
+shape and dtype lazily when an explicitly requested dataset was not discovered
+during preload. This allows chunk binding validation to inspect linked NeXus
+detector datasets without reading their arrays.
+
 The example intentionally processes the detector sessions sequentially. Each
 pilot holds one complete detector-specific background working set in memory,
 then partial sample reruns reuse its reduced background branch. The complete

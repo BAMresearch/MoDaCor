@@ -108,6 +108,22 @@ class TestHDFSource(unittest.TestCase):
         data_dtype = self.test_hdf_source.get_data_dtype(self.temp_dataset_name)
         self.assertEqual(np.dtype("float64"), data_dtype)
 
+    def test_shape_and_dtype_are_resolved_through_external_link(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory_path = Path(directory)
+            target_path = directory_path / "target.h5"
+            master_path = directory_path / "master.h5"
+            with h5py.File(target_path, "w") as target:
+                target.create_dataset("detector", shape=(1, 10, 8, 6), dtype=np.int32)
+            with h5py.File(master_path, "w") as master:
+                master["entry/data"] = h5py.ExternalLink(target_path.name, "/detector")
+
+            source = HDFSource(source_reference="external", resource_location=master_path)
+
+            self.assertEqual((1, 10, 8, 6), source.get_data_shape("/entry/data"))
+            self.assertEqual(np.dtype(np.int32), source.get_data_dtype("/entry/data"))
+            self.assertEqual({}, source._data_cache)
+
     def test_get_static_metadata(self):
         self.test_hdf_source._file_path = Path(self.temp_file_path)
         self.test_hdf_source._preload()

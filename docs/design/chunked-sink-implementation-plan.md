@@ -58,6 +58,13 @@ As of 2026-09-13:
   extraction, initialization, partial reruns, publication, inspection, and
   finalization. The configured 80-pipeline-run exercise remains an interactive
   validation rather than a CI test.
+- The I22 notebook additionally provides opt-in direct HDFSource and local
+  TiledSource variants of the full 80-run workload. They use the same typed
+  source slices and compare complete stored results chunk by chunk across
+  Buffer, HDF5, and Tiled transport modes. A one-chunk SAXS production-path
+  smoke run passes for both direct modes; the full runs remain interactive.
+  `HDFSource` shape/dtype inspection now also resolves datasets reached through
+  external NeXus links, which the representative source files require.
 - `ChunkPlan.source_bindings` now provides typed `aligned`, `static`, and
   `explicit` mappings from a chunk driver to registered source datasets. The
   runtime applies request-scoped selectors to direct HDF5 or Tiled reads,
@@ -77,7 +84,7 @@ As of 2026-09-13:
   provisional and resolved identities survive server reopen. BufferSource uses
   the same pilot path when the external runner declares `driver.full_shape`
   and uploads already sliced chunks.
-- Verification at the current Phase 5 checkpoint passes 778 tests, with the
+- Verification at the current Phase 5 checkpoint passes 779 tests, with the
   opt-in RSS regression skipped by default; running that check explicitly also
   passes. The three reported test warnings are pre-existing numerical-domain
   warnings in `BaseData` tests. The documentation builds cleanly with Sphinx

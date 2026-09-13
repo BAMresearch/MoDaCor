@@ -119,6 +119,10 @@ The low-level source operations already support these reads. Explicit
 `HDFSource` slices bypass its complete-array cache, and Tiled requests slices
 from the remote node and bypasses its local full-array cache. Complete reads
 remain cacheable for genuinely static inputs such as compact calibration data.
+For NeXus masters that expose detector datasets through external links,
+`HDFSource` resolves the explicitly requested dataset's shape and dtype lazily
+when the normal preload walk cannot see through that link; structure discovery
+still does not read the detector array.
 Unchanged HDF5 and Tiled registrations reuse their source instances across
 session runs, including the Tiled connection; re-registration invalidates that
 session cache.

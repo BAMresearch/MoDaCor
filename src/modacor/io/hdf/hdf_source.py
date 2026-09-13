@@ -146,15 +146,34 @@ class HDFSource(IoSource):
 
     def get_data_shape(self, data_key: str) -> tuple[int, ...]:
         normalized_key = str(data_key).strip().lstrip("/")
+        self._load_dataset_structure(normalized_key)
         if normalized_key in self._file_datasets_shapes:
             return self._file_datasets_shapes[normalized_key]
         return ()
 
     def get_data_dtype(self, data_key: str) -> np.dtype | None:
         normalized_key = str(data_key).strip().lstrip("/")
+        self._load_dataset_structure(normalized_key)
         if normalized_key in self._file_datasets_dtypes:
             return self._file_datasets_dtypes[normalized_key]
         return None
+
+    def _load_dataset_structure(self, normalized_key: str) -> None:
+        """Resolve structure lazily for datasets reached through external links."""
+
+        if normalized_key in self._file_datasets_shapes:
+            return
+        try:
+            with h5py.File(self._file_path, "r") as hdf_file:
+                try:
+                    dataset = hdf_file[normalized_key]
+                except KeyError:
+                    return
+                if isinstance(dataset, h5py.Dataset):
+                    self._file_datasets_shapes[normalized_key] = dataset.shape
+                    self._file_datasets_dtypes[normalized_key] = dataset.dtype
+        except OSError as error:
+            _raise_hdf5_read_error(error)
 
     def get_data_attributes(self, data_key: str) -> dict[str, Any]:
         attributes = {}

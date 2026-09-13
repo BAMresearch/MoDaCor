@@ -108,7 +108,10 @@ matrix interpreter.
    Test representative detector arrays and repeated pipeline execution. The
    current full-read cache has no size or entry limit. Decide whether facility
    workflows should disable it, bound it, or rely on explicit `clear_cache()`.
-   Sliced reads already avoid populating that cache.
+   Sliced reads already avoid populating that cache. The I22 notebook now
+   contains an opt-in four-measurement SAXS/WAXS workload served by a local
+   Tiled service; its one-chunk SAXS production-path smoke check passes, while
+   the complete scale and facility-deployment measurements remain open.
 
 8. `Open` Multi-array write atomicity
 
@@ -144,6 +147,10 @@ matrix interpreter.
 - 2026-09-08: Tiled CI coverage was expanded to Python 3.13 and 3.14. Clean
   `tox -e tiled` runs passed all 21 tests on both versions; the environment
   selects the active matrix interpreter through `TOXPYTHON`.
+- 2026-09-13: A notebook-owned Tiled 0.2.18 service streamed a real externally
+  linked I22 SAXS detector slice through the runtime. One ten-frame production
+  chunk completed through both HDFSource and TiledSource and produced matching
+  finalized HDF5 results with one trace record each.
 
 The remaining open items require representative facility infrastructure or a
 product decision; they do not block local array-based source and sink use.
