@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## v1.8.0 (2026-09-14)
+
+### Enh
+
+* enh: phase 5 complete with client methods, tested using MoDaCor-examples ([`0b01e7d`](https://github.com/BAMresearch/MoDaCor/commit/0b01e7df10dde630c40cfd0ac2cda16e297d7f70))
+
+* enh: phase 5 complete apart from facility data testing of the provisional plans workflow ([`c7ada9e`](https://github.com/BAMresearch/MoDaCor/commit/c7ada9eef56837d83ac3d478a6b9b784d1e76532))
+
+* enh: provisional plans implemented which will autocomplete chunking information ([`ffe1871`](https://github.com/BAMresearch/MoDaCor/commit/ffe18714a21fd15ca64010c5ed08b7bb4053e929))
+
+* enh: server-side slice bindings for Tiled and HDF sources ([`c143cd0`](https://github.com/BAMresearch/MoDaCor/commit/c143cd0d303a571abbe3de73c953c162c7630829))
+
+* enh: bugfixes for chunked operation ([`7a08c3b`](https://github.com/BAMresearch/MoDaCor/commit/7a08c3bb0f2c045c1684d7211235b76ebca46c7e))
+
+* enh: phase five adds tests and benchmarks, halfway complete (until real data is available) ([`6cb77e0`](https://github.com/BAMresearch/MoDaCor/commit/6cb77e0a3ccd5e499b29b9c013854d3cfa7daa11))
+
+* enh: phase four adds server support for chunked operation + e2e tests and docs ([`7fcff1f`](https://github.com/BAMresearch/MoDaCor/commit/7fcff1f36db6922f58ff2e1be31bdc056679974e))
+
+* enh: phase three of the implementation complete ([`337c0e2`](https://github.com/BAMresearch/MoDaCor/commit/337c0e240a540a0e5afa44f12e7fff3f73b599d1))
+
+* enh: first part of the chunked operation plan carried out ([`c68326b`](https://github.com/BAMresearch/MoDaCor/commit/c68326b5d633a8a9812a4885a719addd584b69ab))
+
+### Unknown Scope
+
+* doc: recommendations on chunked and parallel operations, and an implementation plan ([`f98ba9a`](https://github.com/BAMresearch/MoDaCor/commit/f98ba9aa37e27460c5d47b7e9eb1c6b424641c0f))
+
 ## v1.7.0 (2026-09-09)
 
 ### Bug fixes
