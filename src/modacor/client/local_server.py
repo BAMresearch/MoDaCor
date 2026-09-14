@@ -7,6 +7,7 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from time import monotonic, sleep
 from typing import IO, Any
 
 from .runtime import RuntimeClient
@@ -37,6 +38,10 @@ class LocalRuntimeServer:
     ) -> None:
         if runtime_policy not in {"trusted", "restricted"}:
             raise ValueError("runtime_policy must be 'trusted' or 'restricted'.")
+        if not 1 <= int(port) <= 65535:
+            raise ValueError("port must be between 1 and 65535.")
+        if startup_timeout <= 0 or shutdown_timeout <= 0 or request_timeout <= 0:
+            raise ValueError("Runtime server timeouts must be positive.")
         self.host = str(host)
         self.port = int(port)
         self.log_path = None if log_path is None else Path(log_path)
@@ -56,7 +61,7 @@ class LocalRuntimeServer:
 
     @property
     def launched(self) -> bool:
-        return self.process is not None
+        return self.process is not None and self.process.poll() is None
 
     def __enter__(self) -> RuntimeClient:
         return self.start()
@@ -65,12 +70,39 @@ class LocalRuntimeServer:
         self.stop()
 
     def start(self) -> RuntimeClient:
+        if self.process is not None and self.process.poll() is not None:
+            self.process = None
+            self._close_log()
         if self.client.is_ready():
             return self.client
-        if self.process is not None and self.process.poll() is None:
-            self.client.wait_until_ready(timeout=self.startup_timeout)
+        if self.launched:
+            try:
+                self.client.wait_until_ready(timeout=self.startup_timeout)
+            except Exception:
+                self.stop()
+                raise
             return self.client
 
+        self.process = None
+        self._close_log()
+        target = self._open_log()
+        environment = os.environ.copy()
+        environment.update(self.environment)
+        try:
+            self.process = subprocess.Popen(
+                self._command(),
+                stdout=target,
+                stderr=subprocess.STDOUT,
+                env=environment,
+                text=True,
+            )
+            self._wait_for_startup()
+        except Exception:
+            self.stop()
+            raise
+        return self.client
+
+    def _command(self) -> list[str]:
         command = [
             self.executable,
             "-m",
@@ -94,33 +126,21 @@ class LocalRuntimeServer:
         ):
             if value is not None:
                 command.extend([option, str(value)])
+        return command
 
-        target: int | IO[str] = subprocess.DEVNULL
-        if self.log_path is not None:
-            if self._log_file is not None:
-                self._log_file.close()
-            self.log_path.parent.mkdir(parents=True, exist_ok=True)
-            self._log_file = self.log_path.open("a", encoding="utf-8", buffering=1)
-            target = self._log_file
-        environment = os.environ.copy()
-        environment.update(self.environment)
-        self.process = subprocess.Popen(
-            command,
-            stdout=target,
-            stderr=subprocess.STDOUT,
-            env=environment,
-            text=True,
-        )
-        try:
-            self._wait_for_startup()
-        except Exception:
-            self.stop()
-            raise
-        return self.client
+    def _open_log(self) -> int | IO[str]:
+        if self.log_path is None:
+            return subprocess.DEVNULL
+        self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        self._log_file = self.log_path.open("a", encoding="utf-8", buffering=1)
+        return self._log_file
+
+    def _close_log(self) -> None:
+        if self._log_file is not None:
+            self._log_file.close()
+            self._log_file = None
 
     def _wait_for_startup(self) -> None:
-        from time import monotonic, sleep
-
         deadline = monotonic() + self.startup_timeout
         while monotonic() < deadline:
             if self.client.is_ready():
@@ -148,6 +168,4 @@ class LocalRuntimeServer:
                     process.kill()
                     process.wait(timeout=self.shutdown_timeout)
         finally:
-            if self._log_file is not None:
-                self._log_file.close()
-                self._log_file = None
+            self._close_log()

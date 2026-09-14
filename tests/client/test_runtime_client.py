@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from modacor.client import RuntimeAPIError, RuntimeClient
+from modacor.client import BufferClient, ChunkedOutputHandle, RuntimeAPIError, RuntimeClient
 from modacor.io.buffer.codec import encode_npy
 
 
@@ -83,6 +83,15 @@ def test_session_and_buffer_clients_build_payloads_and_decode_arrays():
     assert transport.calls[1]["headers"]["Content-Type"] == "application/x-npy"
 
 
+def test_generic_buffer_client_remains_backwards_compatible():
+    transport = StubTransport([(200, encode_npy(np.arange(2)), {"Content-Type": "application/x-npy"})])
+    session = RuntimeClient("http://runtime", transport=transport).session("demo")
+
+    values = BufferClient(session, "result", kind="sink").get_array("/signal")
+
+    assert np.array_equal(values, np.arange(2))
+
+
 def test_chunked_output_handle_wraps_create_process_and_finalize():
     transport = StubTransport(
         [
@@ -106,3 +115,55 @@ def test_chunked_output_handle_wraps_create_process_and_finalize():
     assert chunk_payload["chunk_spec"]["chunk_id"] == "c0"
     assert finalized["status"] == "complete"
     assert json.loads(transport.calls[1]["data"]) == {"plan_hash": "hash-1"}
+
+
+@pytest.mark.parametrize("spec", ["c0", {"chunk_id": "c0"}])
+def test_provisional_chunk_payload_uses_only_chunk_id(spec):
+    transport = StubTransport([response(201, {"output_id": "out-1", "status": "awaiting_schema"})])
+    session = RuntimeClient("http://runtime", transport=transport).session("demo")
+    output = session.runtime.chunked_outputs.create_provisional(
+        session=session,
+        sink_ref="result",
+        subpath="run",
+        plan={"plan_id": "p1"},
+    )
+
+    assert output.chunk(spec) == {"output_id": "out-1", "chunk_id": "c0"}
+    assert output.chunk_id("c1") == {"output_id": "out-1", "chunk_id": "c1"}
+
+
+def test_complete_chunk_requires_explicit_spec_payload():
+    transport = StubTransport([])
+    handle = ChunkedOutputHandle(
+        RuntimeClient("http://runtime", transport=transport),
+        {"output_id": "out-1"},
+        plan_hash="hash-1",
+    )
+
+    assert handle.chunk({"chunk_id": "c0"}) == {
+        "output_id": "out-1",
+        "chunk_spec": {"chunk_id": "c0"},
+    }
+    assert handle.chunk_id("c0") == {"output_id": "out-1", "chunk_id": "c0"}
+
+
+def test_reopen_detects_provisional_output_and_finalize_resolves_hash():
+    transport = StubTransport(
+        [
+            response(200, {"output_id": "out-1", "status": "awaiting_schema", "provisional_hash": "draft"}),
+            response(200, {"output_id": "out-1", "status": "open", "plan_hash": "resolved"}),
+            response(200, {"status": "complete"}),
+        ]
+    )
+    client = RuntimeClient("http://runtime", transport=transport)
+
+    output = client.chunked_outputs.reopen(
+        plan_id="p1",
+        sink={"ref": "result", "type": "hdf_chunked", "location": "/tmp/out.h5"},
+    )
+    result = output.finalize()
+
+    assert output.provisional is True
+    assert output.plan_hash == "resolved"
+    assert result["status"] == "complete"
+    assert json.loads(transport.calls[2]["data"]) == {"plan_hash": "resolved"}

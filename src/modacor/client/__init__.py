@@ -2,15 +2,13 @@
 
 """Synchronous clients for the MoDaCor runtime service."""
 
+from .buffer import BufferClient, SinkBufferClient, SourceBufferClient
+from .chunked import ChunkedOutputHandle, ChunkedOutputsClient
+from .errors import RuntimeAPIError
 from .local_server import LocalRuntimeServer
-from .runtime import (
-    BufferClient,
-    ChunkedOutputHandle,
-    ChunkedOutputsClient,
-    RuntimeAPIError,
-    RuntimeClient,
-    SessionClient,
-)
+from .runtime import RuntimeClient
+from .session import SessionClient
+from .transport import RuntimeTransport
 
 __all__ = [
     "BufferClient",
@@ -19,5 +17,8 @@ __all__ = [
     "LocalRuntimeServer",
     "RuntimeAPIError",
     "RuntimeClient",
+    "RuntimeTransport",
     "SessionClient",
+    "SinkBufferClient",
+    "SourceBufferClient",
 ]
