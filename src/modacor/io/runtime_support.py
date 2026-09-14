@@ -13,6 +13,7 @@ from modacor.io.buffer.buffer_source import BufferSource
 from modacor.io.buffer.runtime_buffer_store import RuntimeBufferStore
 from modacor.io.csv.csv_sink import CSVSink
 from modacor.io.csv.csv_source import CSVSource
+from modacor.io.hdf.hdf_chunked_processing_sink import HDFChunkedProcessingSink
 from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 from modacor.io.hdf.hdf_source import HDFSource
 from modacor.io.io_sinks import IoSinks
@@ -169,6 +170,7 @@ def build_sink_from_spec(
         "buffer": BufferSink,
         "csv": CSVSink,
         "hdf": HDFProcessingSink,
+        "hdf_chunked": HDFChunkedProcessingSink,
         "hdf_processing": HDFProcessingSink,
         "tiled": TiledSink,
         "plotly": PlotlyJSONSink,

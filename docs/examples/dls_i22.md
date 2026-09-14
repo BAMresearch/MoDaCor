@@ -1,9 +1,10 @@
 # DLS I22 notebook server pattern
 
 This example shows how a notebook can drive the MoDaCor runtime service for a
-DLS I22 operando SAXS/WAXS series. The full working notebook is a workspace
-artifact, not a file shipped by the MoDaCor repository, so the snippets below
-are reduced patterns with neutral paths.
+DLS I22 operando SAXS/WAXS series. Instrument implementations now live in the
+separate `MoDaCor_examples` repository; the canonical working notebook is
+`DLS/I22/I22_solids_server_operando_preprocessed.ipynb` there. The snippets
+below remain reduced patterns with neutral paths.
 
 Use this workflow when many similar measurements should reuse server-side
 session state: the first sample runs in `full` mode, later samples update only

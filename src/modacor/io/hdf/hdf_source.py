@@ -36,22 +36,6 @@ else:
     _HDF5PLUGIN_IMPORT_ERROR = None
 
 
-def _slice_cache_key(load_slice: ArraySlice) -> Any:
-    if load_slice is Ellipsis:
-        return ("ellipsis",)
-    if load_slice is None:
-        return ("none",)
-    if isinstance(load_slice, slice):
-        return ("slice", load_slice.start, load_slice.stop, load_slice.step)
-    if isinstance(load_slice, tuple):
-        return tuple(_slice_cache_key(item) for item in load_slice)
-    try:
-        hash(load_slice)
-    except TypeError:
-        return repr(load_slice)
-    return load_slice
-
-
 def _decode_hdf_value(value: Any) -> Any:
     if isinstance(value, (bytes, np.bytes_)):
         return value.decode("utf-8")
@@ -142,25 +126,54 @@ class HDFSource(IoSource):
         return self._static_metadata_cache[data_key]
 
     def get_data(self, data_key: str, load_slice: ArraySlice = ...) -> np.ndarray:
-        cache_key = (data_key, _slice_cache_key(load_slice))
-        if cache_key not in self._data_cache:
+        # Cache only complete-array reads. Explicit slices are commonly used for
+        # streaming large datasets and retaining every distinct slice would make
+        # memory consumption grow with the total dataset size.
+        if load_slice is not Ellipsis and load_slice is not None:
             try:
                 with h5py.File(self._file_path, "r") as f:
-                    data_array = f[data_key][load_slice]  # if load_slice is not None else f[data_key][()]
-                    self._data_cache[cache_key] = np.array(data_array)
+                    return np.array(f[data_key][load_slice])
             except OSError as error:
                 _raise_hdf5_read_error(error)
-        return np.array(self._data_cache[cache_key], copy=True)
+
+        if data_key not in self._data_cache:
+            try:
+                with h5py.File(self._file_path, "r") as f:
+                    self._data_cache[data_key] = np.array(f[data_key][...])
+            except OSError as error:
+                _raise_hdf5_read_error(error)
+        return np.array(self._data_cache[data_key], copy=True)
 
     def get_data_shape(self, data_key: str) -> tuple[int, ...]:
-        if data_key in self._file_datasets_shapes:
-            return self._file_datasets_shapes[data_key]
+        normalized_key = str(data_key).strip().lstrip("/")
+        self._load_dataset_structure(normalized_key)
+        if normalized_key in self._file_datasets_shapes:
+            return self._file_datasets_shapes[normalized_key]
         return ()
 
     def get_data_dtype(self, data_key: str) -> np.dtype | None:
-        if data_key in self._file_datasets_dtypes:
-            return self._file_datasets_dtypes[data_key]
+        normalized_key = str(data_key).strip().lstrip("/")
+        self._load_dataset_structure(normalized_key)
+        if normalized_key in self._file_datasets_dtypes:
+            return self._file_datasets_dtypes[normalized_key]
         return None
+
+    def _load_dataset_structure(self, normalized_key: str) -> None:
+        """Resolve structure lazily for datasets reached through external links."""
+
+        if normalized_key in self._file_datasets_shapes:
+            return
+        try:
+            with h5py.File(self._file_path, "r") as hdf_file:
+                try:
+                    dataset = hdf_file[normalized_key]
+                except KeyError:
+                    return
+                if isinstance(dataset, h5py.Dataset):
+                    self._file_datasets_shapes[normalized_key] = dataset.shape
+                    self._file_datasets_dtypes[normalized_key] = dataset.dtype
+        except OSError as error:
+            _raise_hdf5_read_error(error)
 
     def get_data_attributes(self, data_key: str) -> dict[str, Any]:
         attributes = {}

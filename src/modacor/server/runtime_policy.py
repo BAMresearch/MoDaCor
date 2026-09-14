@@ -14,7 +14,7 @@ __all__ = ["RuntimePolicy"]
 
 
 _FILE_SOURCE_TYPES = {"csv", "hdf", "yaml"}
-_FILE_SINK_TYPES = {"csv", "hdf", "hdf_processing"}
+_FILE_SINK_TYPES = {"csv", "hdf", "hdf_chunked", "hdf_processing"}
 
 
 def _normalise_roots(roots: tuple[Path | str, ...]) -> tuple[Path, ...]:

@@ -96,6 +96,9 @@ class TraceEvent:
     # wall-clock runtime for this step execution (seconds)
     duration_s: float | None = field(default=None, validator=validators.optional(validators.instance_of(float)))
 
+    # Compact run-envelope identity; never contains array payloads or the full plan.
+    chunk_identity: dict[str, Any] | None = None
+
     def __attrs_post_init__(self) -> None:
         object.__setattr__(self, "config_hash", _stable_hash_dict(self.config))
 
@@ -103,7 +106,7 @@ class TraceEvent:
         """
         JSON-serializable representation suitable for Pipeline.to_spec().
         """
-        return {
+        payload = {
             "step_id": self.step_id,
             "module": self.module,
             "label": self.label,
@@ -116,3 +119,6 @@ class TraceEvent:
             "datasets": _to_jsonable(self.datasets),
             "messages": _to_jsonable(self.messages),
         }
+        if self.chunk_identity is not None:
+            payload["chunk_identity"] = _to_jsonable(self.chunk_identity)
+        return payload

@@ -46,6 +46,17 @@ class IndexSource(IoSource):
         return key
 
 
+class SliceRecordingSource(IoSource):
+    type_reference = "slice_recording_source"
+
+    def get_data(self, data_key, load_slice=...):
+        self.configuration["last_slice"] = load_slice
+        values = self.configuration["values"]
+        if load_slice is None or load_slice is Ellipsis:
+            return values
+        return values[load_slice]
+
+
 @pytest.fixture
 def io_sources():
     return IoSources()
@@ -113,6 +124,22 @@ def test_split_data_reference__valid(io_sources, ref):
     source_ref, data_key = io_sources.split_data_reference(ref)
     assert source_ref == "test"
     assert data_key == ref.lstrip("test::")
+
+
+def test_bound_data_slice_is_applied_once(io_sources):
+    source = SliceRecordingSource(source_reference="sample")
+    source.configuration["values"] = np.arange(24).reshape(2, 3, 4)
+    source.configuration["last_slice"] = None
+    io_sources.register_source(source)
+    bound_slice = (slice(None), slice(1, 3), slice(None))
+    io_sources.set_data_slice_bindings({"sample::entry/data": bound_slice})
+
+    result = io_sources.get_data("sample::/entry/data")
+
+    np.testing.assert_array_equal(result, source.configuration["values"][:, 1:3, :])
+    assert source.configuration["last_slice"] == bound_slice
+    with pytest.raises(ValueError, match="both a bound and an explicit slice"):
+        io_sources.get_data("sample::/entry/data", load_slice=slice(0, 1))
 
 
 if __name__ == "__main__":

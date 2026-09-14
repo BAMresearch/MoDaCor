@@ -14,6 +14,7 @@ tags:
   - name: Sinks
   - name: Processing
   - name: Runs
+  - name: Chunked Outputs
 
 paths:
   /health:
@@ -60,6 +61,112 @@ paths:
                     type: object
                     additionalProperties:
                       type: object
+
+  /chunked-outputs:
+    post:
+      tags: [Chunked Outputs]
+      summary: Initialize a server-managed chunked output
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitializeChunkedOutputRequest"
+      responses:
+        "201":
+          description: Output initialized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChunkedOutputStatus"
+
+  /chunked-outputs/reopen:
+    post:
+      tags: [Chunked Outputs]
+      summary: Reconstruct an output handle from a persistent manifest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReopenChunkedOutputRequest"
+      responses:
+        "201":
+          description: Output handle reconstructed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChunkedOutputStatus"
+
+  /chunked-outputs/{output_id}:
+    parameters:
+      - $ref: "#/components/parameters/OutputId"
+    get:
+      tags: [Chunked Outputs]
+      summary: Inspect the authoritative chunk manifest
+      parameters:
+        - name: offset
+          in: query
+          schema: {type: integer, minimum: 0, default: 0}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, default: 100}
+      responses:
+        "200":
+          description: Current output status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChunkedOutputStatus"
+    delete:
+      tags: [Chunked Outputs]
+      summary: Detach the process-local handle without deleting backend data
+      responses:
+        "204":
+          description: Handle detached
+
+  /chunked-outputs/{output_id}/recover:
+    parameters:
+      - $ref: "#/components/parameters/OutputId"
+    post:
+      tags: [Chunked Outputs]
+      summary: Reconcile, abandon, or resume an incomplete assembly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoverChunkedOutputRequest"
+      responses:
+        "200":
+          description: Recovery action applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChunkedOutputStatus"
+        "409":
+          description: Recovery action is invalid for the current state
+
+  /chunked-outputs/{output_id}/finalize:
+    parameters:
+      - $ref: "#/components/parameters/OutputId"
+    post:
+      tags: [Chunked Outputs]
+      summary: Validate and publish a completed chunked output
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_hash]
+              properties:
+                plan_hash: {type: string}
+      responses:
+        "200":
+          description: Output finalized, or already complete
+        "409":
+          description: Plan mismatch or incomplete output
 
   /sessions:
     get:
@@ -545,6 +652,12 @@ paths:
 
 components:
   parameters:
+    OutputId:
+      name: output_id
+      in: path
+      required: true
+      schema:
+        type: string
     SessionId:
       name: session_id
       in: path
@@ -666,12 +779,111 @@ components:
           type: string
         type:
           type: string
-          enum: [csv, hdf, hdf_processing, custom]
+          enum: [csv, hdf, hdf_chunked, hdf_processing, custom]
         location:
           type: string
         kwargs:
           type: object
           additionalProperties: true
+
+    InitializeChunkedOutputRequest:
+      type: object
+      required: [subpath]
+      properties:
+        sink:
+          $ref: "#/components/schemas/SinkRegistration"
+        session_id:
+          type: string
+        sink_ref:
+          type: string
+        subpath:
+          type: string
+        collision:
+          type: string
+          enum: [error, resume, replace]
+          default: error
+        plan:
+          type: object
+          description: Complete serialized ChunkPlan, including its declared output layouts.
+          additionalProperties: true
+        provisional_plan:
+          type: object
+          description: ProvisionalChunkPlan for source discovery and pilot output-schema resolution.
+          additionalProperties: true
+      allOf:
+        - oneOf:
+            - required: [sink]
+            - required: [session_id, sink_ref]
+        - oneOf:
+            - required: [plan]
+            - required: [provisional_plan, session_id]
+
+    ReopenChunkedOutputRequest:
+      type: object
+      required: [plan_id]
+      properties:
+        sink:
+          $ref: "#/components/schemas/SinkRegistration"
+        session_id:
+          type: string
+        sink_ref:
+          type: string
+        plan_id:
+          type: string
+        plan_hash:
+          type: string
+      oneOf:
+        - required: [sink]
+        - required: [session_id, sink_ref]
+
+    RecoverChunkedOutputRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [reconcile, abandon, resume]
+
+    ChunkedOutputStatus:
+      type: object
+      required: [output_id, status, plan_id, plan_hash, expected_chunks, completed_chunks]
+      properties:
+        output_id: {type: string}
+        status: {type: string}
+        plan_id: {type: string}
+        plan_hash: {type: string}
+        provisional_hash: {type: string}
+        resolution_hash: {type: string}
+        pilot_chunk_id: {type: string}
+        expected_chunks: {type: integer, minimum: 1}
+        completed_chunks: {type: integer, minimum: 0}
+        writing_chunks: {type: integer, minimum: 0}
+        failed_chunks: {type: integer, minimum: 0}
+        missing_chunks: {type: integer, minimum: 0}
+        chunks:
+          type: array
+          items:
+            type: object
+            properties:
+              chunk_id: {type: string}
+              ordinal: {type: integer, minimum: 0}
+              status: {type: string}
+
+    ChunkPublishRequest:
+      type: object
+      required: [output_id]
+      properties:
+        output_id: {type: string}
+        chunk_id:
+          type: string
+          description: Server-managed work id for a provisional or resolved provisional plan.
+        chunk_spec:
+          type: object
+          description: Complete serialized ChunkSpec for this run.
+          additionalProperties: true
+      oneOf:
+        - required: [chunk_id]
+        - required: [chunk_spec]
 
     UpsertSourcesRequest:
       type: object
@@ -726,6 +938,8 @@ components:
           type: string
         write_hdf:
           $ref: "#/components/schemas/WriteHdfRequest"
+        chunk_output:
+          $ref: "#/components/schemas/ChunkPublishRequest"
 
     ResetRequest:
       type: object

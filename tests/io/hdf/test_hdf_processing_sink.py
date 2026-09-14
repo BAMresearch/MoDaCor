@@ -18,7 +18,7 @@ import h5py
 import numpy as np
 import pytest
 
-from modacor import ureg
+from modacor import __version__, ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
@@ -142,6 +142,8 @@ def test_hdf_processing_sink_writes_result_and_metadata(
         assert _read_text_dataset(h5["processing"], "run") == "run1"
         assert _read_text_dataset(h5["processing"], "title") == "MoDaCor processing result run1"
         assert _read_text_dataset(h5["processing"], "program_name") == "MoDaCor"
+        assert _read_text_dataset(h5["processing"], "program_version") == __version__
+        assert h5["processing/result/run1"].attrs["modacor_version"] == __version__
         assert _resolve_default_nxdata(h5).name == "/processing/result/run1/sample/signal"
         assert _resolve_default_nxdata(h5).attrs["signal"] == "signal"
         _assert_utf8_string_attr(h5, "default")

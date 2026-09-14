@@ -18,6 +18,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.buffer import BufferSink, BufferSource, RuntimeBufferStore
 from modacor.io.csv.csv_sink import CSVSink
+from modacor.io.hdf.hdf_chunked_processing_sink import HDFChunkedProcessingSink
 from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 from modacor.io.io_sink import IoSink
 from modacor.io.runtime_support import build_sinks_from_specs, build_sources_from_specs, write_processing_data_hdf
@@ -67,6 +68,27 @@ def test_build_sinks_from_specs_builds_hdf_processing_sink(tmp_path: Path):
 
     sink = sinks.get_sink("export_hdf")
     assert isinstance(sink, HDFProcessingSink)
+    assert sink.resource_location == out_file
+    assert sink.iosink_method_kwargs == {"compression": "gzip"}
+
+
+def test_build_sinks_from_specs_builds_hdf_chunked_sink(tmp_path: Path):
+    out_file = tmp_path / "chunked.h5"
+
+    sinks = build_sinks_from_specs(
+        [
+            {
+                "ref": "export_chunks",
+                "type": "hdf_chunked",
+                "location": out_file,
+                "kwargs": {"compression": "gzip"},
+            }
+        ]
+    )
+
+    sink = sinks.get_sink("export_chunks")
+    assert isinstance(sink, HDFChunkedProcessingSink)
+    assert sink.supports_chunked_writes is True
     assert sink.resource_location == out_file
     assert sink.iosink_method_kwargs == {"compression": "gzip"}
 

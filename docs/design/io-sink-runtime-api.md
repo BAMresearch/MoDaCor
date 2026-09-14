@@ -77,8 +77,15 @@ Built-in sink types:
 
 - `csv` -> `modacor.io.csv.csv_sink.CSVSink`
 - `hdf` -> `modacor.io.hdf.hdf_processing_sink.HDFProcessingSink`
+- `hdf_chunked` -> `modacor.io.hdf.hdf_chunked_processing_sink.HDFChunkedProcessingSink`
 - `hdf_processing` -> `HDFProcessingSink` alias for clarity
 - `custom` -> class selected by `kwargs.class_path`
+
+The runtime builder can construct `hdf_chunked`, but the ordinary process and
+`SinkProcessingData` paths do not drive its three-operation lifecycle. Server
+endpoints for chunked-output initialization, per-run publication, inspection,
+and finalization remain part of Phase 4 in
+`docs/design/chunked-sink-implementation-plan.md`.
 
 For custom sinks, mirror custom source behavior: `kwargs.class_path` is consumed
 as the fully qualified import path, and the remaining kwargs are forwarded as

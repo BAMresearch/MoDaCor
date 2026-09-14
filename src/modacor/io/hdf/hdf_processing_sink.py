@@ -21,6 +21,7 @@ import h5py
 import numpy as np
 from attrs import define, field, validators
 
+from modacor import __version__
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.processing_data import ProcessingData
@@ -52,6 +53,18 @@ def _compression_for_data(data: Any, compression: str | None) -> str | None:
 
 def _as_hdf_str_list(values: Sequence[str]) -> np.ndarray:
     return np.asarray([str(value) for value in values], dtype=h5py.string_dtype(encoding="utf-8"))
+
+
+def _set_array_metadata(
+    dataset: h5py.Dataset,
+    *,
+    units: str | None = None,
+    rank_of_data: int | None = None,
+) -> None:
+    if units is not None:
+        dataset.attrs["units"] = str(units)
+    if rank_of_data is not None:
+        dataset.attrs["rank_of_data"] = int(rank_of_data)
 
 
 def _find_basedata_name(databundle: Any, axis: BaseData | None) -> str | None:
@@ -121,8 +134,11 @@ def _write_axis_fields(
             data=axis_basedata.signal,
             compression=_compression_for_data(axis_basedata.signal, compression),
         )
-        axis_dataset.attrs["units"] = str(axis_basedata.units)
-        axis_dataset.attrs["rank_of_data"] = int(axis_basedata.rank_of_data)
+        _set_array_metadata(
+            axis_dataset,
+            units=str(axis_basedata.units),
+            rank_of_data=axis_basedata.rank_of_data,
+        )
         written_axis_names.add(axis_name)
 
 
@@ -139,8 +155,11 @@ def _write_basedata(
         data=basedata.signal,
         compression=_compression_for_data(basedata.signal, compression),
     )
-    signal_dataset.attrs["units"] = str(basedata.units)
-    signal_dataset.attrs["rank_of_data"] = int(basedata.rank_of_data)
+    _set_array_metadata(
+        signal_dataset,
+        units=str(basedata.units),
+        rank_of_data=basedata.rank_of_data,
+    )
 
     if databundle is not None and basedata_name is not None and _is_plot_basedata(databundle, basedata_name):
         axis_names = _infer_axis_names(databundle, basedata)
@@ -170,7 +189,7 @@ def _write_basedata(
                 data=values,
                 compression=_compression_for_data(values, compression),
             )
-            dset.attrs["units"] = str(basedata.units)
+            _set_array_metadata(dset, units=str(basedata.units))
 
 
 def _json_ready(value: Any) -> Any:
@@ -544,6 +563,7 @@ def _set_nexus_default_chain(
     _write_text_field(processing_group, "run", run_name)
     _write_text_field(processing_group, "title", f"MoDaCor processing result {run_name}")
     _write_text_field(processing_group, "program_name", "MoDaCor")
+    _write_text_field(processing_group, "program_version", __version__)
 
     result_root = processing_group["result"]
     result_root.attrs["NX_class"] = "NXcollection"
@@ -552,6 +572,7 @@ def _set_nexus_default_chain(
     run_result_group = result_root[run_name]
     run_result_group.attrs["NX_class"] = "NXcollection"
     run_result_group.attrs["default"] = bundle_key
+    run_result_group.attrs["modacor_version"] = __version__
 
     bundle_group = run_result_group[bundle_key]
     bundle_group.attrs["NX_class"] = "NXcollection"

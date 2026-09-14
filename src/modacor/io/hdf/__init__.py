@@ -26,6 +26,7 @@ __license__ = "BSD-3-Clause"
 __copyright__ = "Copyright 2025 MoDaCor Authors"
 __status__ = "Alpha"
 
-__all__ = ["HDFProcessingSink"]
+__all__ = ["HDFChunkedProcessingSink", "HDFProcessingSink"]
 
+from .hdf_chunked_processing_sink import HDFChunkedProcessingSink
 from .hdf_processing_sink import HDFProcessingSink

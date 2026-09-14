@@ -12,6 +12,7 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.processing_data import ProcessingData
+from modacor.io.chunking import AxisSelector, ChunkArrayLayout, ChunkOutputLayout, ChunkPlacement, ChunkPlan, ChunkSpec
 from modacor.runner.pipeline import Pipeline
 from modacor.runner.pipeline_runner import PipelineRunError, run_pipeline_job
 
@@ -52,6 +53,50 @@ def test_run_pipeline_job_executes_and_traces():
     assert result.tracer is not None
     assert "s1" in result.pipeline.trace_events
     assert "s2" in result.pipeline.trace_events
+
+
+def test_run_pipeline_job_carries_chunk_identity_into_result_and_trace():
+    plan = ChunkPlan(
+        schema_version="1.0",
+        plan_id="trace-plan",
+        total_chunks=1,
+        expected_chunk_ids=("c0",),
+        outputs=(
+            ChunkOutputLayout(
+                output_id="signal",
+                processing_path="/sample/signal",
+                destination_path="sample/signal",
+                units="dimensionless",
+                rank_of_data=1,
+                arrays=(ChunkArrayLayout(component="signal", final_shape=(1,), dtype="float64"),),
+            ),
+        ),
+    )
+    chunk = ChunkSpec(
+        schema_version=plan.schema_version,
+        plan_id=plan.plan_id,
+        plan_hash=plan.plan_hash,
+        chunk_id="c0",
+        ordinal=0,
+        grid_index=(0,),
+        source_selection=(AxisSelector.all(),),
+        expected_input_shape=(1,),
+        placements=(
+            ChunkPlacement(
+                output_id="signal",
+                destination_selection=(AxisSelector.all(),),
+                expected_shape=(1,),
+            ),
+        ),
+    )
+    step = SeedSignal(step_id="seed")
+
+    result = run_pipeline_job(Pipeline.from_dict({step: set()}), trace=True, chunk_spec=chunk)
+
+    assert result.chunk_spec is chunk
+    event = result.pipeline.trace_events["seed"][0].to_dict()
+    assert event["chunk_identity"] == chunk.identity_dict()
+    assert "placements" not in event["chunk_identity"]
 
 
 def test_run_pipeline_job_can_reuse_pipeline_instance_without_scheduler_reset():

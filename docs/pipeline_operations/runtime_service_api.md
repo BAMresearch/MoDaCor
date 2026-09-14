@@ -17,6 +17,8 @@ The first structural refactor tranche between `U6` and `U8` is now in place:
 - `src/modacor/server/runtime_service.py` owns session orchestration and run lifecycle behavior.
 - `src/modacor/server/planning.py` owns dry-run planning and dirty-step calculations.
 - `src/modacor/server/io_utils.py` adapts session source/sink registrations into runtime IO objects.
+- `src/modacor/server/chunked_outputs.py` owns server-level output registrations
+  and storage-target locks independently of worker sessions.
 - `src/modacor/server/errors.py` defines framework-neutral service exceptions.
 - `src/modacor/io/runtime_support.py` provides shared source/sink builders and HDF export handling for both the CLI and runtime service.
 
@@ -65,7 +67,7 @@ This preserves flexibility for pipelines with 2 to 6+ source files.
 Sinks are dynamic output targets bound to stable refs:
 
 - `sink_ref` (e.g. `export_csv`, `export_hdf`)
-- `type` (e.g. `csv`, `hdf`, `hdf_processing`, `custom`)
+- `type` (e.g. `csv`, `hdf`, `hdf_chunked`, `hdf_processing`, `custom`)
 - `resource_location` (path/URI)
 - optional constructor kwargs
 
@@ -347,10 +349,106 @@ Request:
 
 Response includes accepted refs and the current sink map.
 
-In restricted runtime policy, file-backed sink locations (`csv`, `hdf`, and
-`hdf_processing`) must resolve under one of the configured `--write-root`
+In restricted runtime policy, file-backed sink locations (`csv`, `hdf`,
+`hdf_chunked`, and `hdf_processing`) must resolve under one of the configured `--write-root`
 directories. Custom sinks using `kwargs.class_path` are rejected; use built-in
 sink types or a programmatically registered `kwargs.class_alias`.
+
+The server supports `hdf_chunked` through a separate server-level output
+resource. Ordinary process requests remain unchanged; requests that include
+`chunk_output` publish the successful in-memory result through that resource.
+
+## Chunked outputs
+
+`POST /chunked-outputs` initializes either a complete declared `ChunkPlan` or a
+`ProvisionalChunkPlan` and returns an opaque `output_id`. A complete request may
+contain a complete sink registration:
+
+```json
+{
+  "sink": {
+    "ref": "assembled",
+    "type": "hdf_chunked",
+    "location": "/data/out/assembled.h5"
+  },
+  "subpath": "run1",
+  "collision": "error",
+  "plan": {"schema_version": "1.0", "plan_id": "scan-42", "...": "..."}
+}
+```
+
+For server-discovered input extents and pilot-discovered output schema, send
+`provisional_plan` instead of `plan` and include the worker `session_id` so the
+server can inspect its registered driver source:
+
+```json
+{
+  "session_id": "i22-worker",
+  "sink": {
+    "ref": "assembled",
+    "type": "hdf_chunked",
+    "location": "/data/out/assembled.h5"
+  },
+  "subpath": "saxs",
+  "provisional_plan": {
+    "schema_version": "1.0",
+    "plan_id": "i22-saxs",
+    "driver": {"source": "raw::/entry/data", "rank_of_data": 2},
+    "axis_rules": [
+      {"axis": 0, "chunk_size": 1},
+      {"axis": 1, "chunk_size": 10}
+    ],
+    "outputs": [
+      {
+        "output_id": "reduced",
+        "processing_path": "/sample/I",
+        "destination_path": "sample/I"
+      }
+    ]
+  }
+}
+```
+
+The response status is `awaiting_schema` and includes `provisional_hash`,
+`resolution_hash`, `expected_chunks`, and `pilot_chunk_id`. Submit work using
+`{"chunk_output": {"output_id": "...", "chunk_id": "c000000"}}`. The pilot
+response contains the resolved final `plan_hash`; later chunks use the same
+compact `chunk_id` form. Both provisional and resolved resources can be
+reopened from HDF5 after a server restart.
+
+For convenience, `session_id` and `sink_ref` may replace `sink`; the
+registration is copied at initialization and thereafter belongs to the output
+resource. `GET /chunked-outputs/{output_id}` reads authoritative manifest
+counts and accepts `offset` and `limit` for chunk-entry pagination.
+
+For direct source reads, the plan may include `source_bindings`. Each binding
+identifies an exact registered source and dataset with role `aligned`, `static`,
+or `explicit`. When a process request supplies a chunk for that output, the
+server projects its `source_selection` onto the bound HDF5 or Tiled datasets.
+Explicit bindings provide one `axis_map` entry per source axis, using a driver
+axis number or `null` for a complete source axis. Buffer sources must omit these
+executable bindings because uploaded arrays are already sliced. The complete
+contract and examples are in [Chunked Operation](../design/chunked-operation.md).
+
+`POST /chunked-outputs/{output_id}/finalize` takes `{"plan_hash":
+"sha256:..."}`. Missing chunks or a hash mismatch return `409`; repeating a
+successful finalization with the same hash is idempotent.
+
+Output ids are held in server memory, while the plan, run subpath, manifest,
+and staged pipeline provenance are persisted in the backend. After a restart,
+`POST /chunked-outputs/reopen` accepts a sink registration, `plan_id`, and
+optional `plan_hash`, validates the stored layout, and returns a new output id.
+It does not require the original worker session or a copy of the complete plan.
+The `session_id` plus `sink_ref` convenience form is also accepted when that
+session is still present, but an explicit sink registration is the
+restart-independent form.
+
+`POST /chunked-outputs/{output_id}/recover` accepts `reconcile`, `abandon`, or
+`resume`. Reconciliation marks stale `writing` entries as retryable `failed`
+entries and returns an interrupted finalization to `writing`. Deleting an
+output id only detaches the server mapping; it never deletes backend content.
+The complete recovery runbook is in
+[Chunked Beamline Validation](../design/chunked-beamline-validation.md).
 
 ### `POST /sessions/{session_id}/sinks/patch`
 
@@ -408,6 +506,10 @@ Request:
     "path": "/data/out/sample_2026_03_13_153045.h5",
     "write_all_processing_data": true,
     "data_paths": []
+  },
+  "chunk_output": {
+    "output_id": "out-8c57c4",
+    "chunk_spec": {"plan_id": "scan-42", "chunk_id": "c000017", "...": "..."}
   }
 }
 ```
@@ -423,6 +525,13 @@ Notes:
 - `changed_sources` or `changed_keys` is required for `partial`; both are optional for `auto`.
 - `changed_keys` enables key-aware invalidation (e.g. `sample.signal`, `sample.Q`) for tighter partial reruns.
 - `write_hdf` is optional; if provided, pipeline spec/yaml and trace are persisted.
+- `chunk_output` is optional. When present, the server passes the successful
+  run's `ProcessingData` to the initialized output and only responds with
+  success after the chunk manifest has been flushed. Publication failures use
+  `CHUNK_WRITE_FAILED` and are distinct from pipeline failures.
+- A plan's non-static `source_bindings` automatically add their source
+  references to partial-run invalidation. Callers do not need to repeat those
+  references in `changed_sources`.
 - In restricted runtime policy, `write_hdf.path` must resolve under one of the
   configured `--write-root` directories.
 - Full per-step `ProcessingData` snapshots are opt-in through the session trace
