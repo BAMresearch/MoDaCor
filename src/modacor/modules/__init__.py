@@ -35,6 +35,7 @@ from modacor.modules.base_modules.subtract import Subtract
 from modacor.modules.base_modules.subtract_databundles import SubtractDatabundles
 from modacor.modules.base_modules.threshold_mask import ThresholdMask
 from modacor.modules.base_modules.units_label_update import UnitsLabelUpdate
+from modacor.modules.instrument_modules.DLS.B21.b21_frame_quality_filter import B21FrameQualityFilter
 from modacor.modules.technique_modules.scattering.attenuator_plate_correction import AttenuatorPlateCorrection
 from modacor.modules.technique_modules.scattering.capillary_sample_container_correction import (
     CapillarySampleContainerCorrection,
@@ -46,6 +47,7 @@ from modacor.modules.technique_modules.scattering.detector_efficiency_correction
 from modacor.modules.technique_modules.scattering.flat_plate_self_absorption_correction import (
     FlatPlateSelfAbsorptionCorrection,
 )
+from modacor.modules.technique_modules.scattering.framewise_indexed_averager import FramewiseIndexedAverager
 from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
 from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
@@ -62,6 +64,7 @@ __all__ = [
     "AttenuatorPlateCorrection",
     "ApplyMask",
     "BitwiseOrMasks",
+    "B21FrameQualityFilter",
     "CapillarySelfAbsorptionCorrection",
     "CapillarySampleContainerCorrection",
     "CombineUncertainties",
@@ -74,6 +77,7 @@ __all__ = [
     "IndexPixels",
     "IndexedAverager",
     "FindScaleFactor1D",
+    "FramewiseIndexedAverager",
     "Multiply",
     "MultiplyDatabundles",
     "PixelCoordinates3D",
