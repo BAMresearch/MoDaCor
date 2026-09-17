@@ -11,6 +11,7 @@ api-buffer-source-sink
 io-sink-runtime-api
 pixel-unit-removal
 architecture-upgrade-plan
+future-package-architecture
 tiled-io-upgrade
 chunked-processing-handoff
 chunked-operation
