@@ -7,11 +7,11 @@ from __future__ import annotations
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw"]
 __copyright__ = "Copyright 2026, The MoDaCor team"
-__date__ = "02/09/2026"
+__date__ = "23/09/2026"
 __status__ = "Development"
 
 __all__ = ["ReduceMask"]
-__version__ = "20260902.1"
+__version__ = "20260923.1"
 
 from pathlib import Path
 from typing import Any
@@ -23,6 +23,7 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.modules.helpers import leading_non_data_axes
 
 
 class ReduceMask(ProcessStep):
@@ -53,9 +54,12 @@ class ReduceMask(ProcessStep):
                 "doc": "BaseData key for the reduced mask output.",
             },
             "axes": {
-                "type": (int, list, tuple, type(None)),
+                "type": (int, list, tuple, str, type(None)),
                 "default": None,
-                "doc": "Axis or axes to reduce. Use None to reduce all axes.",
+                "doc": (
+                    "Axis or axes to reduce. Use None to reduce all axes, or 'non_data' to reduce every "
+                    "leading axis before the final rank_of_data axes."
+                ),
             },
             "reduction": {
                 "type": str,
@@ -89,6 +93,15 @@ class ReduceMask(ProcessStep):
         if len(set(normalized)) != len(normalized):
             raise ValueError(f"ReduceMask axes must not contain duplicates: {axes_tuple!r}.")
         return normalized
+
+    @staticmethod
+    def _resolve_axes(axes: Any, mask: BaseData) -> tuple[int, ...]:
+        if isinstance(axes, str):
+            mode = axes.strip().lower()
+            if mode != "non_data":
+                raise ValueError("ReduceMask axes string must be 'non_data'.")
+            return leading_non_data_axes(mask.signal.ndim, mask.rank_of_data)
+        return ReduceMask._normalize_axes(axes, mask.signal.ndim)
 
     @staticmethod
     def _rank_after_reduction(mask: BaseData, reduced_axes: tuple[int, ...], new_ndim: int) -> int:
@@ -135,13 +148,18 @@ class ReduceMask(ProcessStep):
         if not np.issubdtype(source.dtype, np.integer):
             raise TypeError(f"{processing_key}::{source_key} must be an integer mask, got {source.dtype}.")
 
-        axes = self._normalize_axes(self.configuration.get("axes"), source.ndim)
+        axes = self._resolve_axes(self.configuration.get("axes"), source_mask)
         reduced = self._reduce(source, axes, reduction)
+        output_axes = (
+            [axis for index, axis in enumerate(source_mask.axes) if index not in set(axes)]
+            if len(source_mask.axes) == source.ndim
+            else []
+        )
         bundle[target_key] = BaseData(
             signal=reduced,
             units=ureg.dimensionless,
             uncertainties={},
-            axes=[],
+            axes=output_axes,
             rank_of_data=self._rank_after_reduction(source_mask, axes, reduced.ndim),
         )
         return {processing_key: bundle}

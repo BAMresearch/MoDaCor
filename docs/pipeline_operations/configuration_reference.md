@@ -226,6 +226,30 @@ For dynamic detector data, keep the dimensionality semantics explicit:
 mean/sum reductions. It is not a replacement for `ReduceMask`, because numeric
 averaging does not preserve integer mask bitfields.
 
+Both modules accept `axes: non_data` to derive the leading reduction axes from
+`BaseData.rank_of_data`. MoDaCor treats the final `rank_of_data` dimensions as
+data dimensions, so a signal shaped `(frames, singleton, y, x)` with
+`rank_of_data: 2` is reduced over axes `(0, 1)`. Data already at its declared
+rank is left unchanged.
+
+```yaml
+steps:
+  average_frames:
+    module: ReduceDimensionality
+    configuration:
+      with_processing_keys: [sample]
+      axes: non_data
+      reduction: mean
+  reduce_frame_mask:
+    module: ReduceMask
+    configuration:
+      with_processing_keys: [sample]
+      source_mask_key: threshold_mask
+      target_mask_key: threshold_mask
+      axes: non_data
+      reduction: any
+```
+
 When `ApplyMask` is used to replace masked signal values, `masked_value`
 defaults to `nan`. Explicit sentinel values remain available:
 
