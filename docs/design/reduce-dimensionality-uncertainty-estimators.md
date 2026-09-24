@@ -1,6 +1,6 @@
 # ReduceDimensionality Uncertainty-Estimator Upgrade Plan
 
-Status: proposed implementation contract; implementation not started.
+Status: implemented and verified locally on 2026-09-24.
 
 ## Goal
 
@@ -221,11 +221,12 @@ weight additionally scales the weighted sum and its uncertainty by that
 weight. The sum estimator can also be written as
 `sqrt(sum_w2 * variance)`.
 
-Estimator calculations require non-negative weights and a positive `sum_w`.
-Zero-weight observations do not participate. If an estimator is requested and
-the effective weights violate this contract, the step must raise a clear
-error. This validation applies to uncertainty estimation; changing the legacy
-signal-reduction behavior for negative weights is outside this upgrade.
+Estimator calculations require non-negative weights. Zero-weight observations
+do not participate, and an output position with no positive effective weight
+receives `NaN` estimates. If an estimator is requested and a participating
+weight is negative, the step must raise a clear error. This validation applies
+to uncertainty estimation; changing the legacy signal-reduction behavior for
+negative weights is outside this upgrade.
 
 An estimate is undefined and should be `NaN` wherever the participating count
 or `N_eff` is less than or equal to `ddof`.
@@ -270,8 +271,8 @@ Estimators operate over exactly the axes selected for the signal reduction,
 including `axes: non_data`, negative axes, axis tuples, and `axes: null`.
 
 - With `nan_policy: omit`, a signal value excluded from the mean or sum is also
-  excluded from all requested estimators. A non-finite array weight excludes
-  the same value.
+  excluded from all requested estimators. A `NaN` array weight excludes the
+  same value, matching the existing reduction mask.
 - With `nan_policy: propagate`, a non-finite participating signal or weight
   propagates to the signal result and requested estimates as it does in the
   current reduction.
@@ -281,6 +282,44 @@ including `axes: non_data`, negative axes, axis tuples, and `axes: null`.
 - When `axes: non_data` resolves to no axes, the existing true no-op behavior
   remains: the original `BaseData` object is retained and no estimator keys are
   added.
+
+## Direct mask support
+
+`ReduceDimensionality` can exclude an integer NeXus-style mask without first
+replacing signal values with `NaN`:
+
+```yaml
+mask_key: mask
+mask_bits: null
+```
+
+`mask_key: null` is the backward-compatible default and disables direct mask
+handling. When `mask_key` is configured, its `BaseData.signal` must have an
+integer dtype and be broadcast-compatible with the signal being reduced. The
+source signal and mask are not modified.
+
+With `mask_bits: null`, every nonzero mask value is excluded. `mask_bits` may
+instead be one positive uint32 bitfield value or a list/tuple of values; values
+in an iterable are combined with bitwise OR. An element is excluded when:
+
+```text
+(mask_value & selected_mask_bits) != 0
+```
+
+Explicitly masked elements receive zero effective weight for the signal
+reduction, existing-uncertainty propagation, and every scatter-derived
+estimator. They are excluded independently of `nan_policy`. Consequently, a
+masked `NaN` does not propagate when `nan_policy: propagate`, while an unmasked
+`NaN` still does.
+
+If all contributors to an output position are masked, a mean is `NaN` and a
+sum follows NumPy's empty-sum identity of zero. Scatter-derived estimators are
+`NaN` because there is no effective sample.
+
+The configured mask is an input selection and is not automatically reduced or
+replaced. Use `ReduceMask` separately when the output `DataBundle` also needs a
+mask at the reduced shape. `ApplyMask` followed by `nan_policy: omit` remains a
+supported alternative when replacing the source values is desired.
 
 ## Processing order
 
@@ -325,12 +364,35 @@ bundle.
    semantics.
 8. Increment the module version and update its descriptor text and reference
    documentation.
+9. Add optional, non-mutating `mask_key` and `mask_bits` selection and apply
+   the resulting exclusion consistently to reductions, propagated
+   uncertainties, and estimators.
 
-There are related weighted-statistics implementations in
-`IndexedAverager` and `modules.helpers.scattering.detector_data`. The new helper
-should be compared against them. Migrating those modules is not required for
-this enhancement and should happen only with equivalence tests, because their
-current edge-case behavior and defaults are part of their own contracts.
+## Shared implementation with IndexedAverager
+
+`ReduceDimensionality` and `IndexedAverager` use different grouping
+mechanisms: regular NumPy axes versus arbitrary pixel bins accumulated with
+`numpy.bincount`. That selection and accumulation code remains module-local.
+
+Their common moment-finalization code belongs in
+`modacor.modules.helpers.statistics`. Both modules should call this helper for:
+
+- effective sample size;
+- degree-of-freedom correction of weighted variance;
+- standard deviation;
+- standard error of the mean; and
+- standard error of a sum.
+
+The helper accepts already accumulated `sum_w`, `sum_w2`, and weighted squared
+deviations. It does not know about axes, bin indices, masks, Q, or circular Psi.
+This boundary lets `IndexedAverager` retain its existing population-variance
+and minimum-bin-size behavior while removing its duplicate finalization
+formula. Equivalence is protected by its existing focused tests.
+
+There is another related scalar-only implementation in
+`modules.helpers.scattering.detector_data`. Migrating that helper is outside
+this enhancement and should happen only with equivalence tests, because its
+current defaults are part of its own contract.
 
 ## Test plan
 
@@ -384,6 +446,23 @@ The upgrade is complete when:
 - `propagate` combines components in quadrature and documents the independence
   assumption;
 - mean and sum estimators are validated against the configured reduction;
+- omitted `mask_key` configuration preserves legacy behavior, while a
+  configured mask is applied consistently without mutating its inputs;
 - weighted, multi-axis, and NaN behavior is covered by focused tests; and
 - no arbitrary function import or execution is possible through estimator
   configuration.
+
+## Implementation record
+
+- Added the opt-in `uncertainty_estimation` configuration and estimator-level
+  collision-policy overrides to `ReduceDimensionality`.
+- Added `standard_deviation`, `standard_error_mean`, and
+  `standard_error_sum`, including weighted estimates and configurable `ddof`.
+- Added direct, non-mutating bitfield-mask selection through `mask_key` and
+  `mask_bits`.
+- Added the shared `modacor.modules.helpers.statistics` moment finalizer and
+  migrated `IndexedAverager` to it without changing its established results.
+- Added focused estimator, collision, configuration-validation, helper, and
+  compatibility tests.
+- Verified the complete test suite: 847 tests passed and one optional memory
+  integration test was skipped.

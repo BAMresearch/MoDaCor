@@ -232,6 +232,92 @@ data dimensions, so a signal shaped `(frames, singleton, y, x)` with
 `rank_of_data: 2` is reduced over axes `(0, 1)`. Data already at its declared
 rank is left unchanged.
 
+`ReduceDimensionality` can consume an integer mask directly without modifying
+the source signal. `mask_key` names the `BaseData` mask in the same
+`DataBundle`. By default every nonzero reason bit is excluded; `mask_bits` can
+restrict exclusion to one uint32 bitfield value or a list of values:
+
+```yaml
+steps:
+  average_frames:
+    module: ReduceDimensionality
+    configuration:
+      with_processing_keys: [sample]
+      axes: non_data
+      reduction: mean
+      mask_key: mask
+      mask_bits: [1, 4]
+      nan_policy: propagate
+```
+
+The mask must have an integer dtype and be broadcast-compatible with the
+signal. Selected elements receive zero effective weight in the signal
+reduction, propagated uncertainties, and scatter-derived estimators. Masked
+elements are omitted independently of `nan_policy`, so a masked `NaN` does not
+propagate but an unmasked `NaN` does. The source signal and mask remain
+unchanged.
+
+When every contributor to an output position is masked, a mean is `nan`, a sum
+is zero, and scatter-derived estimators are `nan`.
+
+Direct mask selection does not reduce the stored mask. Use `ReduceMask`
+separately if the output bundle needs a mask with the reduced dimensionality.
+
+The optional `uncertainty_estimation` mapping adds scatter-derived uncertainty
+components under user-selected keys. Available methods are
+`standard_deviation`, `standard_error_mean` (mean reductions), and
+`standard_error_sum` (sum reductions). `ddof` defaults to `1`.
+
+```yaml
+steps:
+  average_frames:
+    module: ReduceDimensionality
+    configuration:
+      with_processing_keys: [sample]
+      axes: non_data
+      reduction: mean
+      use_weights: true
+      nan_policy: omit
+      uncertainty_estimation:
+        collision_policy: error
+        estimators:
+          frame_STD:
+            method: standard_deviation
+            ddof: 1
+          frame_SEM:
+            method: standard_error_mean
+            ddof: 1
+```
+
+Estimator mapping keys such as `frame_STD` and `frame_SEM` are the exact output
+keys in `BaseData.uncertainties`. If a key already exists after normal
+uncertainty propagation, `collision_policy` may be `error` (the default),
+`overwrite_existing`, `keep_existing`, or `propagate`. Here, *existing* means
+the uncertainty already present at the reduced output shape. `propagate`
+combines the existing and estimated components in quadrature and therefore
+assumes that they are independent. An individual estimator may override the
+enclosing collision policy.
+
+For a sum reduction, `standard_error_sum` estimates uncertainty of the sum
+from contributor scatter. `standard_deviation` remains available but describes
+the scatter of the contributing values rather than uncertainty of the sum:
+
+```yaml
+uncertainty_estimation:
+  collision_policy: error
+  estimators:
+    summed_repeatability:
+      method: standard_error_sum
+      ddof: 1
+```
+
+These estimates are distinct from propagation of uncertainty components
+already attached to the input. Known per-value uncertainties, including
+Poisson uncertainties, are normally best attached before reduction and allowed
+to propagate through the existing mean or sum formulas. The complete design
+and statistical contract is recorded in
+[ReduceDimensionality uncertainty estimators](../design/reduce-dimensionality-uncertainty-estimators.md).
+
 ```yaml
 steps:
   average_frames:
@@ -250,8 +336,9 @@ steps:
       reduction: any
 ```
 
-When `ApplyMask` is used to replace masked signal values, `masked_value`
-defaults to `nan`. Explicit sentinel values remain available:
+`ApplyMask` remains available when replacing masked signal values is preferred
+over direct, non-mutating selection. Its `masked_value` defaults to `nan`;
+explicit sentinel values remain available:
 
 ```yaml
 steps:
