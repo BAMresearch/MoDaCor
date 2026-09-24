@@ -180,7 +180,7 @@ def _pilot_axis_names(bundle: Any, basedata: BaseData, batch_rank: int) -> tuple
         for index, axis in enumerate(basedata.axes):
             if isinstance(axis, BaseData):
                 names[offset + index] = _basedata_name(bundle, axis) or f"axis_{offset + index}"
-    elif basedata.rank_of_data and isinstance(bundle.get("Q"), BaseData):
+    elif basedata.rank_of_data and isinstance(bundle.get("Q"), BaseData) and bundle.get("Q") is not basedata:
         for index in range(signal_rank - basedata.rank_of_data, signal_rank):
             names[index] = "Q"
     return tuple(names)

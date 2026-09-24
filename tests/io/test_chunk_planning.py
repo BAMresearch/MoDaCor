@@ -126,6 +126,36 @@ def test_pilot_resolves_complete_outputs_and_regular_chunk_specs():
         spec.validate_for_plan(plan)
 
 
+def test_coordinate_output_does_not_treat_itself_as_an_axis():
+    provisional = ProvisionalChunkPlan(
+        schema_version="1.0",
+        plan_id="coordinate-pilot-plan",
+        driver={"source": "raw::/entry/data", "rank_of_data": 2},
+        axis_rules=(ChunkAxisRule(axis=0, chunk_size=1),),
+        outputs=(ProvisionalChunkOutput("Q", "/sample/Q", "sample/Q"),),
+    )
+    input_plan = resolve_chunk_input_plan(provisional, (2, 8, 6), np.uint16)
+    pilot = input_plan.chunks[0]
+    processing_data = ProcessingData()
+    processing_data["sample"] = DataBundle(
+        Q=BaseData(
+            signal=np.linspace(0.1, 1.0, 5)[None, :],
+            units="1/nm",
+            rank_of_data=1,
+        )
+    )
+
+    plan, _specs = resolve_provisional_chunk_plan(
+        provisional,
+        input_plan,
+        processing_data,
+        pilot.chunk_id,
+    )
+
+    assert plan.outputs[0].axis_names == (".", ".")
+    assert [layout.component for layout in plan.outputs[0].arrays] == ["signal"]
+
+
 def test_pilot_rejects_pipeline_that_changes_batch_dimensions():
     provisional = _provisional()
     input_plan = resolve_chunk_input_plan(provisional, (2, 10, 8, 6), np.uint16)
