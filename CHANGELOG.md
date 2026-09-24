@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v1.8.1 (2026-09-24)
+
+### Bug fixes
+
+* fix: updating the ReduceDimensionality (and mask reduction) so it can reduce to all but the data rank automatically ([`b95b854`](https://github.com/BAMresearch/MoDaCor/commit/b95b85432c0275f4e2b199c0343c9332f8257b8a))
+
 ## v1.8.0 (2026-09-14)
 
 ### Enh
