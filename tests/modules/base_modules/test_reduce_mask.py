@@ -66,3 +66,48 @@ def test_reduce_mask_all_preserves_only_bits_present_everywhere():
 def test_reduce_mask_rejects_float_masks():
     with pytest.raises(TypeError):
         _run_reduce(np.zeros((2, 2), dtype=float), axes=0)
+
+
+def test_reduce_mask_non_data_axes_reduce_all_leading_dimensions():
+    mask = np.zeros((2, 3, 2, 2), dtype=np.uint32)
+    mask[0, 0, 0, 1] = 1
+    mask[1, 2, 1, 0] = 4
+
+    out = _run_reduce(mask, axes="non_data", reduction="any", rank_of_data=2)
+
+    np.testing.assert_array_equal(out.signal, np.array([[0, 1], [4, 0]], dtype=np.uint32))
+    assert out.rank_of_data == 2
+
+
+def test_reduce_mask_non_data_axes_preserve_axes_at_data_rank():
+    processing_data = ProcessingData()
+    axis0 = BaseData(signal=np.arange(2.0), units=ureg.dimensionless)
+    axis1 = BaseData(signal=np.arange(3.0), units=ureg.dimensionless)
+    original = BaseData(
+        signal=np.ones((2, 3), dtype=np.uint16),
+        units=ureg.dimensionless,
+        axes=[axis0, axis1],
+        rank_of_data=2,
+    )
+    processing_data["sample"] = DataBundle(mask=original)
+    step = ReduceMask(io_sources=IoSources())
+    step.modify_config_by_dict(
+        {
+            "with_processing_keys": ["sample"],
+            "source_mask_key": "mask",
+            "target_mask_key": "mask",
+            "axes": "non_data",
+        }
+    )
+    step.execute(processing_data)
+
+    result = processing_data["sample"]["mask"]
+    np.testing.assert_array_equal(result.signal, original.signal)
+    assert result.signal.dtype == np.uint32
+    assert result.rank_of_data == 2
+    assert result.axes == [axis0, axis1]
+
+
+def test_reduce_mask_rejects_unknown_symbolic_axis_mode():
+    with pytest.raises(ValueError, match="non_data"):
+        _run_reduce(np.zeros((2, 2), dtype=np.uint32), axes="automatic", rank_of_data=1)

@@ -7,11 +7,11 @@ from __future__ import annotations
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
 __copyright__ = "Copyright 2025, The MoDaCor team"
-__date__ = "16/11/2025"
+__date__ = "23/09/2026"
 __status__ = "Development"  # "Development", "Production"
 
 __all__ = ["ReduceDimensionality"]
-__version__ = "20251116.1"
+__version__ = "20260923.1"
 
 from pathlib import Path
 from typing import Any
@@ -23,6 +23,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.modules.helpers import leading_non_data_axes
 
 # Facility-pluggable logger; by default this uses std logging
 logger = MessageHandler(name=__name__)
@@ -53,9 +54,12 @@ class ReduceDimensionality(ProcessStep):
         modifies={"signal": ["signal", "uncertainties", "units", "weights"]},
         arguments={
             "axes": {
-                "type": (int, list, tuple, type(None)),
+                "type": (int, list, tuple, str, type(None)),
                 "default": None,
-                "doc": "Axis or axes to reduce (int, list/tuple, or None for all).",
+                "doc": (
+                    "Axis or axes to reduce (int, list/tuple, or None for all). "
+                    "Use 'non_data' to reduce every leading axis before the final rank_of_data axes."
+                ),
             },
             "use_weights": {
                 "type": bool,
@@ -81,7 +85,9 @@ class ReduceDimensionality(ProcessStep):
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
         step_note=(
             "This step reduces the dimensionality of the signal by averaging over one or more axes. "
-            "Units are preserved; axes metadata is currently not adjusted and is left empty on the result."
+            "With axes='non_data', it automatically reduces leading acquisition axes until signal.ndim "
+            "equals rank_of_data. "
+            "Units are preserved; complete axes metadata is reduced along the same axes."
         ),
     )
 
@@ -106,6 +112,22 @@ class ReduceDimensionality(ProcessStep):
         normalized = tuple(int(a) for a in axes)
         logger.debug(f"ReduceDimensionality: multiple axes requested: axes={normalized}.")
         return normalized
+
+    @staticmethod
+    def _resolve_axes(axes: Any, bd: BaseData) -> int | tuple[int, ...] | None:
+        """Resolve explicit axes or the leading ``non_data`` axis mode."""
+
+        if isinstance(axes, str):
+            mode = axes.strip().lower()
+            if mode != "non_data":
+                raise ValueError("ReduceDimensionality axes string must be 'non_data'.")
+            resolved = leading_non_data_axes(bd.signal.ndim, bd.rank_of_data)
+            logger.debug(
+                f"ReduceDimensionality: axes='non_data' resolved to {resolved} for "
+                f"ndim={bd.signal.ndim} and rank_of_data={bd.rank_of_data}."
+            )
+            return resolved
+        return ReduceDimensionality._normalize_axes(axes)
 
     @staticmethod
     def _axis_count(shape: tuple[int, ...], axis: int | tuple[int, ...] | None) -> int:
@@ -334,16 +356,29 @@ class ReduceDimensionality(ProcessStep):
     # ---------------------------- main API ---------------------------------
 
     def calculate(self) -> dict[str, DataBundle]:
-        axis = self._normalize_axes(self.configuration.get("axes"))
+        axes_spec = self.configuration.get("axes")
         use_weights = bool(self.configuration.get("use_weights", True))
         nan_policy = self.configuration.get("nan_policy", "omit")
         reduction = self.configuration.get("reduction", "mean")  # NEW
+        if nan_policy not in {"omit", "propagate"}:
+            raise ValueError(f"Invalid nan_policy: {nan_policy!r}. Use 'omit' or 'propagate'.")
+        if reduction not in {"mean", "sum"}:
+            raise ValueError(f"Invalid reduction: {reduction!r}. Use 'mean' or 'sum'.")
 
         output: dict[str, DataBundle] = {}
 
         for key in self._normalised_processing_keys():
             databundle: DataBundle = self.processing_data.get(key)
             bd: BaseData = databundle["signal"]
+            axis = self._resolve_axes(axes_spec, bd)
+
+            if axis == ():
+                logger.debug(
+                    f"ReduceDimensionality: {key}::signal already has ndim={bd.signal.ndim} "
+                    f"matching rank_of_data={bd.rank_of_data}; skipping."
+                )
+                output[key] = databundle
+                continue
 
             averaged = self._weighted_mean_with_uncertainty(
                 bd=bd,

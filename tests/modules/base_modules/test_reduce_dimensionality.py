@@ -416,3 +416,101 @@ def test_reduce_dimensionality_emits_info_and_debug_logs(caplog):
     levels = {rec.levelno for rec in records}
     assert logging.INFO in levels, "Expected at least one INFO log from ReduceDimensionality."
     assert logging.DEBUG in levels, "Expected at least one DEBUG log from ReduceDimensionality."
+
+
+def test_non_data_axes_reduce_all_leading_dimensions_and_preserve_data_axes():
+    signal = np.arange(2 * 3 * 4 * 5.0).reshape(2, 3, 4, 5)
+    axes = [BaseData(signal=np.arange(size), units=ureg.dimensionless) for size in signal.shape]
+    processing_data = ProcessingData(
+        sample=DataBundle(
+            signal=BaseData(
+                signal=signal,
+                units=ureg.count,
+                uncertainties={"u": np.ones_like(signal)},
+                axes=axes,
+                rank_of_data=2,
+            )
+        )
+    )
+
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        axes="non_data",
+        use_weights=False,
+        nan_policy="propagate",
+    )
+    step.execute(processing_data)
+
+    result = processing_data["sample"]["signal"]
+    np.testing.assert_allclose(result.signal, np.mean(signal, axis=(0, 1)))
+    assert result.signal.shape == (4, 5)
+    assert result.rank_of_data == 2
+    assert result.axes == axes[-2:]
+
+
+def test_non_data_axes_are_a_true_noop_at_data_rank():
+    signal = BaseData(
+        signal=np.arange(12.0).reshape(3, 4),
+        units=ureg.count,
+        uncertainties={"u": np.ones((3, 4))},
+        weights=np.full((3, 4), 2.0),
+        rank_of_data=2,
+    )
+    processing_data = ProcessingData(sample=DataBundle(signal=signal))
+
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(with_processing_keys=["sample"], axes="non_data")
+    step.execute(processing_data)
+
+    assert processing_data["sample"]["signal"] is signal
+
+
+def test_non_data_axes_resolve_per_processing_key():
+    first = np.arange(6.0).reshape(2, 3)
+    second = np.arange(24.0).reshape(2, 3, 4)
+    processing_data = ProcessingData(
+        first=DataBundle(signal=BaseData(signal=first, units=ureg.count, rank_of_data=1)),
+        second=DataBundle(signal=BaseData(signal=second, units=ureg.count, rank_of_data=2)),
+    )
+
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["first", "second"],
+        axes="non_data",
+        use_weights=False,
+        nan_policy="propagate",
+    )
+    step.execute(processing_data)
+
+    np.testing.assert_allclose(processing_data["first"]["signal"].signal, np.mean(first, axis=0))
+    np.testing.assert_allclose(processing_data["second"]["signal"].signal, np.mean(second, axis=0))
+
+
+def test_non_data_axes_with_rank_zero_reduce_to_scalar():
+    processing_data = ProcessingData(
+        sample=DataBundle(signal=BaseData(signal=np.arange(6.0).reshape(2, 3), units=ureg.count, rank_of_data=0))
+    )
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        axes="non_data",
+        use_weights=False,
+        nan_policy="propagate",
+    )
+    step.execute(processing_data)
+
+    result = processing_data["sample"]["signal"]
+    assert result.signal.shape == ()
+    assert result.rank_of_data == 0
+
+
+def test_non_data_axes_reject_unknown_symbolic_mode():
+    processing_data = ProcessingData(
+        sample=DataBundle(signal=BaseData(signal=np.ones((2, 3)), units=ureg.count, rank_of_data=1))
+    )
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(with_processing_keys=["sample"], axes="automatic")
+
+    with pytest.raises(ValueError, match="non_data"):
+        step.execute(processing_data)
