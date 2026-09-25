@@ -12,6 +12,7 @@ pipeline_basics
 configuration_reference
 tracing_and_debugging
 server_installation
+advanced_server_use
 runtime_service_api
 backlog
 ```

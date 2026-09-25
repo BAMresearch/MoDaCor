@@ -49,6 +49,58 @@ code still performs semantic checks for values that need runtime context, such
 as missing sources, non-empty required strings, mutually exclusive options, or
 nested dictionary contents.
 
+## DataBundle arithmetic
+
+The source-based `Divide`, `Subtract`, and `Multiply` modules load their second
+operand from `IoSources`. Their interfaces remain source-oriented.
+
+Use `DivideDatabundles` when both operands have already been prepared as
+`BaseData` entries in `ProcessingData`. `with_processing_keys` contains exactly
+two keys: the dividend first and the divisor second. The default entry name is
+`signal` in both bundles; `dividend_data_key` and `divisor_data_key` can select
+different entries.
+
+```yaml
+steps:
+  normalize_to_count_time:
+    module: DivideDatabundles
+    configuration:
+      with_processing_keys: [sample, sample_count_time]
+      dividend_data_key: signal
+      divisor_data_key: signal
+```
+
+The dividend is updated in place and returned. `BaseData` arithmetic supplies
+array broadcasting, unit calculation, and uncertainty propagation. This is the
+division counterpart of the existing `SubtractDatabundles` and
+`MultiplyDatabundles` steps.
+
+## Sampled-data integration
+
+`Integrate1D` integrates one or more sampled curves with trapezoidal or Simpson
+quadrature. The curves share a coordinate array, which may be nonuniform but
+must be strictly monotonic. Coordinate units are multiplied into the result
+units and each uncertainty component is propagated independently with the
+quadrature coefficients.
+
+```yaml
+steps:
+  integrate_sample_and_blank:
+    module: Integrate1D
+    configuration:
+      with_processing_keys: [sample_curve, blank_curve]
+      signal_key: signal
+      axis_key: q
+      method: trapezoid
+      output_processing_keys: [sample_integral, blank_integral]
+```
+
+Invalid, masked, or zero-weight samples in any input are omitted from every
+integral so ratios use the same physical domain. Restricting this module to 1D
+keeps the coordinate and uncertainty rules unambiguous; an n-dimensional
+sampled-data integrator can be introduced later if a concrete pipeline
+requires one.
+
 ## NeXus detector frames
 
 MoDaCor has a generic NeXus transformation-chain resolver in the base modules.
