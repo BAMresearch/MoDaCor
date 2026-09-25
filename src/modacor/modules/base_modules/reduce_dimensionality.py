@@ -7,12 +7,14 @@ from __future__ import annotations
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
 __copyright__ = "Copyright 2025, The MoDaCor team"
-__date__ = "23/09/2026"
+__date__ = "24/09/2026"
 __status__ = "Development"  # "Development", "Production"
 
 __all__ = ["ReduceDimensionality"]
-__version__ = "20260923.1"
+__version__ = "20260924.2"
 
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -21,18 +23,33 @@ import numpy as np
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
-from modacor.modules.helpers import leading_non_data_axes
+from modacor.modules.helpers import finalize_weighted_scatter, leading_non_data_axes
 
 # Facility-pluggable logger; by default this uses std logging
 logger = MessageHandler(name=__name__)
 
+_COLLISION_POLICIES = frozenset({"error", "overwrite_existing", "keep_existing", "propagate"})
+_ESTIMATOR_REDUCTIONS = {
+    "standard_deviation": frozenset({"mean", "sum"}),
+    "standard_error_mean": frozenset({"mean"}),
+    "standard_error_sum": frozenset({"sum"}),
+}
+
+
+@dataclass(frozen=True)
+class _EstimatorSpec:
+    output_key: str
+    method: str
+    ddof: int
+    collision_policy: str
+
 
 class ReduceDimensionality(ProcessStep):
     """
-    Compute a (possibly weighted) average of a BaseData signal over one or more axes,
-    propagating uncertainties.
+    Compute a (possibly weighted) mean or sum over one or more axes, propagate
+    existing uncertainties, and optionally estimate uncertainties from scatter.
 
     For each uncertainty key `k`, assumes uncorrelated errors:
 
@@ -76,22 +93,301 @@ class ReduceDimensionality(ProcessStep):
                 "default": "mean",
                 "doc": "Reduction method: 'mean' or 'sum'.",
             },
+            "mask_key": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": (
+                    "Optional BaseData mask key in each selected DataBundle. Nonzero mask values are excluded "
+                    "without modifying the input signal."
+                ),
+            },
+            "mask_bits": {
+                "type": (int, list, tuple, type(None)),
+                "default": None,
+                "doc": (
+                    "Optional uint32 bit value or iterable of bit values to exclude. None excludes any nonzero mask."
+                ),
+            },
+            "uncertainty_estimation": {
+                "type": (dict, type(None)),
+                "default": None,
+                "doc": (
+                    "Optional mapping containing estimator definitions and a collision policy for "
+                    "scatter-derived uncertainty components."
+                ),
+            },
         },
         step_keywords=["average", "mean", "weighted", "nanmean", "reduce", "axis", "sum"],
         step_doc=(
-            "Compute (default weighted) mean of the BaseData signal over the given axes, "
-            "with proper uncertainty propagation."
+            "Compute a weighted or unweighted mean/sum over the given axes, propagate existing "
+            "uncertainties, and optionally add scatter-derived uncertainty estimates."
         ),
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
         step_note=(
             "This step reduces the dimensionality of the signal by averaging over one or more axes. "
             "With axes='non_data', it automatically reduces leading acquisition axes until signal.ndim "
             "equals rank_of_data. "
+            "An optional integer mask can exclude selected reason bits without modifying the input signal. "
             "Units are preserved; complete axes metadata is reduced along the same axes."
         ),
     )
 
     # ---------------------------- helpers ---------------------------------
+
+    @staticmethod
+    def _normalize_mask_configuration(mask_key: Any, mask_bits: Any) -> tuple[str | None, int | None]:
+        """Validate mask configuration and combine selected reason bits."""
+
+        if mask_key is None:
+            if mask_bits is not None:
+                raise ValueError("ReduceDimensionality mask_bits requires mask_key to be configured.")
+            return None, None
+        if not isinstance(mask_key, str) or not mask_key.strip():
+            raise ValueError("ReduceDimensionality mask_key must be a non-empty string or None.")
+
+        if mask_bits is None:
+            return mask_key, None
+        if isinstance(mask_bits, (int, np.integer)) and not isinstance(mask_bits, bool):
+            bit_values = (int(mask_bits),)
+        elif isinstance(mask_bits, (list, tuple)):
+            bit_values = tuple(mask_bits)
+            if not bit_values:
+                raise ValueError("ReduceDimensionality mask_bits must not be empty.")
+        else:
+            raise TypeError("ReduceDimensionality mask_bits must be an integer, a list/tuple, or None.")
+
+        combined = 0
+        uint32_max = int(np.iinfo(np.uint32).max)
+        for bit_value in bit_values:
+            if isinstance(bit_value, bool) or not isinstance(bit_value, (int, np.integer)):
+                raise TypeError("ReduceDimensionality mask_bits values must be integers.")
+            bit_value = int(bit_value)
+            if not 0 < bit_value <= uint32_max:
+                raise ValueError(f"ReduceDimensionality mask_bits values must be between 1 and {uint32_max}.")
+            combined |= bit_value
+        return mask_key, combined
+
+    @staticmethod
+    def _mask_exclusion(
+        *,
+        databundle: DataBundle,
+        signal_shape: tuple[int, ...],
+        mask_key: str | None,
+        mask_bits: int | None,
+    ) -> np.ndarray | None:
+        """Return a signal-shaped boolean exclusion mask without mutating the source mask."""
+
+        if mask_key is None:
+            return None
+        if mask_key not in databundle:
+            raise KeyError(f"ReduceDimensionality mask_key {mask_key!r} is not present in the DataBundle.")
+
+        mask = np.asarray(databundle[mask_key].signal)
+        if not np.issubdtype(mask.dtype, np.integer):
+            raise TypeError(f"ReduceDimensionality mask {mask_key!r} must have an integer dtype, got {mask.dtype}.")
+        try:
+            mask = np.broadcast_to(mask, signal_shape)
+        except ValueError as exc:
+            raise ValueError(
+                f"ReduceDimensionality mask {mask_key!r} with shape {mask.shape} cannot broadcast "
+                f"to signal shape {signal_shape}."
+            ) from exc
+
+        mask_u32 = mask.astype(np.uint32, copy=False)
+        if mask_bits is None:
+            return mask_u32 != 0
+        return np.bitwise_and(mask_u32, np.uint32(mask_bits)) != 0
+
+    @staticmethod
+    def _effective_values_and_weights(
+        *,
+        bd: BaseData,
+        use_weights: bool,
+        nan_policy: str,
+        exclusion_mask: np.ndarray | None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Apply explicit-mask and NaN selection to values and effective weights."""
+
+        x = np.asarray(bd.signal, dtype=float)
+        if use_weights:
+            weights = np.broadcast_to(np.asarray(bd.weights, dtype=float), x.shape)
+        else:
+            weights = np.broadcast_to(np.array(1.0), x.shape)
+
+        if exclusion_mask is None:
+            effective_mask = np.zeros(x.shape, dtype=bool)
+        else:
+            effective_mask = np.asarray(exclusion_mask, dtype=bool)
+
+        if nan_policy == "omit":
+            effective_mask = effective_mask | np.isnan(x) | np.isnan(weights)
+        elif nan_policy != "propagate":
+            raise ValueError(f"Invalid nan_policy: {nan_policy!r}. Use 'omit' or 'propagate'.")
+
+        x_eff = np.where(effective_mask, 0.0, x)
+        w_eff = np.where(effective_mask, 0.0, weights)
+        return x_eff, w_eff, effective_mask
+
+    @staticmethod
+    def _normalize_uncertainty_estimation(
+        configuration: Mapping[str, Any] | None,
+        *,
+        reduction: str,
+    ) -> tuple[_EstimatorSpec, ...]:
+        """Validate and normalize the nested uncertainty-estimation contract."""
+
+        if configuration is None:
+            return ()
+        if not isinstance(configuration, Mapping):
+            raise TypeError("ReduceDimensionality uncertainty_estimation must be a mapping or None.")
+
+        unknown_keys = set(configuration) - {"collision_policy", "estimators"}
+        if unknown_keys:
+            raise ValueError(
+                "ReduceDimensionality uncertainty_estimation contains unknown key(s): "
+                f"{', '.join(sorted(map(str, unknown_keys)))}."
+            )
+
+        default_policy = configuration.get("collision_policy", "error")
+        if not isinstance(default_policy, str) or default_policy not in _COLLISION_POLICIES:
+            allowed = ", ".join(sorted(_COLLISION_POLICIES))
+            raise ValueError(
+                f"Invalid uncertainty-estimation collision_policy {default_policy!r}. Use one of: {allowed}."
+            )
+
+        estimators = configuration.get("estimators", {})
+        if estimators is None:
+            estimators = {}
+        if not isinstance(estimators, Mapping):
+            raise TypeError("ReduceDimensionality uncertainty_estimation.estimators must be a mapping.")
+
+        normalized: list[_EstimatorSpec] = []
+        for output_key, raw_spec in estimators.items():
+            if not isinstance(output_key, str) or not output_key.strip():
+                raise ValueError("Uncertainty-estimator destination keys must be non-empty strings.")
+            if not isinstance(raw_spec, Mapping):
+                raise TypeError(f"Uncertainty estimator {output_key!r} must be configured by a mapping.")
+
+            unknown_spec_keys = set(raw_spec) - {"method", "ddof", "collision_policy"}
+            if unknown_spec_keys:
+                raise ValueError(
+                    f"Uncertainty estimator {output_key!r} contains unknown key(s): "
+                    f"{', '.join(sorted(map(str, unknown_spec_keys)))}."
+                )
+
+            method = raw_spec.get("method")
+            if not isinstance(method, str) or method not in _ESTIMATOR_REDUCTIONS:
+                allowed = ", ".join(sorted(_ESTIMATOR_REDUCTIONS))
+                raise ValueError(
+                    f"Unknown uncertainty estimator method {method!r} for {output_key!r}. Use one of: {allowed}."
+                )
+            if reduction not in _ESTIMATOR_REDUCTIONS[method]:
+                raise ValueError(f"Uncertainty estimator method {method!r} is not valid for reduction={reduction!r}.")
+
+            ddof = raw_spec.get("ddof", 1)
+            if isinstance(ddof, bool) or not isinstance(ddof, (int, np.integer)) or ddof < 0:
+                raise ValueError(f"Uncertainty estimator {output_key!r} ddof must be a non-negative integer.")
+
+            collision_policy = raw_spec.get("collision_policy", default_policy)
+            if not isinstance(collision_policy, str) or collision_policy not in _COLLISION_POLICIES:
+                allowed = ", ".join(sorted(_COLLISION_POLICIES))
+                raise ValueError(
+                    f"Invalid collision_policy {collision_policy!r} for uncertainty estimator "
+                    f"{output_key!r}. Use one of: {allowed}."
+                )
+
+            normalized.append(
+                _EstimatorSpec(
+                    output_key=output_key,
+                    method=method,
+                    ddof=int(ddof),
+                    collision_policy=collision_policy,
+                )
+            )
+
+        return tuple(normalized)
+
+    @staticmethod
+    def _estimate_uncertainties_from_scatter(
+        *,
+        bd: BaseData,
+        axis: int | tuple[int, ...] | None,
+        use_weights: bool,
+        nan_policy: str,
+        exclusion_mask: np.ndarray | None,
+        estimator_specs: tuple[_EstimatorSpec, ...],
+        uncertainties_out: dict[str, np.ndarray],
+    ) -> None:
+        """Calculate requested estimates and merge them into ``uncertainties_out``."""
+
+        active_specs: list[_EstimatorSpec] = []
+        for spec in estimator_specs:
+            if spec.output_key not in uncertainties_out:
+                active_specs.append(spec)
+                continue
+            if spec.collision_policy == "error":
+                raise ValueError(
+                    f"Uncertainty estimator output key {spec.output_key!r} already exists after propagation. "
+                    "Choose overwrite_existing, keep_existing, or propagate to resolve the collision."
+                )
+            if spec.collision_policy == "keep_existing":
+                logger.warning(
+                    f"ReduceDimensionality: keeping existing propagated uncertainty {spec.output_key!r}; "
+                    "discarding the configured estimator result."
+                )
+                continue
+            active_specs.append(spec)
+
+        if not active_specs:
+            return
+
+        x_eff, w_eff, _ = ReduceDimensionality._effective_values_and_weights(
+            bd=bd,
+            use_weights=use_weights,
+            nan_policy=nan_policy,
+            exclusion_mask=exclusion_mask,
+        )
+
+        if np.any(np.isfinite(w_eff) & (w_eff < 0.0)):
+            raise ValueError("Scatter-derived uncertainty estimators require non-negative effective weights.")
+
+        sum_w = np.sum(w_eff, axis=axis)
+        sum_w2 = np.sum(w_eff**2, axis=axis)
+        sum_w_keepdims = np.sum(w_eff, axis=axis, keepdims=True)
+        sum_wx_keepdims = np.sum(w_eff * x_eff, axis=axis, keepdims=True)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            mean_keepdims = sum_wx_keepdims / sum_w_keepdims
+        deviations = x_eff - mean_keepdims
+        weighted_squared_deviations = np.where(w_eff == 0.0, 0.0, w_eff * deviations**2)
+        sum_w_squared_deviations = np.sum(weighted_squared_deviations, axis=axis)
+
+        estimates_by_ddof = {}
+        for spec in active_specs:
+            estimates = estimates_by_ddof.get(spec.ddof)
+            if estimates is None:
+                estimates = finalize_weighted_scatter(
+                    sum_w=sum_w,
+                    sum_w2=sum_w2,
+                    sum_w_squared_deviations=sum_w_squared_deviations,
+                    ddof=spec.ddof,
+                )
+                estimates_by_ddof[spec.ddof] = estimates
+
+            estimate = np.asarray(getattr(estimates, spec.method))
+            existing = uncertainties_out.get(spec.output_key)
+            if existing is None:
+                uncertainties_out[spec.output_key] = estimate
+            elif spec.collision_policy == "overwrite_existing":
+                logger.warning(
+                    f"ReduceDimensionality: overwriting existing propagated uncertainty {spec.output_key!r}."
+                )
+                uncertainties_out[spec.output_key] = estimate
+            else:  # propagate; error and keep_existing were handled above
+                logger.warning(
+                    f"ReduceDimensionality: combining existing and estimated uncertainty "
+                    f"{spec.output_key!r} in quadrature."
+                )
+                uncertainties_out[spec.output_key] = np.hypot(np.asarray(existing, dtype=float), estimate)
 
     @staticmethod
     def _normalize_axes(axes: Any) -> int | tuple[int, ...] | None:
@@ -150,7 +446,9 @@ class ReduceDimensionality(ProcessStep):
         axis: int | tuple[int, ...] | None,
         use_weights: bool,
         nan_policy: str,
-        reduction: str = "mean",  # NEW
+        reduction: str = "mean",
+        estimator_specs: tuple[_EstimatorSpec, ...] = (),
+        exclusion_mask: np.ndarray | None = None,
     ) -> BaseData:
         """
         Compute weighted reduction ('mean' or 'sum') of a BaseData over axis,
@@ -163,30 +461,32 @@ class ReduceDimensionality(ProcessStep):
         x = bd.signal
         scalar_weight = ReduceDimensionality._scalar_weight(bd.weights) if use_weights else 1.0
 
-        if scalar_weight is not None:
-            return ReduceDimensionality._scalar_weight_reduction(
+        if scalar_weight is not None and exclusion_mask is None:
+            result = ReduceDimensionality._scalar_weight_reduction(
                 bd=bd,
                 axis=axis,
                 nan_policy=nan_policy,
                 reduction=reduction,
                 scalar_weight=scalar_weight,
             )
+            if estimator_specs:
+                ReduceDimensionality._estimate_uncertainties_from_scatter(
+                    bd=bd,
+                    axis=axis,
+                    use_weights=use_weights,
+                    nan_policy=nan_policy,
+                    exclusion_mask=None,
+                    estimator_specs=estimator_specs,
+                    uncertainties_out=result.uncertainties,
+                )
+            return result
 
-        # Choose weights
-        w = np.asarray(bd.weights, dtype=float)
-        w = np.broadcast_to(w, x.shape)
-
-        # NaN handling
-        if nan_policy == "omit":
-            mask = np.isnan(x) | np.isnan(w)
-            x_eff = np.where(mask, 0.0, x)
-            w_eff = np.where(mask, 0.0, w)
-        elif nan_policy == "propagate":
-            mask = np.zeros_like(x, dtype=bool)
-            x_eff = x
-            w_eff = w
-        else:
-            raise ValueError(f"Invalid nan_policy: {nan_policy!r}. Use 'omit' or 'propagate'.")
+        x_eff, w_eff, effective_mask = ReduceDimensionality._effective_values_and_weights(
+            bd=bd,
+            use_weights=use_weights,
+            nan_policy=nan_policy,
+            exclusion_mask=exclusion_mask,
+        )
 
         # Weighted sums
         w_sum = np.sum(w_eff, axis=axis)
@@ -209,10 +509,7 @@ class ReduceDimensionality(ProcessStep):
             err_arr = np.asarray(err, dtype=float)
             err_arr = np.broadcast_to(err_arr, x.shape)
 
-            if nan_policy == "omit":
-                err_arr_eff = np.where(mask, 0.0, err_arr)
-            else:
-                err_arr_eff = err_arr
+            err_arr_eff = np.where(effective_mask, 0.0, err_arr)
 
             var_sum = np.sum((w_eff**2) * (err_arr_eff**2), axis=axis)
 
@@ -222,6 +519,17 @@ class ReduceDimensionality(ProcessStep):
                 sigma = np.sqrt(var_sum)
 
             uncertainties_out[key] = sigma
+
+        if estimator_specs:
+            ReduceDimensionality._estimate_uncertainties_from_scatter(
+                bd=bd,
+                axis=axis,
+                use_weights=use_weights,
+                nan_policy=nan_policy,
+                exclusion_mask=exclusion_mask,
+                estimator_specs=estimator_specs,
+                uncertainties_out=uncertainties_out,
+            )
 
         # --- build result BaseData (numeric content) ---
         result = BaseData(
@@ -355,15 +663,51 @@ class ReduceDimensionality(ProcessStep):
 
     # ---------------------------- main API ---------------------------------
 
+    def dependency_contract(self) -> ProcessStepDependencies:
+        keys = self.configuration.get("with_processing_keys")
+        reads = set(processing_key_patterns(keys, basedata_key="signal"))
+        writes = set(reads)
+        mask_key = self.configuration.get("mask_key")
+        if isinstance(mask_key, str) and mask_key.strip():
+            reads.update(processing_key_patterns(keys, basedata_key=mask_key))
+        return ProcessStepDependencies(
+            source_refs=(),
+            processing_reads=reads,
+            processing_writes=writes,
+        )
+
+    def prepare_execution(self) -> None:
+        """Validate estimator configuration before processing data."""
+
+        reduction = self.configuration.get("reduction", "mean")
+        if reduction not in {"mean", "sum"}:
+            raise ValueError(f"Invalid reduction: {reduction!r}. Use 'mean' or 'sum'.")
+        self._normalize_uncertainty_estimation(
+            self.configuration.get("uncertainty_estimation"),
+            reduction=reduction,
+        )
+        self._normalize_mask_configuration(
+            self.configuration.get("mask_key"),
+            self.configuration.get("mask_bits"),
+        )
+
     def calculate(self) -> dict[str, DataBundle]:
         axes_spec = self.configuration.get("axes")
         use_weights = bool(self.configuration.get("use_weights", True))
         nan_policy = self.configuration.get("nan_policy", "omit")
-        reduction = self.configuration.get("reduction", "mean")  # NEW
+        reduction = self.configuration.get("reduction", "mean")
         if nan_policy not in {"omit", "propagate"}:
             raise ValueError(f"Invalid nan_policy: {nan_policy!r}. Use 'omit' or 'propagate'.")
         if reduction not in {"mean", "sum"}:
             raise ValueError(f"Invalid reduction: {reduction!r}. Use 'mean' or 'sum'.")
+        estimator_specs = self._normalize_uncertainty_estimation(
+            self.configuration.get("uncertainty_estimation"),
+            reduction=reduction,
+        )
+        mask_key, mask_bits = self._normalize_mask_configuration(
+            self.configuration.get("mask_key"),
+            self.configuration.get("mask_bits"),
+        )
 
         output: dict[str, DataBundle] = {}
 
@@ -380,12 +724,21 @@ class ReduceDimensionality(ProcessStep):
                 output[key] = databundle
                 continue
 
+            exclusion_mask = self._mask_exclusion(
+                databundle=databundle,
+                signal_shape=bd.signal.shape,
+                mask_key=mask_key,
+                mask_bits=mask_bits,
+            )
+
             averaged = self._weighted_mean_with_uncertainty(
                 bd=bd,
                 axis=axis,
                 use_weights=use_weights,
                 nan_policy=nan_policy,
-                reduction=reduction,  # NEW
+                reduction=reduction,
+                estimator_specs=estimator_specs,
+                exclusion_mask=exclusion_mask,
             )
 
             databundle["signal"] = averaged

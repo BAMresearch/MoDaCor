@@ -514,3 +514,542 @@ def test_non_data_axes_reject_unknown_symbolic_mode():
 
     with pytest.raises(ValueError, match="non_data"):
         step.execute(processing_data)
+
+
+def _run_reduction_with_estimators(
+    *,
+    signal,
+    estimators,
+    reduction="mean",
+    weights=1.0,
+    use_weights=False,
+    nan_policy="propagate",
+    uncertainties=None,
+    collision_policy="error",
+    axes=0,
+):
+    original = BaseData(
+        signal=np.asarray(signal, dtype=float),
+        units=ureg.count,
+        weights=np.asarray(weights, dtype=float),
+        uncertainties={} if uncertainties is None else uncertainties,
+    )
+    processing_data = ProcessingData(sample=DataBundle(signal=original))
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        axes=axes,
+        reduction=reduction,
+        use_weights=use_weights,
+        nan_policy=nan_policy,
+        uncertainty_estimation={
+            "collision_policy": collision_policy,
+            "estimators": estimators,
+        },
+    )
+    step.execute(processing_data)
+    return processing_data["sample"]["signal"]
+
+
+def test_uncertainty_estimators_add_unweighted_std_and_sem_under_selected_keys():
+    signal = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    propagated = np.full_like(signal, 0.1)
+
+    result = _run_reduction_with_estimators(
+        signal=signal,
+        uncertainties={"detector": propagated},
+        estimators={
+            "frame_STD": {"method": "standard_deviation", "ddof": 1},
+            "frame_SEM": {"method": "standard_error_mean", "ddof": 1},
+        },
+    )
+
+    expected_std = np.std(signal, axis=0, ddof=1)
+    np.testing.assert_allclose(result.uncertainties["frame_STD"], expected_std)
+    np.testing.assert_allclose(result.uncertainties["frame_SEM"], expected_std / np.sqrt(2.0))
+    np.testing.assert_allclose(
+        result.uncertainties["detector"],
+        np.sqrt(np.sum(propagated**2, axis=0)) / 2.0,
+    )
+
+
+def test_uncertainty_estimators_use_weighted_effective_sample_size():
+    signal = np.array([[1.0, 2.0], [4.0, 5.0]])
+    weights = np.array([[1.0], [2.0]])
+
+    result = _run_reduction_with_estimators(
+        signal=signal,
+        weights=weights,
+        use_weights=True,
+        estimators={
+            "weighted_STD": {"method": "standard_deviation", "ddof": 1},
+            "weighted_SEM": {"method": "standard_error_mean", "ddof": 1},
+        },
+    )
+
+    np.testing.assert_allclose(result.uncertainties["weighted_STD"], np.sqrt(4.5))
+    np.testing.assert_allclose(result.uncertainties["weighted_SEM"], np.sqrt(2.5))
+
+
+@pytest.mark.parametrize(
+    ("use_weights", "weights", "expected"),
+    [
+        (False, np.array(1.0), 3.0),
+        (True, np.array([[1.0], [2.0]]), np.sqrt(22.5)),
+    ],
+)
+def test_standard_error_sum_estimates_uncertainty_of_sum(use_weights, weights, expected):
+    signal = np.array([[1.0, 2.0], [4.0, 5.0]])
+
+    result = _run_reduction_with_estimators(
+        signal=signal,
+        reduction="sum",
+        weights=weights,
+        use_weights=use_weights,
+        estimators={"sum_repeatability": {"method": "standard_error_sum", "ddof": 1}},
+    )
+
+    np.testing.assert_allclose(result.uncertainties["sum_repeatability"], expected)
+
+
+def test_standard_deviation_is_available_as_input_scatter_for_sum():
+    signal = np.array([[1.0, 2.0], [4.0, 5.0]])
+    result = _run_reduction_with_estimators(
+        signal=signal,
+        reduction="sum",
+        estimators={"input_scatter": {"method": "standard_deviation", "ddof": 1}},
+    )
+
+    np.testing.assert_allclose(result.uncertainties["input_scatter"], np.std(signal, axis=0, ddof=1))
+
+
+def test_uncertainty_estimators_follow_nan_omit_and_insufficient_count_rules():
+    signal = np.array([[1.0, np.nan, np.nan], [4.0, 5.0, np.nan]])
+    result = _run_reduction_with_estimators(
+        signal=signal,
+        nan_policy="omit",
+        estimators={
+            "STD": {"method": "standard_deviation", "ddof": 1},
+            "SEM": {"method": "standard_error_mean", "ddof": 1},
+        },
+    )
+
+    np.testing.assert_allclose(
+        result.uncertainties["STD"],
+        np.array([np.std([1.0, 4.0], ddof=1), np.nan, np.nan]),
+        equal_nan=True,
+    )
+    np.testing.assert_allclose(
+        result.uncertainties["SEM"],
+        np.array([np.std([1.0, 4.0], ddof=1) / np.sqrt(2.0), np.nan, np.nan]),
+        equal_nan=True,
+    )
+
+
+def test_uncertainty_estimators_follow_nan_propagate_policy():
+    signal = np.array([[1.0, np.nan], [4.0, 5.0]])
+    result = _run_reduction_with_estimators(
+        signal=signal,
+        nan_policy="propagate",
+        estimators={"STD": {"method": "standard_deviation", "ddof": 1}},
+    )
+
+    np.testing.assert_allclose(
+        result.uncertainties["STD"],
+        np.array([np.std([1.0, 4.0], ddof=1), np.nan]),
+        equal_nan=True,
+    )
+
+
+def test_uncertainty_estimators_reduce_multiple_axes():
+    signal = np.arange(24.0).reshape(2, 3, 4)
+    result = _run_reduction_with_estimators(
+        signal=signal,
+        axes=(0, 1),
+        estimators={"STD": {"method": "standard_deviation", "ddof": 1}},
+    )
+
+    np.testing.assert_allclose(result.uncertainties["STD"], np.std(signal, axis=(0, 1), ddof=1))
+
+
+@pytest.mark.parametrize("disabled_configuration", [None, {}, {"estimators": {}}])
+def test_empty_uncertainty_estimation_configuration_preserves_existing_behavior(disabled_configuration):
+    signal = np.arange(6.0).reshape(2, 3)
+    uncertainty = np.full_like(signal, 0.2)
+    processing_data = ProcessingData(
+        sample=DataBundle(signal=BaseData(signal=signal, units=ureg.count, uncertainties={"u": uncertainty}))
+    )
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        axes=0,
+        use_weights=False,
+        uncertainty_estimation=disabled_configuration,
+    )
+    step.execute(processing_data)
+
+    assert set(processing_data["sample"]["signal"].uncertainties) == {"u"}
+
+
+def test_estimator_collision_error_leaves_existing_basedata_unmodified():
+    original = BaseData(
+        signal=np.array([[1.0, 2.0], [4.0, 5.0]]),
+        units=ureg.count,
+        uncertainties={"repeatability": np.full((2, 2), 0.1)},
+    )
+    processing_data = ProcessingData(sample=DataBundle(signal=original))
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        axes=0,
+        use_weights=False,
+        uncertainty_estimation={
+            "collision_policy": "error",
+            "estimators": {"repeatability": {"method": "standard_deviation"}},
+        },
+    )
+
+    with pytest.raises(ValueError, match="already exists after propagation"):
+        step.execute(processing_data)
+    assert processing_data["sample"]["signal"] is original
+
+
+@pytest.mark.parametrize("collision_policy", ["overwrite_existing", "keep_existing", "propagate"])
+def test_estimator_collision_policies(collision_policy):
+    signal = np.array([[1.0, 2.0], [4.0, 5.0]])
+    input_uncertainty = np.full_like(signal, 0.2)
+    result = _run_reduction_with_estimators(
+        signal=signal,
+        uncertainties={"repeatability": input_uncertainty},
+        collision_policy=collision_policy,
+        estimators={"repeatability": {"method": "standard_deviation", "ddof": 1}},
+    )
+
+    propagated = np.sqrt(2.0 * 0.2**2) / 2.0
+    estimated = np.std(signal, axis=0, ddof=1)
+    if collision_policy == "overwrite_existing":
+        expected = estimated
+    elif collision_policy == "keep_existing":
+        expected = propagated
+    else:
+        expected = np.hypot(propagated, estimated)
+    np.testing.assert_allclose(result.uncertainties["repeatability"], expected)
+
+
+def test_estimator_collision_policy_can_be_overridden_per_estimator():
+    signal = np.array([[1.0, 2.0], [4.0, 5.0]])
+    result = _run_reduction_with_estimators(
+        signal=signal,
+        uncertainties={"repeatability": np.full_like(signal, 0.2)},
+        collision_policy="error",
+        estimators={
+            "repeatability": {
+                "method": "standard_deviation",
+                "collision_policy": "overwrite_existing",
+            }
+        },
+    )
+
+    np.testing.assert_allclose(result.uncertainties["repeatability"], np.std(signal, axis=0, ddof=1))
+
+
+@pytest.mark.parametrize(
+    ("reduction", "method"),
+    [("sum", "standard_error_mean"), ("mean", "standard_error_sum")],
+)
+def test_estimator_rejects_method_for_wrong_reduction_before_mutation(reduction, method):
+    original = BaseData(signal=np.arange(6.0).reshape(2, 3), units=ureg.count)
+    processing_data = ProcessingData(sample=DataBundle(signal=original))
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        axes=0,
+        reduction=reduction,
+        uncertainty_estimation={"estimators": {"estimate": {"method": method}}},
+    )
+
+    with pytest.raises(ValueError, match="is not valid"):
+        step.execute(processing_data)
+    assert processing_data["sample"]["signal"] is original
+
+
+def test_estimator_rejects_negative_weights_without_replacing_basedata():
+    original = BaseData(
+        signal=np.array([[1.0, 2.0], [4.0, 5.0]]),
+        units=ureg.count,
+        weights=np.array([[1.0], [-1.0]]),
+    )
+    processing_data = ProcessingData(sample=DataBundle(signal=original))
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        axes=0,
+        use_weights=True,
+        uncertainty_estimation={"estimators": {"STD": {"method": "standard_deviation"}}},
+    )
+
+    with pytest.raises(ValueError, match="non-negative effective weights"):
+        step.execute(processing_data)
+    assert processing_data["sample"]["signal"] is original
+
+
+def test_estimator_returns_nan_for_zero_effective_weight():
+    result = _run_reduction_with_estimators(
+        signal=np.array([[1.0, 2.0], [4.0, 5.0]]),
+        weights=np.zeros((2, 1)),
+        use_weights=True,
+        estimators={"STD": {"method": "standard_deviation", "ddof": 1}},
+    )
+
+    assert np.isnan(result.uncertainties["STD"]).all()
+
+
+@pytest.mark.parametrize(
+    ("uncertainty_estimation", "message"),
+    [
+        ({"collision_policy": "replace", "estimators": {}}, "collision_policy"),
+        ({"estimators": {"u": {"method": "variance"}}}, "Unknown uncertainty estimator"),
+        ({"estimators": {"u": {"method": "standard_deviation", "ddof": -1}}}, "ddof"),
+        ({"estimators": {"u": {"method": "standard_deviation", "extra": True}}}, "unknown key"),
+    ],
+)
+def test_invalid_estimator_configuration_fails_before_mutation(uncertainty_estimation, message):
+    original = BaseData(signal=np.arange(6.0).reshape(2, 3), units=ureg.count)
+    processing_data = ProcessingData(sample=DataBundle(signal=original))
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        axes=0,
+        uncertainty_estimation=uncertainty_estimation,
+    )
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        step.execute(processing_data)
+    assert processing_data["sample"]["signal"] is original
+
+
+def test_non_data_noop_does_not_add_configured_estimators():
+    original = BaseData(signal=np.arange(6.0).reshape(2, 3), units=ureg.count, rank_of_data=2)
+    processing_data = ProcessingData(sample=DataBundle(signal=original))
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        axes="non_data",
+        uncertainty_estimation={"estimators": {"STD": {"method": "standard_deviation"}}},
+    )
+    step.execute(processing_data)
+
+    assert processing_data["sample"]["signal"] is original
+    assert "STD" not in original.uncertainties
+
+
+def _run_direct_mask_reduction(
+    *,
+    signal,
+    mask,
+    axes=0,
+    reduction="mean",
+    use_weights=False,
+    weights=1.0,
+    nan_policy="propagate",
+    mask_bits=None,
+    uncertainties=None,
+    uncertainty_estimation=None,
+):
+    signal_bd = BaseData(
+        signal=np.asarray(signal),
+        units=ureg.count,
+        weights=np.asarray(weights, dtype=float),
+        uncertainties={} if uncertainties is None else uncertainties,
+    )
+    bundle = DataBundle(
+        signal=signal_bd,
+        mask=BaseData(signal=np.asarray(mask), units=ureg.dimensionless),
+    )
+    processing_data = ProcessingData(sample=bundle)
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        axes=axes,
+        reduction=reduction,
+        use_weights=use_weights,
+        nan_policy=nan_policy,
+        mask_key="mask",
+        mask_bits=mask_bits,
+        uncertainty_estimation=uncertainty_estimation,
+    )
+    step.execute(processing_data)
+    return signal_bd, processing_data["sample"]["signal"]
+
+
+def test_direct_mask_excludes_values_without_mutating_input_signal():
+    signal = np.array([[1.0, 10.0], [3.0, 20.0]])
+    mask = np.array([[0, 1], [0, 0]], dtype=np.uint32)
+    uncertainty = np.full_like(signal, 0.1)
+
+    original, result = _run_direct_mask_reduction(
+        signal=signal,
+        mask=mask,
+        uncertainties={"detector": uncertainty},
+    )
+
+    np.testing.assert_array_equal(original.signal, signal)
+    np.testing.assert_allclose(result.signal, np.array([2.0, 20.0]))
+    np.testing.assert_allclose(
+        result.uncertainties["detector"],
+        np.array([np.sqrt(2.0) * 0.1 / 2.0, 0.1]),
+    )
+
+
+def test_direct_mask_is_omitted_even_when_nan_policy_is_propagate():
+    signal = np.array([[1.0, np.nan], [3.0, 20.0]])
+    mask = np.array([[0, 1], [0, 0]], dtype=np.uint32)
+
+    _, result = _run_direct_mask_reduction(signal=signal, mask=mask, nan_policy="propagate")
+
+    np.testing.assert_allclose(result.signal, np.array([2.0, 20.0]))
+
+
+def test_direct_mask_is_shared_by_scatter_estimators():
+    signal = np.array([[1.0, 10.0], [3.0, 20.0]])
+    mask = np.array([[0, 1], [0, 0]], dtype=np.uint32)
+
+    _, result = _run_direct_mask_reduction(
+        signal=signal,
+        mask=mask,
+        uncertainty_estimation={
+            "estimators": {
+                "frame_STD": {"method": "standard_deviation", "ddof": 1},
+                "frame_SEM": {"method": "standard_error_mean", "ddof": 1},
+            }
+        },
+    )
+
+    np.testing.assert_allclose(
+        result.uncertainties["frame_STD"],
+        np.array([np.std([1.0, 3.0], ddof=1), np.nan]),
+        equal_nan=True,
+    )
+    np.testing.assert_allclose(
+        result.uncertainties["frame_SEM"],
+        np.array([np.std([1.0, 3.0], ddof=1) / np.sqrt(2.0), np.nan]),
+        equal_nan=True,
+    )
+
+
+def test_direct_mask_excludes_values_from_weighted_sum_and_sum_uncertainty():
+    signal = np.array([[1.0, 10.0], [3.0, 20.0]])
+    mask = np.array([[0, 1], [0, 0]], dtype=np.uint32)
+    weights = np.array([[1.0], [2.0]])
+    uncertainty = np.full_like(signal, 0.1)
+
+    _, result = _run_direct_mask_reduction(
+        signal=signal,
+        mask=mask,
+        reduction="sum",
+        use_weights=True,
+        weights=weights,
+        uncertainties={"detector": uncertainty},
+        uncertainty_estimation={"estimators": {"sum_repeatability": {"method": "standard_error_sum", "ddof": 1}}},
+    )
+
+    np.testing.assert_allclose(result.signal, np.array([7.0, 40.0]))
+    np.testing.assert_allclose(result.uncertainties["detector"], np.array([np.sqrt(5.0) * 0.1, 0.2]))
+    assert result.uncertainties["sum_repeatability"][0] == pytest.approx(np.sqrt(10.0))
+    assert np.isnan(result.uncertainties["sum_repeatability"][1])
+
+
+def test_direct_mask_can_select_reason_bits():
+    signal = np.array([[1.0, 10.0], [3.0, 20.0]])
+    mask = np.array([[1, 2], [0, 0]], dtype=np.uint32)
+
+    _, selected = _run_direct_mask_reduction(signal=signal, mask=mask, mask_bits=1)
+    _, all_bits = _run_direct_mask_reduction(signal=signal, mask=mask)
+
+    np.testing.assert_allclose(selected.signal, np.array([3.0, 15.0]))
+    np.testing.assert_allclose(all_bits.signal, np.array([3.0, 20.0]))
+
+
+def test_direct_mask_broadcasts_over_leading_signal_dimensions():
+    signal = np.arange(8.0).reshape(2, 2, 2)
+    mask = np.array([[0, 1], [0, 0]], dtype=np.uint32)
+
+    _, result = _run_direct_mask_reduction(signal=signal, mask=mask, axes=0)
+
+    expected = np.mean(signal, axis=0)
+    expected[0, 1] = np.nan
+    np.testing.assert_allclose(result.signal, expected, equal_nan=True)
+
+
+@pytest.mark.parametrize(("reduction", "expected_signal"), [("mean", np.nan), ("sum", 0.0)])
+def test_direct_mask_all_excluded_follows_empty_reduction_semantics(reduction, expected_signal):
+    signal = np.array([[1.0], [3.0]])
+    mask = np.ones_like(signal, dtype=np.uint32)
+
+    _, result = _run_direct_mask_reduction(signal=signal, mask=mask, reduction=reduction)
+
+    if reduction == "mean":
+        assert np.isnan(result.signal[0])
+    else:
+        assert result.signal[0] == expected_signal
+        assert result.weights[0] == 0.0
+
+
+@pytest.mark.parametrize(
+    ("mask", "mask_bits", "message"),
+    [
+        (np.zeros((2, 2), dtype=float), None, "integer dtype"),
+        (np.zeros((3, 2), dtype=np.uint32), None, "cannot broadcast"),
+        (np.zeros((2, 2), dtype=np.uint32), 0, "between 1"),
+        (np.zeros((2, 2), dtype=np.uint32), [], "must not be empty"),
+    ],
+)
+def test_direct_mask_rejects_invalid_mask_inputs(mask, mask_bits, message):
+    original = BaseData(signal=np.arange(4.0).reshape(2, 2), units=ureg.count)
+    processing_data = ProcessingData(
+        sample=DataBundle(signal=original, mask=BaseData(signal=mask, units=ureg.dimensionless))
+    )
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample"],
+        axes=0,
+        mask_key="mask",
+        mask_bits=mask_bits,
+    )
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        step.execute(processing_data)
+    assert processing_data["sample"]["signal"] is original
+
+
+def test_mask_bits_requires_mask_key_during_preparation():
+    original = BaseData(signal=np.arange(4.0).reshape(2, 2), units=ureg.count)
+    processing_data = ProcessingData(sample=DataBundle(signal=original))
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(with_processing_keys=["sample"], axes=0, mask_bits=1)
+
+    with pytest.raises(ValueError, match="requires mask_key"):
+        step.execute(processing_data)
+    assert processing_data["sample"]["signal"] is original
+
+
+def test_direct_mask_requires_configured_key_in_each_processed_bundle():
+    original = BaseData(signal=np.arange(4.0).reshape(2, 2), units=ureg.count)
+    processing_data = ProcessingData(sample=DataBundle(signal=original))
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(with_processing_keys=["sample"], axes=0, mask_key="missing_mask")
+
+    with pytest.raises(KeyError, match="missing_mask"):
+        step.execute(processing_data)
+    assert processing_data["sample"]["signal"] is original
+
+
+def test_direct_mask_dependency_contract_reads_mask_and_signal_but_only_writes_signal():
+    step = ReduceDimensionality(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(with_processing_keys=["sample"], mask_key="quality_mask")
+
+    contract = step.dependency_contract()
+
+    assert contract.source_refs == frozenset()
+    assert contract.processing_reads == frozenset({"sample.signal", "sample.quality_mask"})
+    assert contract.processing_writes == frozenset({"sample.signal"})
