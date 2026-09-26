@@ -9,10 +9,10 @@ from typing import Dict, Tuple
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw"]
 __copyright__ = "Copyright 2025, The MoDaCor team"
-__date__ = "30/11/2025"
+__date__ = "24/09/2026"
 __status__ = "Development"  # "Development", "Production"
 
-__version__ = "20251130.1"
+__version__ = "20260924.1"
 __all__ = ["IndexedAverager"]
 
 from pathlib import Path
@@ -25,7 +25,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
-from modacor.modules.helpers import get_first_present, normalize_str_list
+from modacor.modules.helpers import finalize_weighted_scatter, get_first_present, normalize_str_list
 
 logger = MessageHandler(name=__name__)
 
@@ -436,27 +436,23 @@ class IndexedAverager(ProcessStep):
         if stats_keys is None:
             stats_keys = ["signal", "Q", "Psi"]
 
-        # Effective sample size:
         sum_w2 = np.bincount(bin_idx, weights=w_valid**2, minlength=n_bins)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            N_eff = np.full(n_bins, np.nan, dtype=float)
-            positive = sum_w2 > 0.0
-            N_eff[positive] = (sum_w[positive] ** 2) / sum_w2[positive]
 
         def _scatter_stats(values: np.ndarray, mean_per_bin: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
             mean_per_pixel = mean_per_bin[bin_idx]
             dev = values - mean_per_pixel
             sum_w_dev2 = np.bincount(bin_idx, weights=w_valid * (dev**2), minlength=n_bins)
-            with np.errstate(divide="ignore", invalid="ignore"):
-                var_spread = np.full(n_bins, np.nan, dtype=float)
-                sem_spread = np.full(n_bins, np.nan, dtype=float)
-                std_spread = np.full(n_bins, np.nan, dtype=float)
-
-                valid_bins = (sum_w > 0.0) & np.isfinite(N_eff) & (N_eff > 1.0)
-                var_spread[valid_bins] = sum_w_dev2[valid_bins] / sum_w[valid_bins]
-                std_spread[valid_bins] = np.sqrt(var_spread[valid_bins])
-                sem_spread[valid_bins] = np.sqrt(var_spread[valid_bins] / N_eff[valid_bins])
-
+            estimates = finalize_weighted_scatter(
+                sum_w=sum_w,
+                sum_w2=sum_w2,
+                sum_w_squared_deviations=sum_w_dev2,
+                ddof=0,
+            )
+            # Preserve IndexedAverager's established behavior: scatter is
+            # undefined for bins with only one effective observation.
+            enough_observations = estimates.effective_sample_size > 1.0
+            sem_spread = np.where(enough_observations, estimates.standard_error_mean, np.nan)
+            std_spread = np.where(enough_observations, estimates.standard_deviation, np.nan)
             return sem_spread, std_spread
 
         if "signal" in stats_keys:

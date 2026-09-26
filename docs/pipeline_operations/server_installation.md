@@ -97,3 +97,7 @@ run session creation from a trusted local deployment that permits
 
 The endpoint shapes, state machine, partial-rerun behavior, and error payloads
 are documented in [Runtime Service API](runtime_service_api.md).
+
+For trusted project-local process steps, in-memory registry customization, and
+the distinction between same-process notebook definitions and subprocess
+servers, see [Advanced server use](advanced_server_use.md).

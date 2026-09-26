@@ -22,7 +22,9 @@ from modacor.modules.base_modules.combine_uncertainties_max import CombineUncert
 from modacor.modules.base_modules.copy_databundle_keys import CopyDataBundleKeys
 from modacor.modules.base_modules.dilate_mask import DilateMask
 from modacor.modules.base_modules.divide import Divide
+from modacor.modules.base_modules.divide_databundles import DivideDatabundles
 from modacor.modules.base_modules.find_scale_factor1d import FindScaleFactor1D
+from modacor.modules.base_modules.integrate_1d import Integrate1D
 from modacor.modules.base_modules.multiply import Multiply
 from modacor.modules.base_modules.multiply_databundles import MultiplyDatabundles
 from modacor.modules.base_modules.plot_1d_visualization import Plot1DVisualization
@@ -71,9 +73,11 @@ __all__ = [
     "FlatPlateSelfAbsorptionCorrection",
     "DilateMask",
     "Divide",
+    "DivideDatabundles",
     "IndexPixels",
     "IndexedAverager",
     "FindScaleFactor1D",
+    "Integrate1D",
     "Multiply",
     "MultiplyDatabundles",
     "PixelCoordinates3D",

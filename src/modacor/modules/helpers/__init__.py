@@ -6,7 +6,16 @@ from __future__ import annotations
 
 from typing import Any, Mapping, MutableMapping, Sequence, TypeVar
 
-__all__ = ["attach_prepared_data", "get_first_present", "leading_non_data_axes", "normalize_str_list"]
+from modacor.modules.helpers.statistics import WeightedScatterEstimates, finalize_weighted_scatter
+
+__all__ = [
+    "WeightedScatterEstimates",
+    "attach_prepared_data",
+    "finalize_weighted_scatter",
+    "get_first_present",
+    "leading_non_data_axes",
+    "normalize_str_list",
+]
 
 T = TypeVar("T")
 
