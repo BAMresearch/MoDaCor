@@ -1,6 +1,9 @@
 # Chunked Processing Handoff
 
-Status: design handoff for a future implementation branch.
+Status: completed handoff, superseded by
+[Chunked Operation](../chunked-operation.md) and
+[Chunked Sink Implementation Plan](../chunked-sink-implementation-plan.md), and
+archived on 2026-09-27.
 
 ## Goal
 
@@ -67,7 +70,7 @@ input detector data may still have been loaded in full.
 Ordinary pipeline YAML does not contain execution-specific source intervals.
 Chunked server requests can now coordinate slices across exact HDF5 or Tiled
 datasets using typed `ChunkPlan.source_bindings`; staged `BufferSource` values
-remain already-sliced inputs. See [Chunked Operation](chunked-operation.md) for
+remain already-sliced inputs. See [Chunked Operation](../chunked-operation.md) for
 the current contract. Direct Python callers can also use source slicing.
 
 MoDaCor also has no general:
@@ -259,7 +262,9 @@ The next discussion should settle these points before fixing the public API:
 
 ## Suggested prompt for the next chat
 
-> Read `docs/design/chunked-processing-handoff.md` and the linked buffer design.
+> Historical prompt: read
+> `docs/design/completed/chunked-processing-handoff.md` and the linked buffer
+> design.
 > Create a new branch for chunked processing. Start by reviewing the current
 > source slicing, `AppendProcessingData`, `IndexedAverager`, and sink contracts.
 > Propose and implement the smallest frame-chunking vertical slice, with tests

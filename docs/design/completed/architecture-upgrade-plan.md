@@ -1,7 +1,8 @@
 # Architecture Upgrade Plan
 
-This document tracks the design issues identified during the September 2026
-architecture review. Keep the status and notes current as each item is fixed.
+This document records the completed design issues identified during the
+September 2026 architecture review. All tracked items were implemented and the
+record was archived on 2026-09-27.
 
 Status values:
 
