@@ -174,11 +174,7 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
         )
         np.testing.assert_array_equal(self.test_processing_data["sample"]["signal"].signal, expected)
 
-    def test_target_non_uint32_is_upcast_to_uint32_once(self):
-        """
-        If the mask isn't uint32 (e.g. int64), the step should convert it to uint32
-        (one-time allocation) and then OR into that.
-        """
+    def test_non_uint32_mask_is_normalized_without_mutating_mask_basedata(self):
         self.test_processing_data = ProcessingData()
 
         mask_i64 = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.int64)
@@ -193,15 +189,17 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
         step = self._make_step()
         step.processing_data = self.test_processing_data
 
-        before_id = id(self.test_processing_data["sample"]["mask"].signal)
+        stored_mask = self.test_processing_data["sample"]["mask"].signal
         step.calculate()
 
         out = self.test_processing_data["sample"]["mask"].signal
-        self.assertEqual(out.dtype, np.uint32)
-        self.assertNotEqual(id(out), before_id)  # replacement happened due to upcast
-
-        expected = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.uint32)
-        np.testing.assert_array_equal(out, expected)
+        self.assertIs(out, stored_mask)
+        self.assertEqual(out.dtype, np.int64)
+        np.testing.assert_array_equal(out, mask_i64)
+        np.testing.assert_array_equal(
+            self.test_processing_data["sample"]["signal"].signal,
+            np.array([[0, 1, 1], [1, 0, 1]], dtype=np.uint32),
+        )
 
     def test_apply_mask_dependency_contract_is_exact(self):
         self.test_processing_data["sample"]["variance"] = BaseData(

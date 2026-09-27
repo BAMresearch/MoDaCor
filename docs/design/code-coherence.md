@@ -45,6 +45,26 @@ contract gaps, not a list of failing tests. Each fix must add a regression test
 that fails before the fix; a passing legacy suite is not sufficient evidence
 that the contract is complete.
 
+## Implementation progress
+
+- **C1 completed on 2026-09-27:** `FindScaleFactor1D` now converts a copied
+  working signal, including all named uncertainties, to the reference signal
+  units before fitting. Compatible-unit and incompatible-unit regression tests
+  protect the behavior without mutating the input signal.
+- **C2 completed on 2026-09-27:** `IndexedAverager` now honors
+  `output_processing_key` for a single input, rejects its ambiguous use with
+  multiple inputs, preserves the source bundle in distinct-output mode, and
+  retains auxiliary entries in in-place mode. Its dependency contract now
+  declares exact input reads and output-mode-specific writes.
+- **C3 completed on 2026-09-27:** `Integrate1D` now declares exact signal,
+  axis, and optional mask reads plus output-mode-specific writes, including
+  newly created output bundles.
+- **C4 completed on 2026-09-27:** source contracts now include flat-plate
+  transmission uncertainty sources and the plain source identifiers in NeXus
+  detector-frame and sample-position mappings.
+- **C5 completed on 2026-09-27:** `ApplyMask` converts non-`uint32` masks only
+  into a local working array and no longer mutates its declared read-only mask.
+
 ## Contract hierarchy
 
 Four related contracts must remain distinct:
@@ -66,14 +86,14 @@ A change is coherent only when all four views agree where they overlap.
 These items can produce incorrect scientific values or incorrect partial-rerun
 selection and should be addressed before metadata cleanup or refactoring.
 
-### C1. `FindScaleFactor1D` dependent-unit handling
+### C1. `FindScaleFactor1D` dependent-unit handling (completed)
 
-The module converts the independent axes to a common unit but fits the raw
-magnitudes of the dependent signals. Physically equal signals expressed in
-metres and centimetres consequently produce a dimensionless scale of 100
-instead of 1.
+At audit time, the module converted the independent axes to a common unit but
+fitted the raw magnitudes of the dependent signals. Physically equal signals
+expressed in metres and centimetres consequently produced a dimensionless
+scale of 100 instead of 1.
 
-Required outcome:
+Implemented outcome:
 
 - require compatible dependent units;
 - convert the working signal and all its uncertainty components to the
@@ -82,53 +102,54 @@ Required outcome:
   background in the reference signal unit; and
 - add compatible-unit and incompatible-unit regression tests.
 
-### C2. `IndexedAverager` advertised and actual output disagree
+### C2. `IndexedAverager` advertised and actual output disagree (completed)
 
-`output_processing_key` is accepted and changes the inherited dependency
-contract, but calculation ignores it and replaces each selected input bundle.
-The class documentation also says `pixel_index` and masks remain present even
-though the replacement bundle contains only `signal`, `Q`, and `Psi`.
+At audit time, `output_processing_key` was accepted and changed the inherited
+dependency contract, but calculation ignored it and replaced each selected
+input bundle. The class documentation also said `pixel_index` and masks
+remained present even though the replacement bundle contained only `signal`,
+`Q`, and `Psi`.
 
-Required outcome:
+Implemented outcome:
 
-- choose one explicit output model before implementation;
-- preferably use a distinct output for a single input and leave the source
-  bundle intact, or introduce an unambiguous per-input output mapping for
-  multiple inputs;
-- if in-place replacement remains supported, document which entries are
-  deliberately discarded; and
-- make the dependency contract, return mapping, public metadata, and tests
-  describe that exact behavior.
+- a distinct output is supported for one input and leaves the source bundle
+  intact;
+- configuring one output for multiple inputs is rejected as ambiguous;
+- in-place operation retains auxiliary entries while replacing `signal`, `Q`,
+  and `Psi`; and
+- the dependency contract, return mapping, public metadata, and tests describe
+  that behavior.
 
-### C3. `Integrate1D` does not declare new output bundles
+### C3. `Integrate1D` does not declare new output bundles (completed)
 
-When `output_processing_keys` is configured, calculation creates those bundles
-but the inherited dependency contract declares only writes to the input
-bundles.
+At audit time, configuring `output_processing_keys` created those bundles but
+the inherited dependency contract declared only writes to the input bundles.
 
-Required outcome: implement a custom contract that declares exact signal, axis,
-and optional mask reads, and declares either `input.output_key` writes or each
-new `output_processing_key.*` write according to the configured mode.
+Implemented outcome: the custom contract declares exact signal, axis, and
+optional mask reads, and declares either `input.output_key` writes or each new
+`output_processing_key.*` write according to the configured mode.
 
-### C4. Incomplete external source tracking
+### C4. Incomplete external source tracking (completed)
 
-- `FlatPlateSelfAbsorptionCorrection` reads
-  `transmission_uncertainties_sources` but omits those references from its
-  contract.
-- `PixelCoordinates3D` and `XSGeometryFromPixelCoordinates` miss plain source
+At audit time:
+
+- `FlatPlateSelfAbsorptionCorrection` read
+  `transmission_uncertainties_sources` but omitted those references from its
+  contract; and
+- `PixelCoordinates3D` and `XSGeometryFromPixelCoordinates` missed plain source
   identifiers nested in NeXus `detector_frame` and `sample_z_override`
-  dictionaries; the generic `ref::path` extractor cannot infer those fields.
+  dictionaries because the generic `ref::path` extractor cannot infer those
+  fields.
 
-Required outcome: include field-specific source identifiers explicitly. Do not
-make the generic extractor treat every arbitrary configuration string as a
-source reference.
+Implemented outcome: the field-specific contracts include those source
+identifiers explicitly without making the generic extractor treat arbitrary
+configuration strings as source references.
 
-### C5. `ApplyMask` mutates a read-only dependency
+### C5. `ApplyMask` mutates a read-only dependency (completed)
 
-The mask is declared as a processing read, but non-`uint32` masks are converted
-and written back to the source `BaseData`. Prefer converting into a local
-working array without mutating the mask. If canonicalizing the stored mask is a
-required public behavior, declare the mask read/write and document that output.
+At audit time, the mask was declared as a processing read, but non-`uint32`
+masks were converted and written back to the source `BaseData`. It is now
+converted into a local working array without mutating the mask.
 
 ## Dependency-contract precision backlog
 
@@ -264,11 +285,11 @@ all reads and writes statically.
 
 Implement C1 through C5 in this order:
 
-1. `FindScaleFactor1D` units;
-2. `IndexedAverager` output semantics;
-3. `Integrate1D` output dependencies;
-4. missing external source references; and
-5. `ApplyMask` mask mutation.
+1. `FindScaleFactor1D` units (completed);
+2. `IndexedAverager` output semantics (completed);
+3. `Integrate1D` output dependencies (completed);
+4. missing external source references (completed); and
+5. `ApplyMask` mask mutation (completed).
 
 Keep each behavioral correction in a focused change with its own tests. Do not
 combine these fixes with package moves.

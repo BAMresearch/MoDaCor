@@ -15,7 +15,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["ApplyMask"]
-__version__ = "20260716.1"
+__version__ = "20260927.1"
 
 from pathlib import Path
 
@@ -144,10 +144,10 @@ class ApplyMask(ProcessStep):
 
         self._require_int(mask, f"{processing_key}::{mask_key}")  # noqa: E231
 
-        # Canonicalize target to uint32 once (needed for NeXus-style 32-bit bitfields)
+        # Normalize only the local working array. The mask is a declared read
+        # dependency and must not be rewritten as a side effect of applying it.
         if mask.dtype != np.uint32:
-            mask = mask.astype(np.uint32, copy=True)  # one-time allocation
-            mask_bd.signal = mask
+            mask = mask.astype(np.uint32, copy=True)
 
         for sk in source_keys:
             src_bd: BaseData = bundle[sk]

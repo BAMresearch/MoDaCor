@@ -15,7 +15,7 @@ __copyright__ = "Copyright 2026, The MoDaCor team"
 __date__ = "04/01/2026"
 __status__ = "Development"
 
-__version__ = "20260103.1"
+__version__ = "20260927.1"
 __all__ = ["CanonicalDetectorFrame", "PixelCoordinates3D"]
 
 from typing import Dict, Tuple
@@ -28,7 +28,7 @@ from attrs import define
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.messagehandler import MessageHandler
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies
 from modacor.geometry import unit_vector3
 from modacor.io.nexus.geometry import load_nexus_detector_frame_inputs
 from modacor.modules.helpers import attach_prepared_data, normalize_str_list
@@ -232,6 +232,20 @@ class PixelCoordinates3D(ProcessStep):
             signal_source=self.configuration.get(f"{key}_source"),
             units_source=self.configuration.get(f"{key}_units_source", None),
             uncertainty_sources=self.configuration.get(f"{key}_uncertainties_sources", {}),
+        )
+
+    def dependency_contract(self) -> ProcessStepDependencies:
+        base_contract = super().dependency_contract()
+        source_refs = set(base_contract.source_refs)
+        detector_frame = self.configuration.get("detector_frame")
+        if isinstance(detector_frame, dict) and str(detector_frame.get("type", "")).strip().lower() == "nexus":
+            source_reference = detector_frame.get("source")
+            if source_reference is not None and str(source_reference).strip():
+                source_refs.add(str(source_reference).strip())
+        return ProcessStepDependencies(
+            source_refs=source_refs,
+            processing_reads=base_contract.processing_reads,
+            processing_writes=base_contract.processing_writes,
         )
 
     def _load_canonical_frame(

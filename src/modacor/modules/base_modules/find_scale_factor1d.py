@@ -11,7 +11,7 @@ __date__ = "12/12/2025"
 __status__ = "Development"
 
 __all__ = ["FindScaleFactor1D"]
-__version__ = "20251212.2"
+__version__ = "20260927.1"
 
 from pathlib import Path
 from typing import Dict
@@ -198,7 +198,10 @@ class FindScaleFactor1D(ProcessStep):
             "signal_key": {
                 "type": str,
                 "default": "signal",
-                "doc": "BaseData key for the dependent variable signal.",
+                "doc": (
+                    "BaseData key for the dependent variable signal. Working and reference "
+                    "signals must have compatible units; fitting uses the reference units."
+                ),
             },
             "independent_axis_key": {
                 "type": str,
@@ -280,6 +283,9 @@ class FindScaleFactor1D(ProcessStep):
 
         y_work_bd = work_db[sig_key].copy(with_axes=True)
         y_ref_bd = ref_db[sig_key].copy(with_axes=True)
+
+        if y_work_bd.units != y_ref_bd.units:
+            y_work_bd.to_units(y_ref_bd.units)
 
         x_work_bd = work_db[axis_key].copy(with_axes=False)
         x_ref_bd = ref_db[axis_key].copy(with_axes=False)

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["FlatPlateSelfAbsorptionCorrection"]
-__version__ = "20260905.1"
+__version__ = "20260927.1"
 
 from pathlib import Path
 
@@ -94,7 +94,11 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
         keys = cfg.get("with_processing_keys")
         cos_alpha_key = cfg.get("cos_alpha_key", "CosAlpha")
         correction_key = cfg.get("correction_key", "flat_plate_self_absorption")
-        sources = [cfg.get("transmission_source"), cfg.get("transmission_units_source")]
+        sources = [
+            cfg.get("transmission_source"),
+            cfg.get("transmission_units_source"),
+            cfg.get("transmission_uncertainties_sources", {}),
+        ]
         return ProcessStepDependencies(
             source_refs=source_refs_from_references(sources),
             processing_reads=(

@@ -124,6 +124,60 @@ def test_find_scale_factor_scale_only_perfect_overlap():
     assert sf_bd.uncertainties["propagate_to_all"].size == 1
 
 
+def test_find_scale_factor_converts_dependent_data_and_uncertainties_to_reference_units():
+    x = np.linspace(1.0, 10.0, 200)
+    physical_work_m = 0.3 + np.exp(-x / 4.0)
+    true_scale = 2.5
+
+    work_signal_cm = physical_work_m * 100.0
+    work_sigma_cm = np.full_like(x, 1.0)
+    reference_signal_m = true_scale * physical_work_m
+
+    pd = ProcessingData()
+    pd["work"] = _make_curve_bundle(
+        x,
+        work_signal_cm,
+        y_units="cm",
+        sigma_y=work_sigma_cm,
+    )
+    pd["ref"] = _make_curve_bundle(
+        x,
+        reference_signal_m,
+        y_units="m",
+        sigma_y=0.01,
+    )
+
+    _run_step(
+        pd,
+        {
+            "with_processing_keys": ["work", "ref"],
+            "fit_background": False,
+            "robust_loss": "linear",
+            "use_basedata_weights": True,
+        },
+    )
+
+    assert float(pd["work"]["scale_factor"].signal.item()) == pytest.approx(true_scale, rel=1e-3)
+    assert pd["work"]["scale_factor"].units.is_compatible_with("dimensionless")
+
+    # Unit normalization is performed on a copy used for fitting.
+    assert pd["work"]["signal"].units.is_compatible_with("cm")
+    np.testing.assert_allclose(pd["work"]["signal"].signal, work_signal_cm)
+    np.testing.assert_allclose(pd["work"]["signal"].uncertainties["propagate_to_all"], work_sigma_cm)
+
+
+def test_find_scale_factor_rejects_incompatible_dependent_units_before_mutation():
+    x = np.linspace(1.0, 10.0, 20)
+    pd = ProcessingData()
+    pd["work"] = _make_curve_bundle(x, np.ones_like(x), y_units="s")
+    pd["ref"] = _make_curve_bundle(x, np.ones_like(x), y_units="m")
+
+    with pytest.raises(ValueError, match="Units are not compatible"):
+        _run_step(pd, {"with_processing_keys": ["work", "ref"]})
+
+    assert "scale_factor" not in pd["work"]
+
+
 def test_find_scale_factor_scale_and_background_mismatched_axes_robust():
     x_w = np.linspace(0.0, 10.0, 700)
     x_r = np.linspace(1.0, 9.0, 400)

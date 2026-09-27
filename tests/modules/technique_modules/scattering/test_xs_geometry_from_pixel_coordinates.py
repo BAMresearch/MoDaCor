@@ -18,6 +18,7 @@ import pytest
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.hdf.hdf_source import HDFSource
 from modacor.io.io_sources import IoSources
@@ -350,3 +351,28 @@ def test_geometry_from_pixel_coordinates_uses_nexus_sample_z_override(tmp_path):
     )
 
     np.testing.assert_allclose(pd["sample"]["TwoTheta"].signal, exp_two_theta)
+
+
+def test_geometry_dependency_contract_tracks_nested_nexus_sources():
+    step = XSGeometryFromPixelCoordinates(io_sources=IoSources())
+    step.modify_config_by_dict(
+        {
+            "with_processing_keys": ["sample"],
+            "wavelength_source": "measurement::/wavelength",
+            "detector_frame": {
+                "type": "nexus",
+                "source": "calibration",
+                "detector_path": "/entry/instrument/detector",
+            },
+            "sample_z_override": {
+                "type": "nexus",
+                "source": "sample_position",
+                "transform_path": "/entry/sample/transformations/z",
+            },
+        }
+    )
+
+    contract = step.dependency_contract()
+
+    assert isinstance(contract, ProcessStepDependencies)
+    assert contract.source_refs == frozenset({"measurement", "calibration", "sample_position"})
