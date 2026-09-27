@@ -14,4 +14,5 @@ api-buffer-source-sink
 io-sink-runtime-api
 reduce-dimensionality-uncertainty-estimators
 chunked-processing-handoff
+code-coherence
 ```

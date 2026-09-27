@@ -2,6 +2,8 @@
 # /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""Try to import all submodules from the installed modacor package tree."""
+
 from __future__ import annotations
 
 __coding__ = "utf-8"
@@ -10,9 +12,6 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
-
-
-"""Try to import all submodules from the installed modacor package tree."""
 
 import importlib
 from pathlib import Path

@@ -11,6 +11,7 @@ import numpy as np
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies
@@ -28,7 +29,7 @@ from modacor.modules.helpers.scattering.detector_data import (
 
 logger = MessageHandler(name=__name__)
 
-__version__ = "20260927.1"
+__version__ = "20260927.2"
 __all__ = ["XSGeometryFromPixelCoordinates"]
 
 
@@ -406,7 +407,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
 
         self._prepared_data = {k: out[k] for k in self.output_keys}
 
-    def calculate(self):
+    def calculate(self) -> dict[str, DataBundle]:
         with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
         if not with_keys:
             logger.warning("XSGeometryFromPixelCoordinates: no with_processing_keys specified; nothing to do.")

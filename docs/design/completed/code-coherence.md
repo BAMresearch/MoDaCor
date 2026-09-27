@@ -1,6 +1,6 @@
 # Module and Component Code Coherence
 
-Status: active remediation plan, based on the 2026-09-27 module audit.
+Status: completed on 2026-09-27.
 
 ## Purpose
 
@@ -11,14 +11,14 @@ runtime behavior, dependency contract, public metadata, tests, and generated
 documentation.
 
 The normative authoring rules remain in
-[the module author guide](../extending/module_author_guide.md) and
-[the contribution checklist](../extending/contribution_checklist.md). This note
+[the module author guide](../../extending/module_author_guide.md) and
+[the contribution checklist](../../extending/contribution_checklist.md). This note
 records deviations found in the current module set and the recommended order
 for resolving them.
 
 ## Audit scope and baseline
 
-The audit covered all 37 public `ProcessStep` classes exported through
+The current audit surface covers all 36 public `ProcessStep` classes exported through
 `modacor.modules`, their module-layer helpers, their generated reference pages,
 and focused module/runtime dependency tests. The deliberately non-discoverable
 deprecated `XSGeometry` step was not treated as part of the public surface.
@@ -64,6 +64,22 @@ that the contract is complete.
   detector-frame and sample-position mappings.
 - **C5 completed on 2026-09-27:** `ApplyMask` converts non-`uint32` masks only
   into a local working array and no longer mutates its declared read-only mask.
+- **Phases 1 and 3 completed on 2026-09-27:** executable guardrails now cover
+  every exported step, generated-reference discovery, exact contract values,
+  and the absence of runtime assertions. All identified wildcard dependency
+  contracts were narrowed to the paths actually read or written.
+- **Phase 4 completed on 2026-09-27:** default required keys, modified keys,
+  calling identifiers, return annotations, and argument descriptions now agree
+  with the current public implementations. The generated module reference was
+  rebuilt from the 36-step public surface.
+- **Phase 5 completed on 2026-09-27:** module input checks now raise explicit
+  exceptions; `_EstimatorSpec` is a validated `attrs` class; and the source and
+  sink registration helpers no longer use mutable function defaults.
+- **Phase 6 completed on 2026-09-27:** reusable quadrature, scale-fitting,
+  planar attenuation, and polarization kernels now live under `modacor.models`.
+  Their `ProcessStep` adapters retain unit conversion, `BaseData` handling,
+  dependency declarations, configuration, and pipeline mutation. An import
+  guardrail protects the documented `models` and `geometry` boundaries.
 
 ## Contract hierarchy
 
@@ -151,10 +167,10 @@ At audit time, the mask was declared as a processing read, but non-`uint32`
 masks were converted and written back to the source `BaseData`. It is now
 converted into a local working array without mutating the mask.
 
-## Dependency-contract precision backlog
+## Dependency-contract precision (completed)
 
-The following modules use whole-bundle invalidation where exact paths are
-available:
+At audit time, the following modules used whole-bundle invalidation where exact
+paths were available:
 
 - `CopyDataBundleKeys`;
 - `Divide`, `Multiply`, and `Subtract`;
@@ -166,21 +182,19 @@ available:
 - `AttenuatorPlateCorrection`; and
 - `DetectorEfficiencyCorrection`.
 
-For fixed-key modules, add a small explicit contract. For configurable
-BaseData-key arguments, prefer `dependency_role`. Multi-bundle operations need
-custom contracts because input positions have different read/write roles.
-`AttenuatorPlateCorrection` and `DetectorEfficiencyCorrection` already override
-the method, but should replace `bundle.*` patterns with exact signal, geometry,
-and correction-map paths.
+These contracts now name exact source references and `BaseData` paths. The
+two-bundle arithmetic steps use asymmetric contracts that write only their
+first operand; configurable-key steps derive paths from their configuration;
+and the material corrections name their signal, geometry, and correction-map
+paths rather than invalidating whole bundles.
 
-Every repaired module must receive a focused equality assertion for all three
-fields of `ProcessStepDependencies`; subset assertions do not prevent accidental
-wildcards or undeclared dependencies.
+Focused tests assert equality for all three `ProcessStepDependencies` fields so
+future wildcards and undeclared dependencies cannot pass as subsets.
 
-## Public metadata backlog
+## Public metadata reconciliation (completed)
 
-The generated module reference is currently incomplete or misleading in these
-areas:
+At audit time, the generated module reference was incomplete or misleading in
+these areas:
 
 - `AttenuatorPlateCorrection`, `DetectorEfficiencyCorrection`,
   `FlatPlateSelfAbsorptionCorrection`, and `PolarizationCorrection` create
@@ -191,28 +205,28 @@ areas:
   `signal.uncertainties["Poisson"]`.
 - `UnitsLabelUpdate` uses empty-string placeholders in `required_data_keys` and
   `modifies`.
-- `FindScaleFactor1D`, `Integrate1D`, `DivideDatabundles`, and
-  `XSGeometryFromAnalyserAngle` understate their default required inputs.
+- `FindScaleFactor1D`, `Integrate1D`, and `DivideDatabundles` understated their
+  default required inputs.
 - `BitwiseOrMasks`, `Divide`, `Multiply`, and `Subtract` have `calling_id`
   values different from the class names used by the registry and pipeline YAML.
 
-For configurable key names, metadata should describe the default public
-behavior and the argument documentation should explain how configuration
-changes it. Do not use empty strings as dynamic placeholders. If exact dynamic
-outputs become necessary for runtime introspection, extend the descriptor with
-a deliberate machine-readable mechanism instead of overloading `modifies`.
+The current descriptors now state default public behavior, while argument
+documentation explains configurable keys. Empty strings are no longer used as
+dynamic placeholders. If exact dynamic outputs become necessary for runtime
+introspection, extend the descriptor with a deliberate machine-readable
+mechanism instead of overloading `modifies`.
 
-After correcting metadata, regenerate `docs/reference/modules/` and review the
-resulting pages as part of the same change.
+The reference pages were regenerated after the corrections. A discovery test
+now requires the exports, discoverable `ProcessStep` implementations, generated
+targets, filenames, and index entries to remain in agreement.
 
-## Validation and typing backlog
+## Validation and typing (completed for the current public surface)
 
-Runtime input validation currently relies on `assert` in `ApplyMask`,
+At audit time, runtime input validation relied on `assert` in `ApplyMask`,
 `BitwiseOrMasks`, `CopyDataBundleKeys`, `DilateMask`, `DivideDatabundles`,
 `MultiplyDatabundles`, `ReduceMask`, `SubtractDatabundles`, and
-`ThresholdMask`. Assertions disappear under optimized Python. Replace them with
-explicit `TypeError` or `ValueError` checks, preferably during
-`prepare_execution()` when validation does not depend on per-frame values.
+`ThresholdMask`. These checks now raise explicit `TypeError` or `ValueError`
+exceptions. An AST guardrail rejects new runtime assertions in public modules.
 
 Four internal carriers use Python's built-in `dataclasses`:
 
@@ -221,16 +235,15 @@ Four internal carriers use Python's built-in `dataclasses`:
 - `material_attenuation.MaterialAttenuation`; and
 - `statistics.WeightedScatterEstimates`.
 
-`_EstimatorSpec` is the clear migration candidate because its fields have
-semantic constraints currently validated outside the class. Move those
-constraints into an `attrs` class with converters and validators. The remaining
-three are passive internal result carriers; migrate them only when they become
-validation boundaries or when consistency materially simplifies the code. Do
-not perform a mechanical dataclass-to-attrs rewrite without a contract benefit.
+`_EstimatorSpec` now owns its semantic constraints as an `attrs` class with a
+converter and validators. The remaining three are passive internal result
+carriers; migrate them only when they become validation boundaries or when
+consistency materially simplifies the code. Do not perform a mechanical
+dataclass-to-attrs rewrite without a contract benefit.
 
-Add the documented return annotation to `PixelCoordinates3D.calculate()`,
-`PoissonUncertainties.calculate()`, and
-`XSGeometryFromPixelCoordinates.calculate()`.
+The documented return annotation is now present on every public `calculate()`
+method, including `PixelCoordinates3D`, `PoissonUncertainties`, and
+`XSGeometryFromPixelCoordinates`.
 
 ## Units, uncertainties, and data containers
 
@@ -245,14 +258,13 @@ Most scientific arithmetic already follows the intended design:
 The confirmed unit correctness defect is C1. `UnitsLabelUpdate` is an
 intentional metadata repair tool, not a converter. Keep that limitation explicit
 and never use it where `BaseData.to_units()` or a Pint quantity conversion is
-required. Numeric thresholds in `ThresholdMask` are interpreted in the source
-signal's current units; document that fact or add an explicit threshold-unit
-configuration before cross-unit thresholds are supported.
+required. Numeric thresholds in `ThresholdMask` are documented as magnitudes
+in the source signal's current units. An explicit threshold-unit configuration
+remains necessary before cross-unit thresholds can be supported.
 
-## Package-boundary cleanup
+## Package-boundary cleanup (completed for the audited candidates)
 
-Move pure reusable numerical or physical kernels only after their behavior is
-covered by the preceding tests. Candidates include:
+The audit identified these reusable numerical or physical kernels:
 
 - `Integrate1D._quadrature_weights` and the fit/interpolation kernel in
   `FindScaleFactor1D` for `modacor.models`;
@@ -262,14 +274,17 @@ covered by the preceding tests. Candidates include:
 - the linear polarization-factor equation in `PolarizationCorrection` for a
   scattering model module.
 
-The `ProcessStep` classes should retain configuration interpretation, source
-resolution, `BaseData` adaptation, dependency declarations, and mutation of
-`ProcessingData`. Pure kernels must not import `ProcessStep`, `BaseData`, or I/O
-registries.
+They now reside in `modacor.models.integration`, `modacor.models.scaling`,
+`modacor.models.attenuation.planar`, and
+`modacor.models.scattering.polarization`, respectively. The `ProcessStep`
+classes retain configuration interpretation, source resolution, `BaseData`
+adaptation, dependency declarations, and mutation of `ProcessingData`. Pure
+kernels do not import `ProcessStep`, `BaseData`, or I/O registries, and a
+package-boundary test enforces that direction.
 
 ## Recommended implementation sequence
 
-### Phase 1: add executable guardrails
+### Phase 1: add executable guardrails (completed)
 
 1. Add regression tests for C1--C5 before changing behavior.
 2. Add exact dependency-contract tests for every module touched in later
@@ -281,7 +296,7 @@ registries.
 These checks should report concrete class names rather than attempting to infer
 all reads and writes statically.
 
-### Phase 2: correct values and false invalidation claims
+### Phase 2: correct values and false invalidation claims (completed)
 
 Implement C1 through C5 in this order:
 
@@ -294,7 +309,7 @@ Implement C1 through C5 in this order:
 Keep each behavioral correction in a focused change with its own tests. Do not
 combine these fixes with package moves.
 
-### Phase 3: make dependency contracts exact
+### Phase 3: make dependency contracts exact (completed)
 
 1. Repair fixed-key single-bundle arithmetic steps.
 2. Repair asymmetric two-bundle operations and `CopyDataBundleKeys`.
@@ -306,30 +321,34 @@ Run the server partial-rerun tests after each group because an under-declared
 contract is a correctness error, while an over-declared contract is a
 performance and coherence defect.
 
-### Phase 4: reconcile public metadata and generated documentation
+### Phase 4: reconcile public metadata and generated documentation (completed)
 
 Update `required_data_keys`, `modifies`, `calling_id`, argument descriptions,
 and module notes. Regenerate all public module pages and ensure examples use the
 class names accepted by `ProcessStepRegistry`.
 
-### Phase 5: harden validation and class contracts
+### Phase 5: harden validation and class contracts (completed)
 
 Replace runtime assertions, migrate `_EstimatorSpec` to validated `attrs`, add
 missing return annotations, and remove mutable function defaults in
 `AppendSource` and `AppendSink` while those files are being touched.
 
-### Phase 6: extract reusable kernels
+### Phase 6: extract reusable kernels (completed)
 
 Move reusable numerical functions into `models` only after behavioral and
 contract tests are stable. Keep module adapters thin and verify that package
 imports still point in the documented direction.
 
-### Phase 7: final verification
+### Phase 7: final verification (completed)
 
-Run focused tests throughout, then the complete test suite, lint checks,
-generated-reference check, and warning-free documentation build. Record the
-verification result and move this document to `docs/design/completed/` only
-when every acceptance criterion below is met.
+Final verification on 2026-09-27 produced these results:
+
+- the full test suite passed with 935 tests, one opt-in memory test skipped,
+  and three established `BaseData` numerical-domain warnings;
+- repository-wide Ruff checks passed for `src`, `tests`, and `scripts`;
+- generated-reference discovery covered exactly all 36 exported steps and the
+  generator pruned the obsolete analyser-angle page; and
+- Sphinx completed with `-E -W --keep-going` and no warnings.
 
 ## Completion criteria
 

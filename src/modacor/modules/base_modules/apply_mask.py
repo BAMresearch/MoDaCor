@@ -15,7 +15,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["ApplyMask"]
-__version__ = "20260927.1"
+__version__ = "20260927.2"
 
 from pathlib import Path
 
@@ -87,7 +87,8 @@ class ApplyMask(ProcessStep):
 
     @staticmethod
     def _require_int(arr: np.ndarray, name: str) -> None:
-        assert np.issubdtype(arr.dtype, np.integer), f"{name} must be an integer mask, got {arr.dtype}."
+        if not np.issubdtype(arr.dtype, np.integer):
+            raise TypeError(f"{name} must be an integer mask, got {arr.dtype}.")
 
     @staticmethod
     def _masked_value(value):
@@ -130,13 +131,17 @@ class ApplyMask(ProcessStep):
         cfg = self.configuration
 
         keys = self._normalised_processing_keys()
-        assert len(keys) == 1, "ApplyMask requires a single databundle processing key."
+        if len(keys) != 1:
+            raise ValueError("ApplyMask requires a single databundle processing key.")
         processing_key = keys[0]
         mask_key = cfg.get("mask_key", "mask")
         source_keys = cfg.get("basedata_to_mask", ["signal"])
         masked_value = self._masked_value(cfg.get("masked_value", "nan"))
 
-        assert isinstance(source_keys, list) and source_keys, "basedata_to_mask must be a non-empty list."
+        if not isinstance(source_keys, list):
+            raise TypeError("ApplyMask basedata_to_mask must be a list.")
+        if not source_keys:
+            raise ValueError("ApplyMask basedata_to_mask must be a non-empty list.")
 
         bundle = self.processing_data[processing_key]
         mask_bd: BaseData = bundle[mask_key]

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["FlatPlateSelfAbsorptionCorrection"]
-__version__ = "20260927.1"
+__version__ = "20260927.2"
 
 from pathlib import Path
 
@@ -35,7 +35,10 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal", "CosAlpha"],
-        modifies={"signal": ["signal", "uncertainties"]},
+        modifies={
+            "signal": ["signal", "uncertainties"],
+            "flat_plate_self_absorption": ["signal", "uncertainties", "units"],
+        },
         arguments={
             "with_processing_keys": {
                 "type": list,

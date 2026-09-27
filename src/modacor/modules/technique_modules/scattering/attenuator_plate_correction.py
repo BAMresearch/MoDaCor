@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 __all__ = ["AttenuatorPlateCorrection"]
-__version__ = "20260902.1"
+__version__ = "20260927.2"
 
 from pathlib import Path
 
@@ -21,6 +21,7 @@ from modacor.dataclasses.process_step import (
     source_refs_from_references,
 )
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.models.attenuation import planar_transmission
 from modacor.modules.helpers.scattering.material_attenuation import (
     material_attenuation_from_config,
     positive_cos_alpha,
@@ -37,7 +38,10 @@ class AttenuatorPlateCorrection(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal", "CosAlpha"],
-        modifies={"signal": ["signal", "uncertainties"]},
+        modifies={
+            "signal": ["signal", "uncertainties"],
+            "attenuator_transmission": ["signal", "units"],
+        },
         arguments={
             "with_processing_keys": {
                 "type": list,
@@ -203,21 +207,18 @@ class AttenuatorPlateCorrection(ProcessStep):
         ),
     )
 
-    @staticmethod
-    def _transmission(mu_m_inv: float, thickness_m: float, cos_alpha: np.ndarray) -> np.ndarray:
-        return np.exp((-mu_m_inv * thickness_m) / cos_alpha)
-
     def dependency_contract(self) -> ProcessStepDependencies:
         cfg = self.configuration or {}
         keys = cfg.get("with_processing_keys")
         cos_alpha_key = cfg.get("cos_alpha_key", "CosAlpha")
-        source_values = [
-            value for key, value in cfg.items() if key.endswith("_source") or key.endswith("_units_source")
-        ]
+        signal_paths = processing_key_patterns(keys, basedata_key="signal")
+        correction_paths = processing_key_patterns(
+            keys, basedata_key=cfg.get("correction_key", "attenuator_transmission")
+        )
         return ProcessStepDependencies(
-            source_refs=source_refs_from_references(source_values),
-            processing_reads=processing_key_patterns(keys) | processing_key_patterns(keys, basedata_key=cos_alpha_key),
-            processing_writes=processing_key_patterns(keys),
+            source_refs=source_refs_from_references(cfg),
+            processing_reads=signal_paths | processing_key_patterns(keys, basedata_key=cos_alpha_key),
+            processing_writes=signal_paths | correction_paths,
         )
 
     def calculate(self) -> dict[str, DataBundle]:
@@ -242,14 +243,14 @@ class AttenuatorPlateCorrection(ProcessStep):
             # materials and compute their own lab-frame incidence cosine.
             cos_alpha = positive_cos_alpha(cos_alpha_bd, minimum_cos_alpha=minimum_cos_alpha)
 
-            transmission = self._transmission(
+            transmission = planar_transmission(
                 attenuation.linear_attenuation_coefficient_m_inv,
                 thickness_m,
                 cos_alpha,
             )
             if normalize:
                 normal_transmission = float(
-                    self._transmission(attenuation.linear_attenuation_coefficient_m_inv, thickness_m, np.asarray(1.0))
+                    planar_transmission(attenuation.linear_attenuation_coefficient_m_inv, thickness_m, np.asarray(1.0))
                 )
                 if normal_transmission <= 0:
                     raise ValueError("Normal-incidence attenuator transmission is zero.")

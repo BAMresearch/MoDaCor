@@ -15,7 +15,7 @@ __copyright__ = "Copyright 2026, The MoDaCor team"
 __date__ = "04/01/2026"
 __status__ = "Development"
 
-__version__ = "20260927.1"
+__version__ = "20260927.2"
 __all__ = ["CanonicalDetectorFrame", "PixelCoordinates3D"]
 
 from typing import Dict, Tuple
@@ -27,6 +27,7 @@ from attrs import define
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies
 from modacor.geometry import unit_vector3
@@ -437,7 +438,7 @@ class PixelCoordinates3D(ProcessStep):
 
         self._prepared_data = {k: outputs[k] for k in ("coord_x", "coord_y", "coord_z")}
 
-    def calculate(self):
+    def calculate(self) -> dict[str, DataBundle]:
         with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
         if not with_keys:
             logger.warning("PixelCoordinates3D: no with_processing_keys specified; nothing to do.")

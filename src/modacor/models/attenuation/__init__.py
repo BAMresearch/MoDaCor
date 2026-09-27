@@ -19,6 +19,7 @@ from modacor.models.attenuation.flat_plate import (
     flat_plate_relative_attenuation,
     flat_plate_relative_attenuation_derivative,
 )
+from modacor.models.attenuation.planar import planar_absorption_efficiency, planar_transmission
 
 __all__ = [
     "AdaptiveDetectorAttenuation",
@@ -32,6 +33,8 @@ __all__ = [
     "flat_plate_relative_attenuation_derivative",
     "gaussian_beam_profile",
     "image_beam_profile",
+    "planar_absorption_efficiency",
+    "planar_transmission",
     "trapezoid_beam_profile",
     "uniform_cross_section_quadrature",
 ]

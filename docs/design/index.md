@@ -10,7 +10,6 @@ source of truth when they differ from runtime code or maintainer documentation.
 ```{toctree}
 :maxdepth: 1
 
-code-coherence
 capillary-self-absorption
 pixel-unit-removal
 tiled-io-upgrade

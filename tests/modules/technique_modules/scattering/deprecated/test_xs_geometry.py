@@ -2,6 +2,12 @@
 # /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""Tests retained for the deprecated XSGeometry implementation.
+
+The tests cover low-level geometry helpers, basic detector symmetry, 1D and 0D
+cases, and a thin ``prepare_execution()``/``calculate()`` integration path.
+"""
+
 from __future__ import annotations
 
 __coding__ = "utf-8"
@@ -11,24 +17,13 @@ __date__ = "22/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-from modacor.dataclasses.databundle import DataBundle
-
-"""
-Tests retained for the deprecated XSGeometry implementation.
-
-We test:
-- Low-level geometry helpers (_compute_coordinates, _compute_angles, _compute_Q, ...)
-- Basic symmetry properties for a simple 2D detector
-- Simple checks for 1D and 0D cases
-- A thin integration test for prepare_execution() + calculate()
-"""
-
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 from modacor.modules.technique_modules.scattering.deprecated.xs_geometry import XSGeometry

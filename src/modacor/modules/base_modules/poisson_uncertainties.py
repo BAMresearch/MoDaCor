@@ -11,15 +11,15 @@ __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
-__version__ = "20250522.1"
+__version__ = "20260927.2"
 __all__ = ["PoissonUncertainties"]
 
 from pathlib import Path
 
 import numpy as np
 
-# from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 # from typing import Any
@@ -36,13 +36,13 @@ class PoissonUncertainties(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
-        modifies={"variances": ["Poisson"]},
+        modifies={"signal": ["uncertainties"]},
         arguments={
             "with_processing_keys": {
                 "type": list,
                 "required": True,
                 "default": None,
-                "doc": "ProcessingData keys to update with Poisson variances.",
+                "doc": "ProcessingData keys whose signal receives a named Poisson uncertainty.",
             },
         },
         step_keywords=["uncertainties", "Poisson"],
@@ -51,7 +51,14 @@ class PoissonUncertainties(ProcessStep):
         step_note="This is a simple Poisson uncertainty calculation based on the signal intensity",
     )
 
-    def calculate(self):
+    def dependency_contract(self) -> ProcessStepDependencies:
+        signal_paths = processing_key_patterns(
+            self.configuration.get("with_processing_keys"),
+            basedata_key="signal",
+        )
+        return ProcessStepDependencies(processing_reads=signal_paths, processing_writes=signal_paths)
+
+    def calculate(self) -> dict[str, DataBundle]:
         """
         Calculate the Poisson uncertainties for the data
         """

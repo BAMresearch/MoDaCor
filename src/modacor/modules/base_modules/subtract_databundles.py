@@ -12,12 +12,12 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["SubtractDatabundles"]
-__version__ = "20251029.1"
+__version__ = "20260927.2"
 
 from pathlib import Path
 
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -51,13 +51,27 @@ class SubtractDatabundles(ProcessStep):
         """,
     )
 
+    def dependency_contract(self) -> ProcessStepDependencies:
+        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
+        if len(processing_keys) != 2:
+            return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
+
+        minuend_key, subtrahend_key = processing_keys
+        minuend_path = f"{minuend_key}.signal"
+        subtrahend_path = f"{subtrahend_key}.signal"
+        return ProcessStepDependencies(
+            processing_reads={minuend_path, subtrahend_path},
+            processing_writes={minuend_path},
+        )
+
     def calculate(self) -> dict[str, DataBundle]:
         # actual work happens here:
         keys = self._normalised_processing_keys()
-        assert len(keys) == 2, (
-            "SubtractDatabundles requires exactly two processing keys in 'with_processing_keys': "
-            "the first is the minuend, the second is the subtrahend."
-        )
+        if len(keys) != 2:
+            raise ValueError(
+                "SubtractDatabundles requires exactly two processing keys in 'with_processing_keys': "
+                "the first is the minuend, the second is the subtrahend."
+            )
         minuend_key = keys[0]
         minuend = self.processing_data.get(minuend_key)
         subtrahend = self.processing_data.get(keys[1])

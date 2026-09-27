@@ -201,6 +201,13 @@ class TestApplyMaskProcessingStep(unittest.TestCase):
             np.array([[0, 1, 1], [1, 0, 1]], dtype=np.uint32),
         )
 
+    def test_apply_mask_rejects_non_integer_mask(self):
+        self.test_processing_data["sample"]["mask"].signal = np.zeros((2, 3), dtype=float)
+        step = self._make_step()
+
+        with self.assertRaisesRegex(TypeError, "must be an integer mask"):
+            step.calculate()
+
     def test_apply_mask_dependency_contract_is_exact(self):
         self.test_processing_data["sample"]["variance"] = BaseData(
             signal=np.ones((2, 3), dtype=np.uint32),

@@ -2,6 +2,8 @@
 # /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""Generate a Markdown documentation page for a MoDaCor ProcessStep module."""
+
 from __future__ import annotations
 
 __coding__ = "utf-8"
@@ -10,8 +12,6 @@ __copyright__ = "Copyright 2026, The MoDaCor team"
 __date__ = "20/01/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
-
-"""Generate a Markdown documentation page for a MoDaCor ProcessStep module."""
 
 import argparse
 import importlib
@@ -309,6 +309,9 @@ def run_cli() -> int:
         targets = _discover_targets()
         output_dir = args.output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
+        existing_module_pages = set(output_dir.glob("*.md"))
+        if args.index is not None:
+            existing_module_pages.discard(args.index)
 
         generated_files: list[Path] = []
         for target in targets:
@@ -317,6 +320,9 @@ def run_cli() -> int:
             output_path = output_dir / f"{step_cls.__name__}.md"
             output_path.write_text(markdown, encoding="utf-8")
             generated_files.append(output_path)
+
+        for stale_path in existing_module_pages - set(generated_files):
+            stale_path.unlink()
 
         if args.index:
             _write_module_index(args.index, generated_files)

@@ -16,6 +16,7 @@ import numpy as np
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 
@@ -89,3 +90,24 @@ def test_units_update_accepts_shorthand_string_form():
     step.execute(pd)
 
     assert pd["intensity_calibration"]["intensity_scale_factor"].units == ureg.Unit("second")
+
+
+def test_units_update_dependency_contract_tracks_configured_keys() -> None:
+    step = UnitsLabelUpdate(io_sources=IoSources())
+    step.modify_config_by_dict(
+        {
+            "with_processing_keys": ["sample", "background"],
+            "update_pairs": {"signal": "count", "transmission": "dimensionless"},
+        }
+    )
+
+    expected_paths = {
+        "sample.signal",
+        "sample.transmission",
+        "background.signal",
+        "background.transmission",
+    }
+    assert step.dependency_contract() == ProcessStepDependencies(
+        processing_reads=expected_paths,
+        processing_writes=expected_paths,
+    )
