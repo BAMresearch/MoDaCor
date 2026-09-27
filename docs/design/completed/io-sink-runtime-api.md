@@ -3,7 +3,7 @@
 Design note for runtime-service `IoSink` configuration with the same
 registration model already used for `IoSource`.
 
-Implementation status: implemented in this branch.
+Implementation status: completed and archived on 2026-09-27.
 
 ## Pre-Implementation State
 

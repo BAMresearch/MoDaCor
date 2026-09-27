@@ -11,14 +11,14 @@ __date__ = "25/05/2026"
 __status__ = "Development"
 
 __all__ = ["CopyDataBundleKeys"]
-__version__ = "20260525.1"
+__version__ = "20260927.2"
 
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -113,12 +113,25 @@ class CopyDataBundleKeys(ProcessStep):
 
         return deepcopy(value)
 
+    def dependency_contract(self) -> ProcessStepDependencies:
+        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
+        if len(processing_keys) != 2:
+            return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
+
+        target_processing_key, source_processing_key = processing_keys
+        key_pairs = self._key_pairs()
+        return ProcessStepDependencies(
+            processing_reads={f"{source_processing_key}.{source_key}" for source_key, _ in key_pairs},
+            processing_writes={f"{target_processing_key}.{target_key}" for _, target_key in key_pairs},
+        )
+
     def calculate(self) -> dict[str, DataBundle]:
         keys = self._normalised_processing_keys()
-        assert len(keys) == 2, (
-            "CopyDataBundleKeys requires exactly two processing keys in 'with_processing_keys': "
-            "the first is the target, the second is the source."
-        )
+        if len(keys) != 2:
+            raise ValueError(
+                "CopyDataBundleKeys requires exactly two processing keys in 'with_processing_keys': "
+                "the first is the target, the second is the source."
+            )
 
         target_processing_key, source_processing_key = keys
         source = self.processing_data.get(source_processing_key)

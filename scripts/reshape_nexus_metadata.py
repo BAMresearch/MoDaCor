@@ -2,8 +2,6 @@
 # /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from __future__ import annotations
-
 """Make NeXus metadata arrays broadcast cleanly with MoDaCor data arrays.
 
 Standard stacked NeXus files often store per-stack metadata as ``(N,)`` or ``(N, 1)``
@@ -13,6 +11,8 @@ shape. This script appends trailing singleton dimensions, e.g. ``(N, 1)`` become
 ``(N, 1, 1, 1)``. Size-one metadata arrays are left unchanged because they already
 broadcast to the data shape.
 """
+
+from __future__ import annotations
 
 import argparse
 import os

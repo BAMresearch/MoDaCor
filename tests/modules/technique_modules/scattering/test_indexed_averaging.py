@@ -2,6 +2,8 @@
 # /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""Tests for the IndexedAverager processing step."""
+
 from __future__ import annotations
 
 __coding__ = "utf-8"
@@ -12,17 +14,6 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 __version__ = "20251130.1"
 
-"""
-Tests for the IndexedAverager processing step.
-
-We test:
-- Basic 1D averaging with a simple, hand-crafted pixel_index map.
-- Correct handling of Mask and pixel_index == -1.
-- Uncertainty propagation from per-pixel uncertainties to bin-mean.
-- SEM ("SEM" key) behaviour for signal.
-- Integration-style test using prepare_execution() + calculate().
-"""
-
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -30,6 +21,7 @@ from numpy.testing import assert_allclose
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
@@ -287,6 +279,89 @@ def test_indexedaverager_1d_basic_unweighted_mean():
     # Axis wiring: for averaging_direction="azimuthal", signal axes should reference Q
     assert len(sig_1d.axes) == 1
     assert sig_1d.axes[0] is Q_1d
+    assert "pixel_index" in processing_data["bundle"]
+
+
+def test_indexedaverager_writes_distinct_output_and_preserves_source_bundle():
+    step = IndexedAverager(io_sources=IoSources())
+    processing_data = ProcessingData()
+    source = make_1d_bundle_with_mask_and_uncertainties()
+    original_signal = source["signal"]
+    processing_data["bundle"] = source
+
+    step.processing_data = processing_data
+    step.modify_config_by_dict(
+        {
+            "with_processing_keys": ["bundle"],
+            "output_processing_key": "averaged",
+        }
+    )
+
+    output = step.calculate()
+
+    assert set(output) == {"averaged"}
+    assert set(processing_data["averaged"]) == {"signal", "Q", "Psi"}
+    assert processing_data["bundle"] is source
+    assert processing_data["bundle"]["signal"] is original_signal
+    assert "pixel_index" in processing_data["bundle"]
+    assert "Mask" in processing_data["bundle"]
+
+
+def test_indexedaverager_infers_single_input_for_distinct_output():
+    step = IndexedAverager(io_sources=IoSources())
+    processing_data = ProcessingData()
+    processing_data["bundle"] = make_1d_bundle_basic()
+    step.modify_config_by_kwargs(output_processing_key="averaged")
+
+    step.execute(processing_data)
+
+    assert set(step.produced_outputs) == {"averaged"}
+    assert "averaged" in processing_data
+    assert "pixel_index" in processing_data["bundle"]
+
+
+def test_indexedaverager_rejects_one_output_key_for_multiple_inputs():
+    step = IndexedAverager(io_sources=IoSources())
+    step.modify_config_by_dict(
+        {
+            "with_processing_keys": ["sample", "background"],
+            "output_processing_key": "averaged",
+        }
+    )
+
+    with pytest.raises(ValueError, match="exactly one input"):
+        step.prepare_execution()
+
+
+def test_indexedaverager_dependency_contract_matches_output_mode():
+    step = IndexedAverager(io_sources=IoSources())
+    step.modify_config_by_dict({"with_processing_keys": ["sample"]})
+
+    assert step.dependency_contract() == ProcessStepDependencies(
+        processing_reads={
+            "sample.signal",
+            "sample.Q",
+            "sample.Psi",
+            "sample.pixel_index",
+            "sample.Mask",
+            "sample.mask",
+        },
+        processing_writes={"sample.signal", "sample.Q", "sample.Psi"},
+    )
+
+    step.modify_config_by_kwargs(output_processing_key="averaged")
+
+    assert step.dependency_contract() == ProcessStepDependencies(
+        processing_reads={
+            "sample.signal",
+            "sample.Q",
+            "sample.Psi",
+            "sample.pixel_index",
+            "sample.Mask",
+            "sample.mask",
+        },
+        processing_writes={"averaged.*"},
+    )
 
 
 def test_indexedaverager_mask_and_negative_index():

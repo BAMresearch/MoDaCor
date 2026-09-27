@@ -25,7 +25,10 @@ OUTPUT_DIR = PROJECT_DIR / "modacor_output"
 
 PIPELINE_PATHS = {
     "SAXS": PROJECT_DIR / "processing_pipelines" / "I22_SAXS_solids_operando.yaml",
-    "WAXS": PROJECT_DIR / "processing_pipelines" / "I22_WAXS_solids_operando.yaml",
+    # Select the WAXS profile matching the installed nosecone.
+    "WAXS": PROJECT_DIR
+    / "processing_pipelines"
+    / "I22_WAXS_solids_operando_usaxs_saxs_waxs.yaml",
 }
 CALIBRATION_FILES = {
     "SAXS": PROCESSING_DIR / "SAXS_calibration.nxs",
@@ -366,8 +369,8 @@ The SAXS and WAXS pipelines share the same broad structure:
 1. load sample, background, calibration-shape, and mask data;
 2. attach Poisson uncertainties;
 3. mask invalid raw counts;
-4. normalize sample and background by beamstop-diode intensity;
-5. normalize by detector count time;
+4. normalize by detector count time;
+5. normalize sample and background by calibrated sample transmission and I0;
 6. average frame stacks with weights;
 7. subtract the corrected background;
 8. compute static pixel coordinates and scattering geometry from calibration
@@ -379,10 +382,11 @@ The SAXS and WAXS pipelines share the same broad structure:
     corrections;
 12. publish live 2D and I(Q) plots and write HDF outputs.
 
-The WAXS flow additionally applies an aluminium attenuator-plate correction
-before polarization correction. In the current operando YAML, that correction
-divides by the angle-dependent aluminium transmission and avoids a second
-division by the scalar `/modacor/normalization/transmission` value.
+The WAXS flow has two operational nosecone profiles. The combined
+USAXS/SAXS/WAXS configuration has no aluminium attenuator and bypasses that
+step. The standard SAXS/WAXS configuration divides by the angle-dependent
+transmission of its 1 mm aluminium attenuator before polarization correction.
+The SAXS pipeline is common to both configurations.
 
 ## Detector-specific integration settings
 

@@ -58,5 +58,5 @@ def test_divide_databundles_requires_two_processing_keys() -> None:
     step = DivideDatabundles(io_sources=IoSources())
     step.modify_config_by_kwargs(with_processing_keys=["scan"])
 
-    with pytest.raises(AssertionError, match="exactly two processing keys"):
+    with pytest.raises(ValueError, match="exactly two processing keys"):
         step(processing_data)

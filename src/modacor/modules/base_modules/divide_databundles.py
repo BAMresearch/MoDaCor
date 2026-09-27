@@ -11,12 +11,12 @@ __date__ = "25/09/2026"
 __status__ = "Development"
 
 __all__ = ["DivideDatabundles"]
-__version__ = "20260925.1"
+__version__ = "20260927.2"
 
 from pathlib import Path
 
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -28,7 +28,7 @@ class DivideDatabundles(ProcessStep):
         calling_id="DivideDatabundles",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=[],
+        required_data_keys=["signal"],
         modifies={"signal": ["signal", "uncertainties", "units"]},
         arguments={
             "with_processing_keys": {
@@ -57,12 +57,26 @@ class DivideDatabundles(ProcessStep):
         ),
     )
 
+    def dependency_contract(self) -> ProcessStepDependencies:
+        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
+        if len(processing_keys) != 2:
+            return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
+
+        dividend_key, divisor_key = processing_keys
+        dividend_path = f"{dividend_key}.{self.configuration['dividend_data_key']}"
+        divisor_path = f"{divisor_key}.{self.configuration['divisor_data_key']}"
+        return ProcessStepDependencies(
+            processing_reads={dividend_path, divisor_path},
+            processing_writes={dividend_path},
+        )
+
     def calculate(self) -> dict[str, DataBundle]:
         keys = self._normalised_processing_keys()
-        assert len(keys) == 2, (
-            "DivideDatabundles requires exactly two processing keys in "
-            "'with_processing_keys': the first is the dividend, the second is the divisor."
-        )
+        if len(keys) != 2:
+            raise ValueError(
+                "DivideDatabundles requires exactly two processing keys in "
+                "'with_processing_keys': the first is the dividend, the second is the divisor."
+            )
 
         dividend_key, divisor_key = keys
         dividend = self.processing_data.get(dividend_key)

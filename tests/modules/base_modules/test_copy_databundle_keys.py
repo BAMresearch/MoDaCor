@@ -10,6 +10,7 @@ import pytest
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 from modacor.modules.base_modules.copy_databundle_keys import CopyDataBundleKeys
@@ -88,7 +89,7 @@ def test_copy_databundle_keys_requires_two_processing_keys() -> None:
     step.modify_config_by_kwargs(with_processing_keys=["sample"], data_keys=["Q"])
     step.processing_data = processing_data
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="exactly two processing keys"):
         step.calculate()
 
 
@@ -100,3 +101,16 @@ def test_copy_databundle_keys_requires_data_keys_or_key_map() -> None:
 
     with pytest.raises(ValueError, match="requires data_keys or key_map"):
         step.calculate()
+
+
+def test_copy_databundle_keys_dependency_contract_tracks_renamed_keys() -> None:
+    step = CopyDataBundleKeys(io_sources=TEST_IO_SOURCES)
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample", "static"],
+        key_map={"Q": "q", "Psi": "azimuth"},
+    )
+
+    assert step.dependency_contract() == ProcessStepDependencies(
+        processing_reads={"static.Q", "static.Psi"},
+        processing_writes={"sample.q", "sample.azimuth"},
+    )

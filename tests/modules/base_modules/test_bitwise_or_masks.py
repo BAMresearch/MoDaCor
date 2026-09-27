@@ -220,7 +220,7 @@ class TestBitwiseOrMasksProcessingStep(unittest.TestCase):
         }
         step.processing_data = self.test_processing_data
 
-        with self.assertRaises(AssertionError):
+        with self.assertRaisesRegex(TypeError, "must be an integer mask"):
             step.calculate()
 
     def test_broadcasting_and_shape_errors(self):

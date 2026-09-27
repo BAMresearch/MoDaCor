@@ -5,6 +5,7 @@ import numpy as np
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 from modacor.modules.base_modules.integrate_1d import Integrate1D
@@ -78,3 +79,32 @@ def test_integrate_1d_can_store_simpson_result_in_source_bundle() -> None:
 
     np.testing.assert_allclose(data["curve"]["area"].signal, 8.0 / 3.0)
     np.testing.assert_allclose(data["curve"]["area"].uncertainties["SEM"], np.sqrt(2.0))
+
+
+def test_integrate_1d_dependency_contract_declares_new_output_bundles() -> None:
+    step = Integrate1D(io_sources=IoSources())
+    step.modify_config_by_kwargs(
+        with_processing_keys=["sample", "blank"],
+        axis_key="q",
+        output_processing_keys=["sample_integral", "blank_integral"],
+    )
+
+    assert step.dependency_contract() == ProcessStepDependencies(
+        processing_reads={"sample.signal", "sample.q", "blank.signal", "blank.q"},
+        processing_writes={"sample_integral.*", "blank_integral.*"},
+    )
+
+
+def test_integrate_1d_dependency_contract_declares_in_place_output_and_mask() -> None:
+    step = Integrate1D(io_sources=IoSources())
+    step.modify_config_by_kwargs(
+        with_processing_keys=["curve"],
+        axis_key="x",
+        mask_key="mask",
+        output_key="area",
+    )
+
+    assert step.dependency_contract() == ProcessStepDependencies(
+        processing_reads={"curve.signal", "curve.x", "curve.mask"},
+        processing_writes={"curve.area"},
+    )

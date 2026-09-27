@@ -2,6 +2,8 @@
 # /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""Tests for the IndexPixels processing step."""
+
 from __future__ import annotations
 
 __coding__ = "utf-8"
@@ -12,17 +14,6 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 __version__ = "20251130.1"
 
-"""
-Tests for the IndexPixels processing step.
-
-We test:
-- Basic azimuthal binning in Q (1D case).
-- Basic radial binning in Psi (1D case).
-- Unit conversion for q_limits_unit.
-- Psi wrap-around masking for azimuthal direction.
-- A small integration-style test using prepare_execution() + calculate().
-"""
-
 import numpy as np
 
 # import pytest
@@ -32,6 +23,7 @@ from numpy.testing import assert_array_equal
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
@@ -424,3 +416,13 @@ def test_indexpixels_prepare_and_calculate_integration_2d():
     assert len(pix.axes) == len(signal_bd.axes[-signal_bd.rank_of_data :])
     # dimensionless units
     assert pix.units == ureg.dimensionless
+
+
+def test_indexpixels_dependency_contract_reads_primary_geometry_and_writes_all_outputs():
+    step = IndexPixels(io_sources=IoSources())
+    step.modify_config_by_kwargs(with_processing_keys=["sample", "background"])
+
+    assert step.dependency_contract() == ProcessStepDependencies(
+        processing_reads={"sample.signal", "sample.Q", "sample.Psi"},
+        processing_writes={"sample.pixel_index", "background.pixel_index"},
+    )

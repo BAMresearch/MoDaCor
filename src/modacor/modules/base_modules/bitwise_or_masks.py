@@ -12,7 +12,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["BitwiseOrMasks"]
-__version__ = "20260109.3"
+__version__ = "20260927.2"
 
 from pathlib import Path
 
@@ -35,7 +35,7 @@ class BitwiseOrMasks(ProcessStep):
 
     documentation = ProcessStepDescriber(
         calling_name="Combine masks within one DataBundle (bitwise OR)",
-        calling_id="BitwiseOrMasksInBundle",
+        calling_id="BitwiseOrMasks",
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["mask"],
@@ -77,18 +77,23 @@ class BitwiseOrMasks(ProcessStep):
 
     @staticmethod
     def _require_int(arr: np.ndarray, name: str) -> None:
-        assert np.issubdtype(arr.dtype, np.integer), f"{name} must be an integer mask, got {arr.dtype}."
+        if not np.issubdtype(arr.dtype, np.integer):
+            raise TypeError(f"{name} must be an integer mask, got {arr.dtype}.")
 
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration
 
         keys = self._normalised_processing_keys()
-        assert len(keys) == 1, "BitwiseOrMasks requires a single databundle processing key."
+        if len(keys) != 1:
+            raise ValueError("BitwiseOrMasks requires a single databundle processing key.")
         processing_key = keys[0]
         target_key = cfg.get("target_mask_key", "mask")
         source_keys = cfg["source_mask_keys"]
 
-        assert isinstance(source_keys, list) and source_keys, "source_mask_keys must be a non-empty list."
+        if not isinstance(source_keys, list):
+            raise TypeError("BitwiseOrMasks source_mask_keys must be a list.")
+        if not source_keys:
+            raise ValueError("BitwiseOrMasks source_mask_keys must be a non-empty list.")
 
         bundle = self.processing_data[processing_key]
         target_bd: BaseData = bundle[target_key]

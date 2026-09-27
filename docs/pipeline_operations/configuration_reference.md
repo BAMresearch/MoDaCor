@@ -368,7 +368,7 @@ already attached to the input. Known per-value uncertainties, including
 Poisson uncertainties, are normally best attached before reduction and allowed
 to propagate through the existing mean or sum formulas. The complete design
 and statistical contract is recorded in
-[ReduceDimensionality uncertainty estimators](../design/reduce-dimensionality-uncertainty-estimators.md).
+[ReduceDimensionality uncertainty estimators](../design/completed/reduce-dimensionality-uncertainty-estimators.md).
 
 ```yaml
 steps:

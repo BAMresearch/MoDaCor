@@ -12,7 +12,7 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "24/09/2026"
 __status__ = "Development"  # "Development", "Production"
 
-__version__ = "20260924.1"
+__version__ = "20260927.1"
 __all__ = ["IndexedAverager"]
 
 from pathlib import Path
@@ -23,7 +23,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.modules.helpers import finalize_weighted_scatter, get_first_present, normalize_str_list
 
@@ -80,10 +80,13 @@ class IndexedAverager(ProcessStep):
         use_signal_uncertainty_weights is True. Must be provided and present
         in signal.uncertainties in that case.
 
-    Outputs (returned from calculate())
-    -----------------------------------
-    For each key in with_processing_keys, the corresponding databundle will
-    be updated with 1D BaseData:
+    Outputs
+    -------
+    By default, each selected databundle is updated in place with 1D BaseData;
+    entries other than "signal", "Q", and "Psi" are retained. If
+    ``output_processing_key`` is set, exactly one input must be selected and a
+    new reduced databundle is written under that key while the input remains
+    unchanged.
 
     - "signal": BaseData
         Bin-averaged signal as 1D array (length n_bins).
@@ -110,8 +113,8 @@ class IndexedAverager(ProcessStep):
             bin mean for that key (using linear propagation on angles).
           * Optional keys "SEM" and "STD" derived from the weighted scatter.
 
-    The original 2D/1D "pixel_index" and optional "Mask" remain present in
-    the databundle, enabling further inspection or reuse.
+    In in-place mode, the original 2D/1D "pixel_index", optional "Mask", and
+    other entries remain present in the databundle for inspection or reuse.
     """
 
     documentation = ProcessStepDescriber(
@@ -130,7 +133,10 @@ class IndexedAverager(ProcessStep):
             "output_processing_key": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "Optional output key override (currently unused).",
+                "doc": (
+                    "Optional key for a new reduced DataBundle. This requires exactly one input "
+                    "and preserves the source DataBundle unchanged."
+                ),
             },
             "averaging_direction": {
                 "type": str,
@@ -528,6 +534,43 @@ class IndexedAverager(ProcessStep):
                 f"IndexedAverager: averaging_direction must be 'radial' or 'azimuthal', got {direction!r}."
             )
 
+        configured_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
+        if not configured_keys and self.processing_data is not None:
+            configured_keys = self._normalised_processing_keys()
+        self._validate_output_selection(configured_keys)
+
+    def _validate_output_selection(self, processing_keys: list[str]) -> str | None:
+        output_key = self.configuration.get("output_processing_key")
+        if output_key is None:
+            return None
+        output_key = str(output_key).strip()
+        if not output_key:
+            return None
+        if len(processing_keys) != 1:
+            raise ValueError("IndexedAverager: output_processing_key requires exactly one input processing key.")
+        return output_key
+
+    def dependency_contract(self) -> ProcessStepDependencies:
+        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
+        if not processing_keys:
+            return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
+
+        reads = {
+            f"{processing_key}.{basedata_key}"
+            for processing_key in processing_keys
+            for basedata_key in ("signal", "Q", "Psi", "pixel_index", "Mask", "mask")
+        }
+        output_key = self._validate_output_selection(processing_keys)
+        if output_key is not None and output_key not in processing_keys:
+            writes = {f"{output_key}.*"}
+        else:
+            writes = {
+                f"{processing_key}.{basedata_key}"
+                for processing_key in processing_keys
+                for basedata_key in ("signal", "Q", "Psi")
+            }
+        return ProcessStepDependencies(processing_reads=reads, processing_writes=writes)
+
     # ------------------------------------------------------------------
     # calculate: perform per-key averaging using pixel_index
     # ------------------------------------------------------------------
@@ -545,6 +588,7 @@ class IndexedAverager(ProcessStep):
             return output
 
         keys = self._normalised_processing_keys()
+        output_processing_key = self._validate_output_selection(keys)
         use_signal_weights = bool(self.configuration.get("use_signal_weights", True))
         use_unc_w = bool(self.configuration.get("use_signal_uncertainty_weights", False))
         uncertainty_weight_key = self.configuration.get("uncertainty_weight_key", None)
@@ -589,16 +633,17 @@ class IndexedAverager(ProcessStep):
             else:  # "radial"
                 signal_1d.axes = [Psi_1d]
 
-            db_out = DataBundle(
-                {
-                    "signal": signal_1d,
-                    "Q": Q_1d,
-                    "Psi": Psi_1d,
-                    # pixel_index, Mask, etc. remain in the original databundle
-                }
-            )
+            if output_processing_key is not None and output_processing_key != key:
+                destination_key = output_processing_key
+                db_out = DataBundle({"signal": signal_1d, "Q": Q_1d, "Psi": Psi_1d})
+                self.processing_data[destination_key] = db_out
+            else:
+                destination_key = key
+                databundle["signal"] = signal_1d
+                databundle["Q"] = Q_1d
+                databundle["Psi"] = Psi_1d
+                db_out = databundle
 
-            self.processing_data[key] = db_out
-            output[key] = db_out
+            output[destination_key] = db_out
 
         return output

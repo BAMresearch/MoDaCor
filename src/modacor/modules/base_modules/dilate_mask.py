@@ -11,7 +11,7 @@ __date__ = "02/09/2026"
 __status__ = "Development"
 
 __all__ = ["DilateMask"]
-__version__ = "20260902.1"
+__version__ = "20260927.2"
 
 from pathlib import Path
 from typing import Any
@@ -38,8 +38,8 @@ class DilateMask(ProcessStep):
         calling_id="DilateMask",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=[],
-        modifies={},
+        required_data_keys=["mask"],
+        modifies={"mask": ["signal", "units", "axes"]},
         arguments={
             "with_processing_keys": {
                 "type": list,
@@ -183,7 +183,8 @@ class DilateMask(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         keys = self._normalised_processing_keys()
-        assert len(keys) == 1, "DilateMask requires a single databundle processing key."
+        if len(keys) != 1:
+            raise ValueError("DilateMask requires a single databundle processing key.")
 
         processing_key = keys[0]
         source_key = self.configuration.get("source_mask_key", "mask")

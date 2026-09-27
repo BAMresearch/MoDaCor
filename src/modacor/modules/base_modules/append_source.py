@@ -12,7 +12,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["AppendSource"]
-__version__ = "20251030.1"
+__version__ = "20260927.1"
 
 from importlib import import_module
 from pathlib import Path
@@ -131,7 +131,7 @@ class AppendSource(ProcessStep):
         loader_name: str,
         source_location: str,
         source_identifier: str,
-        iosource_method_kwargs: dict[str, Any] = {},
+        iosource_method_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """
         Resolve the requested loader and append the resulting ioSource to
@@ -151,6 +151,7 @@ class AppendSource(ProcessStep):
             Additional keyword arguments to pass to the loader callable.
         """
         source_callable = self._resolve_iosource_callable(loader_name)
+        method_kwargs = {} if iosource_method_kwargs is None else iosource_method_kwargs
 
         # Ensure io_sources exists or initialize it
         if not hasattr(self, "io_sources") or self.io_sources is None:
@@ -162,7 +163,7 @@ class AppendSource(ProcessStep):
             source_callable(
                 source_reference=source_identifier,
                 resource_location=source_location,
-                iosource_method_kwargs=iosource_method_kwargs,
+                iosource_method_kwargs=method_kwargs,
             )
         )
 
