@@ -1,6 +1,7 @@
 # ReduceDimensionality Uncertainty-Estimator Upgrade Plan
 
-Status: implemented and verified locally on 2026-09-24.
+Status: implemented, verified locally on 2026-09-24, and archived on
+2026-09-27.
 
 ## Goal
 

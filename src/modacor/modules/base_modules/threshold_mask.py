@@ -15,7 +15,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["ThresholdMask"]
-__version__ = "20260717.1"
+__version__ = "20260927.3"
 
 from pathlib import Path
 from typing import Any
@@ -46,8 +46,8 @@ class ThresholdMask(ProcessStep):
         calling_id="ThresholdMask",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=[],
-        modifies={},
+        required_data_keys=["signal"],
+        modifies={"threshold_mask": ["signal", "units"]},
         arguments={
             "with_processing_keys": {
                 "type": list,
@@ -70,12 +70,12 @@ class ThresholdMask(ProcessStep):
             "lower_bound": {
                 "type": (float, int, type(None)),
                 "default": None,
-                "doc": "Optional inclusive lower bound.",
+                "doc": "Optional inclusive lower-bound magnitude in the source signal's current units.",
             },
             "upper_bound": {
                 "type": (float, int, type(None)),
                 "default": None,
-                "doc": "Optional inclusive upper bound.",
+                "doc": "Optional inclusive upper-bound magnitude in the source signal's current units.",
             },
             "mask_mode": {
                 "type": str,
@@ -85,7 +85,10 @@ class ThresholdMask(ProcessStep):
             "threshold": {
                 "type": (float, int, type(None)),
                 "default": None,
-                "doc": "Deprecated compatibility alias for upper_bound when upper_bound is not set.",
+                "doc": (
+                    "Deprecated compatibility alias for upper_bound when upper_bound is not set; interpreted "
+                    "in the source signal's current units."
+                ),
             },
         },
         step_keywords=["mask", "threshold", "databundle"],
@@ -105,7 +108,8 @@ class ThresholdMask(ProcessStep):
               inside:  mask = (source >= lower_bound) & (source <= upper_bound)
 
             The legacy threshold option is treated as upper_bound when
-            upper_bound is not configured.
+            upper_bound is not configured. Bounds are numeric magnitudes in
+            the source signal's current units; this step does not convert them.
         """,
     )
 
@@ -153,7 +157,8 @@ class ThresholdMask(ProcessStep):
         cfg = self.configuration
 
         keys = self._normalised_processing_keys()
-        assert len(keys) == 1, "ThresholdMask requires a single databundle processing key."
+        if len(keys) != 1:
+            raise ValueError("ThresholdMask requires a single databundle processing key.")
         processing_key = keys[0]
         target_key = cfg.get("target_mask_key", "threshold_mask")
         source_key = cfg.get("source_basedata_key", "signal")

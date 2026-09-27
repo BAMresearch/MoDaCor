@@ -122,15 +122,14 @@ class TestSubtractDatabundles(unittest.TestCase):
 
     def test_requires_exactly_two_keys(self):
         """
-        SubtractDatabundles should assert if 'with_processing_keys' does not
-        contain exactly two keys.
+        SubtractDatabundles should reject configurations that do not contain
+        exactly two processing keys.
         """
         step = SubtractDatabundles(io_sources=TEST_IO_SOURCES)
-        # Only one key → should trigger the assertion in calculate()
         step.modify_config_by_kwargs(
             with_processing_keys=["bundle1"],
         )
         step.processing_data = self.processing_data
 
-        with self.assertRaises(AssertionError):
+        with self.assertRaisesRegex(ValueError, "exactly two processing keys"):
             step.calculate()

@@ -11,13 +11,13 @@ __date__ = "16/12/2025"
 __status__ = "Development"  # "Development", "Production"
 
 __all__ = ["UnitsLabelUpdate"]
-__version__ = "20251216.1"
+__version__ = "20260927.2"
 
 from pathlib import Path
 
 from modacor import ureg
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -32,8 +32,8 @@ class UnitsLabelUpdate(ProcessStep):
         calling_id="UnitsLabelUpdate",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=[""],  # provided via update_pairs
-        modifies={"": ["units"]},
+        required_data_keys=[],  # dynamic keys are provided via update_pairs
+        modifies={},
         arguments={
             "update_pairs": {
                 "type": dict,
@@ -46,6 +46,14 @@ class UnitsLabelUpdate(ProcessStep):
         step_doc="Update unit labels of one or more BaseData elements (no conversion).",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
     )
+
+    def dependency_contract(self) -> ProcessStepDependencies:
+        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
+        basedata_keys = {str(key).strip() for key in self.configuration.get("update_pairs", {}) if str(key).strip()}
+        paths = {
+            f"{processing_key}.{basedata_key}" for processing_key in processing_keys for basedata_key in basedata_keys
+        }
+        return ProcessStepDependencies(processing_reads=paths, processing_writes=paths)
 
     def calculate(self) -> dict[str, DataBundle]:
         pairs = self.configuration["update_pairs"]

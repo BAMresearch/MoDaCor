@@ -11,14 +11,15 @@ __date__ = "24/09/2026"
 __status__ = "Development"  # "Development", "Production"
 
 __all__ = ["ReduceDimensionality"]
-__version__ = "20260924.2"
+__version__ = "20260927.1"
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+from attrs import define, field
+from attrs import validators as v
 
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
@@ -38,12 +39,30 @@ _ESTIMATOR_REDUCTIONS = {
 }
 
 
-@dataclass(frozen=True)
+def _validate_non_empty_string(_instance: object, attribute: Any, value: str) -> None:
+    if not value.strip():
+        raise ValueError(f"{attribute.name} must be a non-empty string.")
+
+
+def _convert_non_negative_integer(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, np.integer)):
+        raise TypeError("ddof must be an integer.")
+    return int(value)
+
+
+def _validate_non_negative(_instance: object, attribute: Any, value: int) -> None:
+    if value < 0:
+        raise ValueError(f"{attribute.name} must be non-negative.")
+
+
+@define(frozen=True, slots=True)
 class _EstimatorSpec:
-    output_key: str
-    method: str
-    ddof: int
-    collision_policy: str
+    """Validated normalized representation of one uncertainty estimator."""
+
+    output_key: str = field(validator=[v.instance_of(str), _validate_non_empty_string])
+    method: str = field(validator=[v.instance_of(str), v.in_(tuple(_ESTIMATOR_REDUCTIONS))])
+    ddof: int = field(converter=_convert_non_negative_integer, validator=_validate_non_negative)
+    collision_policy: str = field(validator=[v.instance_of(str), v.in_(tuple(_COLLISION_POLICIES))])
 
 
 class ReduceDimensionality(ProcessStep):

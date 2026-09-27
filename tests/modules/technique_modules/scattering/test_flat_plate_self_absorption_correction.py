@@ -121,12 +121,13 @@ def test_dependency_contract_tracks_transmission_and_geometry():
             "with_processing_keys": ["sample"],
             "transmission_source": "measurement::/transmission",
             "transmission_units_source": "measurement::/transmission@units",
+            "transmission_uncertainties_sources": {"SEM": "statistics::/transmission_sem"},
         }
     )
 
     contract = step.dependency_contract()
 
     assert isinstance(contract, ProcessStepDependencies)
-    assert contract.source_refs == frozenset({"measurement"})
+    assert contract.source_refs == frozenset({"measurement", "statistics"})
     assert contract.processing_reads == frozenset({"sample.signal", "sample.CosAlpha"})
     assert contract.processing_writes == frozenset({"sample.signal", "sample.flat_plate_self_absorption"})

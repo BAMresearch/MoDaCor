@@ -11,6 +11,7 @@ __date__ = "09/01/2026"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
+from inspect import signature
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,11 @@ import pytest
 from modacor.io.csv.csv_sink import CSVSink
 from modacor.io.io_sinks import IoSinks
 from modacor.modules.base_modules.append_sink import AppendSink
+
+
+def test_append_sink_helper_has_no_mutable_default():
+    parameter = signature(AppendSink._append_sink_by_name).parameters["iosink_method_kwargs"]
+    assert parameter.default is None
 
 
 @pytest.fixture

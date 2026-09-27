@@ -2,6 +2,8 @@
 # /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""HDF5 sink for writing processing results, pipeline metadata, and trace events."""
+
 from __future__ import annotations
 
 __coding__ = "utf-8"
@@ -10,8 +12,6 @@ __copyright__ = "Copyright 2026, The MoDaCor team"
 __date__ = "12/02/2026"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
-
-"""HDF5 sink for writing processing results, pipeline metadata, and trace events."""
 
 import re
 from pathlib import Path, PurePosixPath

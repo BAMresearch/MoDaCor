@@ -11,9 +11,10 @@ import numpy as np
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.messagehandler import MessageHandler
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.geometry import unit_vector3
 from modacor.io.nexus.geometry import (
@@ -28,7 +29,7 @@ from modacor.modules.helpers.scattering.detector_data import (
 
 logger = MessageHandler(name=__name__)
 
-__version__ = "20260106.1"
+__version__ = "20260927.2"
 __all__ = ["XSGeometryFromPixelCoordinates"]
 
 
@@ -169,6 +170,31 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
             signal_source=self.configuration.get(f"{key}_source"),
             units_source=self.configuration.get(f"{key}_units_source", None),
             uncertainty_sources=self.configuration.get(f"{key}_uncertainties_sources", {}),
+        )
+
+    def dependency_contract(self) -> ProcessStepDependencies:
+        base_contract = super().dependency_contract()
+        source_refs = set(base_contract.source_refs)
+
+        detector_frame = self.configuration.get("detector_frame")
+        if isinstance(detector_frame, dict) and str(detector_frame.get("type", "")).strip().lower() == "nexus":
+            source_reference = detector_frame.get("source")
+            if source_reference is not None and str(source_reference).strip():
+                source_refs.add(str(source_reference).strip())
+
+        sample_z_override = self.configuration.get("sample_z_override")
+        if (
+            isinstance(sample_z_override, dict)
+            and str(sample_z_override.get("type", "value")).strip().lower() == "nexus"
+        ):
+            source_reference = sample_z_override.get("source", sample_z_override.get("source_reference"))
+            if source_reference is not None and str(source_reference).strip():
+                source_refs.add(str(source_reference).strip())
+
+        return ProcessStepDependencies(
+            source_refs=source_refs,
+            processing_reads=base_contract.processing_reads,
+            processing_writes=base_contract.processing_writes,
         )
 
     @staticmethod
@@ -381,7 +407,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
 
         self._prepared_data = {k: out[k] for k in self.output_keys}
 
-    def calculate(self):
+    def calculate(self) -> dict[str, DataBundle]:
         with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
         if not with_keys:
             logger.warning("XSGeometryFromPixelCoordinates: no with_processing_keys specified; nothing to do.")

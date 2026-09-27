@@ -13,12 +13,18 @@ __status__ = "Development"  # "Development", "Production"
 
 import sys
 import types
+from inspect import signature
 from typing import List, Tuple
 
 import pytest
 
 from modacor.io.io_sources import IoSource, IoSources
 from modacor.modules.base_modules.append_source import AppendSource
+
+
+def test_append_loader_helper_has_no_mutable_default():
+    parameter = signature(AppendSource._append_loader_by_name).parameters["iosource_method_kwargs"]
+    assert parameter.default is None
 
 
 def _install_dummy_iosource_module(monkeypatch) -> Tuple[str, List[tuple]]:

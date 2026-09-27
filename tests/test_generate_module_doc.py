@@ -120,6 +120,9 @@ def test_cli_error_on_missing_documentation(tmp_path: Path, monkeypatch):
 def test_cli_generate_all(tmp_path: Path):
     output_dir = tmp_path / "modules"
     index_path = output_dir / "index.md"
+    output_dir.mkdir()
+    stale_path = output_dir / "RemovedProcessStep.md"
+    stale_path.write_text("stale generated page\n", encoding="utf-8")
 
     completed = subprocess.run(
         [
@@ -138,11 +141,17 @@ def test_cli_generate_all(tmp_path: Path):
     )
 
     assert index_path.exists()
+    assert not stale_path.exists()
     assert "Module reference" in index_path.read_text(encoding="utf-8")
     assert completed.stdout == ""
 
     module_files = list(output_dir.glob("*.md"))
-    assert module_files
+    expected_names = {target.rsplit(".", 1)[1] for target in generate_module_doc._discover_targets()}
+    assert {path.stem for path in module_files if path != index_path} == expected_names
+
+    index_content = index_path.read_text(encoding="utf-8")
+    for name in expected_names:
+        assert f"\n{name}\n" in index_content
 
 
 def test_exports_and_doc_generation_cover_all_process_steps():

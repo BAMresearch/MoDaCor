@@ -12,14 +12,14 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["SolidAngleCorrection"]
-__version__ = "20251029.1"
+__version__ = "20260927.1"
 
 from pathlib import Path
 
 # from modacor import ureg
 # from modacor.dataclasss.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -49,6 +49,15 @@ class SolidAngleCorrection(ProcessStep):
         step_note="""This divides the signal by the value previously calculated
             using XSGeometryFromPixelCoordinates""",
     )
+
+    def dependency_contract(self) -> ProcessStepDependencies:
+        processing_keys = self.configuration.get("with_processing_keys")
+        signal_paths = processing_key_patterns(processing_keys, basedata_key="signal")
+        omega_paths = processing_key_patterns(processing_keys, basedata_key="Omega")
+        return ProcessStepDependencies(
+            processing_reads=signal_paths | omega_paths,
+            processing_writes=signal_paths,
+        )
 
     def calculate(self) -> dict[str, DataBundle]:
         output: dict[str, DataBundle] = {}

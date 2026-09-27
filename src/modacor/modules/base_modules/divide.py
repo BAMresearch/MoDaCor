@@ -12,7 +12,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["Divide"]
-__version__ = "20251029.1"
+__version__ = "20260927.2"
 
 from pathlib import Path
 
@@ -20,7 +20,12 @@ from pathlib import Path
 # from modacor.dataclasss.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.helpers import basedata_from_sources
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import (
+    ProcessStep,
+    ProcessStepDependencies,
+    processing_key_patterns,
+    source_refs_from_references,
+)
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -31,7 +36,7 @@ class Divide(ProcessStep):
 
     documentation = ProcessStepDescriber(
         calling_name="Divide by IoSource data",
-        calling_id="DivideBySourceData",
+        calling_id="Divide",
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
@@ -59,6 +64,15 @@ class Divide(ProcessStep):
         step_note="""This loads a scalar (value, units and uncertainty)
             from an IOSource and applies it to the data signal""",
     )
+
+    def dependency_contract(self) -> ProcessStepDependencies:
+        cfg = self.configuration
+        signal_paths = processing_key_patterns(cfg.get("with_processing_keys"), basedata_key="signal")
+        return ProcessStepDependencies(
+            source_refs=source_refs_from_references(cfg),
+            processing_reads=signal_paths,
+            processing_writes=signal_paths,
+        )
 
     def calculate(self) -> dict[str, DataBundle]:
         # build up the divisor BaseData object from the IoSources

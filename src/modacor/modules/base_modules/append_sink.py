@@ -12,7 +12,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["AppendSink"]
-__version__ = "20260109.1"
+__version__ = "20260927.1"
 
 from importlib import import_module
 from pathlib import Path
@@ -115,9 +115,10 @@ class AppendSink(ProcessStep):
         sink_name: str,
         sink_location: str,
         sink_identifier: str,
-        iosink_method_kwargs: dict[str, Any] = {},
+        iosink_method_kwargs: dict[str, Any] | None = None,
     ) -> None:
         sink_callable = self._resolve_iosink_callable(sink_name)
+        method_kwargs = {} if iosink_method_kwargs is None else iosink_method_kwargs
 
         # Ensure io_sinks exists or initialize it
         if not hasattr(self, "io_sinks") or self.io_sinks is None:
@@ -128,7 +129,7 @@ class AppendSink(ProcessStep):
             sink_callable(
                 sink_reference=sink_identifier,
                 resource_location=sink_location,
-                iosink_method_kwargs=iosink_method_kwargs,
+                iosink_method_kwargs=method_kwargs,
             )
         )
 

@@ -10,7 +10,7 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "29/11/2025"
 __status__ = "Development"  # "Development", "Production"
 
-__version__ = "20251130.1"
+__version__ = "20260927.1"
 __all__ = ["IndexPixels"]
 
 from pathlib import Path
@@ -22,7 +22,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 logger = MessageHandler(name=__name__)
@@ -175,7 +175,7 @@ class IndexPixels(ProcessStep):
                 "doc": "Units for psi_min/psi_max if provided.",
             },
         },
-        modifies={},  # nothing, we only add.
+        modifies={"pixel_index": ["signal", "units", "axes"]},
         step_keywords=[
             "radial",
             "azimuthal",
@@ -195,6 +195,21 @@ class IndexPixels(ProcessStep):
     def __attrs_post_init__(self) -> None:
         super().__attrs_post_init__()
         # Prepared state lives in self._prepared_data.
+
+    def dependency_contract(self) -> ProcessStepDependencies:
+        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
+        if not processing_keys:
+            return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
+
+        primary_key = processing_keys[0]
+        return ProcessStepDependencies(
+            processing_reads={
+                f"{primary_key}.signal",
+                f"{primary_key}.Q",
+                f"{primary_key}.Psi",
+            },
+            processing_writes={f"{processing_key}.pixel_index" for processing_key in processing_keys},
+        )
 
     # ------------------------------------------------------------------
     # internal helper: normalise with_processing_keys

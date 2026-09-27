@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 __all__ = ["Integrate1D"]
-__version__ = "20260925.1"
+__version__ = "20260927.3"
 
 from pathlib import Path
 
 import numpy as np
-from scipy.integrate import simpson
 
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.models.integration import quadrature_weights_1d
 
 
 class Integrate1D(ProcessStep):
@@ -24,8 +24,8 @@ class Integrate1D(ProcessStep):
         calling_id="Integrate1D",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=[],
-        modifies={},
+        required_data_keys=["signal", "q"],
+        modifies={"integral": ["signal", "uncertainties", "units"]},
         arguments={
             "with_processing_keys": {
                 "type": list,
@@ -75,19 +75,31 @@ class Integrate1D(ProcessStep):
         ),
     )
 
-    @staticmethod
-    def _quadrature_weights(axis: np.ndarray, method: str) -> np.ndarray:
-        """Return coefficients whose dot product with samples is the integral."""
-        if method == "trapezoid":
-            weights = np.empty(axis.size, dtype=float)
-            weights[0] = 0.5 * (axis[1] - axis[0])
-            weights[-1] = 0.5 * (axis[-1] - axis[-2])
-            if axis.size > 2:
-                weights[1:-1] = 0.5 * (axis[2:] - axis[:-2])
-            return weights
-        if method == "simpson":
-            return np.asarray(simpson(np.eye(axis.size), x=axis, axis=1), dtype=float)
-        raise ValueError("Integrate1D method must be 'trapezoid' or 'simpson'.")
+    def dependency_contract(self) -> ProcessStepDependencies:
+        cfg = self.configuration
+        processing_keys = normalize_processing_key_values(cfg.get("with_processing_keys"))
+        if not processing_keys:
+            return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
+
+        signal_key = str(cfg.get("signal_key", "signal"))
+        axis_key = str(cfg.get("axis_key", "q"))
+        mask_key = cfg.get("mask_key")
+        read_keys = {signal_key, axis_key}
+        if mask_key is not None:
+            read_keys.add(str(mask_key))
+        reads = {f"{processing_key}.{basedata_key}" for processing_key in processing_keys for basedata_key in read_keys}
+
+        output_processing_keys = cfg.get("output_processing_keys")
+        if output_processing_keys is None:
+            output_key = str(cfg.get("output_key", "integral"))
+            writes = {f"{processing_key}.{output_key}" for processing_key in processing_keys}
+        else:
+            output_processing_keys = [str(key) for key in output_processing_keys]
+            if len(output_processing_keys) != len(processing_keys):
+                raise ValueError("output_processing_keys must contain one key per input bundle.")
+            writes = {f"{output_processing_key}.*" for output_processing_key in output_processing_keys}
+
+        return ProcessStepDependencies(processing_reads=reads, processing_writes=writes)
 
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration
@@ -130,7 +142,7 @@ class Integrate1D(ProcessStep):
         differences = np.diff(axis)
         if not (np.all(differences > 0.0) or np.all(differences < 0.0)):
             raise ValueError("Integrate1D axis must be strictly monotonic.")
-        quadrature_weights = self._quadrature_weights(axis, method)
+        quadrature_weights = quadrature_weights_1d(axis, method)
 
         output_processing_keys = cfg.get("output_processing_keys")
         if output_processing_keys is not None:

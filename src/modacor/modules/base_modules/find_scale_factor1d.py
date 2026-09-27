@@ -11,43 +11,19 @@ __date__ = "12/12/2025"
 __status__ = "Development"
 
 __all__ = ["FindScaleFactor1D"]
-__version__ = "20251212.2"
+__version__ = "20260927.3"
 
 from pathlib import Path
 from typing import Dict
 
 import numpy as np
-from attrs import define
-from scipy.interpolate import interp1d
-from scipy.optimize import least_squares
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
-
-# -------------------------------------------------------------------------
-# Small data containers (attrs, not namedtuple)
-# -------------------------------------------------------------------------
-
-
-@define(slots=True)
-class DependentData1D:
-    y: np.ndarray
-    sigma: np.ndarray
-    weights: np.ndarray
-
-
-@define(slots=True)
-class FitData1D:
-    x: np.ndarray
-    y_ref: np.ndarray
-    y_work: np.ndarray
-    sigma_ref: np.ndarray
-    sigma_work: np.ndarray
-    weights: np.ndarray
-
+from modacor.models.scaling import DependentData1D, fit_scale_factor_1d, prepare_scale_fit_data
 
 # -------------------------------------------------------------------------
 # Helpers
@@ -94,90 +70,6 @@ def _extract_dependent(bd: BaseData) -> DependentData1D:
     return DependentData1D(y=y, sigma=sigma, weights=weights)
 
 
-def _overlap_range(x1: np.ndarray, x2: np.ndarray) -> tuple[float, float]:
-    return float(max(np.nanmin(x1), np.nanmin(x2))), float(min(np.nanmax(x1), np.nanmax(x2)))
-
-
-def _prepare_fit_data(
-    *,
-    x_work: np.ndarray,
-    dep_work: DependentData1D,
-    x_ref: np.ndarray,
-    dep_ref: DependentData1D,
-    require_overlap: bool,
-    interpolation_kind: str,
-    fit_min: float,
-    fit_max: float,
-    use_weights: bool,
-) -> FitData1D:
-    ov_min, ov_max = _overlap_range(x_ref, x_work)
-    if require_overlap and not (ov_min < ov_max):
-        raise ValueError("No overlap between working and reference x-axes.")
-
-    lo = max(fit_min, ov_min) if require_overlap else fit_min
-    hi = min(fit_max, ov_max) if require_overlap else fit_max
-    if not lo < hi:
-        raise ValueError("Empty fit range after overlap constraints.")
-
-    mask = (x_ref >= lo) & (x_ref <= hi)
-    if np.count_nonzero(mask) < 2:
-        raise ValueError("Not enough points in fit window.")
-
-    x_fit = x_ref[mask]
-    y_ref = dep_ref.y[mask]
-    sigma_ref = dep_ref.sigma[mask]
-    weights_ref = dep_ref.weights[mask]
-
-    # sort working data
-    order = np.argsort(x_work)
-    x_work = x_work[order]
-    y_work = dep_work.y[order]
-    sigma_work = dep_work.sigma[order]
-    weights_work = dep_work.weights[order]
-
-    bounds_error = require_overlap
-    fill_value = None if bounds_error else "extrapolate"
-
-    interp_y = interp1d(
-        x_work, y_work, kind=interpolation_kind, bounds_error=bounds_error, fill_value=fill_value, assume_sorted=True
-    )
-    interp_sigma = interp1d(
-        x_work, sigma_work, kind="linear", bounds_error=bounds_error, fill_value=fill_value, assume_sorted=True
-    )
-    interp_w = interp1d(
-        x_work, weights_work, kind="linear", bounds_error=bounds_error, fill_value=fill_value, assume_sorted=True
-    )
-
-    y_work_i = interp_y(x_fit)
-    sigma_work_i = interp_sigma(x_fit)
-    weights_work_i = interp_w(x_fit)
-
-    weights = (weights_ref * weights_work_i) if use_weights else np.ones_like(y_ref)
-
-    valid = (
-        np.isfinite(y_ref)
-        & np.isfinite(y_work_i)
-        & np.isfinite(sigma_ref)
-        & (sigma_ref > 0)
-        & np.isfinite(sigma_work_i)
-        & (sigma_work_i >= 0)
-        & np.isfinite(weights)
-        & (weights > 0)
-    )
-
-    if np.count_nonzero(valid) < 2:
-        raise ValueError("Not enough valid points after masking.")
-
-    return FitData1D(
-        x=x_fit[valid],
-        y_ref=y_ref[valid],
-        y_work=y_work_i[valid],
-        sigma_ref=sigma_ref[valid],
-        sigma_work=sigma_work_i[valid],
-        weights=weights[valid],
-    )
-
-
 # -------------------------------------------------------------------------
 # Main ProcessStep
 # -------------------------------------------------------------------------
@@ -189,7 +81,7 @@ class FindScaleFactor1D(ProcessStep):
         calling_id="FindScaleFactor1D",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=["signal"],
+        required_data_keys=["signal", "Q"],
         modifies={
             "scale_factor": ["signal", "uncertainties", "units"],
             "scale_background": ["signal", "uncertainties", "units"],
@@ -198,7 +90,10 @@ class FindScaleFactor1D(ProcessStep):
             "signal_key": {
                 "type": str,
                 "default": "signal",
-                "doc": "BaseData key for the dependent variable signal.",
+                "doc": (
+                    "BaseData key for the dependent variable signal. Working and reference "
+                    "signals must have compatible units; fitting uses the reference units."
+                ),
             },
             "independent_axis_key": {
                 "type": str,
@@ -281,6 +176,9 @@ class FindScaleFactor1D(ProcessStep):
         y_work_bd = work_db[sig_key].copy(with_axes=True)
         y_ref_bd = ref_db[sig_key].copy(with_axes=True)
 
+        if y_work_bd.units != y_ref_bd.units:
+            y_work_bd.to_units(y_ref_bd.units)
+
         x_work_bd = work_db[axis_key].copy(with_axes=False)
         x_ref_bd = ref_db[axis_key].copy(with_axes=False)
 
@@ -307,7 +205,7 @@ class FindScaleFactor1D(ProcessStep):
         else:
             fit_max = np.nanmax(x_ref)
 
-        fit_data = _prepare_fit_data(
+        fit_data = prepare_scale_fit_data(
             x_work=x_work,
             dep_work=dep_work,
             x_ref=x_ref,
@@ -320,53 +218,27 @@ class FindScaleFactor1D(ProcessStep):
         )
 
         fit_background = bool(cfg.get("fit_background", False))
-
-        def residuals(p: np.ndarray) -> np.ndarray:
-            scale = p[0]
-            background = p[1] if fit_background else 0.0
-            model = scale * fit_data.y_work + background
-            sigma = np.sqrt(fit_data.sigma_ref**2 + (scale * fit_data.sigma_work) ** 2)
-            r = (fit_data.y_ref - model) / sigma
-            return np.sqrt(fit_data.weights) * r
-
-        if fit_background:
-            X = np.column_stack([fit_data.y_work, np.ones_like(fit_data.y_work)])
-            x0, *_ = np.linalg.lstsq(X, fit_data.y_ref, rcond=None)
-        else:
-            denom = np.dot(fit_data.y_work, fit_data.y_work) or 1.0
-            x0 = np.array([np.dot(fit_data.y_ref, fit_data.y_work) / denom])
-
-        res = least_squares(
-            residuals,
-            x0=x0,
-            loss=cfg.get("robust_loss", "huber"),
-            f_scale=float(cfg.get("robust_fscale", 1.0)),
+        fit_result = fit_scale_factor_1d(
+            fit_data,
+            fit_background=fit_background,
+            robust_loss=cfg.get("robust_loss", "huber"),
+            robust_fscale=float(cfg.get("robust_fscale", 1.0)),
         )
-
-        J = res.jac
-        dof = max(1, len(res.fun) - len(res.x))
-        s_sq = np.sum(res.fun**2) / dof
-
-        cov = s_sq * np.linalg.pinv(J.T @ J)
-        sig_params = np.sqrt(np.clip(np.diag(cov), 0.0, np.inf))
-
-        scale = float(res.x[0])
-        scale_sigma = float(sig_params[0])
 
         out_key = cfg.get("scale_output_key", "scale_factor")
         work_db[out_key] = BaseData(
-            signal=np.array([scale]),
+            signal=np.array([fit_result.scale]),
             units="dimensionless",
-            uncertainties={"propagate_to_all": np.array([scale_sigma])},
+            uncertainties={"propagate_to_all": np.array([fit_result.scale_sigma])},
             rank_of_data=0,
         )
 
         if fit_background:
             bg_key = cfg.get("background_output_key", "scale_background")
             work_db[bg_key] = BaseData(
-                signal=np.array([float(res.x[1])]),
+                signal=np.array([fit_result.background]),
                 units=y_ref_bd.units,
-                uncertainties={"propagate_to_all": np.array([sig_params[1]])},
+                uncertainties={"propagate_to_all": np.array([fit_result.background_sigma])},
                 rank_of_data=0,
             )
 

@@ -12,12 +12,12 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["MultiplyDatabundles"]
-__version__ = "20251212.1"
+__version__ = "20260927.2"
 
 from pathlib import Path
 
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -55,13 +55,27 @@ class MultiplyDatabundles(ProcessStep):
         """,
     )
 
+    def dependency_contract(self) -> ProcessStepDependencies:
+        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
+        if len(processing_keys) != 2:
+            return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
+
+        multiplicand_key, multiplier_key = processing_keys
+        multiplicand_path = f"{multiplicand_key}.{self.configuration['multiplicand_data_key']}"
+        multiplier_path = f"{multiplier_key}.{self.configuration['multiplier_data_key']}"
+        return ProcessStepDependencies(
+            processing_reads={multiplicand_path, multiplier_path},
+            processing_writes={multiplicand_path},
+        )
+
     def calculate(self) -> dict[str, DataBundle]:
         # actual work happens here:
         keys = self._normalised_processing_keys()
-        assert len(keys) == 2, (
-            "MultiplyDatabundles requires exactly two processing keys in 'with_processing_keys': "
-            "the first is the multiplicand, the second is the multiplier."
-        )
+        if len(keys) != 2:
+            raise ValueError(
+                "MultiplyDatabundles requires exactly two processing keys in 'with_processing_keys': "
+                "the first is the multiplicand, the second is the multiplier."
+            )
         multiplicand_key = keys[0]
         multiplicand = self.processing_data.get(multiplicand_key)
         multiplier = self.processing_data.get(keys[1])

@@ -18,6 +18,7 @@ import pytest
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.hdf.hdf_source import HDFSource
 from modacor.io.io_sources import IoSources
@@ -359,3 +360,22 @@ def test_pixel_coordinates_2d_from_nexus_detector_frame(tmp_path):
     np.testing.assert_allclose(out["coord_x"].signal, expected_x, atol=1e-15)
     np.testing.assert_allclose(out["coord_y"].signal, expected_y, atol=1e-15)
     np.testing.assert_allclose(out["coord_z"].signal, expected_z, atol=1e-15)
+
+
+def test_pixel_coordinates_dependency_contract_tracks_nested_nexus_source():
+    step = PixelCoordinates3D(io_sources=IoSources())
+    step.modify_config_by_dict(
+        {
+            "with_processing_keys": ["sample"],
+            "detector_frame": {
+                "type": "nexus",
+                "source": "calibration",
+                "detector_path": "/entry/instrument/detector",
+            },
+        }
+    )
+
+    contract = step.dependency_contract()
+
+    assert isinstance(contract, ProcessStepDependencies)
+    assert contract.source_refs == frozenset({"calibration"})

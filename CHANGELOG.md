@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v1.9.0 (2026-09-26)
+
+### Enh
+
+* enh: adding 1D integration and divide databundles step ([`8358172`](https://github.com/BAMresearch/MoDaCor/commit/83581724878ab8338a7b412aab7b19b800400851))
+
+* enh: add statistics calculation and mask awareness to ReduceDimensionality ([`9d31c46`](https://github.com/BAMresearch/MoDaCor/commit/9d31c46e70edf5cb5064cc998f13835829473280))
+
+### Unknown Scope
+
+* doc: documentation on how to register ephemeral processingSteps ([`b667b66`](https://github.com/BAMresearch/MoDaCor/commit/b667b66c37588fa0729f045c88e8df0bb0363d21))
+
+* doc: documenting the contract for adding uncertainty estimators to ReduceDimensionality ([`0a4965f`](https://github.com/BAMresearch/MoDaCor/commit/0a4965fa37f5717f4256c8313654a86ad60b9d18))
+
 ## v1.8.1 (2026-09-24)
 
 ### Bug fixes

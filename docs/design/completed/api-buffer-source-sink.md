@@ -1,6 +1,6 @@
 # API Buffer Source/Sink
 
-Status: implementation plan for the keyed in-memory buffer MVP.
+Status: completed keyed in-memory buffer MVP; archived on 2026-09-27.
 
 ## Goal
 

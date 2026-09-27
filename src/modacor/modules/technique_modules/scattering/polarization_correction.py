@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 __all__ = ["PolarizationCorrection"]
-__version__ = "20260902.1"
+__version__ = "20260927.2"
 
 from pathlib import Path
 from typing import Any
@@ -17,6 +17,7 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.models.scattering import linear_polarization_factor
 
 
 class PolarizationCorrection(ProcessStep):
@@ -28,7 +29,10 @@ class PolarizationCorrection(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal", "TwoTheta", "Psi"],
-        modifies={"signal": ["signal", "uncertainties"]},
+        modifies={
+            "signal": ["signal", "uncertainties"],
+            "polarization_factor_map": ["signal", "units"],
+        },
         arguments={
             "with_processing_keys": {
                 "type": list,
@@ -115,14 +119,6 @@ class PolarizationCorrection(ProcessStep):
         return np.asarray(angle.signal, dtype=float)
 
     @staticmethod
-    def _linear_fraction_factor(two_theta: np.ndarray, psi: np.ndarray, fraction: float, offset_radian: float):
-        phi = psi - offset_radian
-        sin2 = np.sin(two_theta) ** 2
-        cos_phi2 = np.cos(phi) ** 2
-        sin_phi2 = np.sin(phi) ** 2
-        return fraction * (1.0 - sin2 * cos_phi2) + (1.0 - fraction) * (1.0 - sin2 * sin_phi2)
-
-    @staticmethod
     def _fraction_from_config(cfg: dict[str, Any]) -> float:
         value = cfg.get("polarization_factor")
         if value is None:
@@ -189,7 +185,7 @@ class PolarizationCorrection(ProcessStep):
             two_theta = self._angle_signal_radian(two_theta_bd, name=f"{key}::{two_theta_key}")
             psi = self._angle_signal_radian(psi_bd, name=f"{key}::{psi_key}")
 
-            factor = self._linear_fraction_factor(two_theta, psi, fraction, offset_radian)
+            factor = linear_polarization_factor(two_theta, psi, fraction, offset_radian)
             if np.any(factor < minimum) or not np.all(np.isfinite(factor)):
                 raise ValueError("Polarization correction contains too-small or non-finite factors.")
 

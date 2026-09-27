@@ -16,6 +16,7 @@ import unittest
 
 import numpy as np
 import pytest
+from attrs import has
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
@@ -24,9 +25,21 @@ from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 
 # adjust this import path to where you put the step:
-from modacor.modules.base_modules.reduce_dimensionality import ReduceDimensionality  # noqa: E402
+from modacor.modules.base_modules.reduce_dimensionality import ReduceDimensionality, _EstimatorSpec  # noqa: E402
 
 TEST_IO_SOURCES = IoSources()
+
+
+def test_estimator_spec_is_an_attrs_validation_carrier():
+    assert has(_EstimatorSpec)
+    assert _EstimatorSpec("scatter", "standard_deviation", np.int64(1), "error").ddof == 1
+
+    with pytest.raises(ValueError, match="output_key"):
+        _EstimatorSpec(" ", "standard_deviation", 1, "error")
+    with pytest.raises(TypeError, match="ddof"):
+        _EstimatorSpec("scatter", "standard_deviation", True, "error")
+    with pytest.raises(ValueError, match="ddof"):
+        _EstimatorSpec("scatter", "standard_deviation", -1, "error")
 
 
 class TestReduceDimensionality(unittest.TestCase):

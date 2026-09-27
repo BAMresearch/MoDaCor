@@ -163,7 +163,37 @@ def test_detector_efficiency_dependency_contract_tracks_sources_and_cos_alpha():
 
     contract = step.dependency_contract()
 
-    assert isinstance(contract, ProcessStepDependencies)
-    assert "calibration" in contract.source_refs
-    assert "sample.CosAlpha" in contract.processing_reads
-    assert "sample.*" in contract.processing_writes
+    assert contract == ProcessStepDependencies(
+        source_refs={"calibration"},
+        processing_reads={"sample.signal", "sample.CosAlpha"},
+        processing_writes={"sample.signal", "sample.detector_efficiency"},
+    )
+
+
+def test_attenuator_dependency_contract_tracks_exact_paths() -> None:
+    step = AttenuatorPlateCorrection(io_sources=IoSources())
+    step.modify_config_by_dict(
+        {
+            "with_processing_keys": ["sample", "background"],
+            "cos_alpha_key": "incidence_cosine",
+            "correction_key": "filter_transmission",
+            "linear_attenuation_coefficient_source": "calibration::/filter/mu",
+            "thickness_source": "instrument::/filter/thickness",
+        }
+    )
+
+    assert step.dependency_contract() == ProcessStepDependencies(
+        source_refs={"calibration", "instrument"},
+        processing_reads={
+            "sample.signal",
+            "sample.incidence_cosine",
+            "background.signal",
+            "background.incidence_cosine",
+        },
+        processing_writes={
+            "sample.signal",
+            "sample.filter_transmission",
+            "background.signal",
+            "background.filter_transmission",
+        },
+    )
