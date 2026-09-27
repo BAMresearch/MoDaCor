@@ -53,6 +53,9 @@ from modacor.modules.technique_modules.scattering.indexed_averager import Indexe
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
 from modacor.modules.technique_modules.scattering.polarization_correction import PolarizationCorrection
 from modacor.modules.technique_modules.scattering.solid_angle_correction import SolidAngleCorrection
+from modacor.modules.technique_modules.scattering.usaxs.xs_geometry_from_analyser_angle import (
+    XSGeometryFromAnalyserAngle,
+)
 from modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordinates import (
     XSGeometryFromPixelCoordinates,
 )
@@ -93,5 +96,6 @@ __all__ = [
     "Subtract",
     "ThresholdMask",
     "UnitsLabelUpdate",
+    "XSGeometryFromAnalyserAngle",
     "XSGeometryFromPixelCoordinates",
 ]
