@@ -1,6 +1,24 @@
 # CHANGELOG
 
-## v1.9.1 (2026-09-27)
+## v1.10.0 (2026-09-28)
+
+### Bug fixes
+
+* fix: fix for new documentation CI-CD ([`22a7cc4`](https://github.com/BAMresearch/MoDaCor/commit/22a7cc431ac694bbcd425db56b9689e209f5ae4e))
+
+* fix: fix for new documentation CI-CD ([`2acdc86`](https://github.com/BAMresearch/MoDaCor/commit/2acdc8620b9eb72a26db1c88a698236495d5b24d))
+
+### Features
+
+* feat: add repository-wide contributor and coding-agent instructions ([`59f4ae9`](https://github.com/BAMresearch/MoDaCor/commit/59f4ae9a53c10cd651f74539414a6f1d2ba3d7d7))
+
+### Unknown Scope
+
+* doc: refactored documentation ([`db1b354`](https://github.com/BAMresearch/MoDaCor/commit/db1b354f29dd3bde439f220cebf376e5fd9e9a87))
+
+* doc: documentation refactor plan ([`92b1942`](https://github.com/BAMresearch/MoDaCor/commit/92b194261795ac73047d30fd953904267dbc1c43))
+
+## v1.9.1 (2026-09-28)
 
 ### Bug fixes
 
