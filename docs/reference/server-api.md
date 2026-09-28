@@ -1,0 +1,816 @@
+# Runtime service API reference
+
+This page records the exact HTTP interface for long-lived MoDaCor processing
+sessions. For task-oriented use, begin with
+[Client-server operation](../server/index.md).
+
+Status: reference for the current runtime-service implementation.
+
+Companion OpenAPI schema:
+
+- [runtime-service-openapi.yaml](runtime-service-openapi.yaml)
+- [runtime-service backlog](../development/design/pipeline-operations-backlog.md)
+
+## Current implementation status
+
+The runtime service is divided into these public-facing implementation areas:
+
+- `src/modacor/server/api.py` is a thin FastAPI binding layer.
+- `src/modacor/server/runtime_service.py` owns session orchestration and run lifecycle behavior.
+- `src/modacor/server/planning.py` owns dry-run planning and dirty-step calculations.
+- `src/modacor/server/io_utils.py` adapts session source/sink registrations into runtime IO objects.
+- `src/modacor/server/chunked_outputs.py` owns server-level output registrations
+  and storage-target locks independently of worker sessions.
+- `src/modacor/server/errors.py` defines framework-neutral service exceptions.
+- `src/modacor/io/runtime_support.py` provides shared source/sink builders and HDF export handling for both the CLI and runtime service.
+
+Together these components implement the interface described below. Planned work
+that is not part of the current contract is tracked in the
+[runtime-service backlog](../development/design/pipeline-operations-backlog.md).
+
+## Goals
+
+- Keep named MoDaCor instances alive (`PipelineSession`) and accept new files over time.
+- Support partial rerun when only specific sources change (for example a new `sample` file).
+- Provide deterministic fallback to full reset/rerun after partial-run failure.
+- Support multiple concurrent sessions (for multiple instruments / detector streams).
+- Expose an integration-friendly API for orchestration systems such as Bluesky.
+
+## Core concepts
+
+## `PipelineSession`
+
+A session is an isolated runtime instance with:
+
+- `session_id` (string, unique)
+- `name` (human-readable)
+- `pipeline_yaml` (canonical configuration text)
+- `pipeline` (instantiated graph)
+- `io_sources` / `io_sinks`
+- `processing_data`
+- `tracer` and last run metadata
+- session lock (single active run per session)
+
+Sessions are managed by a `SessionManager` in-process.
+
+## Source registry model
+
+Sources are dynamic and unbounded in count:
+
+- `source_ref` (e.g. `sample`, `background`, `ical`, `ical_bg`, `defaults`)
+- `type` (e.g. `hdf`, `yaml`, `csv`, future extensions)
+- `resource_location` (path/URI)
+- optional constructor kwargs
+
+This preserves flexibility for pipelines with 2 to 6+ source files.
+
+## Sink registry model
+
+Sinks are dynamic output targets bound to stable refs:
+
+- `sink_ref` (e.g. `export_csv`, `export_hdf`)
+- `type` (e.g. `csv`, `hdf`, `hdf_chunked`, `hdf_processing`, `custom`)
+- `resource_location` (path/URI)
+- optional constructor kwargs
+
+Pipeline steps can write through targets such as `export_csv::` while the
+runtime API controls the concrete destination path. API-registered HDF sinks can
+opt into available runtime metadata via sink kwargs, but metadata-rich final HDF
+artifacts remain the responsibility of the process-level `write_hdf` shortcut.
+
+## Reset modes
+
+- `partial` reset: recompute only dirty subgraph.
+- `full` reset: rebuild pipeline/session state and rerun from scratch.
+- `auto` mode: try `partial`, fallback to `full` on failure (if enabled).
+
+## State machine
+
+Session states:
+
+- `idle`
+- `running_partial`
+- `running_full`
+- `error_partial`
+- `error_full`
+
+Transitions:
+
+1. `idle -> running_partial` on partial process request.
+2. `running_partial -> idle` on success.
+3. `running_partial -> error_partial` on failure.
+4. `error_partial -> running_full` on explicit full reset/process request, or automatic fallback.
+5. `running_full -> idle` on success.
+6. `running_full -> error_full` on failure.
+
+## Partial invalidation contract
+
+When sources change:
+
+1. Compute seed steps affected by changed source refs.
+2. Expand to descendants in DAG (dirty set).
+3. Restore `processing_data` snapshot captured before earliest dirty step.
+4. Call `reset()` on dirty steps.
+5. Execute dirty subgraph in topological order.
+
+Guarantee:
+
+- No mixed old/new outputs in affected downstream chain.
+
+Initial policy is conservative (descendant closure). Fine-grained optimizations can be added later.
+
+## API schema (REST)
+
+Base path: `/v1`
+
+## Service status
+
+### `GET /health`
+
+Liveness probe for orchestration systems. This endpoint only answers the
+question "is the process alive enough to respond?" and currently returns:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+### `GET /readiness`
+
+Readiness probe for runtime usability. This endpoint reports whether the
+service can still accept work and includes high-level runtime metrics.
+
+Example response:
+
+```json
+{
+  "status": "degraded",
+  "ready": true,
+  "metrics": {
+    "session_count": 3,
+    "active_run_count": 1,
+    "error_session_count": 1,
+    "error_session_ids": ["sess-error"],
+    "last_updated_utc": "2026-03-15T10:10:00+00:00"
+  }
+}
+```
+
+Current semantics:
+
+- `ready: true` means the service can accept requests.
+- `status: "degraded"` means one or more sessions are in an error state, even
+  though the API itself remains usable.
+
+## Sessions
+
+### `GET /source-templates`
+
+List built-in source templates/profiles (for example `mouse`, `saxsess`) with required/optional source refs.
+
+### `POST /sessions`
+
+Create a named session.
+
+Request:
+
+```json
+{
+  "session_id": "mouse-main",
+  "name": "MOUSE production",
+  "source_profile": "mouse",
+  "pipeline": {
+    "yaml_text": "name: ...",
+    "yaml_path": "/opt/pipelines/MOUSE_solids.yaml"
+  },
+  "trace": {
+    "enabled": true,
+    "watch": {"sample": ["signal"]},
+    "record_only_on_change": true,
+    "snapshot_processing_data": false,
+    "snapshot_step_ids": []
+  },
+  "auto_full_reset_on_partial_error": true
+}
+```
+
+Rules:
+
+- Exactly one of `yaml_text` or `yaml_path` must be provided.
+- `session_id` must be unique.
+- If `source_profile` is set, required source refs must be registered before `/process` is allowed.
+- In restricted runtime policy, `yaml_path` is disabled. Submit `yaml_text` or
+  use a server-side trusted/local deployment.
+
+### `GET /sessions`
+
+List sessions and summary status.
+
+### `GET /sessions/{session_id}`
+
+Get full session metadata, current sources/sinks, state, and last run summary.
+
+### `GET /sessions/{session_id}/errors/latest`
+
+Return the current session error state plus the latest recorded failed-run
+diagnostics.
+
+Example response after a failed full run:
+
+```json
+{
+  "session_id": "mouse-main",
+  "state": "error_full",
+  "active_run_id": null,
+  "updated_utc": "2026-03-15T10:10:00+00:00",
+  "current_error": {
+    "code": "RUN_FAILED",
+    "message": "synthetic failure",
+    "details": {"exception_type": "RuntimeError"},
+    "run_id": "run-abc123",
+    "recorded_utc": "2026-03-15T10:10:00+00:00",
+    "effective_mode": "full"
+  },
+  "latest_error": {
+    "code": "RUN_FAILED",
+    "message": "synthetic failure",
+    "details": {"exception_type": "RuntimeError"},
+    "run_id": "run-abc123",
+    "recorded_utc": "2026-03-15T10:10:00+00:00",
+    "effective_mode": "full"
+  },
+  "latest_failed_run": {
+    "run_id": "run-abc123",
+    "mode": "full",
+    "effective_mode": "full",
+    "status": "failed"
+  }
+}
+```
+
+Semantics:
+
+- `current_error` reflects the session's current error state and becomes `null`
+  after a successful recovery or full reset.
+- `latest_error` is derived from the most recent failed run in history and
+  remains available after recovery for post-mortem inspection.
+
+### `DELETE /sessions/{session_id}`
+
+Stop and remove session.
+
+## Sources
+
+### `PUT /sessions/{session_id}/sources`
+
+Upsert one or more sources.
+
+Request:
+
+```json
+{
+  "sources": [
+    {"ref": "sample", "type": "hdf", "location": "/data/new_sample.nxs"},
+    {"ref": "background", "type": "hdf", "location": "/data/bg.nxs"},
+    {"ref": "defaults", "type": "yaml", "location": "/data/defaults.yaml"}
+  ]
+}
+```
+
+Response includes accepted refs and current source map.
+
+In restricted runtime policy, file-backed source locations (`hdf`, `csv`, and
+`yaml`) must resolve under one of the configured `--read-root` directories.
+Custom sources using `kwargs.class_path` are rejected; use built-in source types
+or a programmatically registered `kwargs.class_alias`.
+
+Runtime sessions cache unchanged HDF source objects internally. The cache is
+transparent to API clients: if an HDF source registration has the same `ref`,
+`type`, `location`, `kwargs`, file size, and file modification time as the
+previous run, the server reuses the existing `HDFSource` object for that session.
+This avoids repeated HDF tree preloading and preserves the source object's
+internal metadata/data cache for stable sources such as backgrounds or static
+calibration files. Updating or deleting a source registration invalidates that
+source ref's cache entry. Non-HDF, buffer, and custom sources are rebuilt for
+each run. Cached HDF sources keep their internal arrays private; `get_data()`
+returns copies so pipeline steps cannot mutate cached source arrays across runs.
+
+### `POST /sessions/{session_id}/sources/patch`
+
+Convenience endpoint to upsert a single source.
+
+Request:
+
+```json
+{
+  "ref": "sample",
+  "type": "hdf",
+  "location": "/data/new_sample.nxs",
+  "kwargs": {}
+}
+```
+
+Equivalent to `PUT /sources` with a single-item `sources` list.
+
+### `POST /sessions/{session_id}/sample`
+
+Convenience shortcut for the common "new sample file arrived" workflow.
+This endpoint updates source ref `sample` directly.
+
+Request:
+
+```json
+{
+  "location": "/data/new_sample.nxs",
+  "type": "hdf",
+  "kwargs": {}
+}
+```
+
+### `DELETE /sessions/{session_id}/sources/{ref}`
+
+Remove one source registration.
+
+## Sinks
+
+### `PUT /sessions/{session_id}/sinks`
+
+Upsert one or more sinks.
+
+Request:
+
+```json
+{
+  "sinks": [
+    {"ref": "export_csv", "type": "csv", "location": "/data/out/current.csv", "kwargs": {"delimiter": ","}},
+    {"ref": "export_hdf", "type": "hdf", "location": "/data/out/current.h5"}
+  ]
+}
+```
+
+Response includes accepted refs and the current sink map.
+
+In restricted runtime policy, file-backed sink locations (`csv`, `hdf`,
+`hdf_chunked`, and `hdf_processing`) must resolve under one of the configured `--write-root`
+directories. Custom sinks using `kwargs.class_path` are rejected; use built-in
+sink types or a programmatically registered `kwargs.class_alias`.
+
+The server supports `hdf_chunked` through a separate server-level output
+resource. Ordinary process requests remain unchanged; requests that include
+`chunk_output` publish the successful in-memory result through that resource.
+
+## Chunked outputs
+
+`POST /chunked-outputs` initializes either a complete declared `ChunkPlan` or a
+`ProvisionalChunkPlan` and returns an opaque `output_id`. A complete request may
+contain a complete sink registration:
+
+```json
+{
+  "sink": {
+    "ref": "assembled",
+    "type": "hdf_chunked",
+    "location": "/data/out/assembled.h5"
+  },
+  "subpath": "run1",
+  "collision": "error",
+  "plan": {"schema_version": "1.0", "plan_id": "scan-42", "...": "..."}
+}
+```
+
+For server-discovered input extents and pilot-discovered output schema, send
+`provisional_plan` instead of `plan` and include the worker `session_id` so the
+server can inspect its registered driver source:
+
+```json
+{
+  "session_id": "i22-worker",
+  "sink": {
+    "ref": "assembled",
+    "type": "hdf_chunked",
+    "location": "/data/out/assembled.h5"
+  },
+  "subpath": "saxs",
+  "provisional_plan": {
+    "schema_version": "1.0",
+    "plan_id": "i22-saxs",
+    "driver": {"source": "raw::/entry/data", "rank_of_data": 2},
+    "axis_rules": [
+      {"axis": 0, "chunk_size": 1},
+      {"axis": 1, "chunk_size": 10}
+    ],
+    "outputs": [
+      {
+        "output_id": "reduced",
+        "processing_path": "/sample/I",
+        "destination_path": "sample/I"
+      }
+    ]
+  }
+}
+```
+
+The response status is `awaiting_schema` and includes `provisional_hash`,
+`resolution_hash`, `expected_chunks`, and `pilot_chunk_id`. Submit work using
+`{"chunk_output": {"output_id": "...", "chunk_id": "c000000"}}`. The pilot
+response contains the resolved final `plan_hash`; later chunks use the same
+compact `chunk_id` form. Both provisional and resolved resources can be
+reopened from HDF5 after a server restart.
+
+For convenience, `session_id` and `sink_ref` may replace `sink`; the
+registration is copied at initialization and thereafter belongs to the output
+resource. `GET /chunked-outputs/{output_id}` reads authoritative manifest
+counts and accepts `offset` and `limit` for chunk-entry pagination.
+
+For direct source reads, the plan may include `source_bindings`. Each binding
+identifies an exact registered source and dataset with role `aligned`, `static`,
+or `explicit`. When a process request supplies a chunk for that output, the
+server projects its `source_selection` onto the bound HDF5 or Tiled datasets.
+Explicit bindings provide one `axis_map` entry per source axis, using a driver
+axis number or `null` for a complete source axis. Buffer sources must omit these
+executable bindings because uploaded arrays are already sliced. The complete
+contract and examples are in [Chunked Operation](../development/design/chunked-operation.md).
+
+`POST /chunked-outputs/{output_id}/finalize` takes `{"plan_hash":
+"sha256:..."}`. Missing chunks or a hash mismatch return `409`; repeating a
+successful finalization with the same hash is idempotent.
+
+Output ids are held in server memory, while the plan, run subpath, manifest,
+and staged pipeline provenance are persisted in the backend. After a restart,
+`POST /chunked-outputs/reopen` accepts a sink registration, `plan_id`, and
+optional `plan_hash`, validates the stored layout, and returns a new output id.
+It does not require the original worker session or a copy of the complete plan.
+The `session_id` plus `sink_ref` convenience form is also accepted when that
+session is still present, but an explicit sink registration is the
+restart-independent form.
+
+`POST /chunked-outputs/{output_id}/recover` accepts `reconcile`, `abandon`, or
+`resume`. Reconciliation marks stale `writing` entries as retryable `failed`
+entries and returns an interrupted finalization to `writing`. Deleting an
+output id only detaches the server mapping; it never deletes backend content.
+The complete recovery runbook is in
+[Chunked Beamline Validation](../development/design/chunked-beamline-validation.md).
+
+### `POST /sessions/{session_id}/sinks/patch`
+
+Convenience endpoint to upsert a single sink.
+
+Request:
+
+```json
+{
+  "ref": "export_csv",
+  "type": "csv",
+  "location": "/data/out/current.csv",
+  "kwargs": {"delimiter": ","}
+}
+```
+
+Equivalent to `PUT /sinks` with a single-item `sinks` list.
+
+For HDF sinks, runtime metadata is opt-in:
+
+```json
+{
+  "ref": "export_hdf",
+  "type": "hdf",
+  "location": "/data/out/current.h5",
+  "kwargs": {
+    "include_runtime_metadata": {
+      "pipeline_yaml": true,
+      "pipeline_spec": true,
+      "trace_events": false
+    }
+  }
+}
+```
+
+### `DELETE /sessions/{session_id}/sinks/{ref}`
+
+Remove one sink registration.
+
+## Processing
+
+### `POST /sessions/{session_id}/process`
+
+Trigger run.
+
+Request:
+
+```json
+{
+  "mode": "partial",
+  "changed_sources": ["sample"],
+  "changed_keys": ["sample.signal"],
+  "run_name": "sample_2026_03_13_153045",
+  "write_hdf": {
+    "path": "/data/out/sample_2026_03_13_153045.h5",
+    "write_all_processing_data": true,
+    "data_paths": []
+  },
+  "chunk_output": {
+    "output_id": "out-8c57c4",
+    "chunk_spec": {"plan_id": "scan-42", "chunk_id": "c000017", "...": "..."}
+  }
+}
+```
+
+`mode` enum:
+
+- `partial`
+- `full`
+- `auto`
+
+Notes:
+
+- `changed_sources` or `changed_keys` is required for `partial`; both are optional for `auto`.
+- `changed_keys` enables key-aware invalidation (e.g. `sample.signal`, `sample.Q`) for tighter partial reruns.
+- `write_hdf` is optional; if provided, pipeline spec/yaml and trace are persisted.
+- `chunk_output` is optional. When present, the server passes the successful
+  run's `ProcessingData` to the initialized output and only responds with
+  success after the chunk manifest has been flushed. Publication failures use
+  `CHUNK_WRITE_FAILED` and are distinct from pipeline failures.
+- A plan's non-static `source_bindings` automatically add their source
+  references to partial-run invalidation. Callers do not need to repeat those
+  references in `changed_sources`.
+- In restricted runtime policy, `write_hdf.path` must resolve under one of the
+  configured `--write-root` directories.
+- Full per-step `ProcessingData` snapshots are opt-in through the session trace
+  config. When enabled, the HDF export stores them under
+  `/processing/tracer/<run>/steps/<step>/processing_data`.
+
+### `POST /sessions/{session_id}/process/dry-run`
+
+Preview what would run without executing any pipeline steps.
+
+Request (same shape as `/process`, excluding `write_hdf` in typical usage):
+
+```json
+{
+  "mode": "partial",
+  "changed_sources": ["sample"],
+  "changed_keys": ["sample.signal"]
+}
+```
+
+Response includes:
+
+- `effective_mode`
+- `dirty_steps`
+- `skipped_steps`
+- `checkpoint_boundary_step`
+- `missing_required_sources`
+- `warnings`
+- `can_process`
+
+### `POST /sessions/{session_id}/reset`
+
+Reset without immediate processing.
+
+Request:
+
+```json
+{
+  "mode": "full"
+}
+```
+
+### `POST /sessions/{session_id}/recover`
+
+Explicit recovery path after error.
+
+Request:
+
+```json
+{
+  "strategy": "full_reset_then_process",
+  "changed_sources": ["sample"]
+}
+```
+
+## Runs
+
+### `GET /sessions/{session_id}/runs`
+
+List run history metadata.
+
+### `GET /sessions/{session_id}/runs/{run_id}`
+
+Run details include:
+
+- `dirty_steps`
+- `skipped_steps`
+- `step_durations_s`
+- `elapsed_s`
+- fallback metadata (`fallback_reason`, `recovered_from_run_id`) for auto recovery cases
+- output artifact locations (e.g. `hdf_output`)
+
+## Runtime Policy
+
+The runtime policy is a small trust-boundary layer for the HTTP API. It is not a
+security sandbox; container filesystem mounts, CPU limits, memory limits,
+network policy, and authentication should still be handled by the deployment
+environment.
+
+Policy modes:
+
+- `trusted`: backward-compatible local-helper behavior. Allows
+  `pipeline.yaml_path`, process-step filesystem discovery, and custom IO
+  `kwargs.class_path` imports.
+- `restricted`: recommended for network-facing/container service use. Disables
+  `pipeline.yaml_path`, disables process-step filesystem discovery outside the
+  curated/explicit registry, and disables arbitrary custom source/sink imports
+  through `kwargs.class_path`. File-backed source/sink paths require configured
+  read/write roots.
+
+Optional limits:
+
+- `--read-root PATH`: allowed root for file-backed sources and, in trusted mode,
+  pipeline YAML paths.
+- `--write-root PATH`: allowed root for file-backed sinks and `write_hdf.path`.
+- `--max-sessions N`: maximum in-memory sessions in this process.
+- `--max-pipeline-yaml-bytes N`: maximum pipeline YAML payload size.
+- `--max-buffer-upload-bytes N`: maximum `.npy` source buffer upload size.
+
+Common policy failures and fixes:
+
+- `Runtime policy disables pipeline.yaml_path`: send `pipeline.yaml_text`
+  instead, or run a trusted local service.
+- `filesystem discovery is disabled by runtime policy`: export/register the
+  process step in the curated module registry used by the service.
+- `disables arbitrary custom source/sink imports`: use a built-in IO type or
+  configure a registered `kwargs.class_alias` in the service process.
+- `outside allowed read roots`: mount the file under `--read-root` or add the
+  correct read root.
+- `no allowed read roots are configured`: start the restricted service with at
+  least one `--read-root` before registering file-backed sources.
+- `outside allowed write roots`: write under `--write-root` or add the correct
+  write root.
+- `no allowed write roots are configured`: start the restricted service with at
+  least one `--write-root` before registering file-backed sinks or using
+  `write_hdf.path`.
+- `max_sessions=... has been reached`: delete an old session or raise the
+  process-level cap.
+- `buffer source array`: lower the upload size or raise
+  `--max-buffer-upload-bytes`.
+
+## WebSocket events
+
+Endpoint: `/v1/sessions/{session_id}/events`
+
+Event envelope:
+
+```json
+{
+  "event": "step_finished",
+  "session_id": "mouse-main",
+  "run_id": "run-000123",
+  "ts_utc": "2026-03-13T15:30:45.123Z",
+  "payload": {}
+}
+```
+
+Event types:
+
+- `session_state_changed`
+- `run_started`
+- `run_finished`
+- `run_failed`
+- `step_started`
+- `step_finished`
+- `trace_event`
+- `recovery_started`
+- `recovery_finished`
+
+## Error model
+
+REST errors:
+
+```json
+{
+  "error": {
+    "code": "PARTIAL_RUN_FAILED",
+    "message": "Step GX failed: ...",
+    "details": {
+      "session_id": "mouse-main",
+      "run_id": "run-000123",
+      "failed_step_id": "GX"
+    }
+  }
+}
+```
+
+Recommended codes:
+
+- `SESSION_NOT_FOUND`
+- `SESSION_BUSY`
+- `INVALID_REQUEST`
+- `SOURCE_NOT_FOUND`
+- `PIPELINE_LOAD_FAILED`
+- `PARTIAL_RUN_FAILED`
+- `FULL_RUN_FAILED`
+- `RECOVERY_FAILED`
+
+## Concurrency and consistency contracts
+
+- One active run per session (guarded by lock).
+- Multiple sessions can run in parallel.
+- Each run receives immutable run metadata (`run_id`, `run_name`, timestamps).
+- Writes to HDF artifacts are per-run file path or per-run group to avoid collisions.
+
+## Bluesky integration notes
+
+- Bluesky callback/plan can call:
+  1. `PUT /sources` with new file path(s)
+  2. `POST /process` with `mode=partial`, `changed_sources=["sample"]`
+- Live monitoring consumes WebSocket events.
+- Keep MoDaCor runtime API transport-agnostic internally so future Kafka/Redis event buses are optional.
+
+## Quick use example
+
+The example below shows a complete session lifecycle with a MOUSE-style pipeline.
+
+1. Create a session from a pipeline file:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/sessions" \
+  -H "content-type: application/json" \
+  -d '{
+    "session_id": "mouse-main",
+    "name": "MOUSE production",
+    "pipeline": {
+      "yaml_path": "/srv/modacor/pipelines/pipeline.yaml"
+    },
+    "trace": {
+      "enabled": true,
+      "watch": {"sample": ["signal"], "background": ["signal"]},
+      "record_only_on_change": true,
+      "snapshot_processing_data": false,
+      "snapshot_step_ids": []
+    },
+    "auto_full_reset_on_partial_error": true
+  }'
+```
+
+2. Register/update sources (repeat this step whenever a new sample file arrives):
+
+```bash
+curl -X PUT "http://127.0.0.1:8000/v1/sessions/mouse-main/sources" \
+  -H "content-type: application/json" \
+  -d '{
+    "sources": [
+      {"ref": "sample", "type": "hdf", "location": "/data/MOUSE_sample_latest.nxs"},
+      {"ref": "background", "type": "hdf", "location": "/data/MOUSE_background.nxs"}
+    ]
+  }'
+```
+
+3. Register/update sinks used by sink-aware pipeline steps:
+
+```bash
+curl -X PUT "http://127.0.0.1:8000/v1/sessions/mouse-main/sinks" \
+  -H "content-type: application/json" \
+  -d '{
+    "sinks": [
+      {"ref": "export_csv", "type": "csv", "location": "/tmp/mouse_latest.csv", "kwargs": {"delimiter": ","}}
+    ]
+  }'
+```
+
+4. Trigger a partial run using changed keys, and write a full HDF artifact:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/sessions/mouse-main/process" \
+  -H "content-type: application/json" \
+  -d '{
+    "mode": "partial",
+    "changed_sources": ["sample"],
+    "changed_keys": ["sample.signal"],
+    "run_name": "mouse_run_2026_03_13T1530",
+    "write_hdf": {
+      "path": "/tmp/mouse_run_2026_03_13T1530.h5",
+      "write_all_processing_data": true
+    }
+  }'
+```
+
+5. Use auto mode to attempt partial first and fallback to full on failure:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/sessions/mouse-main/process" \
+  -H "content-type: application/json" \
+  -d '{
+    "mode": "auto",
+    "changed_sources": ["sample"],
+    "changed_keys": ["sample.signal"]
+  }'
+```
+
+6. If needed, force a complete reset without processing:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/sessions/mouse-main/reset" \
+  -H "content-type: application/json" \
+  -d '{"mode":"full"}'
+```
