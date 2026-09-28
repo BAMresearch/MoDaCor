@@ -28,6 +28,11 @@ If you are proposing a feature:
 
 ## Development
 
+Repository-specific instructions for contributors and coding agents are kept in
+the version-controlled root `AGENTS.md`. Read it before changing shared
+components; nested `AGENTS.md` files, when present, provide more specific
+instructions for their subtree.
+
 To set up `modacor` for local development:
 
 1. Fork [modacor](https://github.com/BAMresearch/modacor) (look for the "Fork" button).

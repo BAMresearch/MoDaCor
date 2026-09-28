@@ -88,6 +88,9 @@ def test_build_markdown_contains_core_sections(divide_docs):
     assert "| Argument | Type | Required | Default | Dependency role | Description |" in md
     assert "| `divisor_source` | str | No | - | - | IoSources key for the divisor signal. |" in md
     assert "Divide" in md
+    assert "modacor.modules.base_modules.divide.Divide" in md
+    assert str(PROJECT_ROOT) not in md
+    assert "src/modacor/modules/base_modules/divide.py" in md
 
 
 @pytest.mark.parametrize("target", [TARGET])
@@ -142,7 +145,7 @@ def test_cli_generate_all(tmp_path: Path):
 
     assert index_path.exists()
     assert not stale_path.exists()
-    assert "Module reference" in index_path.read_text(encoding="utf-8")
+    assert "Process-step reference" in index_path.read_text(encoding="utf-8")
     assert completed.stdout == ""
 
     module_files = list(output_dir.glob("*.md"))
@@ -152,6 +155,49 @@ def test_cli_generate_all(tmp_path: Path):
     index_content = index_path.read_text(encoding="utf-8")
     for name in expected_names:
         assert f"\n{name}\n" in index_content
+
+    check_completed = subprocess.run(
+        [
+            "python3",
+            "scripts/generate_module_doc.py",
+            "--all",
+            "--output-dir",
+            str(output_dir),
+            "--index",
+            str(index_path),
+            "--check",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=PROJECT_ROOT,
+    )
+    assert check_completed.returncode == 0
+
+    next(iter(path for path in module_files if path != index_path)).write_text("stale\n", encoding="utf-8")
+    stale_completed = subprocess.run(
+        [
+            "python3",
+            "scripts/generate_module_doc.py",
+            "--all",
+            "--output-dir",
+            str(output_dir),
+            "--index",
+            str(index_path),
+            "--check",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=PROJECT_ROOT,
+    )
+    assert stale_completed.returncode == 1
+    assert "Generated module documentation is not current" in stale_completed.stderr
+
+
+def test_module_groups_cover_every_generated_page_exactly_once():
+    names = {target.rsplit(".", 1)[1] for target in generate_module_doc._discover_targets()}
+    generate_module_doc._validate_module_groups(names)
 
 
 def test_exports_and_doc_generation_cover_all_process_steps():

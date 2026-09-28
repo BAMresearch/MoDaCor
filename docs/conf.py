@@ -19,6 +19,7 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
     "myst_parser",
+    "sphinxext.rediraffe",
     "sphinxcontrib.mermaid",
 ]
 myst_enable_extensions = [
@@ -42,7 +43,7 @@ author = (
     "Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow"
 )
 copyright = "{0}, {1}".format(year, author)
-version = "1.9.0"
+version = "1.10.0"
 release = version
 commit_id = None
 try:
@@ -110,7 +111,71 @@ linkcheck_ignore = [
     # attempted fix of '406 Client Error: Not Acceptable for url'
     # https://github.com/sphinx-doc/sphinx/issues/1331
     join(project_meta["project"]["urls"]["repository"], "commit", r"[0-9a-fA-F]+"),
+    # Generated module pages contain one source link per public step. Checking
+    # those in a single run quickly trips GitHub's anonymous rate limits; the
+    # generator tests verify that every corresponding local source path exists.
+    r"https://github\.com/BAMresearch/MoDaCor/blob/main/src/.*",
+    # DOI resolvers and the IUCr journal site intermittently reject automated
+    # HEAD/GET requests even though these stable literature links work in a
+    # browser. Keep them in the prose but exclude them from linkcheck.
+    r"https://doi\.org/.*",
+    r"https://journals\.iucr\.org/.*",
+    # A historical changelog entry mentions ``license.py``; MyST linkification
+    # interprets it as this non-existent host when the changelog is included.
+    r"http://license\.py/?",
 ]
 linkcheck_anchors_ignore_for_url = [
     r"https://pypi\.org/project/[^/]+",
 ]
+
+# Preserve published page URLs while the documentation is organized by reader
+# journey. Keys and values are Sphinx document names, without ``.html``.
+rediraffe_redirects = {
+    "installation": "getting-started/installation",
+    "getting_started/index": "getting-started/index",
+    "getting_started/quickstart": "getting-started/quickstart",
+    "getting_started/cli_and_runner": "processing/local-execution",
+    "pipeline_operations/index": "processing/index",
+    "pipeline_operations/pipeline_basics": "processing/pipeline-graphs",
+    "pipeline_operations/configuration_reference": "reference/pipeline-schema",
+    "pipeline_operations/tracing_and_debugging": "processing/tracing-and-provenance",
+    "pipeline_operations/server_installation": "server/installation-and-deployment",
+    "pipeline_operations/advanced_server_use": "server/custom-steps-and-io",
+    "pipeline_operations/runtime_service_api": "reference/server-api",
+    "pipeline_operations/backlog": "development/design/pipeline-operations-backlog",
+    "corrections/index": "modules/scattering-corrections",
+    "corrections/capillary_self_absorption": "modules/capillary-self-absorption",
+    "examples/mouse_pipeline": "examples/index",
+    "examples/saxsess_pipeline": "examples/index",
+    "examples/dls_i22": "examples/index",
+    "extending/index": "development/index",
+    "extending/module_author_guide": "development/module-author-guide",
+    "extending/io_source_sink_guide": "development/io-source-sink-guide",
+    "extending/contribution_checklist": "development/contribution-checklist",
+    "readme": "development/documentation-guide",
+    "usage": "processing/local-execution",
+    "contributing": "development/contributing",
+    "authors": "project/authors",
+    "changelog": "project/changelog",
+    "design/index": "development/design/index",
+    "design/capillary-self-absorption": "development/design/capillary-self-absorption",
+    "design/chunked-beamline-validation": "development/design/chunked-beamline-validation",
+    "design/chunked-operation": "development/design/chunked-operation",
+    "design/chunked-sink-implementation-plan": "development/design/chunked-sink-implementation-plan",
+    "design/documentation-architecture": "development/design/documentation-architecture",
+    "design/documentation-refactor-implementation-plan": (
+        "development/design/documentation-refactor-implementation-plan"
+    ),
+    "design/external-parallel-runner": "development/design/external-parallel-runner",
+    "design/pixel-unit-removal": "development/design/pixel-unit-removal",
+    "design/tiled-io-upgrade": "development/design/tiled-io-upgrade",
+    "design/completed/index": "development/design/completed/index",
+    "design/completed/api-buffer-source-sink": "development/design/completed/api-buffer-source-sink",
+    "design/completed/architecture-upgrade-plan": "development/design/completed/architecture-upgrade-plan",
+    "design/completed/chunked-processing-handoff": "development/design/completed/chunked-processing-handoff",
+    "design/completed/code-coherence": "development/design/completed/code-coherence",
+    "design/completed/io-sink-runtime-api": "development/design/completed/io-sink-runtime-api",
+    "design/completed/reduce-dimensionality-uncertainty-estimators": (
+        "development/design/completed/reduce-dimensionality-uncertainty-estimators"
+    ),
+}

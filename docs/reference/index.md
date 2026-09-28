@@ -1,11 +1,18 @@
-
 # Reference
 
-Reference pages for generated process-step documentation and other API-adjacent
-material.
+Exact interfaces, schemas, commands, and generated process-step metadata.
 
 ```{toctree}
-:maxdepth: 1
+:maxdepth: 2
 
 modules/index
+python-api/index
+cli
+pipeline-schema
+io-capabilities
+server-api
+glossary
 ```
+
+The downloadable [OpenAPI document](runtime-service-openapi.yaml) describes the
+runtime HTTP schema.
