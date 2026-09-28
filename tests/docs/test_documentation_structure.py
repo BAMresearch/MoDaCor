@@ -1,22 +1,31 @@
 from __future__ import annotations
 
-from importlib.util import module_from_spec, spec_from_file_location
+import ast
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DOCS_ROOT = PROJECT_ROOT / "docs"
 
 
-def _load_docs_conf():
-    spec = spec_from_file_location("modacor_docs_conf", DOCS_ROOT / "conf.py")
-    assert spec and spec.loader
-    module = module_from_spec(spec)
-    spec.loader.exec_module(module)  # type: ignore[attr-defined]
-    return module
+def _load_rediraffe_redirects() -> dict[str, str]:
+    """Read the literal redirect map without importing optional Sphinx deps."""
+    conf_path = DOCS_ROOT / "conf.py"
+    tree = ast.parse(conf_path.read_text(encoding="utf-8"), filename=str(conf_path))
+    assignments = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "rediraffe_redirects" for target in node.targets)
+    ]
+    assert len(assignments) == 1
+    redirects = ast.literal_eval(assignments[0].value)
+    assert isinstance(redirects, dict)
+    assert all(isinstance(source, str) and isinstance(target, str) for source, target in redirects.items())
+    return redirects
 
 
 def test_redirect_sources_are_retired_and_targets_exist():
-    redirects = _load_docs_conf().rediraffe_redirects
+    redirects = _load_rediraffe_redirects()
     assert redirects
     assert not (set(redirects) & set(redirects.values())), "Redirect chains are not allowed."
 
@@ -43,6 +52,13 @@ def test_primary_navigation_and_examples_repository_are_present():
     examples_url = "https://github.com/BAMResearch/MoDaCor-examples"
     assert examples_url in (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     assert examples_url in (DOCS_ROOT / "examples/index.md").read_text(encoding="utf-8")
+    for externalized_example in (
+        "MOUSE_solids.yaml",
+        "mouse_pipeline.md",
+        "saxsess_pipeline.md",
+        "dls_i22.md",
+    ):
+        assert not (DOCS_ROOT / "examples" / externalized_example).exists()
 
 
 def test_agents_documentation_references_use_current_paths():
