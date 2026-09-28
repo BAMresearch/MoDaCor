@@ -1,0 +1,43 @@
+# Append Sink
+
+## Summary
+Append an IoSink to the available data sinks
+
+## Metadata
+- **Import path:** `modacor.modules.base_modules.append_sink.AppendSink`
+- **Source:** [`src/modacor/modules/base_modules/append_sink.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/append_sink.py)
+- **Module ID:** AppendSink
+- **Module version:** 20260927.1
+- **Keywords:** append, sink
+
+## Required data keys
+- _None_
+
+## Modifies
+- _None_
+
+## Required arguments
+- sink_identifier
+- sink_location
+- iosink_module
+
+## Default configuration
+```json
+{
+  "iosink_method_kwargs": {},
+  "iosink_module": "",
+  "sink_identifier": "",
+  "sink_location": ""
+}
+```
+
+## Argument specification
+| Argument | Type | Required | Default | Dependency role | Description |
+|---|---|---|---|---|---|
+| `iosink_method_kwargs` | dict | No | {} | - | Keyword arguments forwarded to the ioSink constructor. |
+| `iosink_module` | str | Yes |  | - | Fully qualified module path to the ioSink class. |
+| `sink_identifier` | str or list | Yes |  | - | Identifier(s) to register the ioSink(s) under. |
+| `sink_location` | str or list | Yes |  | - | Resource location(s) understood by the sink. |
+
+## Notes
+This adds an IoSink to the data sinks registry.
