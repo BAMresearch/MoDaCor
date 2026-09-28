@@ -10,6 +10,8 @@ source of truth when they differ from runtime code or maintainer documentation.
 ```{toctree}
 :maxdepth: 1
 
+documentation-architecture
+documentation-refactor-implementation-plan
 capillary-self-absorption
 pixel-unit-removal
 tiled-io-upgrade
