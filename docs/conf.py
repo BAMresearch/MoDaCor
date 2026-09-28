@@ -43,7 +43,7 @@ author = (
     "Brian R. Pauw, Malte Storm, Jérôme Kieffer, Ingo Breßler, Anja Hörmann, Glen Smales, Armin Moser, and Tim Snow"
 )
 copyright = "{0}, {1}".format(year, author)
-version = "1.9.1"
+version = "1.10.0"
 release = version
 commit_id = None
 try:
