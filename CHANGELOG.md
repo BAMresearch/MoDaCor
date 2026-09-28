@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v1.9.1 (2026-09-27)
+
+### Bug fixes
+
+* fix: Completed the code-coherence remediation programme ([`07d4c43`](https://github.com/BAMresearch/MoDaCor/commit/07d4c43a782a6ef7599e8a145501758735466221))
+
+* fix: most pressing code consistency issues fixed ([`5955e36`](https://github.com/BAMresearch/MoDaCor/commit/5955e36fcee1b934b3322944bcf67f5d15155550))
+
+### Unknown Scope
+
+* doc: documented code coherence issues and plan fixes ([`7926415`](https://github.com/BAMresearch/MoDaCor/commit/79264156982ff6836635438d390ae63fcc6c4122))
+
 ## v1.9.0 (2026-09-26)
 
 ### Enh
