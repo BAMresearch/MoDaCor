@@ -47,6 +47,9 @@ def test_primary_navigation_and_examples_repository_are_present():
 
 def test_agents_documentation_references_use_current_paths():
     agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    assert "/Users/" not in agents
+    assert "https://github.com/BAMResearch/MoDaCor-examples" in agents
+
     for retired_prefix in (
         "docs/extending/",
         "docs/design/completed/",
