@@ -59,7 +59,6 @@ output/*/index.html
 # Sphinx
 docs/_build
 docs/reference/autosummary
-docs/reference/modules
 
 .DS_Store
 *~

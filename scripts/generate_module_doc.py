@@ -27,6 +27,62 @@ from typing import Any, Iterable
 # an editable install in the active interpreter.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
+REPOSITORY_URL = "https://github.com/BAMresearch/MoDaCor"
+
+MODULE_GROUPS: dict[str, tuple[str, ...]] = {
+    "Data movement and copying": (
+        "AppendProcessingData",
+        "AppendSink",
+        "AppendSource",
+        "CopyDataBundleKeys",
+        "SinkProcessingData",
+    ),
+    "Arithmetic and normalization": (
+        "Divide",
+        "DivideDatabundles",
+        "FindScaleFactor1D",
+        "Multiply",
+        "MultiplyDatabundles",
+        "Subtract",
+        "SubtractDatabundles",
+        "UnitsLabelUpdate",
+    ),
+    "Masks": (
+        "ApplyMask",
+        "BitwiseOrMasks",
+        "DilateMask",
+        "ReduceMask",
+        "ThresholdMask",
+    ),
+    "Uncertainty creation and combination": (
+        "CombineUncertainties",
+        "CombineUncertaintiesMax",
+        "PoissonUncertainties",
+    ),
+    "Geometry and coordinates": (
+        "IndexPixels",
+        "PixelCoordinates3D",
+        "XSGeometryFromPixelCoordinates",
+    ),
+    "Reduction and integration": (
+        "IndexedAverager",
+        "Integrate1D",
+        "ReduceDimensionality",
+    ),
+    "Visualization": (
+        "Plot1DVisualization",
+        "Plot2DVisualization",
+    ),
+    "Technique-specific corrections": (
+        "AttenuatorPlateCorrection",
+        "CapillarySampleContainerCorrection",
+        "CapillarySelfAbsorptionCorrection",
+        "DetectorEfficiencyCorrection",
+        "FlatPlateSelfAbsorptionCorrection",
+        "PolarizationCorrection",
+        "SolidAngleCorrection",
+    ),
+}
 if SRC_ROOT.is_dir():
     sys.path.insert(0, str(SRC_ROOT))
 
@@ -195,15 +251,27 @@ def _format_required_arguments(documentation: ProcessStepDescriber) -> str:
     return _format_list(required_args)
 
 
-def _format_summary(documentation: ProcessStepDescriber) -> str:
+def _repository_relative_source(documentation: ProcessStepDescriber) -> Path | None:
+    source_path = Path(documentation.calling_module_path)
+    try:
+        return source_path.resolve().relative_to(PROJECT_ROOT)
+    except ValueError:
+        return None
+
+
+def _format_summary(step_cls, documentation: ProcessStepDescriber) -> str:
     metadata = attr.asdict(documentation, recurse=False)
     interesting_keys = [
         ("Module ID", "calling_id"),
-        ("Module path", "calling_module_path"),
         ("Module version", "calling_version"),
         ("Keywords", "step_keywords"),
     ]
-    lines = []
+    import_path = f"{step_cls.__module__}.{step_cls.__name__}"
+    lines = [f"- **Import path:** `{import_path}`"]
+    relative_source = _repository_relative_source(documentation)
+    if relative_source is not None:
+        source_text = relative_source.as_posix()
+        lines.append(f"- **Source:** [`{source_text}`]({REPOSITORY_URL}/blob/main/{source_text})")
     for label, key in interesting_keys:
         value = metadata.get(key)
         if value in (None, "", []):
@@ -227,7 +295,7 @@ def build_markdown(step_cls, documentation: ProcessStepDescriber) -> str:
         step_doc or "_No summary provided._",
         "",
         "## Metadata",
-        _format_summary(documentation),
+        _format_summary(step_cls, documentation),
         "",
         "## Required data keys",
         _format_list(documentation.required_data_keys or []),
@@ -254,21 +322,77 @@ def build_markdown(step_cls, documentation: ProcessStepDescriber) -> str:
     return "\n".join(content).rstrip() + "\n"
 
 
-def _write_module_index(index_path: Path, module_files: list[Path]) -> None:
-    entries = "\n".join(path.stem for path in module_files)
-    content = "\n".join(
+def _validate_module_groups(module_names: set[str]) -> None:
+    classified_names = [name for names in MODULE_GROUPS.values() for name in names]
+    duplicates = sorted({name for name in classified_names if classified_names.count(name) > 1})
+    missing = sorted(module_names - set(classified_names))
+    unknown = sorted(set(classified_names) - module_names)
+    problems = []
+    if duplicates:
+        problems.append(f"duplicate classifications: {', '.join(duplicates)}")
+    if missing:
+        problems.append(f"unclassified modules: {', '.join(missing)}")
+    if unknown:
+        problems.append(f"unknown classified modules: {', '.join(unknown)}")
+    if problems:
+        raise ValueError("Invalid module documentation groups (" + "; ".join(problems) + ").")
+
+
+def _build_module_index(module_names: set[str]) -> str:
+    _validate_module_groups(module_names)
+    content = [
+        "# Process-step reference",
+        "",
+        "Every supported public `ProcessStep` is listed below by function and alphabetically.",
+        "Configuration tables are generated from each step's `ProcessStepDescriber` metadata.",
+    ]
+    for group_name, names in MODULE_GROUPS.items():
+        content.extend(["", f"## {group_name}", ""])
+        content.extend(f"- [{name}]({name}.md)" for name in names)
+    content.extend(
         [
-            "# Module reference",
+            "",
+            "## Alphabetical index",
             "",
             "```{toctree}",
             ":maxdepth: 1",
             "",
-            entries,
+            *sorted(module_names),
             "```",
             "",
         ]
     )
-    index_path.write_text(content, encoding="utf-8")
+    return "\n".join(content)
+
+
+def _generated_pages(targets: list[str]) -> dict[str, str]:
+    pages: dict[str, str] = {}
+    for target in targets:
+        step_cls, documentation = _load_process_step(target)
+        pages[f"{step_cls.__name__}.md"] = build_markdown(step_cls, documentation)
+    _validate_module_groups({Path(filename).stem for filename in pages})
+    return pages
+
+
+def _check_generated_output(output_dir: Path, index_path: Path | None, pages: dict[str, str]) -> list[str]:
+    problems: list[str] = []
+    expected_names = set(pages)
+    actual_names = {path.name for path in output_dir.glob("*.md") if index_path is None or path != index_path}
+    for filename in sorted(expected_names):
+        path = output_dir / filename
+        if not path.exists():
+            problems.append(f"missing {path}")
+        elif path.read_text(encoding="utf-8") != pages[filename]:
+            problems.append(f"stale {path}")
+    for filename in sorted(actual_names - expected_names):
+        problems.append(f"unexpected {output_dir / filename}")
+    if index_path is not None:
+        expected_index = _build_module_index({Path(filename).stem for filename in pages})
+        if not index_path.exists():
+            problems.append(f"missing {index_path}")
+        elif index_path.read_text(encoding="utf-8") != expected_index:
+            problems.append(f"stale {index_path}")
+    return problems
 
 
 def run_cli() -> int:
@@ -301,6 +425,11 @@ def run_cli() -> int:
         type=Path,
         help="Optional index Markdown file to write a toctree for generated modules.",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Check that generated files are current without modifying them (used with --all).",
+    )
     args = parser.parse_args()
 
     if args.all:
@@ -308,16 +437,24 @@ def run_cli() -> int:
             raise SystemExit("--output-dir is required when using --all.")
         targets = _discover_targets()
         output_dir = args.output_dir
+        pages = _generated_pages(targets)
+        if args.check:
+            problems = _check_generated_output(output_dir, args.index, pages)
+            if problems:
+                print("Generated module documentation is not current:", file=sys.stderr)
+                for problem in problems:
+                    print(f"- {problem}", file=sys.stderr)
+                return 1
+            return 0
+
         output_dir.mkdir(parents=True, exist_ok=True)
         existing_module_pages = set(output_dir.glob("*.md"))
         if args.index is not None:
             existing_module_pages.discard(args.index)
 
         generated_files: list[Path] = []
-        for target in targets:
-            step_cls, documentation = _load_process_step(target)
-            markdown = build_markdown(step_cls, documentation)
-            output_path = output_dir / f"{step_cls.__name__}.md"
+        for filename, markdown in pages.items():
+            output_path = output_dir / filename
             output_path.write_text(markdown, encoding="utf-8")
             generated_files.append(output_path)
 
@@ -325,7 +462,10 @@ def run_cli() -> int:
             stale_path.unlink()
 
         if args.index:
-            _write_module_index(args.index, generated_files)
+            args.index.write_text(
+                _build_module_index({path.stem for path in generated_files}),
+                encoding="utf-8",
+            )
         return 0
 
     if not args.target:
