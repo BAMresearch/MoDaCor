@@ -87,7 +87,10 @@ explicit ordinary step for exceptional lanes.
 Expansion happens before `ProcessStep` instantiation. The scheduler therefore
 receives the same flat DAG as an explicitly written pipeline. Exported expanded
 YAML contains ordinary `steps` only, while graph specs attach `origin` metadata
-to generated nodes for grouping and diagnostics.
+to generated nodes for grouping and diagnostics. `Pipeline.to_dot()` and
+`Pipeline.to_mermaid()` use that metadata to group blocks and item lanes by
+default; pass `group_step_blocks=False` to either method for the flat execution
+graph.
 
 ## Step configuration validation
 

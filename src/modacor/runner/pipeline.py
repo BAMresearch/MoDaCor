@@ -28,6 +28,7 @@ from ..dataclasses.pipeline_provenance import PipelineProvenance
 from ..dataclasses.process_step import ProcessStep
 from ..dataclasses.trace_event import TraceEvent
 from ..io.io_sources import IoSources  # noqa: F401  # reserved for future use
+from .pipeline_graph_rendering import render_pipeline_dot, render_pipeline_mermaid
 from .pipeline_schema import StepOrigin, expand_pipeline_yaml
 from .process_step_registry import DEFAULT_PROCESS_STEP_REGISTRY, ProcessStepRegistry
 
@@ -559,7 +560,7 @@ class Pipeline:
             expanded_spec=expanded_spec,
         )
 
-    def to_dot(self, direction: str = "LR") -> str:
+    def to_dot(self, direction: str = "LR", *, group_step_blocks: bool = True) -> str:
         """
         Export the pipeline as a Graphviz DOT string for visualization.
 
@@ -570,32 +571,17 @@ class Pipeline:
         direction:
             Graphviz rank direction, e.g. "LR" for left-to-right or "TB" for
             top-to-bottom.
+        group_step_blocks:
+            Group expanded nodes by their authored block and item. Pipelines
+            without expanded blocks render identically either way.
         """
-        spec = self.to_spec()
-        lines: list[str] = [
-            f'digraph "{spec["name"]}" {{',
-            f"  rankdir={direction};",
-        ]
+        return render_pipeline_dot(
+            self.to_spec(),
+            direction=direction,
+            group_step_blocks=group_step_blocks,
+        )
 
-        # Nodes
-        for node in spec["nodes"]:
-            nid = node["id"]
-            # Show both id and label so it's easy to match YAML <-> graph
-            label = f'{node["id"]}: {node["module"]}'
-            short_title = node.get("short_title")
-            if short_title:
-                label = f"{label}\\n{short_title}"
-            esc_label = label.replace('"', '\\"')
-            lines.append(f'  "{nid}" [label="{esc_label}"];')  # noqa: E702, E231
-
-        # Edges
-        for edge in spec["edges"]:
-            lines.append(f'  "{edge["from"]}" -> "{edge["to"]}";')  # noqa: E702, E231
-
-        lines.append("}")
-        return "\n".join(lines)
-
-    def to_mermaid(self, direction: str = "LR") -> str:
+    def to_mermaid(self, direction: str = "LR", *, group_step_blocks: bool = True) -> str:
         """
         Export the pipeline as a Mermaid flowchart definition.
 
@@ -603,38 +589,15 @@ class Pipeline:
         ----------
         direction:
             Mermaid direction: "LR" (left-right), "TB" (top-bottom), etc.
+        group_step_blocks:
+            Group expanded nodes by their authored block and item. Pipelines
+            without expanded blocks render identically either way.
         """
-        spec = self.to_spec()
-
-        # Mermaid node IDs must be simple identifiers (no spaces, quotes, etc.).
-        # We'll generate safe IDs but keep the original step_id visible in the label.
-        def sanitize(node_id: str) -> str:
-            return "".join(c if (c.isalnum() or c == "_") else "_" for c in node_id)
-
-        id_map: dict[str, str] = {}
-        for node in spec["nodes"]:
-            raw = str(node["id"])
-            id_map[node["id"]] = sanitize(raw)
-
-        lines: list[str] = [f"flowchart {direction}"]
-
-        # Nodes
-        for node in spec["nodes"]:
-            nid = id_map[node["id"]]
-            label = f'{node["id"]}: {node["module"]}'
-            short_title = node.get("short_title")
-            if short_title:
-                label = f"{label}<br/>{short_title}"
-            esc_label = label.replace('"', '\\"')
-            lines.append(f'    {nid}["{esc_label}"]')
-
-        # Edges
-        for edge in spec["edges"]:
-            src = id_map[edge["from"]]
-            dst = id_map[edge["to"]]
-            lines.append(f"    {src} --> {dst}")
-
-        return "\n".join(lines)
+        return render_pipeline_mermaid(
+            self.to_spec(),
+            direction=direction,
+            group_step_blocks=group_step_blocks,
+        )
 
     # in case we used to and from spec to modify the pipeline, we can
     # store the new pipeline back to yaml

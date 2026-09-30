@@ -383,6 +383,7 @@ def test_to_dot_matches_spec():
 
     n1 = DummyNode(step_id="1")
     n2 = DummyNode(step_id="2")
+    n2.short_title = "custom purpose"
     graph = {n2: {n1}, n1: set()}
 
     pipeline = Pipeline(graph=graph, name="dot_test")
@@ -395,7 +396,7 @@ def test_to_dot_matches_spec():
 
     # Node labels should include "<id>: <module name>"
     assert '"1" [label="1: DummyNode"];' in dot_src
-    assert '"2" [label="2: DummyNode"];' in dot_src
+    assert '"2" [label="2: DummyNode\\ncustom purpose"];' in dot_src
 
     # Edge representation
     assert '"1" -> "2";' in dot_src
@@ -431,11 +432,80 @@ def test_to_mermaid_flowchart():
     assert mermaid_src.splitlines()[0] == "flowchart TB"
 
     # Nodes: 1 and 2 with labels "1: DummyNode" etc.
-    assert '1["1: DummyNode"]' in mermaid_src
-    assert '2["2: DummyNode<br/>custom purpose"]' in mermaid_src
+    assert 'node_0["1: DummyNode"]' in mermaid_src
+    assert 'node_1["2: DummyNode<br/>custom purpose"]' in mermaid_src
 
     # Edge: 1 --> 2
-    assert "1 --> 2" in mermaid_src
+    assert "node_0 --> node_1" in mermaid_src
+
+
+def test_graph_renderers_group_expanded_blocks_and_allow_flat_output():
+    pipeline = Pipeline.from_yaml("""
+        name: grouped
+        step_blocks:
+          prepare:
+            for_each:
+              sample: {processing_key: sample}
+              background: {processing_key: background}
+            steps:
+              first:
+                module: PoissonUncertainties
+                configuration:
+                  with_processing_keys: ["${processing_key}"]
+              second:
+                module: PoissonUncertainties
+                requires_steps: [.first]
+                configuration:
+                  with_processing_keys: ["${processing_key}"]
+        steps:
+          finish:
+            module: PoissonUncertainties
+            requires_steps:
+              - prepare.sample.second
+              - prepare.background.second
+            configuration:
+              with_processing_keys: [sample]
+        """)
+
+    dot_src = pipeline.to_dot()
+    assert "newrank=true;" in dot_src
+    assert 'subgraph "cluster_block_0"' in dot_src
+    assert 'label="prepare (for_each)";' in dot_src
+    assert 'label="sample";' in dot_src
+    assert 'label="background";' in dot_src
+    assert '{ rank=same; "prepare.sample.first"; "prepare.background.first"; }' in dot_src
+    assert '"prepare.sample.second" -> "finish";' in dot_src
+    flat_dot = pipeline.to_dot(group_step_blocks=False)
+    assert "subgraph" not in flat_dot
+    assert "newrank=true;" not in flat_dot
+
+    mermaid_src = pipeline.to_mermaid()
+    assert 'subgraph block_0["prepare (for_each)"]' in mermaid_src
+    assert 'subgraph block_0_item_0["sample"]' in mermaid_src
+    assert 'subgraph block_0_item_1["background"]' in mermaid_src
+    assert '["prepare.sample.second: PoissonUncertainties"]' in mermaid_src
+    assert "subgraph" not in pipeline.to_mermaid(group_step_blocks=False)
+
+    top_down_mermaid = pipeline.to_mermaid(direction="TD")
+    assert top_down_mermaid.startswith("flowchart TB\n")
+    assert "direction TD" not in top_down_mermaid
+    assert "direction TB" in top_down_mermaid
+
+
+def test_mermaid_renderer_uses_collision_free_internal_node_ids():
+    class DummyNode:
+        def __init__(self, step_id):
+            self.step_id = step_id
+            self.configuration = {}
+
+    dotted = DummyNode("same.id")
+    underscored = DummyNode("same_id")
+    pipeline = Pipeline(graph={dotted: set(), underscored: set()}, name="identifier_test")
+
+    mermaid_src = pipeline.to_mermaid()
+
+    assert 'node_0["same.id: DummyNode"]' in mermaid_src
+    assert 'node_1["same_id: DummyNode"]' in mermaid_src
 
 
 def test_yaml_spec_roundtrip_with_edit():

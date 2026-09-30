@@ -1,6 +1,6 @@
 # Pipeline `for_each` schema expansion
 
-Status: initial implementation complete; grouped graph rendering deferred
+Status: initial implementation and grouped graph rendering complete
 
 ## Initial implementation result
 
@@ -16,10 +16,11 @@ counts. An end-to-end run against sample scans 978497--978500 and background
 scans 977724--977727 reproduced the previously stored pooled signal, pooled Q,
 and transmission scalar exactly.
 
-The expanded spec now carries stable block, item, and local-step origin
-metadata. The existing DOT and Mermaid renderers still show the complete flat
-execution graph; using that metadata for clustered lanes is deliberately left
-as a presentation-only follow-up.
+The expanded spec carries stable block, item, and local-step origin metadata.
+The DOT and Mermaid renderers use it to group the complete execution graph into
+blocks and item lanes, with an explicit option to retain the flat view. DOT
+also requests matching local stages at the same rank. Rendering remains
+strictly presentational and does not change scheduler nodes or dependencies.
 
 ## Decision summary
 
@@ -356,8 +357,8 @@ resolves to a set of child ids before execution.
    writer. Apply an expanded-child limit in server policy before module
    instantiation.
 7. **Add grouped rendering.** Stable group/lane/stage metadata is present in
-   the spec. Enhancing DOT/Mermaid output remains deferred and is not a
-   prerequisite for execution.
+   the spec. DOT clusters and Mermaid subgraphs now show block and item lanes;
+   the flat representation remains available explicitly.
 8. **Migrate the USAXS example.** Express diode preparation, I0 preparation,
    repeated normalization, paired centering, and final lane preparation as
    blocks where their contracts really are identical. Leave joins and
