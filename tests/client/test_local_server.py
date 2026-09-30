@@ -53,10 +53,11 @@ def test_local_server_command_contains_roots_and_limits(tmp_path):
         runtime_policy="restricted",
         max_sessions=2,
         max_pipeline_yaml_bytes=100,
+        max_expanded_pipeline_steps=150,
         max_buffer_upload_bytes=200,
     )
 
-    assert server._command()[-10:] == [
+    assert server._command()[-12:] == [
         "--read-root",
         str(tmp_path / "read"),
         "--write-root",
@@ -65,6 +66,8 @@ def test_local_server_command_contains_roots_and_limits(tmp_path):
         "2",
         "--max-pipeline-yaml-bytes",
         "100",
+        "--max-expanded-pipeline-steps",
+        "150",
         "--max-buffer-upload-bytes",
         "200",
     ]

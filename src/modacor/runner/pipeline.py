@@ -24,9 +24,11 @@ from attrs import define, field
 
 from modacor.debug.pipeline_tracer import tracer_event_to_datasets_payload
 
+from ..dataclasses.pipeline_provenance import PipelineProvenance
 from ..dataclasses.process_step import ProcessStep
 from ..dataclasses.trace_event import TraceEvent
 from ..io.io_sources import IoSources  # noqa: F401  # reserved for future use
+from .pipeline_schema import StepOrigin, expand_pipeline_yaml
 from .process_step_registry import DEFAULT_PROCESS_STEP_REGISTRY, ProcessStepRegistry
 
 __all__ = ["Pipeline"]
@@ -45,6 +47,9 @@ class Pipeline:
     name: str = field(default="Unnamed Pipeline")
     # Optional trace events collected during a run (step_id -> list of events)
     trace_events: dict[str, list[TraceEvent]] = field(factory=dict, repr=False)
+    authored_yaml: str | None = field(default=None, repr=False)
+    authored_spec: dict[str, Any] | None = field(default=None, repr=False)
+    step_origins: dict[str, StepOrigin] = field(factory=dict, repr=False)
     _active_sorter: TopologicalSorter | None = field(default=None, init=False, repr=False)
     _predecessor_order: dict[Any, tuple[Any, ...]] = field(factory=dict, init=False, repr=False)
 
@@ -75,6 +80,8 @@ class Pipeline:
         cls,
         yaml_file: Path | str,
         registry: ProcessStepRegistry | None = None,
+        *,
+        max_expanded_steps: int | None = None,
     ) -> "Pipeline":
         """
         Instantiate a Pipeline from a YAML configuration file.
@@ -89,13 +96,15 @@ class Pipeline:
         """
         yaml_path = Path(yaml_file)
         yaml_string = yaml_path.read_text(encoding="utf-8")
-        return cls.from_yaml(yaml_string, registry=registry)
+        return cls.from_yaml(yaml_string, registry=registry, max_expanded_steps=max_expanded_steps)
 
     @classmethod
     def from_yaml(
         cls,
         yaml_string: str,
         registry: ProcessStepRegistry | None = None,
+        *,
+        max_expanded_steps: int | None = None,
     ) -> "Pipeline":
         """
         Instantiate a Pipeline from a YAML configuration string.
@@ -126,7 +135,8 @@ class Pipeline:
           the outer key (after string conversion), otherwise an error
           is raised to avoid silent mismatches.
         """
-        yaml_obj = yaml.safe_load(yaml_string) or {}
+        expansion = expand_pipeline_yaml(yaml_string, max_expanded_steps=max_expanded_steps)
+        yaml_obj = expansion.expanded_spec
         steps_cfg = yaml_obj.get("steps", {}) or {}
 
         registry = registry or DEFAULT_PROCESS_STEP_REGISTRY
@@ -205,7 +215,13 @@ class Pipeline:
             graph[process_step_instances[step_id]] = {process_step_instances[dep_id] for dep_id in deps}
 
         name = yaml_obj.get("name", "Unnamed Pipeline")
-        return cls(name=name, graph=graph)
+        return cls(
+            name=name,
+            graph=graph,
+            authored_yaml=yaml_string,
+            authored_spec=expansion.authored_spec,
+            step_origins=expansion.origins,
+        )
 
     @classmethod
     def from_dict(
@@ -492,6 +508,9 @@ class Pipeline:
             }
             if getattr(node, "short_title", None):
                 node_spec["short_title"] = node.short_title
+            origin = self.step_origins.get(sid)
+            if origin is not None:
+                node_spec["origin"] = origin.to_dict()
 
             cfg_json = json.dumps(node_spec["config"], sort_keys=True, default=str).encode("utf-8")
             node_spec["config_hash"] = sha256(cfg_json).hexdigest()
@@ -520,6 +539,25 @@ class Pipeline:
                 edges.append({"from": id_by_node[pre], "to": target_id})
 
         return {"name": self.name, "nodes": nodes, "edges": edges}
+
+    def provenance(self, *, include_trace_events: bool = False) -> PipelineProvenance:
+        """Return authored and expanded representations for persistent provenance."""
+
+        expanded_yaml = self.to_yaml()
+        expanded_spec = self.to_spec()
+        if not include_trace_events:
+            for node in expanded_spec.get("nodes", []):
+                node.pop("trace_events", None)
+        authored_yaml = self.authored_yaml if self.authored_yaml is not None else expanded_yaml
+        authored_spec = self.authored_spec
+        if authored_spec is None:
+            authored_spec = yaml.safe_load(authored_yaml) or {}
+        return PipelineProvenance(
+            authored_yaml=authored_yaml,
+            authored_spec=authored_spec,
+            expanded_yaml=expanded_yaml,
+            expanded_spec=expanded_spec,
+        )
 
     def to_dot(self, direction: str = "LR") -> str:
         """

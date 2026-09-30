@@ -34,6 +34,7 @@ class LocalRuntimeServer:
         executable: str | Path | None = None,
         max_sessions: int | None = None,
         max_pipeline_yaml_bytes: int | None = None,
+        max_expanded_pipeline_steps: int | None = None,
         max_buffer_upload_bytes: int | None = None,
     ) -> None:
         if runtime_policy not in {"trusted", "restricted"}:
@@ -54,6 +55,7 @@ class LocalRuntimeServer:
         self.executable = str(executable or sys.executable)
         self.max_sessions = max_sessions
         self.max_pipeline_yaml_bytes = max_pipeline_yaml_bytes
+        self.max_expanded_pipeline_steps = max_expanded_pipeline_steps
         self.max_buffer_upload_bytes = max_buffer_upload_bytes
         self.client = RuntimeClient(f"http://{self.host}:{self.port}", timeout=request_timeout)
         self.process: subprocess.Popen[str] | None = None
@@ -122,6 +124,7 @@ class LocalRuntimeServer:
         for option, value in (
             ("--max-sessions", self.max_sessions),
             ("--max-pipeline-yaml-bytes", self.max_pipeline_yaml_bytes),
+            ("--max-expanded-pipeline-steps", self.max_expanded_pipeline_steps),
             ("--max-buffer-upload-bytes", self.max_buffer_upload_bytes),
         ):
             if value is not None:

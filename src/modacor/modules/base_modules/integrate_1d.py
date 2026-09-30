@@ -204,7 +204,8 @@ class Integrate1D(ProcessStep):
     def _collapse_duplicate_values(values: np.ndarray, domain: _IntegrationDomain) -> np.ndarray:
         if domain.duplicate_groups is None:
             return values
-        assert domain.duplicate_counts is not None
+        if domain.duplicate_counts is None:  # pragma: no cover - construction invariant
+            raise RuntimeError("Duplicate coordinate groups are missing their sample counts.")
         return np.bincount(domain.duplicate_groups, weights=values) / domain.duplicate_counts
 
     @staticmethod
@@ -215,7 +216,8 @@ class Integrate1D(ProcessStep):
     ) -> np.ndarray:
         values = np.broadcast_to(component, signal.signal.shape).squeeze()[domain.common][domain.sort_order]
         if domain.duplicate_groups is not None:
-            assert domain.duplicate_counts is not None
+            if domain.duplicate_counts is None:  # pragma: no cover - construction invariant
+                raise RuntimeError("Duplicate coordinate groups are missing their sample counts.")
             values = np.sqrt(np.bincount(domain.duplicate_groups, weights=values**2)) / domain.duplicate_counts
         return np.asarray(np.sqrt(np.sum((values * domain.quadrature_weights) ** 2)))
 

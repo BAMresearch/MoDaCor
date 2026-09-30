@@ -21,6 +21,7 @@ import pytest
 from modacor import __version__, ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.pipeline_provenance import PipelineProvenance
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 
@@ -96,8 +97,12 @@ def test_hdf_processing_sink_writes_result_and_metadata(
     out_file = tmp_path / "out.h5"
     sink = HDFProcessingSink(resource_location=out_file, iosink_method_kwargs={"compression": "gzip"})
 
-    pipeline_spec = {"name": "demo", "version": "1.0"}
-    pipeline_yaml = "name: demo\nsteps: {}\n"
+    provenance = PipelineProvenance(
+        authored_spec={"name": "demo", "step_blocks": {}},
+        authored_yaml="name: demo\nstep_blocks: {}\n",
+        expanded_spec={"name": "demo", "nodes": [], "edges": []},
+        expanded_yaml="name: demo\nsteps: {}\n",
+    )
     trace_events = [
         {
             "step_id": "S1",
@@ -118,8 +123,7 @@ def test_hdf_processing_sink_writes_result_and_metadata(
         "run1",
         processing_data_with_uncertainties,
         data_paths=["/sample/signal/signal"],
-        pipeline_spec=pipeline_spec,
-        pipeline_yaml=pipeline_yaml,
+        pipeline_provenance=provenance,
         trace_events=trace_events,
     )
 
@@ -178,8 +182,13 @@ def test_hdf_processing_sink_writes_result_and_metadata(
         )
 
         pipeline_group = h5["processing/pipeline/run1"]
-        assert _read_json_dataset(pipeline_group, "spec") == pipeline_spec
-        assert _read_text_dataset(pipeline_group, "yaml") == pipeline_yaml
+        assert pipeline_group.attrs["schema_version"] == "1.0"
+        assert _read_json_dataset(pipeline_group["authored"], "spec") == provenance.authored_spec
+        assert _read_text_dataset(pipeline_group["authored"], "yaml") == provenance.authored_yaml
+        assert _read_json_dataset(pipeline_group["expanded"], "spec") == provenance.expanded_spec
+        assert _read_text_dataset(pipeline_group["expanded"], "yaml") == provenance.expanded_yaml
+        assert "spec" not in pipeline_group
+        assert "yaml" not in pipeline_group
 
         tracer_group = h5["processing/tracer/run1"]
         assert _read_json_dataset(tracer_group, "events") == trace_events

@@ -1,6 +1,25 @@
 # Pipeline `for_each` schema expansion
 
-Status: design recommendation; no implementation yet
+Status: initial implementation complete; grouped graph rendering deferred
+
+## Initial implementation result
+
+The first implementation compiles non-nested `step_blocks` with typed
+whole-value parameters and local prerequisites into the existing flat DAG. It
+retains origin metadata per generated node, enforces an optional expanded-step
+limit, preserves child-level partial reruns, and stores authored and expanded
+YAML/spec provenance through both ordinary and chunked HDF sinks.
+
+The I22 USAXS example is the acceptance case. Its authored pipeline decreased
+from 1,255 to 496 lines while still expanding to 123 nodes with the same module
+counts. An end-to-end run against sample scans 978497--978500 and background
+scans 977724--977727 reproduced the previously stored pooled signal, pooled Q,
+and transmission scalar exactly.
+
+The expanded spec now carries stable block, item, and local-step origin
+metadata. The existing DOT and Mermaid renderers still show the complete flat
+execution graph; using that metadata for clustered lanes is deliberately left
+as a presentation-only follow-up.
 
 ## Decision summary
 
@@ -146,8 +165,9 @@ steps:
       - prepare_diode.SLR.normalize_time
 ```
 
-This is illustrative syntax, not an implemented contract. Before coding, the
-names and reference grammar should be fixed in a focused schema decision.
+This is the implemented version-1 syntax. Its deliberately small reference and
+substitution grammar is fixed by the rules below and by the schema-expansion
+tests.
 
 ### Expansion rules
 
@@ -266,16 +286,51 @@ can provide useful static grouping, but neither should affect scheduler nodes.
 Renderer node identifiers should be generated independently of step ids so
 that sanitizing punctuation cannot create collisions.
 
-For reproducibility, server and sink provenance should retain both:
+For reproducibility, server and sink provenance should retain both the authored
+description and the expanded execution description. In the HDF processing
+sink, the preferred layout is:
 
-- the authored YAML submitted by the user;
-- the canonical expanded spec (and preferably a stable hash of it).
+```text
+/processing/pipeline/<run-id>/
+    authored/
+        yaml       # exact submitted YAML text
+        spec       # normalized compact document: ordinary steps + step blocks
+    expanded/
+        yaml       # canonical executable YAML containing ordinary steps only
+        spec       # flat execution graph from Pipeline.to_spec()
+```
+
+`authored` is preferable to `input`: it describes the semantic role and remains
+accurate whether the pipeline eventually enters through YAML, an API object, or
+a graph editor. `expanded` is preferable to `unfolded` because it matches the
+compiler operation and generated-id terminology.
+
+The two objects called `spec` have related but distinct schemas. The authored
+spec is the normalized, JSON-serializable compiler input and remains suitable
+for editing or re-expansion. The expanded spec is the executable node/edge
+graph, including block/item/local-step origin metadata. A collapsed graph view
+does not need a fifth stored representation: it can be derived from the
+expanded spec's origin metadata, while the authored spec preserves the actual
+compact description.
+
+The current HDF layout stores `yaml` and `spec` directly below the run group.
+Today those already have mixed semantics: `yaml` is submitted text while
+`spec` is the runtime graph. No production reader in the repository depends on
+those paths, so the new schema should replace them rather than retain aliases
+or duplicate datasets. The affected sink tests should be updated to assert the
+four explicit paths. Both ordinary and chunked HDF sinks should call one shared
+provenance writer so their layouts cannot diverge.
+
+The run group should also identify the compact-schema/compiler version and may
+store stable hashes of the authored and expanded representations. This makes it
+possible to prove which expanded DAG was executed without discarding the more
+readable source supplied by the user.
 
 Partial-rerun selection continues to operate on expanded ids and exact child
 dependency contracts. Selecting a block or item in a UI is a convenience that
 resolves to a set of child ids before execution.
 
-## Implementation plan
+## Implemented sequence
 
 1. **Freeze the compact schema.** Add schema examples and failure examples;
    decide the final names, exact placeholder form, local-reference syntax, and
@@ -296,11 +351,13 @@ resolves to a set of child ids before execution.
    expose them from `to_spec()`. Keep the scheduler graph unchanged.
 6. **Add inspection and provenance.** Provide an expansion/validation API (and
    optionally CLI command), continue exporting expanded YAML, and persist the
-   submitted source alongside the expanded spec. Apply an expanded-child limit
-   in server policy before module instantiation.
-7. **Add grouped rendering.** First add stable group/lane/stage metadata to the
-   spec; then enhance DOT/Mermaid output. Do not make rendering a prerequisite
-   for execution.
+   authored and expanded YAML/spec pairs under explicit HDF groups. Route the
+   ordinary and chunked sinks through a shared provenance representation and
+   writer. Apply an expanded-child limit in server policy before module
+   instantiation.
+7. **Add grouped rendering.** Stable group/lane/stage metadata is present in
+   the spec. Enhancing DOT/Mermaid output remains deferred and is not a
+   prerequisite for execution.
 8. **Migrate the USAXS example.** Express diode preparation, I0 preparation,
    repeated normalization, paired centering, and final lane preparation as
    blocks where their contracts really are identical. Leave joins and
@@ -320,6 +377,8 @@ resolves to a set of child ids before execution.
 - Child-level tracing, failures, timing, stop-after, and partial reruns remain
   available.
 - The expanded pipeline can be exported and run without the compact schema.
+- HDF provenance contains the authored YAML/spec and expanded YAML/spec at the
+  four explicit grouped paths.
 - Users can inspect all generated ids and dependencies before execution.
 - The USAXS compact source is materially shorter and groups the eight diode
   lanes coherently, while its expanded DAG remains scientifically explicit.

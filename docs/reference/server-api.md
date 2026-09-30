@@ -478,8 +478,7 @@ For HDF sinks, runtime metadata is opt-in:
   "location": "/data/out/current.h5",
   "kwargs": {
     "include_runtime_metadata": {
-      "pipeline_yaml": true,
-      "pipeline_spec": true,
+      "pipeline_provenance": true,
       "trace_events": false
     }
   }

@@ -185,6 +185,54 @@ def test_pipeline_from_yaml_accepts_tuple_config_from_yaml_sequence():
     assert isinstance(node.configuration["basis_fast"], tuple)
 
 
+def test_pipeline_from_yaml_expands_step_blocks_and_exports_origins():
+    yaml_str = """
+    name: expanded_pipeline
+    step_blocks:
+      uncertainty:
+        for_each:
+          sample: {processing_key: sample}
+          background: {processing_key: background}
+        steps:
+          first:
+            module: PoissonUncertainties
+            configuration:
+              with_processing_keys: ["${processing_key}"]
+          second:
+            module: PoissonUncertainties
+            requires_steps: [.first]
+            configuration:
+              with_processing_keys: ["${processing_key}"]
+    """
+
+    pipeline = Pipeline.from_yaml(yaml_str)
+
+    assert [node.step_id for node in pipeline.static_order()] == [
+        "uncertainty.sample.first",
+        "uncertainty.background.first",
+        "uncertainty.sample.second",
+        "uncertainty.background.second",
+    ]
+    spec = pipeline.to_spec()
+    node_map = {node["id"]: node for node in spec["nodes"]}
+    assert node_map["uncertainty.sample.second"]["origin"] == {
+        "block": "uncertainty",
+        "item": "sample",
+        "local_step": "second",
+        "block_index": 0,
+        "item_index": 0,
+        "local_step_index": 1,
+    }
+    assert "step_blocks" not in yaml.safe_load(pipeline.to_yaml())
+    assert pipeline.authored_yaml == yaml_str
+    assert "step_blocks" in pipeline.authored_spec
+    provenance = pipeline.provenance()
+    assert provenance.authored_yaml == yaml_str
+    assert "step_blocks" in provenance.authored_spec
+    assert "step_blocks" not in yaml.safe_load(provenance.expanded_yaml)
+    assert all("trace_events" not in node for node in provenance.expanded_spec["nodes"])
+
+
 def test_pipeline_static_order_uses_fresh_scheduler_each_call(linear_pipeline):
     pipeline = Pipeline.from_dict(linear_pipeline)
 
