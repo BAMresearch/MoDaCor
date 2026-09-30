@@ -41,6 +41,7 @@ from modacor.modules.base_modules.subtract_databundles import SubtractDatabundle
 from modacor.modules.base_modules.subtract_interpolated_1d import SubtractInterpolated1D
 from modacor.modules.base_modules.threshold_mask import ThresholdMask
 from modacor.modules.base_modules.units_label_update import UnitsLabelUpdate
+from modacor.modules.technique_modules.scattering.angle_to_q import AngleToQ
 from modacor.modules.technique_modules.scattering.attenuator_plate_correction import AttenuatorPlateCorrection
 from modacor.modules.technique_modules.scattering.capillary_sample_container_correction import (
     CapillarySampleContainerCorrection,
@@ -60,12 +61,12 @@ from modacor.modules.technique_modules.scattering.solid_angle_correction import 
 from modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordinates import (
     XSGeometryFromPixelCoordinates,
 )
-from modacor.modules.technique_modules.scattering.yaw_to_q import YawToQ
 
 __all__ = [
     "AppendProcessingData",
     "AppendSink",
     "AppendSource",
+    "AngleToQ",
     "AttenuatorPlateCorrection",
     "ApplyMask",
     "BitwiseOrMasks",
@@ -103,5 +104,4 @@ __all__ = [
     "ThresholdMask",
     "UnitsLabelUpdate",
     "XSGeometryFromPixelCoordinates",
-    "YawToQ",
 ]

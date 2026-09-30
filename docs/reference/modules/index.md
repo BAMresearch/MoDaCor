@@ -44,7 +44,7 @@ Configuration tables are generated from each step's `ProcessStepDescriber` metad
 - [IndexPixels](IndexPixels.md)
 - [PixelCoordinates3D](PixelCoordinates3D.md)
 - [XSGeometryFromPixelCoordinates](XSGeometryFromPixelCoordinates.md)
-- [YawToQ](YawToQ.md)
+- [AngleToQ](AngleToQ.md)
 
 ## Reduction and integration
 
@@ -73,6 +73,7 @@ Configuration tables are generated from each step's `ProcessStepDescriber` metad
 ```{toctree}
 :maxdepth: 1
 
+AngleToQ
 AppendProcessingData
 AppendSink
 AppendSource
@@ -113,5 +114,4 @@ SubtractInterpolated1D
 ThresholdMask
 UnitsLabelUpdate
 XSGeometryFromPixelCoordinates
-YawToQ
 ```

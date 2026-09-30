@@ -12,10 +12,12 @@ coordinates. [`XSGeometryFromPixelCoordinates`](../reference/modules/XSGeometryF
 derives scattering quantities such as `Q`, azimuth, and solid angle from those
 positions and beam metadata.
 
-[`YawToQ`](../reference/modules/YawToQ.md) converts analyser yaw to signed Q
-using a configured or measured beam centre and photon energy. Keeping the sign
-allows asymmetric analyser wings to remain separate until a pipeline selects
-one or combines them deliberately.
+[`AngleToQ`](../reference/modules/AngleToQ.md) converts scattering-angle or
+Bragg-angle coordinates to signed Q using a configured or measured centre and
+either photon energy or wavelength. Energy-to-wavelength conversion uses
+`BaseData` arithmetic so units and separate uncertainty components propagate.
+Keeping the sign allows asymmetric analyser wings to remain separate until a
+pipeline selects one or combines them deliberately.
 
 Prefer NeXus transformation chains when the input describes them correctly.
 Explicit basis vectors, pitches, beam centers, or sample positions remain

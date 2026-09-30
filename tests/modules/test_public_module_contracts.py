@@ -13,6 +13,7 @@ from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 PUBLIC_STEP_NAMES = tuple(modacor.modules.__all__)
 
 DEFAULT_METADATA_CONTRACTS = {
+    "AngleToQ": ({"angle", "energy"}, {"Q"}),
     "ConcatenateDatabundles": (set(), {"configured data keys", "source_index"}),
     "DilateMask": ({"mask"}, {"mask"}),
     "DivideDatabundles": ({"signal"}, {"signal"}),
@@ -36,7 +37,6 @@ DEFAULT_METADATA_CONTRACTS = {
     "ReduceMask": ({"mask"}, {"mask"}),
     "SubtractInterpolated1D": ({"signal", "Q"}, {"signal", "remap_mask"}),
     "ThresholdMask": ({"signal"}, {"threshold_mask"}),
-    "YawToQ": ({"yaw", "energy"}, {"Q"}),
 }
 
 

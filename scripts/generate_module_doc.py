@@ -66,7 +66,7 @@ MODULE_GROUPS: dict[str, tuple[str, ...]] = {
         "IndexPixels",
         "PixelCoordinates3D",
         "XSGeometryFromPixelCoordinates",
-        "YawToQ",
+        "AngleToQ",
     ),
     "Reduction and integration": (
         "FindCenterOfMass1D",

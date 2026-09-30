@@ -14,7 +14,6 @@ from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 from modacor.modules.helpers.scattering.material_attenuation import (
-    HC_KEV_ANGSTROM,
     _decode_scalar,
     energy_kev_from_config_or_wavelength,
 )
@@ -136,7 +135,7 @@ def test_material_attenuation_can_derive_energy_from_wavelength():
         },
     )
 
-    assert energy == pytest.approx(HC_KEV_ANGSTROM)
+    assert energy == pytest.approx(12.398419843320026)
 
 
 def test_material_attenuation_accepts_broadcast_constant_as_scalar():
