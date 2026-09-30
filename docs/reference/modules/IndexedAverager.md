@@ -7,19 +7,22 @@ Average signal and geometry using precomputed pixel bin indices.
 - **Import path:** `modacor.modules.technique_modules.scattering.indexed_averager.IndexedAverager`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/indexed_averager.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/indexed_averager.py)
 - **Module ID:** IndexedAverager
-- **Module version:** 20260927.1
+- **Module version:** 20260929.1
 - **Keywords:** radial, azimuthal, averaging, binning, scattering
 
 ## Required data keys
 - signal
 - Q
-- Psi
 - pixel_index
 
 ## Modifies
 - **signal**: signal, uncertainties
 - **Q**: signal, uncertainties
 - **Psi**: signal, uncertainties
+- **bin_count**: signal
+- **positive_weight_count**: signal
+- **sum_weights**: signal
+- **effective_sample_size**: signal
 
 ## Required arguments
 - with_processing_keys

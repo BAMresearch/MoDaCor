@@ -15,9 +15,8 @@ __status__ = "Development"  # "Development", "Production"
 __version__ = "20251130.1"
 
 import numpy as np
-
-# import pytest
 import pint
+import pytest
 from numpy.testing import assert_array_equal
 
 from modacor import ureg
@@ -426,3 +425,54 @@ def test_indexpixels_dependency_contract_reads_primary_geometry_and_writes_all_o
         processing_reads={"sample.signal", "sample.Q", "sample.Psi"},
         processing_writes={"sample.pixel_index", "background.pixel_index"},
     )
+
+
+def test_indexpixels_q_only_does_not_require_psi():
+    bundle = make_1d_signal_bundle(
+        q_values=np.array([1.0, 1.5, 2.5]),
+        psi_values=np.zeros(3),
+        q_unit=ureg.dimensionless,
+    )
+    del bundle["Psi"]
+    processing_data = ProcessingData()
+    processing_data["curve"] = bundle
+
+    step = IndexPixels(io_sources=IoSources())
+    step.processing_data = processing_data
+    step.configuration = {
+        "with_processing_keys": ["curve"],
+        "averaging_direction": "azimuthal",
+        "n_bins": 2,
+        "bin_type": "linear",
+        "q_min": 1.0,
+        "q_max": 3.0,
+    }
+
+    step.prepare_execution()
+    step.calculate()
+
+    assert_array_equal(processing_data["curve"]["pixel_index"].signal, [0, 0, 1])
+    assert step.dependency_contract() == ProcessStepDependencies(
+        processing_reads={"curve.signal", "curve.Q"},
+        processing_writes={"curve.pixel_index"},
+    )
+
+
+def test_indexpixels_requires_psi_for_radial_averaging():
+    bundle = make_1d_signal_bundle(np.array([1.0, 2.0]), np.zeros(2))
+    del bundle["Psi"]
+    processing_data = ProcessingData()
+    processing_data["curve"] = bundle
+
+    step = IndexPixels(io_sources=IoSources())
+    step.processing_data = processing_data
+    step.modify_config_by_dict(
+        {
+            "with_processing_keys": ["curve"],
+            "averaging_direction": "radial",
+            "bin_type": "linear",
+        }
+    )
+
+    with pytest.raises(KeyError, match="required for radial averaging"):
+        step.prepare_execution()

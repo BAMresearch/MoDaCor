@@ -19,6 +19,7 @@ chunked-sink-implementation-plan
 chunked-beamline-validation
 external-parallel-runner
 pipeline-operations-backlog
+pipeline-foreach-expansion
 ```
 
 ## Completed documentation implementation record

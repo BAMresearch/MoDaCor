@@ -7,13 +7,12 @@ Compute per-pixel bin indices (radial or azimuthal) for later 1D averaging.
 - **Import path:** `modacor.modules.technique_modules.scattering.index_pixels.IndexPixels`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/index_pixels.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/index_pixels.py)
 - **Module ID:** IndexPixels
-- **Module version:** 20260927.1
+- **Module version:** 20260929.1
 - **Keywords:** radial, azimuthal, pixel indexing, binning, scattering
 
 ## Required data keys
 - signal
 - Q
-- Psi
 
 ## Modifies
 - **pixel_index**: signal, units, axes

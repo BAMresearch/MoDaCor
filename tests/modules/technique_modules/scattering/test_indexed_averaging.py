@@ -300,7 +300,15 @@ def test_indexedaverager_writes_distinct_output_and_preserves_source_bundle():
     output = step.calculate()
 
     assert set(output) == {"averaged"}
-    assert set(processing_data["averaged"]) == {"signal", "Q", "Psi"}
+    assert set(processing_data["averaged"]) == {
+        "signal",
+        "Q",
+        "Psi",
+        "bin_count",
+        "positive_weight_count",
+        "sum_weights",
+        "effective_sample_size",
+    }
     assert processing_data["bundle"] is source
     assert processing_data["bundle"]["signal"] is original_signal
     assert "pixel_index" in processing_data["bundle"]
@@ -346,7 +354,15 @@ def test_indexedaverager_dependency_contract_matches_output_mode():
             "sample.Mask",
             "sample.mask",
         },
-        processing_writes={"sample.signal", "sample.Q", "sample.Psi"},
+        processing_writes={
+            "sample.signal",
+            "sample.Q",
+            "sample.Psi",
+            "sample.bin_count",
+            "sample.positive_weight_count",
+            "sample.sum_weights",
+            "sample.effective_sample_size",
+        },
     )
 
     step.modify_config_by_kwargs(output_processing_key="averaged")
@@ -362,6 +378,34 @@ def test_indexedaverager_dependency_contract_matches_output_mode():
         },
         processing_writes={"averaged.*"},
     )
+
+
+def test_indexedaverager_q_only_outputs_actual_q_and_diagnostics():
+    bundle = make_1d_bundle_basic()
+    del bundle["Psi"]
+    bundle["signal"].weights = np.array([1.0, 0.0, 2.0, 2.0])
+    processing_data = ProcessingData()
+    processing_data["bundle"] = bundle
+
+    step = IndexedAverager(io_sources=IoSources())
+    step.processing_data = processing_data
+    step.modify_config_by_dict(
+        {
+            "with_processing_keys": ["bundle"],
+            "averaging_direction": "azimuthal",
+            "use_signal_weights": True,
+        }
+    )
+
+    output = step.calculate()["bundle"]
+
+    assert "Psi" not in output
+    assert_allclose(output["signal"].signal, [1.0, 3.5])
+    assert_allclose(output["Q"].signal, [10.0, 35.0])
+    assert_allclose(output["bin_count"].signal, [2.0, 2.0])
+    assert_allclose(output["positive_weight_count"].signal, [1.0, 2.0])
+    assert_allclose(output["sum_weights"].signal, [1.0, 4.0])
+    assert_allclose(output["effective_sample_size"].signal, [1.0, 2.0])
 
 
 def test_indexedaverager_mask_and_negative_index():

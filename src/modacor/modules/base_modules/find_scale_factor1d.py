@@ -11,7 +11,7 @@ __date__ = "12/12/2025"
 __status__ = "Development"
 
 __all__ = ["FindScaleFactor1D"]
-__version__ = "20260927.3"
+__version__ = "20260929.1"
 
 from pathlib import Path
 from typing import Dict
@@ -21,9 +21,14 @@ import numpy as np
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
-from modacor.models.scaling import DependentData1D, fit_scale_factor_1d, prepare_scale_fit_data
+from modacor.models.scaling import (
+    DependentData1D,
+    fit_lognormal_scale_factor_1d,
+    fit_scale_factor_1d,
+    prepare_scale_fit_data,
+)
 
 # -------------------------------------------------------------------------
 # Helpers
@@ -41,7 +46,7 @@ def _combined_sigma(bd: BaseData) -> np.ndarray:
     return np.sqrt(sig2)
 
 
-def _extract_dependent(bd: BaseData) -> DependentData1D:
+def _extract_dependent(bd: BaseData, uncertainty_key: str | None = None) -> DependentData1D:
     if bd.rank_of_data != 1:
         raise ValueError("Dependent BaseData must be rank-1.")
 
@@ -49,7 +54,12 @@ def _extract_dependent(bd: BaseData) -> DependentData1D:
     if y.ndim != 1:
         raise ValueError("Dependent signal must be 1D.")
 
-    sigma = np.asarray(_combined_sigma(bd), dtype=float)
+    if uncertainty_key is None:
+        sigma = np.asarray(_combined_sigma(bd), dtype=float)
+    else:
+        if uncertainty_key not in bd.uncertainties:
+            raise KeyError(f"Uncertainty key {uncertainty_key!r} is not present in the dependent BaseData.")
+        sigma = np.asarray(bd.uncertainties[uncertainty_key], dtype=float)
     weights = np.asarray(bd.weights, dtype=float)
 
     if sigma.size == 1:
@@ -87,6 +97,12 @@ class FindScaleFactor1D(ProcessStep):
             "scale_background": ["signal", "uncertainties", "units"],
         },
         arguments={
+            "with_processing_keys": {
+                "type": list,
+                "required": True,
+                "default": None,
+                "doc": "Two processing keys: working curve then reference curve.",
+            },
             "signal_key": {
                 "type": str,
                 "default": "signal",
@@ -114,6 +130,19 @@ class FindScaleFactor1D(ProcessStep):
                 "type": bool,
                 "default": False,
                 "doc": "Whether to fit a constant background offset.",
+            },
+            "fit_model": {
+                "type": str,
+                "default": "normal",
+                "doc": "Scale estimator: normal or lognormal.",
+            },
+            "uncertainty_weight_key": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": (
+                    "Named propagated uncertainty component used for weighting on both curves. "
+                    "Required for lognormal fitting; normal fitting combines components only when this is None."
+                ),
             },
             "fit_min_val": {
                 "type": (float, int, type(None)),
@@ -156,9 +185,32 @@ class FindScaleFactor1D(ProcessStep):
                 "doc": "Use BaseData weights when fitting.",
             },
         },
-        step_keywords=["scale", "calibration", "1D"],
-        step_doc="Compute scale factor between two 1D curves using robust least squares.",
+        step_keywords=["scale", "calibration", "lognormal", "1D"],
+        step_doc="Compute a normal robust-fit or uncertainty-weighted lognormal scale between two 1D curves.",
+        step_reference="DOI 10.1107/S1600577513030117",
     )
+
+    def dependency_contract(self) -> ProcessStepDependencies:
+        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
+        if len(processing_keys) != 2:
+            return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
+        work_key, reference_key = processing_keys
+        signal_key = str(self.configuration.get("signal_key", "signal"))
+        axis_key = str(self.configuration.get("independent_axis_key", "Q"))
+        scale_key = str(self.configuration.get("scale_output_key", "scale_factor"))
+        writes = {f"{work_key}.{scale_key}"}
+        if bool(self.configuration.get("fit_background", False)):
+            background_key = str(self.configuration.get("background_output_key", "scale_background"))
+            writes.add(f"{work_key}.{background_key}")
+        return ProcessStepDependencies(
+            processing_reads={
+                f"{work_key}.{signal_key}",
+                f"{work_key}.{axis_key}",
+                f"{reference_key}.{signal_key}",
+                f"{reference_key}.{axis_key}",
+            },
+            processing_writes=writes,
+        )
 
     def calculate(self) -> Dict[str, DataBundle]:
         cfg = self.configuration
@@ -188,8 +240,17 @@ class FindScaleFactor1D(ProcessStep):
         x_work = x_work_bd.signal.squeeze()
         x_ref = x_ref_bd.signal.squeeze()
 
-        dep_work = _extract_dependent(y_work_bd)
-        dep_ref = _extract_dependent(y_ref_bd)
+        fit_model = str(cfg.get("fit_model", "normal")).strip().lower()
+        if fit_model not in {"normal", "lognormal"}:
+            raise ValueError("FindScaleFactor1D fit_model must be 'normal' or 'lognormal'.")
+        uncertainty_weight_key = cfg.get("uncertainty_weight_key")
+        if uncertainty_weight_key is not None:
+            uncertainty_weight_key = str(uncertainty_weight_key)
+        if fit_model == "lognormal" and not uncertainty_weight_key:
+            raise ValueError("FindScaleFactor1D lognormal fitting requires uncertainty_weight_key.")
+
+        dep_work = _extract_dependent(y_work_bd, uncertainty_weight_key)
+        dep_ref = _extract_dependent(y_ref_bd, uncertainty_weight_key)
 
         fit_min = cfg.get("fit_min_val")
         fit_max = cfg.get("fit_max_val")
@@ -218,12 +279,17 @@ class FindScaleFactor1D(ProcessStep):
         )
 
         fit_background = bool(cfg.get("fit_background", False))
-        fit_result = fit_scale_factor_1d(
-            fit_data,
-            fit_background=fit_background,
-            robust_loss=cfg.get("robust_loss", "huber"),
-            robust_fscale=float(cfg.get("robust_fscale", 1.0)),
-        )
+        if fit_model == "lognormal":
+            if fit_background:
+                raise ValueError("FindScaleFactor1D lognormal fitting does not support fit_background.")
+            fit_result = fit_lognormal_scale_factor_1d(fit_data)
+        else:
+            fit_result = fit_scale_factor_1d(
+                fit_data,
+                fit_background=fit_background,
+                robust_loss=cfg.get("robust_loss", "huber"),
+                robust_fscale=float(cfg.get("robust_fscale", 1.0)),
+            )
 
         out_key = cfg.get("scale_output_key", "scale_factor")
         work_db[out_key] = BaseData(

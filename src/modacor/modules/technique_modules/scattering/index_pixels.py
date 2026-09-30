@@ -10,7 +10,7 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "29/11/2025"
 __status__ = "Development"  # "Development", "Production"
 
-__version__ = "20260927.1"
+__version__ = "20260929.1"
 __all__ = ["IndexPixels"]
 
 from pathlib import Path
@@ -47,7 +47,11 @@ class IndexPixels(ProcessStep):
     --------------------------------------------------------------
     - "signal": BaseData   (together with its rank_of_data used for data shape)
     - "Q": BaseData        (modulus of scattering vector)
-    - "Psi": BaseData      (azimuthal angle)
+    - "Psi": BaseData      (optional azimuthal angle)
+
+      ``Psi`` is optional for Q-only azimuthal averaging when neither
+      ``psi_min`` nor ``psi_max`` is configured. It remains required for
+      radial averaging and for azimuthal-region selection.
 
     This step does *not* apply the Mask. Mask is left to downstream modules
     (e.g., the averaging step), so that it can vary per frame for dynamic masking.
@@ -120,7 +124,7 @@ class IndexPixels(ProcessStep):
         calling_id="IndexPixels",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=["signal", "Q", "Psi"],
+        required_data_keys=["signal", "Q"],
         arguments={
             "with_processing_keys": {
                 "type": (str, list, type(None)),
@@ -202,12 +206,15 @@ class IndexPixels(ProcessStep):
             return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
 
         primary_key = processing_keys[0]
+        reads = {f"{primary_key}.signal", f"{primary_key}.Q"}
+        direction = str(self.configuration.get("averaging_direction", "azimuthal")).lower()
+        uses_psi = direction == "radial" or any(
+            self.configuration.get(key) is not None for key in ("psi_min", "psi_max")
+        )
+        if uses_psi:
+            reads.add(f"{primary_key}.Psi")
         return ProcessStepDependencies(
-            processing_reads={
-                f"{primary_key}.signal",
-                f"{primary_key}.Q",
-                f"{primary_key}.Psi",
-            },
+            processing_reads=reads,
             processing_writes={f"{processing_key}.pixel_index" for processing_key in processing_keys},
         )
 
@@ -241,7 +248,8 @@ class IndexPixels(ProcessStep):
     def _validate_and_get_geometry(
         self,
         databundle: DataBundle,
-    ) -> Tuple[BaseData, BaseData, BaseData, int, Tuple[int, ...], List[BaseData | None]]:
+        direction: str,
+    ) -> Tuple[BaseData, BaseData, BaseData | None, int, Tuple[int, ...], List[BaseData | None]]:
         """
         Validate signal/Q/Psi for azimuthal geometry and return:
 
@@ -249,7 +257,7 @@ class IndexPixels(ProcessStep):
         """
         signal_bd: BaseData = databundle["signal"]
         q_bd: BaseData = databundle["Q"]
-        psi_bd: BaseData = databundle["Psi"]
+        psi_bd: BaseData | None = databundle.get("Psi")
 
         RoD: int = int(signal_bd.rank_of_data)
         if RoD not in (1, 2):
@@ -259,8 +267,13 @@ class IndexPixels(ProcessStep):
 
         if q_bd.shape != spatial_shape:
             raise ValueError(f"IndexPixels: Q shape {q_bd.shape} does not match spatial shape {spatial_shape}.")
-        if psi_bd.shape != spatial_shape:
+        if psi_bd is not None and psi_bd.shape != spatial_shape:
             raise ValueError(f"IndexPixels: Psi shape {psi_bd.shape} does not match spatial shape {spatial_shape}.")
+
+        psi_roi_requested = any(self.configuration.get(key) is not None for key in ("psi_min", "psi_max"))
+        if psi_bd is None and (direction == "radial" or psi_roi_requested):
+            reason = "radial averaging" if direction == "radial" else "a configured Psi region"
+            raise KeyError(f"IndexPixels: Psi is required for {reason}.")
 
         if signal_bd.axes:
             spatial_axes: List[BaseData | None] = list(signal_bd.axes[-RoD:])
@@ -292,6 +305,12 @@ class IndexPixels(ProcessStep):
             raise KeyError(f"IndexPixels: key {primary_key!r} not found in processing_data.")  # noqa: E713
 
         databundle: DataBundle = self.processing_data[primary_key]
+
+        # Direction of averaging: "radial" or "azimuthal"
+        direction = str(self.configuration.get("averaging_direction", "azimuthal")).lower()
+        if direction not in ("radial", "azimuthal"):
+            raise ValueError(f"IndexPixels: averaging_direction must be 'radial' or 'azimuthal', got {direction!r}.")
+
         (
             signal_bd,
             q_bd,
@@ -299,12 +318,7 @@ class IndexPixels(ProcessStep):
             RoD,
             spatial_shape,
             spatial_axes,
-        ) = self._validate_and_get_geometry(databundle)
-
-        # Direction of averaging: "radial" or "azimuthal"
-        direction = str(self.configuration.get("averaging_direction", "azimuthal")).lower()
-        if direction not in ("radial", "azimuthal"):
-            raise ValueError(f"IndexPixels: averaging_direction must be 'radial' or 'azimuthal', got {direction!r}.")
+        ) = self._validate_and_get_geometry(databundle, direction)
 
         # ------------------------------------------------------------------
         # 1. Resolve Q limits (mask +, for radial, binning)
@@ -370,48 +384,54 @@ class IndexPixels(ProcessStep):
         # ------------------------------------------------------------------
         # 2. Resolve Psi limits (mask +, for azimuthal, binning)
         # ------------------------------------------------------------------
-        psi_limits_unit_cfg = self.configuration.get("psi_limits_unit", None)
-        if psi_limits_unit_cfg is None:
-            psi_limits_unit = psi_bd.units
-        else:
-            psi_limits_unit = ureg.Unit(psi_limits_unit_cfg)
-
         psi_min_cfg = self.configuration.get("psi_min", None)
         psi_max_cfg = self.configuration.get("psi_max", None)
-
-        if psi_min_cfg is None:
-            psi_min_cfg = 0.0
-
-        if psi_max_cfg is None:
-            # Choose a default full-circle depending on psi_limits_unit
-            if psi_limits_unit == ureg.degree:
-                psi_max_cfg = 360.0
-            elif psi_limits_unit == ureg.radian:
-                psi_max_cfg = 2.0 * np.pi
+        if psi_bd is None:
+            psi_flat = np.zeros_like(q_flat, dtype=float)
+            psi_min_val = 0.0
+            psi_max_val = 0.0
+        else:
+            psi_limits_unit_cfg = self.configuration.get("psi_limits_unit", None)
+            if psi_limits_unit_cfg is None:
+                psi_limits_unit = psi_bd.units
             else:
-                raise ValueError(
-                    "IndexPixels: psi_limits_unit is neither degree nor radian "
-                    "and no psi_max is specified; cannot infer a full-circle default."
-                )
+                psi_limits_unit = ureg.Unit(psi_limits_unit_cfg)
 
-        psi_min_val = (float(psi_min_cfg) * psi_limits_unit).to(psi_bd.units).magnitude
-        psi_max_val = (float(psi_max_cfg) * psi_limits_unit).to(psi_bd.units).magnitude
+            if psi_min_cfg is None:
+                psi_min_cfg = 0.0
 
-        try:
-            psi_flat = psi_bd.signal.ravel()
-        except Exception as exc:  # noqa: BLE001
-            raise ValueError("IndexPixels: could not flatten Psi array.") from exc
+            if psi_max_cfg is None:
+                # Choose a default full-circle depending on psi_limits_unit
+                if psi_limits_unit == ureg.degree:
+                    psi_max_cfg = 360.0
+                elif psi_limits_unit == ureg.radian:
+                    psi_max_cfg = 2.0 * np.pi
+                else:
+                    raise ValueError(
+                        "IndexPixels: psi_limits_unit is neither degree nor radian "
+                        "and no psi_max is specified; cannot infer a full-circle default."
+                    )
+
+            psi_min_val = (float(psi_min_cfg) * psi_limits_unit).to(psi_bd.units).magnitude
+            psi_max_val = (float(psi_max_cfg) * psi_limits_unit).to(psi_bd.units).magnitude
+
+            try:
+                psi_flat = psi_bd.signal.ravel()
+            except Exception as exc:  # noqa: BLE001
+                raise ValueError("IndexPixels: could not flatten Psi array.") from exc
 
         # ------------------------------------------------------------------
         # 3. Build masks
         # ------------------------------------------------------------------
-        finite_mask = np.isfinite(q_flat) & np.isfinite(psi_flat)
+        finite_mask = np.isfinite(q_flat)
+        if psi_bd is not None:
+            finite_mask &= np.isfinite(psi_flat)
 
         # Radial mask from Q limits
         q_range_mask = (q_flat >= q_min_val) & (q_flat <= q_max_val)
 
         # Azimuthal mask from Psi limits
-        if np.isclose(psi_min_val, psi_max_val):
+        if psi_bd is None or np.isclose(psi_min_val, psi_max_val):
             # Full circle
             psi_mask = np.ones_like(psi_flat, dtype=bool)
         elif psi_min_val < psi_max_val:

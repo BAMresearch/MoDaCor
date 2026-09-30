@@ -13,22 +13,30 @@ from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 PUBLIC_STEP_NAMES = tuple(modacor.modules.__all__)
 
 DEFAULT_METADATA_CONTRACTS = {
+    "ConcatenateDatabundles": (set(), {"configured data keys", "source_index"}),
     "DilateMask": ({"mask"}, {"mask"}),
     "DivideDatabundles": ({"signal"}, {"signal"}),
     "FindScaleFactor1D": ({"signal", "Q"}, {"scale_factor", "scale_background"}),
+    "FindCenterOfMass1D": (
+        {"signal"},
+        {"beam_center", "centroid_count", "centroid_converged", "centroid_window_min", "centroid_window_max"},
+    ),
     "FlatPlateSelfAbsorptionCorrection": (
         {"signal", "CosAlpha"},
         {"signal", "flat_plate_self_absorption"},
     ),
-    "IndexPixels": ({"signal", "Q", "Psi"}, {"pixel_index"}),
+    "IndexPixels": ({"signal", "Q"}, {"pixel_index"}),
     "Integrate1D": ({"signal", "q"}, {"integral"}),
+    "Negate": (set(), {"configured data key"}),
     "PoissonUncertainties": ({"signal"}, {"signal"}),
     "PolarizationCorrection": (
         {"signal", "TwoTheta", "Psi"},
         {"signal", "polarization_factor_map"},
     ),
     "ReduceMask": ({"mask"}, {"mask"}),
+    "SubtractInterpolated1D": ({"signal", "Q"}, {"signal", "remap_mask"}),
     "ThresholdMask": ({"signal"}, {"threshold_mask"}),
+    "YawToQ": ({"yaw", "energy"}, {"Q"}),
 }
 
 

@@ -12,7 +12,7 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "24/09/2026"
 __status__ = "Development"  # "Development", "Production"
 
-__version__ = "20260927.1"
+__version__ = "20260929.1"
 __all__ = ["IndexedAverager"]
 
 from pathlib import Path
@@ -50,7 +50,7 @@ class IndexedAverager(ProcessStep):
     --------------------------------------------------------------
     - "signal": BaseData
     - "Q": BaseData
-    - "Psi": BaseData
+    - "Psi": BaseData (optional for Q-only azimuthal averaging)
     - "pixel_index": BaseData
          same spatial rank and shape as (at least) the signal data.
     - "Mask": BaseData (optional)
@@ -113,6 +113,14 @@ class IndexedAverager(ProcessStep):
             bin mean for that key (using linear propagation on angles).
           * Optional keys "SEM" and "STD" derived from the weighted scatter.
 
+      This output is omitted when the Q-only input does not contain ``Psi``.
+
+    - "bin_count", "positive_weight_count", "sum_weights", and
+      "effective_sample_size": BaseData
+        Per-bin contribution diagnostics. ``bin_count`` counts otherwise valid
+        input points before zero weights are discarded; effective sample size
+        is ``sum(w)^2 / sum(w^2)``.
+
     In in-place mode, the original 2D/1D "pixel_index", optional "Mask", and
     other entries remain present in the databundle for inspection or reuse.
     """
@@ -122,7 +130,7 @@ class IndexedAverager(ProcessStep):
         calling_id="IndexedAverager",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=["signal", "Q", "Psi", "pixel_index"],
+        required_data_keys=["signal", "Q", "pixel_index"],
         arguments={
             "with_processing_keys": {
                 "type": (str, list, type(None)),
@@ -173,6 +181,10 @@ class IndexedAverager(ProcessStep):
             "signal": ["signal", "uncertainties"],
             "Q": ["signal", "uncertainties"],
             "Psi": ["signal", "uncertainties"],
+            "bin_count": ["signal"],
+            "positive_weight_count": ["signal"],
+            "sum_weights": ["signal"],
+            "effective_sample_size": ["signal"],
         },
         step_keywords=[
             "radial",
@@ -196,7 +208,8 @@ class IndexedAverager(ProcessStep):
     def _validate_inputs(
         self,
         databundle: DataBundle,
-    ) -> Tuple[BaseData, BaseData, BaseData, BaseData, BaseData | None, Tuple[int, ...]]:
+        direction: str,
+    ) -> Tuple[BaseData, BaseData, BaseData | None, BaseData, BaseData | None, Tuple[int, ...]]:
         """
         Validate presence and shapes of signal, Q, Psi, pixel_index
         (and optional Mask) for a given databundle.
@@ -207,17 +220,19 @@ class IndexedAverager(ProcessStep):
         try:
             signal_bd: BaseData = databundle["signal"]
             q_bd: BaseData = databundle["Q"]
-            psi_bd: BaseData = databundle["Psi"]
             pix_bd: BaseData = databundle["pixel_index"]
         except KeyError as exc:
             raise KeyError(
-                "IndexedAverager: databundle missing required keys 'signal', 'Q', 'Psi', or 'pixel_index'."
+                "IndexedAverager: databundle missing required keys 'signal', 'Q', or 'pixel_index'."
             ) from exc
+        psi_bd: BaseData | None = databundle.get("Psi")
+        if psi_bd is None and direction == "radial":
+            raise KeyError("IndexedAverager: Psi is required for radial averaging.")
 
         spatial_shape: Tuple[int, ...] = tuple(signal_bd.shape)
         if q_bd.shape != spatial_shape:
             raise ValueError(f"IndexedAverager: Q shape {q_bd.shape} does not match signal shape {spatial_shape}.")
-        if psi_bd.shape != spatial_shape:
+        if psi_bd is not None and psi_bd.shape != spatial_shape:
             raise ValueError(f"IndexedAverager: Psi shape {psi_bd.shape} does not match signal shape {spatial_shape}.")
         if pix_bd.shape != spatial_shape:
             raise ValueError(
@@ -241,14 +256,14 @@ class IndexedAverager(ProcessStep):
     def _compute_bin_averages(  # noqa: C901 -- complexity # TODO: reduce complexity after testing with index_pixels
         signal_bd: BaseData,
         q_bd: BaseData,
-        psi_bd: BaseData,
+        psi_bd: BaseData | None,
         pix_bd: BaseData,
         mask_bd: BaseData | None,
         use_signal_weights: bool,
         use_signal_uncertainty_weights: bool,
         uncertainty_weight_key: str | None,
         stats_keys: list[str] | None,
-    ) -> Tuple[BaseData, BaseData, BaseData]:
+    ) -> Tuple[BaseData, BaseData, BaseData | None, dict[str, BaseData]]:
         """
         Core binning logic: produce 1D BaseData for signal, Q, Psi.
 
@@ -258,7 +273,7 @@ class IndexedAverager(ProcessStep):
         # Flatten arrays
         sig_full = signal_bd.signal.ravel()
         q_full = q_bd.signal.ravel()
-        psi_full = psi_bd.signal.ravel()
+        psi_full = psi_bd.signal.ravel() if psi_bd is not None else np.zeros_like(q_full)
 
         pix_flat = np.asarray(pix_bd.signal, dtype=float).ravel().astype(int)
 
@@ -280,7 +295,9 @@ class IndexedAverager(ProcessStep):
             valid &= ~mask_flat
 
         # Exclude non-finite signal / Q / Psi
-        valid &= np.isfinite(sig_full) & np.isfinite(q_full) & np.isfinite(psi_full)
+        valid &= np.isfinite(sig_full) & np.isfinite(q_full)
+        if psi_bd is not None:
+            valid &= np.isfinite(psi_full)
 
         if not np.any(valid):
             raise ValueError("IndexedAverager: no valid pixels to average.")
@@ -370,7 +387,7 @@ class IndexedAverager(ProcessStep):
         # ------------------------------------------------------------------
         # 3. Weighted circular mean for Psi
         # ------------------------------------------------------------------
-        psi_unit = psi_bd.units
+        psi_unit = psi_bd.units if psi_bd is not None else ureg.radian
 
         # Convert Psi to radians for trigonometric operations
         cf_to_rad = ureg.radian.m_from(psi_unit)
@@ -433,7 +450,7 @@ class IndexedAverager(ProcessStep):
             sig_unc_binned.update(_propagate_uncertainties(signal_bd.uncertainties, signal_bd))
         if q_bd.uncertainties:
             q_unc_binned.update(_propagate_uncertainties(q_bd.uncertainties, q_bd))
-        if psi_bd.uncertainties:
+        if psi_bd is not None and psi_bd.uncertainties:
             psi_unc_binned.update(_propagate_uncertainties(psi_bd.uncertainties, psi_bd))
 
         # ------------------------------------------------------------------
@@ -471,7 +488,7 @@ class IndexedAverager(ProcessStep):
             q_unc_binned["SEM"] = sem_q
             q_unc_binned["STD"] = std_q
 
-        if "Psi" in stats_keys:
+        if psi_bd is not None and "Psi" in stats_keys:
             mean_psi_rad_per_pixel = mean_psi_rad[bin_idx]
             dev_rad = psi_rad_valid - mean_psi_rad_per_pixel
             dev_rad = (dev_rad + np.pi) % (2 * np.pi) - np.pi
@@ -505,16 +522,30 @@ class IndexedAverager(ProcessStep):
         )
 
         # 1D Psi
-        Psi_1d = BaseData(
-            signal=mean_psi,
-            units=psi_bd.units,
-            uncertainties=psi_unc_binned,
-            weights=np.ones_like(mean_psi, dtype=float),
-            axes=[],
-            rank_of_data=1,
-        )
+        Psi_1d = None
+        if psi_bd is not None:
+            Psi_1d = BaseData(
+                signal=mean_psi,
+                units=psi_bd.units,
+                uncertainties=psi_unc_binned,
+                weights=np.ones_like(mean_psi, dtype=float),
+                axes=[],
+                rank_of_data=1,
+            )
 
-        return signal_1d, Q_1d, Psi_1d
+        bin_count = np.bincount(bin_idx, minlength=n_bins).astype(float)
+        positive_weight_count = np.bincount(bin_idx[w_valid > 0.0], minlength=n_bins).astype(float)
+        effective_sample_size = np.full(n_bins, np.nan, dtype=float)
+        valid_weight_sum = (sum_w > 0.0) & (sum_w2 > 0.0)
+        effective_sample_size[valid_weight_sum] = sum_w[valid_weight_sum] ** 2 / sum_w2[valid_weight_sum]
+        diagnostics = {
+            "bin_count": BaseData(bin_count, ureg.dimensionless, rank_of_data=1),
+            "positive_weight_count": BaseData(positive_weight_count, ureg.dimensionless, rank_of_data=1),
+            "sum_weights": BaseData(sum_w, ureg.dimensionless, rank_of_data=1),
+            "effective_sample_size": BaseData(effective_sample_size, ureg.dimensionless, rank_of_data=1),
+        }
+
+        return signal_1d, Q_1d, Psi_1d, diagnostics
 
     # ------------------------------------------------------------------
     # prepare_execution: nothing heavy here for now
@@ -567,7 +598,15 @@ class IndexedAverager(ProcessStep):
             writes = {
                 f"{processing_key}.{basedata_key}"
                 for processing_key in processing_keys
-                for basedata_key in ("signal", "Q", "Psi")
+                for basedata_key in (
+                    "signal",
+                    "Q",
+                    "Psi",
+                    "bin_count",
+                    "positive_weight_count",
+                    "sum_weights",
+                    "effective_sample_size",
+                )
             }
         return ProcessStepDependencies(processing_reads=reads, processing_writes=writes)
 
@@ -612,10 +651,10 @@ class IndexedAverager(ProcessStep):
                 pix_bd,
                 mask_bd,
                 _spatial_shape,
-            ) = self._validate_inputs(databundle)
+            ) = self._validate_inputs(databundle, direction)
 
             # Compute binned 1D BaseData
-            signal_1d, Q_1d, Psi_1d = self._compute_bin_averages(
+            signal_1d, Q_1d, Psi_1d, diagnostics = self._compute_bin_averages(
                 signal_bd=signal_bd,
                 q_bd=q_bd,
                 psi_bd=psi_bd,
@@ -631,17 +670,24 @@ class IndexedAverager(ProcessStep):
             if direction == "azimuthal":
                 signal_1d.axes = [Q_1d]
             else:  # "radial"
+                if Psi_1d is None:
+                    raise RuntimeError("IndexedAverager: internal error: radial output has no Psi coordinate.")
                 signal_1d.axes = [Psi_1d]
 
             if output_processing_key is not None and output_processing_key != key:
                 destination_key = output_processing_key
-                db_out = DataBundle({"signal": signal_1d, "Q": Q_1d, "Psi": Psi_1d})
+                output_entries = {"signal": signal_1d, "Q": Q_1d, **diagnostics}
+                if Psi_1d is not None:
+                    output_entries["Psi"] = Psi_1d
+                db_out = DataBundle(output_entries)
                 self.processing_data[destination_key] = db_out
             else:
                 destination_key = key
                 databundle["signal"] = signal_1d
                 databundle["Q"] = Q_1d
-                databundle["Psi"] = Psi_1d
+                if Psi_1d is not None:
+                    databundle["Psi"] = Psi_1d
+                databundle.update(diagnostics)
                 db_out = databundle
 
             output[destination_key] = db_out

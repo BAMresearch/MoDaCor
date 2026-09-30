@@ -1,14 +1,14 @@
 # Scale 1D curve to reference (compute-only)
 
 ## Summary
-Compute scale factor between two 1D curves using robust least squares.
+Compute a normal robust-fit or uncertainty-weighted lognormal scale between two 1D curves.
 
 ## Metadata
 - **Import path:** `modacor.modules.base_modules.find_scale_factor1d.FindScaleFactor1D`
 - **Source:** [`src/modacor/modules/base_modules/find_scale_factor1d.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/find_scale_factor1d.py)
 - **Module ID:** FindScaleFactor1D
-- **Module version:** 20260927.3
-- **Keywords:** scale, calibration, 1D
+- **Module version:** 20260929.1
+- **Keywords:** scale, calibration, lognormal, 1D
 
 ## Required data keys
 - signal
@@ -19,7 +19,7 @@ Compute scale factor between two 1D curves using robust least squares.
 - **scale_background**: signal, uncertainties, units
 
 ## Required arguments
-- _None_
+- with_processing_keys
 
 ## Default configuration
 ```json
@@ -28,6 +28,7 @@ Compute scale factor between two 1D curves using robust least squares.
   "fit_background": false,
   "fit_max_val": null,
   "fit_min_val": null,
+  "fit_model": "normal",
   "fit_val_units": null,
   "independent_axis_key": "Q",
   "interpolation_kind": "linear",
@@ -36,7 +37,9 @@ Compute scale factor between two 1D curves using robust least squares.
   "robust_loss": "huber",
   "scale_output_key": "scale_factor",
   "signal_key": "signal",
-  "use_basedata_weights": true
+  "uncertainty_weight_key": null,
+  "use_basedata_weights": true,
+  "with_processing_keys": null
 }
 ```
 
@@ -47,6 +50,7 @@ Compute scale factor between two 1D curves using robust least squares.
 | `fit_background` | bool | No | False | - | Whether to fit a constant background offset. |
 | `fit_max_val` | float or int or NoneType | No | - | - | Maximum x-value for the fit (in fit_val_units). |
 | `fit_min_val` | float or int or NoneType | No | - | - | Minimum x-value for the fit (in fit_val_units). |
+| `fit_model` | str | No | normal | - | Scale estimator: normal or lognormal. |
 | `fit_val_units` | str or NoneType | No | - | - | Units for fit_min_val/fit_max_val if provided. |
 | `independent_axis_key` | str | No | Q | - | BaseData key for the independent axis. |
 | `interpolation_kind` | str | No | linear | - | Interpolation kind passed to scipy/numpy interpolation. |
@@ -55,4 +59,9 @@ Compute scale factor between two 1D curves using robust least squares.
 | `robust_loss` | str | No | huber | - | Robust loss function name for the fit. |
 | `scale_output_key` | str | No | scale_factor | - | BaseData key to store the scale factor output. |
 | `signal_key` | str | No | signal | - | BaseData key for the dependent variable signal. Working and reference signals must have compatible units; fitting uses the reference units. |
+| `uncertainty_weight_key` | str or NoneType | No | - | - | Named propagated uncertainty component used for weighting on both curves. Required for lognormal fitting; normal fitting combines components only when this is None. |
 | `use_basedata_weights` | bool | No | True | - | Use BaseData weights when fitting. |
+| `with_processing_keys` | list | Yes | - | - | Two processing keys: working curve then reference curve. |
+
+## References
+DOI 10.1107/S1600577513030117
