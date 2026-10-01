@@ -26,7 +26,7 @@ DEFAULT_METADATA_CONTRACTS = {
         {"signal", "CosAlpha"},
         {"signal", "flat_plate_self_absorption"},
     ),
-    "IndexPixels": ({"signal", "Q"}, {"pixel_index"}),
+    "IndexByCoordinate": (set(), {"bin_index", "bin_edges"}),
     "Integrate1D": ({"signal", "q"}, {"integral"}),
     "Negate": (set(), {"configured data key"}),
     "PoissonUncertainties": ({"signal"}, {"signal"}),

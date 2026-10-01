@@ -3,9 +3,6 @@
 Geometry modules translate detector indices and instrument metadata into
 physical coordinates used by corrections and integration.
 
-[`IndexPixels`](../reference/modules/IndexPixels.md) creates detector-index maps.
-`Psi` is optional for pure one-dimensional Q binning when no azimuthal region
-of interest is configured.
 [`PixelCoordinates3D`](../reference/modules/PixelCoordinates3D.md) uses explicit
 or NeXus-derived detector frames to locate pixel centers in laboratory
 coordinates. [`XSGeometryFromPixelCoordinates`](../reference/modules/XSGeometryFromPixelCoordinates.md)

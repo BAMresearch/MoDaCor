@@ -41,7 +41,6 @@ Configuration tables are generated from each step's `ProcessStepDescriber` metad
 
 ## Geometry and coordinates
 
-- [IndexPixels](IndexPixels.md)
 - [PixelCoordinates3D](PixelCoordinates3D.md)
 - [XSGeometryFromPixelCoordinates](XSGeometryFromPixelCoordinates.md)
 - [AngleToQ](AngleToQ.md)
@@ -49,6 +48,7 @@ Configuration tables are generated from each step's `ProcessStepDescriber` metad
 ## Reduction and integration
 
 - [FindCenterOfMass1D](FindCenterOfMass1D.md)
+- [IndexByCoordinate](IndexByCoordinate.md)
 - [IndexedAverager](IndexedAverager.md)
 - [Integrate1D](Integrate1D.md)
 - [ReduceDimensionality](ReduceDimensionality.md)
@@ -93,7 +93,7 @@ DivideDatabundles
 FindCenterOfMass1D
 FindScaleFactor1D
 FlatPlateSelfAbsorptionCorrection
-IndexPixels
+IndexByCoordinate
 IndexedAverager
 Integrate1D
 Multiply

@@ -26,6 +26,8 @@ from modacor.modules.base_modules.divide import Divide
 from modacor.modules.base_modules.divide_databundles import DivideDatabundles
 from modacor.modules.base_modules.find_center_of_mass_1d import FindCenterOfMass1D
 from modacor.modules.base_modules.find_scale_factor1d import FindScaleFactor1D
+from modacor.modules.base_modules.index_by_coordinate import IndexByCoordinate
+from modacor.modules.base_modules.indexed_averager import IndexedAverager
 from modacor.modules.base_modules.integrate_1d import Integrate1D
 from modacor.modules.base_modules.multiply import Multiply
 from modacor.modules.base_modules.multiply_databundles import MultiplyDatabundles
@@ -53,8 +55,6 @@ from modacor.modules.technique_modules.scattering.detector_efficiency_correction
 from modacor.modules.technique_modules.scattering.flat_plate_self_absorption_correction import (
     FlatPlateSelfAbsorptionCorrection,
 )
-from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
-from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
 from modacor.modules.technique_modules.scattering.polarization_correction import PolarizationCorrection
 from modacor.modules.technique_modules.scattering.solid_angle_correction import SolidAngleCorrection
@@ -81,7 +81,7 @@ __all__ = [
     "DilateMask",
     "Divide",
     "DivideDatabundles",
-    "IndexPixels",
+    "IndexByCoordinate",
     "IndexedAverager",
     "FindScaleFactor1D",
     "FindCenterOfMass1D",

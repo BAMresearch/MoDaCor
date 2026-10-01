@@ -48,4 +48,4 @@ Concatenate matching 1D BaseData entries, optionally sorting every entry togethe
 | `with_processing_keys` | list | Yes | - | - | Input DataBundle keys, in concatenation order. |
 
 ## Notes
-Input order is preserved when sort_by is None. Units are converted to those of the first input. Uncertainty component names must match across inputs. Sorting is stable and is not required by IndexPixels.
+Input order is preserved when sort_by is None. Units are converted to those of the first input. Uncertainty component names must match across inputs. Sorting is stable and is not required by IndexByCoordinate.

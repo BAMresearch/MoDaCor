@@ -63,13 +63,13 @@ MODULE_GROUPS: dict[str, tuple[str, ...]] = {
         "PoissonUncertainties",
     ),
     "Geometry and coordinates": (
-        "IndexPixels",
         "PixelCoordinates3D",
         "XSGeometryFromPixelCoordinates",
         "AngleToQ",
     ),
     "Reduction and integration": (
         "FindCenterOfMass1D",
+        "IndexByCoordinate",
         "IndexedAverager",
         "Integrate1D",
         "ReduceDimensionality",

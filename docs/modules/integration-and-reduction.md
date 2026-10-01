@@ -6,15 +6,21 @@ reduces leading acquisition dimensions while retaining the trailing scientific
 rank. Existing uncertainties propagate per name, and optional estimators can add
 scatter-derived components.
 
-[`IndexedAverager`](../reference/modules/IndexedAverager.md) groups data by an
-index map, a common pattern for radial or azimuthal binning. It reports the
-weighted mean of the coordinates that actually entered each populated bin,
-their spread, and optional population, weight-sum, and effective-sample-size
-diagnostics rather than substituting nominal bin centres.
+[`IndexByCoordinate`](../reference/modules/IndexByCoordinate.md) assigns one
+arbitrary coordinate to one-dimensional bins. It records the physical edges
+for diagnostics but deliberately does not inspect signals or masks.
+
+[`IndexedAverager`](../reference/modules/IndexedAverager.md) groups a configured
+value by that index map. An optional measured axis, such as Q, is averaged over
+the same accepted points and weights; it is not used to assign bins. The step
+reports actual mean coordinates, their spread, and population, weight-sum, and
+effective-sample-size diagnostics rather than substituting nominal bin centres.
+Bins without positive total weight are omitted and their original IDs are
+retained in the output.
 
 [`ConcatenateDatabundles`](../reference/modules/ConcatenateDatabundles.md)
 pools compatible one-dimensional bundles before indexed reduction. Its
-`sort_by` option is deliberately optional because `IndexPixels` does not
+`sort_by` option is deliberately optional because `IndexByCoordinate` does not
 require monotonic input.
 
 [`FindCenterOfMass1D`](../reference/modules/FindCenterOfMass1D.md) estimates a
