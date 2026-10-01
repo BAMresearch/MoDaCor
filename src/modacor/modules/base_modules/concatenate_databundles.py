@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["ConcatenateDatabundles"]
-__version__ = "20260929.1"
+__version__ = "20261001.1"
 
 from pathlib import Path
 
@@ -63,13 +63,30 @@ class ConcatenateDatabundles(ProcessStep):
                 "default": "source_index",
                 "doc": "Optional output key recording each point's zero-based input-bundle index.",
             },
+            "source_position_key": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": (
+                    "Optional output key recording each point's zero-based position within its input bundle. "
+                    "For aligned inputs, this can be used directly as an IndexedAverager index map."
+                ),
+            },
+            "alignment_key": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": (
+                    "Optional configured data key whose values must match pointwise across all inputs after "
+                    "unit conversion. Useful when source_position_key will group aligned observations."
+                ),
+            },
         },
         step_keywords=["concatenate", "pool", "curves", "sort"],
         step_doc="Concatenate matching 1D BaseData entries, optionally sorting every entry together.",
         step_note=(
             "Input order is preserved when sort_by is None. Units are converted to those of the first input. "
             "Uncertainty component names must match across inputs. Sorting is stable and is not required by "
-            "IndexByCoordinate."
+            "IndexByCoordinate. A source-position index groups points by array position only; set alignment_key "
+            "when the step should verify that a configured coordinate matches pointwise across inputs."
         ),
     )
 
@@ -120,12 +137,26 @@ class ConcatenateDatabundles(ProcessStep):
         data_keys = self._data_keys()
         output_key = self._output_key()
         source_index_key = self.configuration.get("source_index_key", "source_index")
-        if source_index_key is not None:
-            source_index_key = str(source_index_key).strip()
-            if not source_index_key:
-                raise ValueError("ConcatenateDatabundles source_index_key must be non-empty or None.")
-            if source_index_key in data_keys:
-                raise ValueError("ConcatenateDatabundles source_index_key conflicts with a configured data key.")
+        source_position_key = self.configuration.get("source_position_key")
+        generated_keys: dict[str, str] = {}
+        for argument, configured in (
+            ("source_index_key", source_index_key),
+            ("source_position_key", source_position_key),
+        ):
+            if configured is None:
+                continue
+            key = str(configured).strip()
+            if not key:
+                raise ValueError(f"ConcatenateDatabundles {argument} must be non-empty or None.")
+            if key in data_keys:
+                raise ValueError(f"ConcatenateDatabundles {argument} conflicts with a configured data key.")
+            if key in generated_keys:
+                raise ValueError("ConcatenateDatabundles generated provenance keys must be distinct.")
+            generated_keys[key] = argument
+            if argument == "source_index_key":
+                source_index_key = key
+            else:
+                source_position_key = key
 
         bundles: list[DataBundle] = []
         lengths: list[int] = []
@@ -144,6 +175,25 @@ class ConcatenateDatabundles(ProcessStep):
                 raise ValueError("ConcatenateDatabundles currently accepts one-dimensional point series only.")
             bundles.append(bundle)
             lengths.append(shape[0])
+
+        alignment_key = self.configuration.get("alignment_key")
+        if alignment_key is not None:
+            alignment_key = str(alignment_key).strip()
+            if not alignment_key or alignment_key not in data_keys:
+                raise ValueError("ConcatenateDatabundles alignment_key must name a configured data key.")
+            if len(set(lengths)) != 1:
+                raise ValueError("ConcatenateDatabundles aligned inputs must have equal lengths.")
+            reference = bundles[0][alignment_key]
+            reference_values = np.asarray(reference.signal, dtype=float)
+            for processing_key, bundle in zip(processing_keys[1:], bundles[1:], strict=True):
+                current = bundle[alignment_key].copy(with_axes=False)
+                current.signal = np.asarray(current.signal, dtype=float)
+                current.to_units(reference.units)
+                if not np.allclose(current.signal, reference_values, rtol=1e-12, atol=0.0, equal_nan=True):
+                    raise ValueError(
+                        "ConcatenateDatabundles alignment key "
+                        f"{alignment_key!r} does not match pointwise for input {processing_key!r}."
+                    )
 
         output = DataBundle()
         axis_key_map: dict[str, list[str | None]] = {}
@@ -187,6 +237,12 @@ class ConcatenateDatabundles(ProcessStep):
         if source_index_key is not None:
             output[source_index_key] = BaseData(
                 signal=np.concatenate([np.full(length, index, dtype=float) for index, length in enumerate(lengths)]),
+                units=ureg.dimensionless,
+                rank_of_data=1,
+            )
+        if source_position_key is not None:
+            output[source_position_key] = BaseData(
+                signal=np.concatenate([np.arange(length, dtype=float) for length in lengths]),
                 units=ureg.dimensionless,
                 rank_of_data=1,
             )
