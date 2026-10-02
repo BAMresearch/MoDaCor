@@ -45,6 +45,8 @@ def test_prepare_and_fit_scale_with_background() -> None:
 
     assert result.scale == pytest.approx(2.5)
     assert result.background == pytest.approx(3.0)
+    assert result.point_count == 5
+    assert result.reduced_chi_square >= 0.0
 
 
 def test_prepare_scale_fit_data_rejects_disjoint_axes() -> None:
@@ -100,3 +102,5 @@ def test_lognormal_scale_is_uncertainty_weighted_geometric_ratio():
     expected_log_scale = np.mean(np.log([2.0, 4.0, 6.0]))
     assert result.scale == pytest.approx(np.exp(expected_log_scale))
     assert result.scale_sigma == pytest.approx(result.scale * np.sqrt(relative_variance / 3.0))
+    assert result.point_count == 3
+    assert result.reduced_chi_square >= 0.0

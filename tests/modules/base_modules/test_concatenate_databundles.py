@@ -97,6 +97,28 @@ def test_concatenate_rejects_mismatched_uncertainty_components():
         step.calculate()
 
 
+def test_concatenate_can_fill_missing_uncertainty_components_with_zero():
+    processing_data = ProcessingData()
+    processing_data["a"] = _bundle([1], [1], ureg.Unit("1/nm"), [1])
+    processing_data["b"] = _bundle([2], [2], ureg.Unit("1/nm"), [1])
+    processing_data["a"]["signal"].uncertainties["scale_fit"] = np.array([0.2])
+    processing_data["b"]["signal"].uncertainties = {"counting": np.array([0.7])}
+    step = ConcatenateDatabundles(io_sources=IoSources())
+    step.processing_data = processing_data
+    step.modify_config_by_dict(
+        {
+            "with_processing_keys": ["a", "b"],
+            "output_processing_key": "pooled",
+            "uncertainty_key_policy": "fill_zero",
+        }
+    )
+
+    output = step.calculate()["pooled"]["signal"]
+
+    assert_allclose(output.uncertainties["counting"], [0.5, 0.7])
+    assert_allclose(output.uncertainties["scale_fit"], [0.2, 0.0])
+
+
 def test_concatenate_rejects_conflicting_generated_keys():
     processing_data = ProcessingData()
     processing_data["a"] = _bundle([1], [1], ureg.Unit("1/nm"), [1])

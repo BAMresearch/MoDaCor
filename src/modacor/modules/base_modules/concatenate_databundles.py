@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["ConcatenateDatabundles"]
-__version__ = "20261001.1"
+__version__ = "20261002.1"
 
 from pathlib import Path
 
@@ -79,12 +79,23 @@ class ConcatenateDatabundles(ProcessStep):
                     "unit conversion. Useful when source_position_key will group aligned observations."
                 ),
             },
+            "uncertainty_key_policy": {
+                "type": str,
+                "default": "require_matching",
+                "doc": (
+                    "How differently named uncertainty components are handled: "
+                    "'require_matching' rejects them; 'fill_zero' takes their union and fills absent components with "
+                    "zero. Use fill_zero only when an absent component means no contribution from that source."
+                ),
+            },
         },
         step_keywords=["concatenate", "pool", "curves", "sort"],
         step_doc="Concatenate matching 1D BaseData entries, optionally sorting every entry together.",
         step_note=(
             "Input order is preserved when sort_by is None. Units are converted to those of the first input. "
-            "Uncertainty component names must match across inputs. Sorting is stable and is not required by "
+            "Uncertainty component names must match across inputs unless uncertainty_key_policy='fill_zero'. "
+            "Under fill_zero, absence means zero uncertainty from that named source, not unknown uncertainty. "
+            "Sorting is stable and is not required by "
             "IndexByCoordinate. A source-position index groups points by array position only; set alignment_key "
             "when the step should verify that a configured coordinate matches pointwise across inputs."
         ),
@@ -197,19 +208,30 @@ class ConcatenateDatabundles(ProcessStep):
 
         output = DataBundle()
         axis_key_map: dict[str, list[str | None]] = {}
+        uncertainty_key_policy = str(self.configuration.get("uncertainty_key_policy", "require_matching")).strip()
+        if uncertainty_key_policy not in {"require_matching", "fill_zero"}:
+            raise ValueError("ConcatenateDatabundles uncertainty_key_policy must be 'require_matching' or 'fill_zero'.")
         for data_key in data_keys:
             reference = bundles[0][data_key]
-            reference_uncertainties = set(reference.uncertainties)
+            uncertainty_key_sets = [set(bundle[data_key].uncertainties) for bundle in bundles]
+            reference_uncertainties = uncertainty_key_sets[0]
+            if uncertainty_key_policy == "fill_zero":
+                output_uncertainties = set().union(*uncertainty_key_sets)
+            else:
+                output_uncertainties = reference_uncertainties
             signals: list[np.ndarray] = []
             weights: list[np.ndarray] = []
-            uncertainties: dict[str, list[np.ndarray]] = {name: [] for name in reference_uncertainties}
+            uncertainties: dict[str, list[np.ndarray]] = {name: [] for name in output_uncertainties}
             axis_key_map[data_key] = [self._axis_key(bundles[0], axis) for axis in reference.axes]
 
             for processing_key, bundle, length in zip(processing_keys, bundles, lengths, strict=True):
                 current = bundle[data_key].copy(with_axes=False)
                 current.signal = np.asarray(current.signal, dtype=float)
                 current.to_units(reference.units)
-                if set(current.uncertainties) != reference_uncertainties:
+                if (
+                    uncertainty_key_policy == "require_matching"
+                    and set(current.uncertainties) != reference_uncertainties
+                ):
                     raise ValueError(
                         "ConcatenateDatabundles requires matching uncertainty keys for "
                         f"{data_key!r}; {processing_key!r} has {sorted(current.uncertainties)!r}, "
@@ -220,10 +242,12 @@ class ConcatenateDatabundles(ProcessStep):
                     raise ValueError(f"ConcatenateDatabundles axis references differ for data key {data_key!r}.")
                 signals.append(np.asarray(current.signal))
                 weights.append(np.broadcast_to(np.asarray(current.weights, dtype=float), (length,)).copy())
-                for name in reference_uncertainties:
-                    uncertainties[name].append(
-                        np.broadcast_to(np.asarray(current.uncertainties[name], dtype=float), (length,)).copy()
-                    )
+                for name in output_uncertainties:
+                    if name in current.uncertainties:
+                        values = np.broadcast_to(np.asarray(current.uncertainties[name], dtype=float), (length,)).copy()
+                    else:
+                        values = np.zeros(length, dtype=float)
+                    uncertainties[name].append(values)
 
             output[data_key] = BaseData(
                 signal=np.concatenate(signals),

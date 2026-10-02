@@ -293,12 +293,18 @@ def test_find_scale_factor_lognormal_uses_selected_uncertainty_component():
             "uncertainty_weight_key": "propagate_to_all",
             "fit_min_val": 2.0,
             "fit_max_val": 9.0,
+            "scale_uncertainty_key": "scale_fit",
+            "diagnostic_prefix": "gain_fit",
         },
     )
 
     scale = pd["work"]["scale_factor"]
     assert float(scale.signal.item()) == pytest.approx(true_scale, rel=1.0e-4)
-    assert float(scale.uncertainties["propagate_to_all"].item()) > 0.0
+    assert float(scale.uncertainties["scale_fit"].item()) > 0.0
+    assert float(pd["work"]["gain_fit_point_count"].signal.item()) > 2
+    assert float(pd["work"]["gain_fit_x_min"].signal.item()) >= 2.0
+    assert float(pd["work"]["gain_fit_x_max"].signal.item()) <= 9.0
+    assert float(pd["work"]["gain_fit_reduced_chi_square"].signal.item()) >= 0.0
 
 
 def test_find_scale_factor_lognormal_requires_explicit_uncertainty_key():
@@ -324,10 +330,18 @@ def test_find_scale_factor_dependency_contract_is_exact():
             "scale_output_key": "gain",
             "fit_background": True,
             "background_output_key": "offset",
+            "diagnostic_prefix": "fit",
         }
     )
 
     assert step.dependency_contract() == ProcessStepDependencies(
         processing_reads={"work.intensity", "work.q", "reference.intensity", "reference.q"},
-        processing_writes={"work.gain", "work.offset"},
+        processing_writes={
+            "work.gain",
+            "work.offset",
+            "work.fit_point_count",
+            "work.fit_x_min",
+            "work.fit_x_max",
+            "work.fit_reduced_chi_square",
+        },
     )

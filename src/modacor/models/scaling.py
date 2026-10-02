@@ -45,6 +45,8 @@ class ScaleFitResult:
 
     scale: float
     scale_sigma: float
+    point_count: int
+    reduced_chi_square: float
     background: float | None = None
     background_sigma: float | None = None
 
@@ -234,6 +236,8 @@ def fit_scale_factor_1d(
     return ScaleFitResult(
         scale=float(fitted.x[0]),
         scale_sigma=float(parameter_sigmas[0]),
+        point_count=len(fitted.fun),
+        reduced_chi_square=float(residual_variance),
         background=float(fitted.x[1]) if fit_background else None,
         background_sigma=float(parameter_sigmas[1]) if fit_background else None,
     )
@@ -276,4 +280,11 @@ def fit_lognormal_scale_factor_1d(fit_data: FitData1D) -> ScaleFitResult:
     mean_log_scale = float(np.sum(weights * log_ratio) / sum_weights)
     log_scale_sigma = float(np.sqrt(1.0 / sum_weights))
     scale = float(np.exp(mean_log_scale))
-    return ScaleFitResult(scale=scale, scale_sigma=scale * log_scale_sigma)
+    degrees_of_freedom = max(1, log_ratio.size - 1)
+    reduced_chi_square = float(np.sum(weights * (log_ratio - mean_log_scale) ** 2) / degrees_of_freedom)
+    return ScaleFitResult(
+        scale=scale,
+        scale_sigma=scale * log_scale_sigma,
+        point_count=log_ratio.size,
+        reduced_chi_square=reduced_chi_square,
+    )

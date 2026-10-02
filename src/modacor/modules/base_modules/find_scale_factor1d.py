@@ -11,7 +11,7 @@ __date__ = "12/12/2025"
 __status__ = "Development"
 
 __all__ = ["FindScaleFactor1D"]
-__version__ = "20260929.1"
+__version__ = "20261002.1"
 
 from pathlib import Path
 from typing import Dict
@@ -121,10 +121,28 @@ class FindScaleFactor1D(ProcessStep):
                 "default": "scale_factor",
                 "doc": "BaseData key to store the scale factor output.",
             },
+            "scale_uncertainty_key": {
+                "type": str,
+                "default": "propagate_to_all",
+                "doc": "Named uncertainty component used for the fitted scale-factor uncertainty.",
+            },
             "background_output_key": {
                 "type": str,
                 "default": "scale_background",
                 "doc": "BaseData key to store the fitted background output.",
+            },
+            "background_uncertainty_key": {
+                "type": str,
+                "default": "propagate_to_all",
+                "doc": "Named uncertainty component used for the fitted background uncertainty.",
+            },
+            "diagnostic_prefix": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": (
+                    "Optional prefix for scalar '<prefix>_point_count', '<prefix>_x_min', "
+                    "'<prefix>_x_max', and '<prefix>_reduced_chi_square' outputs."
+                ),
             },
             "fit_background": {
                 "type": bool,
@@ -187,6 +205,10 @@ class FindScaleFactor1D(ProcessStep):
         },
         step_keywords=["scale", "calibration", "lognormal", "1D"],
         step_doc="Compute a normal robust-fit or uncertainty-weighted lognormal scale between two 1D curves.",
+        step_note=(
+            "The fitted scale uncertainty is stored under scale_uncertainty_key. Reduced chi-square is a "
+            "goodness-of-fit diagnostic; it does not automatically inflate the formal fitted uncertainty."
+        ),
         step_reference="DOI 10.1107/S1600577513030117",
     )
 
@@ -202,6 +224,18 @@ class FindScaleFactor1D(ProcessStep):
         if bool(self.configuration.get("fit_background", False)):
             background_key = str(self.configuration.get("background_output_key", "scale_background"))
             writes.add(f"{work_key}.{background_key}")
+        diagnostic_prefix = self.configuration.get("diagnostic_prefix")
+        if diagnostic_prefix is not None:
+            prefix = str(diagnostic_prefix).strip()
+            if prefix:
+                writes.update(
+                    {
+                        f"{work_key}.{prefix}_point_count",
+                        f"{work_key}.{prefix}_x_min",
+                        f"{work_key}.{prefix}_x_max",
+                        f"{work_key}.{prefix}_reduced_chi_square",
+                    }
+                )
         return ProcessStepDependencies(
             processing_reads={
                 f"{work_key}.{signal_key}",
@@ -292,20 +326,45 @@ class FindScaleFactor1D(ProcessStep):
             )
 
         out_key = cfg.get("scale_output_key", "scale_factor")
+        scale_uncertainty_key = str(cfg.get("scale_uncertainty_key", "propagate_to_all")).strip()
+        if not scale_uncertainty_key:
+            raise ValueError("FindScaleFactor1D scale_uncertainty_key must not be empty.")
         work_db[out_key] = BaseData(
             signal=np.array([fit_result.scale]),
             units="dimensionless",
-            uncertainties={"propagate_to_all": np.array([fit_result.scale_sigma])},
+            uncertainties={scale_uncertainty_key: np.array([fit_result.scale_sigma])},
             rank_of_data=0,
         )
 
         if fit_background:
             bg_key = cfg.get("background_output_key", "scale_background")
+            background_uncertainty_key = str(cfg.get("background_uncertainty_key", "propagate_to_all")).strip()
+            if not background_uncertainty_key:
+                raise ValueError("FindScaleFactor1D background_uncertainty_key must not be empty.")
             work_db[bg_key] = BaseData(
                 signal=np.array([fit_result.background]),
                 units=y_ref_bd.units,
-                uncertainties={"propagate_to_all": np.array([fit_result.background_sigma])},
+                uncertainties={background_uncertainty_key: np.array([fit_result.background_sigma])},
                 rank_of_data=0,
             )
+
+        diagnostic_prefix = cfg.get("diagnostic_prefix")
+        if diagnostic_prefix is not None:
+            prefix = str(diagnostic_prefix).strip()
+            if not prefix:
+                raise ValueError("FindScaleFactor1D diagnostic_prefix must be a non-empty string or None.")
+            diagnostics = {
+                f"{prefix}_point_count": (float(fit_result.point_count), ureg.dimensionless),
+                f"{prefix}_x_min": (float(np.min(fit_data.x)), x_ref_bd.units),
+                f"{prefix}_x_max": (float(np.max(fit_data.x)), x_ref_bd.units),
+                f"{prefix}_reduced_chi_square": (fit_result.reduced_chi_square, ureg.dimensionless),
+            }
+            for key, (value, units) in diagnostics.items():
+                work_db[key] = BaseData(
+                    signal=np.array([value]),
+                    units=units,
+                    uncertainties={},
+                    rank_of_data=0,
+                )
 
         return {work_key: work_db}
