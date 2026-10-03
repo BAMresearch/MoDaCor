@@ -64,8 +64,9 @@ def test_build_sinks_from_session_can_opt_into_hdf_runtime_metadata(tmp_path: Pa
     assert isinstance(sink, HDFProcessingSink)
     assert sink.resource_location == out_file
     assert sink.iosink_method_kwargs["compression"] == "gzip"
-    assert sink.iosink_method_kwargs["pipeline_yaml"] == pipeline_yaml
-    assert sink.iosink_method_kwargs["pipeline_spec"]["name"] == "metadata-demo"
+    provenance = sink.iosink_method_kwargs["pipeline_provenance"]
+    assert provenance.authored_yaml == pipeline_yaml
+    assert provenance.expanded_spec["name"] == "metadata-demo"
     assert "trace_events" not in sink.iosink_method_kwargs
 
 

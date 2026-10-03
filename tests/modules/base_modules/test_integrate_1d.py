@@ -108,3 +108,65 @@ def test_integrate_1d_dependency_contract_declares_in_place_output_and_mask() ->
         processing_reads={"curve.signal", "curve.x", "curve.mask"},
         processing_writes={"curve.area"},
     )
+
+
+def test_integrate_1d_can_sort_jittered_coordinate_before_quadrature() -> None:
+    x_values = np.asarray([0.0, 2.0, 1.0, 3.0])
+    x = BaseData(signal=x_values, units="second", rank_of_data=1)
+    signal = BaseData(signal=2.0 * x_values, units="count", rank_of_data=1)
+    data = ProcessingData()
+    data["curve"] = DataBundle(signal=signal, x=x)
+    step = Integrate1D(io_sources=IoSources())
+    step.modify_config_by_kwargs(
+        with_processing_keys=["curve"],
+        axis_key="x",
+        sort_axis=True,
+        output_key="area",
+    )
+
+    step(data)
+
+    np.testing.assert_allclose(data["curve"]["area"].signal, 9.0)
+    assert data["curve"]["area"].units == ureg.count * ureg.second
+
+
+def test_integrate_1d_keeps_strict_monotonic_default() -> None:
+    x_values = np.asarray([0.0, 2.0, 1.0])
+    data = ProcessingData()
+    data["curve"] = DataBundle(
+        signal=BaseData(signal=np.ones(3), units="count", rank_of_data=1),
+        x=BaseData(signal=x_values, units="second", rank_of_data=1),
+    )
+    step = Integrate1D(io_sources=IoSources())
+    step.modify_config_by_kwargs(with_processing_keys=["curve"], axis_key="x")
+
+    with np.testing.assert_raises_regex(ValueError, "strictly monotonic"):
+        step(data)
+
+
+def test_integrate_1d_can_average_duplicate_coordinates() -> None:
+    x_values = np.asarray([0.0, 1.0, 1.0, 2.0])
+    data = ProcessingData()
+    data["curve"] = DataBundle(
+        signal=BaseData(
+            signal=np.asarray([0.0, 1.0, 3.0, 4.0]),
+            units="count",
+            uncertainties={"SEM": np.asarray([0.1, 0.2, 0.4, 0.5])},
+            rank_of_data=1,
+        ),
+        x=BaseData(signal=x_values, units="second", rank_of_data=1),
+    )
+    step = Integrate1D(io_sources=IoSources())
+    step.modify_config_by_kwargs(
+        with_processing_keys=["curve"],
+        axis_key="x",
+        duplicate_axis="mean",
+        output_key="area",
+    )
+
+    step(data)
+
+    np.testing.assert_allclose(data["curve"]["area"].signal, 4.0)
+    duplicate_sem = np.sqrt(0.2**2 + 0.4**2) / 2.0
+    expected_sem = np.sqrt((0.5 * 0.1) ** 2 + duplicate_sem**2 + (0.5 * 0.5) ** 2)
+    np.testing.assert_allclose(data["curve"]["area"].uncertainties["SEM"], expected_sem)

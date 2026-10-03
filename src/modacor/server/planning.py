@@ -46,8 +46,13 @@ def build_dry_run_plan(
     changed_sources: list[str],
     changed_keys: list[str],
     registry: ProcessStepRegistry | None = None,
+    max_expanded_steps: int | None = None,
 ) -> dict[str, Any]:
-    pipeline = Pipeline.from_yaml(session.pipeline_yaml or "", registry=registry)
+    pipeline = Pipeline.from_yaml(
+        session.pipeline_yaml or "",
+        registry=registry,
+        max_expanded_steps=max_expanded_steps,
+    )
     topo_ids = ordered_step_ids(pipeline)
 
     effective_mode, mode_note = resolve_effective_mode(mode)

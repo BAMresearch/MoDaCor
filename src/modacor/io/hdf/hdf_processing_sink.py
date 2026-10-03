@@ -13,6 +13,7 @@ __date__ = "12/02/2026"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
+import json
 import re
 from pathlib import Path, PurePosixPath
 from typing import Any, Sequence
@@ -24,6 +25,7 @@ from attrs import define, field, validators
 from modacor import __version__
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.messagehandler import MessageHandler
+from modacor.dataclasses.pipeline_provenance import PipelineProvenance
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sink import IoSink
 from modacor.io.processing_path import parse_processing_path
@@ -230,6 +232,42 @@ def _write_text_field(group: h5py.Group, name: str, text: str) -> None:
     if name in group:
         del group[name]
     group.create_dataset(name, data=str(text), dtype=h5py.string_dtype(encoding="utf-8"))
+
+
+def _read_text_dataset(dataset: h5py.Dataset) -> str:
+    value = dataset[()]
+    return value.decode("utf-8") if isinstance(value, bytes) else str(value)
+
+
+def _write_pipeline_provenance(group: h5py.Group, provenance: PipelineProvenance | None) -> None:
+    if provenance is None:
+        group.attrs["empty"] = True
+        return
+
+    group.attrs["schema_version"] = provenance.schema_version
+    authored = group.create_group("authored")
+    _write_text_dataset(authored, "yaml", provenance.authored_yaml)
+    authored.create_dataset("spec", data=_json_dumps_bytes(provenance.authored_spec))
+    expanded = group.create_group("expanded")
+    _write_text_dataset(expanded, "yaml", provenance.expanded_yaml)
+    expanded.create_dataset("spec", data=_json_dumps_bytes(provenance.expanded_spec))
+
+
+def _read_pipeline_provenance(group: h5py.Group) -> PipelineProvenance | None:
+    if bool(group.attrs.get("empty", False)):
+        return None
+    try:
+        authored = group["authored"]
+        expanded = group["expanded"]
+        return PipelineProvenance(
+            authored_yaml=_read_text_dataset(authored["yaml"]),
+            authored_spec=json.loads(_read_text_dataset(authored["spec"])),
+            expanded_yaml=_read_text_dataset(expanded["yaml"]),
+            expanded_spec=json.loads(_read_text_dataset(expanded["spec"])),
+            schema_version=str(group.attrs.get("schema_version", "1.0")),
+        )
+    except KeyError as exc:
+        raise ValueError(f"Pipeline provenance group {group.name!r} is incomplete.") from exc
 
 
 def _normalise_trace_events(trace_events: Any | None) -> list[dict[str, Any]]:
@@ -597,8 +635,7 @@ class HDFProcessingSink(IoSink):
         data_paths: Sequence[str] | str | None,
         *,
         write_all_processing_data: bool = False,
-        pipeline_spec: dict[str, Any] | None = None,
-        pipeline_yaml: str | None = None,
+        pipeline_provenance: PipelineProvenance | None = None,
         trace_events: Any | None = None,
         processing_data_snapshots: Any | None = None,
         override_resource_location: Path | None = None,
@@ -619,12 +656,15 @@ class HDFProcessingSink(IoSink):
             "tracer_processing_data_compression",
             self.iosink_method_kwargs.get("processing_data_snapshot_compression", "lzf"),
         )
-        resolved_pipeline_spec = (
-            pipeline_spec if pipeline_spec is not None else self.iosink_method_kwargs.get("pipeline_spec")
+        resolved_pipeline_provenance = (
+            pipeline_provenance
+            if pipeline_provenance is not None
+            else self.iosink_method_kwargs.get("pipeline_provenance")
         )
-        resolved_pipeline_yaml = (
-            pipeline_yaml if pipeline_yaml is not None else self.iosink_method_kwargs.get("pipeline_yaml")
-        )
+        if resolved_pipeline_provenance is not None and not isinstance(
+            resolved_pipeline_provenance, PipelineProvenance
+        ):
+            raise TypeError("pipeline_provenance must be a PipelineProvenance instance or None.")
         resolved_trace_events = (
             trace_events if trace_events is not None else self.iosink_method_kwargs.get("trace_events")
         )
@@ -653,13 +693,7 @@ class HDFProcessingSink(IoSink):
             # Pipeline specification (stored as JSON string)
             pipeline_group = processing_group.require_group("pipeline")
             pipeline_run_group = _recreate_group(pipeline_group, run_name)
-            if resolved_pipeline_spec is None and resolved_pipeline_yaml is None:
-                pipeline_run_group.attrs["empty"] = True
-            else:
-                if resolved_pipeline_spec is not None:
-                    pipeline_run_group.create_dataset("spec", data=_json_dumps_bytes(resolved_pipeline_spec))
-                if resolved_pipeline_yaml is not None:
-                    _write_text_dataset(pipeline_run_group, "yaml", str(resolved_pipeline_yaml))
+            _write_pipeline_provenance(pipeline_run_group, resolved_pipeline_provenance)
 
             # Trace events: keep raw JSON + indexed structure for querying
             tracer_group = processing_group.require_group("tracer")

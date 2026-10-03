@@ -16,6 +16,7 @@ import pytest
 
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 from modacor.modules.base_modules.find_scale_factor1d import FindScaleFactor1D
@@ -272,3 +273,75 @@ def test_find_scale_factor_weights_have_effect():
 
     sf = float(pd["work"]["scale_factor"].signal.item())
     assert sf == pytest.approx(true_scale, rel=1e-3, abs=1e-3)
+
+
+def test_find_scale_factor_lognormal_uses_selected_uncertainty_component():
+    x_work = np.linspace(1.0, 10.0, 200)
+    x_reference = np.linspace(1.5, 9.5, 170)
+    work = 1.0 + np.exp(-x_work / 4.0)
+    true_scale = 3.25
+    reference = true_scale * (1.0 + np.exp(-x_reference / 4.0))
+    pd = ProcessingData()
+    pd["work"] = _make_curve_bundle(x_work, work, sigma_y=0.02)
+    pd["reference"] = _make_curve_bundle(x_reference, reference, sigma_y=0.03)
+
+    _run_step(
+        pd,
+        {
+            "with_processing_keys": ["work", "reference"],
+            "fit_model": "lognormal",
+            "uncertainty_weight_key": "propagate_to_all",
+            "fit_min_val": 2.0,
+            "fit_max_val": 9.0,
+            "scale_uncertainty_key": "scale_fit",
+            "diagnostic_prefix": "gain_fit",
+        },
+    )
+
+    scale = pd["work"]["scale_factor"]
+    assert float(scale.signal.item()) == pytest.approx(true_scale, rel=1.0e-4)
+    assert float(scale.uncertainties["scale_fit"].item()) > 0.0
+    assert float(pd["work"]["gain_fit_point_count"].signal.item()) > 2
+    assert float(pd["work"]["gain_fit_x_min"].signal.item()) >= 2.0
+    assert float(pd["work"]["gain_fit_x_max"].signal.item()) <= 9.0
+    assert float(pd["work"]["gain_fit_reduced_chi_square"].signal.item()) >= 0.0
+
+
+def test_find_scale_factor_lognormal_requires_explicit_uncertainty_key():
+    x = np.linspace(1.0, 2.0, 5)
+    pd = ProcessingData()
+    pd["work"] = _make_curve_bundle(x, np.ones(5))
+    pd["reference"] = _make_curve_bundle(x, np.ones(5))
+
+    with pytest.raises(ValueError, match="requires uncertainty_weight_key"):
+        _run_step(
+            pd,
+            {"with_processing_keys": ["work", "reference"], "fit_model": "lognormal"},
+        )
+
+
+def test_find_scale_factor_dependency_contract_is_exact():
+    step = FindScaleFactor1D(io_sources=IoSources())
+    step.modify_config_by_dict(
+        {
+            "with_processing_keys": ["work", "reference"],
+            "signal_key": "intensity",
+            "independent_axis_key": "q",
+            "scale_output_key": "gain",
+            "fit_background": True,
+            "background_output_key": "offset",
+            "diagnostic_prefix": "fit",
+        }
+    )
+
+    assert step.dependency_contract() == ProcessStepDependencies(
+        processing_reads={"work.intensity", "work.q", "reference.intensity", "reference.q"},
+        processing_writes={
+            "work.gain",
+            "work.offset",
+            "work.fit_point_count",
+            "work.fit_x_min",
+            "work.fit_x_max",
+            "work.fit_reduced_chi_square",
+        },
+    )

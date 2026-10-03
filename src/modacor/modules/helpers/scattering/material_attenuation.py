@@ -13,8 +13,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.io.io_sources import IoSources
-
-HC_KEV_ANGSTROM = 12.398419843320026
+from modacor.modules.helpers.scattering.photon_energy import photon_energy_from_wavelength
 
 
 @dataclass(frozen=True)
@@ -118,10 +117,8 @@ def energy_kev_from_config_or_wavelength(io_sources: IoSources, cfg: dict[str, A
         default_units="angstrom",
         required=True,
     )
-    wavelength_angstrom = scalar_in_units(wavelength, "angstrom", name="wavelength")
-    if wavelength_angstrom <= 0:
-        raise ValueError("wavelength must be positive.")
-    return HC_KEV_ANGSTROM / wavelength_angstrom
+    energy = photon_energy_from_wavelength(wavelength, output_units="keV")
+    return scalar_in_units(energy, "keV", name="beam_energy")
 
 
 def _linear_attenuation_from_xraylib(material: str, density_g_cm3: float, energy_kev: float) -> float:

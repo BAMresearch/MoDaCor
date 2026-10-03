@@ -184,6 +184,12 @@ def _add_serve_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
         help="Maximum accepted pipeline YAML payload size in bytes.",
     )
     serve_parser.add_argument(
+        "--max-expanded-pipeline-steps",
+        type=int,
+        default=None,
+        help="Maximum number of executable steps after pipeline block expansion.",
+    )
+    serve_parser.add_argument(
         "--max-buffer-upload-bytes",
         type=int,
         default=None,
@@ -358,7 +364,6 @@ def _run_command(args: argparse.Namespace) -> int:
             },
             run_name=args.run_name,
             result=result,
-            pipeline_yaml=result.pipeline.to_yaml(),
         )
         print(f"Wrote HDF output: {args.write_hdf}")
 
@@ -387,6 +392,7 @@ def _serve_command(args: argparse.Namespace) -> int:
         "sink_write_roots": tuple(args.write_root),
         "max_sessions": args.max_sessions,
         "max_pipeline_yaml_bytes": args.max_pipeline_yaml_bytes,
+        "max_expanded_pipeline_steps": args.max_expanded_pipeline_steps,
         "max_buffer_upload_bytes": args.max_buffer_upload_bytes,
     }
     if args.runtime_policy == "restricted":

@@ -40,4 +40,4 @@ Copy selected BaseData entries between DataBundles.
 | `with_processing_keys` | list | Yes | - | - | Two processing keys: target then source. |
 
 ## Notes
-Use this to attach static maps such as Q, Psi, Omega, pixel_index, or masks to each sample without recomputing the static branch.
+Use this to attach static maps such as Q, Psi, Omega, bin_index, or masks to each sample without recomputing the static branch.

@@ -34,6 +34,7 @@ MODULE_GROUPS: dict[str, tuple[str, ...]] = {
         "AppendProcessingData",
         "AppendSink",
         "AppendSource",
+        "ConcatenateDatabundles",
         "CopyDataBundleKeys",
         "SinkProcessingData",
     ),
@@ -43,8 +44,10 @@ MODULE_GROUPS: dict[str, tuple[str, ...]] = {
         "FindScaleFactor1D",
         "Multiply",
         "MultiplyDatabundles",
+        "Negate",
         "Subtract",
         "SubtractDatabundles",
+        "SubtractInterpolated1D",
         "UnitsLabelUpdate",
     ),
     "Masks": (
@@ -60,11 +63,13 @@ MODULE_GROUPS: dict[str, tuple[str, ...]] = {
         "PoissonUncertainties",
     ),
     "Geometry and coordinates": (
-        "IndexPixels",
         "PixelCoordinates3D",
         "XSGeometryFromPixelCoordinates",
+        "AngleToQ",
     ),
     "Reduction and integration": (
+        "FindCenterOfMass1D",
+        "IndexByCoordinate",
         "IndexedAverager",
         "Integrate1D",
         "ReduceDimensionality",
