@@ -26,10 +26,11 @@ from modacor.modules.helpers.scattering.detector_data import (
     prepare_static_scalar,
     require_scalar,
 )
+from modacor.modules.helpers.scattering.photon_energy import as_photon_wavelength
 
 logger = MessageHandler(name=__name__)
 
-__version__ = "20260927.2"
+__version__ = "20261003.1"
 __all__ = ["XSGeometryFromPixelCoordinates"]
 
 
@@ -42,7 +43,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
 
     Inputs from configuration sources:
       - sample_z: scalar length (sample is at (0,0,sample_z))
-      - wavelength: scalar length
+      - photon: scalar energy or wavelength metadata
       - pixel_pitch_fast, pixel_pitch_slow: scalar detector element size in length units (for Omega);
         legacy forms such as mm/pixel are accepted because pixel is dimensionless
 
@@ -73,21 +74,22 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
                 "default": {},
                 "doc": "Uncertainty sources for sample z-position.",
             },
-            "wavelength_source": {
+            "photon_source": {
                 "type": (str, type(None)),
                 "required": True,
                 "default": None,
-                "doc": "IoSources key for wavelength signal.",
+                "doc": "IoSources key for photon energy or wavelength metadata.",
             },
-            "wavelength_units_source": {
+            "photon_units_source": {
                 "type": (str, type(None)),
+                "required": True,
                 "default": None,
-                "doc": "IoSources key for wavelength units.",
+                "doc": "IoSources key for photon energy or wavelength units.",
             },
-            "wavelength_uncertainties_sources": {
+            "photon_uncertainties_sources": {
                 "type": dict,
                 "default": {},
-                "doc": "Uncertainty sources for wavelength.",
+                "doc": "Uncertainty sources for photon energy or wavelength metadata.",
             },
             "pixel_pitch_slow_source": {
                 "type": (str, type(None)),
@@ -154,11 +156,32 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
             "CosAlpha": ["signal", "uncertainties"],
             "Omega": ["signal", "uncertainties"],
         },
-        step_keywords=["geometry", "Q", "Psi", "TwoTheta", "Solid Angle", "Omega", "scattering"],
+        step_keywords=[
+            "geometry",
+            "Q",
+            "Psi",
+            "TwoTheta",
+            "Solid Angle",
+            "Omega",
+            "scattering",
+        ],
         step_doc="Compute Q-vector components and angles from lab-frame pixel coordinates.",
+        step_note=(
+            "Photon metadata is loaded from IoSources. Energy or wavelength representation is inferred "
+            "from its units and converted to wavelength with uncertainty-aware BaseData arithmetic."
+        ),
     )
 
-    output_keys: Tuple[str, ...] = ("Q0", "Q1", "Q2", "Q", "Psi", "TwoTheta", "CosAlpha", "Omega")
+    output_keys: Tuple[str, ...] = (
+        "Q0",
+        "Q1",
+        "Q2",
+        "Q",
+        "Psi",
+        "TwoTheta",
+        "CosAlpha",
+        "Omega",
+    )
 
     # ----------------------------
     # loading helpers
@@ -245,7 +268,11 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         else:
             value = override
             units = "m"
-        return BaseData(signal=np.asarray(value, dtype=float), units=ureg.Unit(str(units)), rank_of_data=0)
+        return BaseData(
+            signal=np.asarray(value, dtype=float),
+            units=ureg.Unit(str(units)),
+            rank_of_data=0,
+        )
 
     def _load_nexus_detector_frame_inputs(self):
         detector_frame_cfg = self.configuration.get("detector_frame")
@@ -354,14 +381,22 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         coord_z: BaseData = ref["coord_z"]
 
         RoD = int(
-            getattr(coord_x, "rank_of_data", ref["signal"].rank_of_data if "signal" in ref else np.ndim(coord_x.signal))
+            getattr(
+                coord_x,
+                "rank_of_data",
+                ref["signal"].rank_of_data if "signal" in ref else np.ndim(coord_x.signal),
+            )
         )
 
         sample_z = prepare_static_scalar(
-            self._load_sample_z(), require_units=ureg.m, uncertainty_key="sample_position_jitter"
+            self._load_sample_z(),
+            require_units=ureg.m,
+            uncertainty_key="sample_position_jitter",
         )
         wavelength = prepare_static_scalar(
-            self._load_from_sources("wavelength"), require_units=ureg.m, uncertainty_key="wavelength_jitter"
+            as_photon_wavelength(self._load_from_sources("photon"), output_units="m"),
+            require_units=ureg.m,
+            uncertainty_key="wavelength_jitter",
         )
         nexus_frame_inputs = self._load_nexus_detector_frame_inputs()
         if nexus_frame_inputs is None:
@@ -376,13 +411,15 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
                 uncertainty_key="pixel_pitch_jitter",
             )
             detector_normal = unit_vector3(
-                self.configuration.get("detector_normal", (0.0, 0.0, 1.0)), name="detector_normal"
+                self.configuration.get("detector_normal", (0.0, 0.0, 1.0)),
+                name="detector_normal",
             )
         else:
             pitch_slow = nexus_frame_inputs.pixel_pitch_slow
             pitch_fast = nexus_frame_inputs.pixel_pitch_fast
             detector_normal = unit_vector3(
-                self.configuration.get("detector_normal", nexus_frame_inputs.basis_normal), name="detector_normal"
+                self.configuration.get("detector_normal", nexus_frame_inputs.basis_normal),
+                name="detector_normal",
             )
 
         # (optional) enforce scalar-ness right before compute:

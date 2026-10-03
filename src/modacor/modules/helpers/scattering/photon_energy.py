@@ -3,7 +3,11 @@
 
 from __future__ import annotations
 
-__all__ = ["photon_energy_from_wavelength", "photon_wavelength_from_energy"]
+__all__ = [
+    "as_photon_wavelength",
+    "photon_energy_from_wavelength",
+    "photon_wavelength_from_energy",
+]
 
 import numpy as np
 import pint
@@ -57,6 +61,33 @@ def photon_wavelength_from_energy(
         reference_units=ureg.joule,
         output_units=output_units,
     )
+
+
+def as_photon_wavelength(
+    value: BaseData,
+    *,
+    output_units: str | pint.Unit = "m",
+) -> BaseData:
+    """Return photon energy or wavelength input as wavelength.
+
+    The input representation is inferred from its Pint dimensionality. Energy
+    inputs are converted through ``h*c/E``; length inputs are unit-converted
+    directly. Both paths preserve BaseData uncertainties and metadata.
+    """
+
+    dimensionality = value.units.dimensionality
+    if dimensionality == ureg.joule.dimensionality:
+        return photon_wavelength_from_energy(value, output_units=output_units)
+    if dimensionality != ureg.meter.dimensionality:
+        raise ValueError(f"Photon metadata must have energy or wavelength units, got {value.units}.")
+
+    _positive_finite(value, quantity_name="wavelength", reference_units=ureg.meter)
+    wavelength = value.copy(with_axes=True)
+    try:
+        wavelength.to_units(ureg.Unit(output_units))
+    except (ValueError, pint.DimensionalityError) as exc:
+        raise ValueError(f"Photon wavelength output units are incompatible: {output_units}.") from exc
+    return wavelength
 
 
 def photon_energy_from_wavelength(

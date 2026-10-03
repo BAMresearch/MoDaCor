@@ -14,7 +14,7 @@ from modacor.io.io_sources import IoSources
 from modacor.modules import AngleToQ
 
 
-def _processing_data(*, incident: BaseData, incident_key: str = "energy") -> ProcessingData:
+def _processing_data() -> ProcessingData:
     processing_data = ProcessingData()
     processing_data["scan"] = DataBundle(
         angle=BaseData(
@@ -28,13 +28,21 @@ def _processing_data(*, incident: BaseData, incident_key: str = "energy") -> Pro
             ureg.microradian,
             uncertainties={"centre": np.asarray(0.2)},
         ),
-        **{incident_key: incident},
     )
     return processing_data
 
 
-def _run_step(processing_data: ProcessingData, **configuration) -> BaseData:
-    step = AngleToQ(io_sources=IoSources())
+class DummyAngleToQ(AngleToQ):
+    def __init__(self, *, photon: BaseData, **kwargs):
+        super().__init__(**kwargs)
+        self._photon = photon
+
+    def _load_photon(self) -> BaseData:
+        return self._photon
+
+
+def _run_step(processing_data: ProcessingData, *, photon: BaseData, **configuration) -> BaseData:
+    step = DummyAngleToQ(photon=photon, io_sources=IoSources())
     step.processing_data = processing_data
     step.modify_config_by_kwargs(with_processing_keys=["scan"], output_units="1/nm", **configuration)
     return step.calculate()["scan"]["Q"]
@@ -47,7 +55,7 @@ def test_angle_to_q_uses_energy_center_and_retains_sign() -> None:
         uncertainties={"energy": np.asarray(0.01)},
     )
 
-    q = _run_step(_processing_data(incident=energy))
+    q = _run_step(_processing_data(), photon=energy)
 
     wavelength_nm = (ureg.planck_constant * ureg.speed_of_light / (14.0 * ureg.keV)).to("nm").magnitude
     expected = signed_q_from_angle(np.array([-5.0, 0.0, 5.0]) * 1.0e-6, wavelength_nm)
@@ -65,9 +73,8 @@ def test_angle_to_q_accepts_wavelength_and_bragg_angle() -> None:
     )
 
     q = _run_step(
-        _processing_data(incident=wavelength, incident_key="wavelength"),
-        incident_key="wavelength",
-        incident_quantity="wavelength",
+        _processing_data(),
+        photon=wavelength,
         angle_convention="bragg_angle",
     )
 
@@ -85,45 +92,35 @@ def test_angle_to_q_configured_zero_omits_center_dependency() -> None:
     step.modify_config_by_dict(
         {
             "with_processing_keys": ["scan"],
+            "photon_source": "measurement::/beam/energy",
+            "photon_units_source": "measurement::/beam/energy@units",
             "angle_zero": 0.0,
             "angle_zero_units": "microradian",
         }
     )
 
     assert step.dependency_contract() == ProcessStepDependencies(
-        processing_reads={"scan.angle", "scan.energy"},
+        source_refs={"measurement"},
+        processing_reads={"scan.angle"},
         processing_writes={"scan.Q"},
     )
 
 
 def test_angle_to_q_center_dependency_is_exact() -> None:
     step = AngleToQ(io_sources=IoSources())
-    step.modify_config_by_kwargs(with_processing_keys=["scan"])
-
-    assert step.dependency_contract() == ProcessStepDependencies(
-        processing_reads={"scan.angle", "scan.energy", "scan.beam_center"},
-        processing_writes={"scan.Q"},
-    )
-
-
-def test_angle_to_q_wavelength_dependency_is_exact() -> None:
-    step = AngleToQ(io_sources=IoSources())
     step.modify_config_by_kwargs(
         with_processing_keys=["scan"],
-        incident_key="wavelength",
-        incident_quantity="wavelength",
+        photon_source="measurement::/beam/wavelength",
+        photon_units_source="measurement::/beam/wavelength@units",
     )
 
     assert step.dependency_contract() == ProcessStepDependencies(
-        processing_reads={"scan.angle", "scan.wavelength", "scan.beam_center"},
+        source_refs={"measurement"},
+        processing_reads={"scan.angle", "scan.beam_center"},
         processing_writes={"scan.Q"},
     )
 
 
-def test_angle_to_q_rejects_unknown_incident_quantity() -> None:
-    step = AngleToQ(io_sources=IoSources())
-    step.processing_data = _processing_data(incident=BaseData(np.asarray(14.0), ureg.keV))
-    step.modify_config_by_kwargs(with_processing_keys=["scan"], incident_quantity="frequency")
-
-    with pytest.raises(ValueError, match="incident_quantity"):
-        step.calculate()
+def test_angle_to_q_rejects_non_photon_metadata_units() -> None:
+    with pytest.raises(ValueError, match="energy or wavelength units"):
+        _run_step(_processing_data(), photon=BaseData(np.asarray(1.0), ureg.second))

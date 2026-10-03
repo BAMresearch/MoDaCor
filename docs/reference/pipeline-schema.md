@@ -225,9 +225,13 @@ steps:
       sample_z_override:
         value: 0.0
         units: mm
-      wavelength_source: calibration::/entry1/calibration_sample/beam/incident_wavelength
-      wavelength_units_source: calibration::/entry1/calibration_sample/beam/incident_wavelength@units
+      photon_source: calibration::/entry1/calibration_sample/beam/incident_wavelength
+      photon_units_source: calibration::/entry1/calibration_sample/beam/incident_wavelength@units
 ```
+
+`photon_source` may contain photon energy or wavelength. MoDaCor infers the
+representation from the Pint dimensionality of `photon_units_source` and
+converts to wavelength with uncertainty-aware `BaseData` arithmetic.
 
 For measurement files with a NeXus sample-stage transformation chain,
 `sample_z_override` can also resolve the sample position from that chain:

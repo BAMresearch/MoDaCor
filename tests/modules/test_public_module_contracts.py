@@ -13,7 +13,7 @@ from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 PUBLIC_STEP_NAMES = tuple(modacor.modules.__all__)
 
 DEFAULT_METADATA_CONTRACTS = {
-    "AngleToQ": ({"angle", "energy"}, {"Q"}),
+    "AngleToQ": ({"angle"}, {"Q"}),
     "ConcatenateDatabundles": (set(), {"configured data keys", "source_index"}),
     "DilateMask": ({"mask"}, {"mask"}),
     "DivideDatabundles": ({"signal"}, {"signal"}),

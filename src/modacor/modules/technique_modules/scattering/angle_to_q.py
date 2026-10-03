@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["AngleToQ"]
-__version__ = "20260930.1"
+__version__ = "20261003.1"
 
 from pathlib import Path
 
@@ -12,10 +12,15 @@ import numpy as np
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
+from modacor.dataclasses.helpers import basedata_from_sources
+from modacor.dataclasses.process_step import (
+    ProcessStep,
+    ProcessStepDependencies,
+    normalize_processing_key_values,
+)
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.geometry.scattering_angle import q_angle_factor
-from modacor.modules.helpers.scattering.photon_energy import photon_wavelength_from_energy
+from modacor.modules.helpers.scattering.photon_energy import as_photon_wavelength
 
 
 class AngleToQ(ProcessStep):
@@ -26,7 +31,7 @@ class AngleToQ(ProcessStep):
         calling_id="AngleToQ",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=["angle", "energy"],
+        required_data_keys=["angle"],
         modifies={"Q": ["signal", "uncertainties", "units", "axes"]},
         arguments={
             "with_processing_keys": {
@@ -40,15 +45,22 @@ class AngleToQ(ProcessStep):
                 "default": "angle",
                 "doc": "Angular-coordinate BaseData key.",
             },
-            "incident_key": {
-                "type": str,
-                "default": "energy",
-                "doc": "Scalar or angle-shaped photon-energy or wavelength BaseData key.",
+            "photon_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "default": None,
+                "doc": "IoSources key for scalar or angle-shaped photon energy or wavelength metadata.",
             },
-            "incident_quantity": {
-                "type": str,
-                "default": "energy",
-                "doc": "Quantity stored under incident_key: 'energy' or 'wavelength'.",
+            "photon_units_source": {
+                "type": (str, type(None)),
+                "required": True,
+                "default": None,
+                "doc": "IoSources key for photon energy or wavelength units.",
+            },
+            "photon_uncertainties_sources": {
+                "type": dict,
+                "default": {},
+                "doc": "Uncertainty sources for photon energy or wavelength metadata.",
             },
             "center_key": {
                 "type": (str, type(None)),
@@ -84,12 +96,20 @@ class AngleToQ(ProcessStep):
                 "doc": "Momentum-transfer output units.",
             },
         },
-        step_keywords=["scattering angle", "two theta", "Bragg angle", "Q", "momentum transfer", "geometry"],
+        step_keywords=[
+            "scattering angle",
+            "two theta",
+            "Bragg angle",
+            "Q",
+            "momentum transfer",
+            "geometry",
+        ],
         step_doc="Convert an angle relative to its direct-beam or diffraction centre into signed Q.",
         step_note=(
             "Uses Q = 4*pi/lambda*sin(angle/2) for scattering_angle/two_theta and "
-            "Q = 4*pi/lambda*sin(angle) for bragg_angle/theta. Photon energy is converted to wavelength "
-            "with uncertainty-aware BaseData arithmetic. The angle sign is retained."
+            "Q = 4*pi/lambda*sin(angle) for bragg_angle/theta. Photon metadata is loaded from IoSources; "
+            "energy or wavelength representation is inferred from its units and converted with "
+            "uncertainty-aware BaseData arithmetic. The angle sign is retained."
         ),
     )
 
@@ -101,18 +121,23 @@ class AngleToQ(ProcessStep):
         return key or None
 
     def dependency_contract(self) -> ProcessStepDependencies:
+        base_contract = super().dependency_contract()
         processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
         if not processing_keys:
-            return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
+            return ProcessStepDependencies(
+                source_refs=base_contract.source_refs,
+                processing_reads={"*"},
+                processing_writes={"*"},
+            )
         angle_key = str(self.configuration.get("angle_key", "angle"))
-        incident_key = str(self.configuration.get("incident_key", "energy"))
-        read_keys = {angle_key, incident_key}
+        read_keys = {angle_key}
         if self.configuration.get("angle_zero") is None:
             center_key = self._optional_key(self.configuration.get("center_key", "beam_center"))
             if center_key is not None:
                 read_keys.add(center_key)
         output_key = str(self.configuration.get("output_key", "Q"))
         return ProcessStepDependencies(
+            source_refs=base_contract.source_refs,
             processing_reads={f"{processing_key}.{key}" for processing_key in processing_keys for key in read_keys},
             processing_writes={f"{processing_key}.{output_key}" for processing_key in processing_keys},
         )
@@ -133,36 +158,33 @@ class AngleToQ(ProcessStep):
         zero.to_units(angle.units)
         return zero
 
-    def _wavelength(self, incident: BaseData) -> BaseData:
-        quantity = str(self.configuration.get("incident_quantity", "energy")).strip().lower()
-        if quantity == "energy":
-            return photon_wavelength_from_energy(incident, output_units="m")
-        if quantity == "wavelength":
-            wavelength = incident.copy(with_axes=False)
-            wavelength.to_units(ureg.meter)
-            signal = np.asarray(wavelength.signal, dtype=float)
-            if np.any(~np.isfinite(signal)) or np.any(signal <= 0.0):
-                raise ValueError("AngleToQ photon wavelength must be finite and positive.")
-            return wavelength
-        raise ValueError("AngleToQ incident_quantity must be 'energy' or 'wavelength'.")
+    def _load_photon(self) -> BaseData:
+        return basedata_from_sources(
+            io_sources=self.io_sources,
+            signal_source=self.configuration.get("photon_source"),
+            units_source=self.configuration.get("photon_units_source"),
+            uncertainty_sources=self.configuration.get("photon_uncertainties_sources", {}),
+        )
+
+    def _photon_wavelength(self) -> BaseData:
+        return as_photon_wavelength(self._load_photon(), output_units="m")
 
     def calculate(self) -> dict[str, DataBundle]:
         angle_key = str(self.configuration.get("angle_key", "angle"))
-        incident_key = str(self.configuration.get("incident_key", "energy"))
         output_key = str(self.configuration.get("output_key", "Q")).strip()
         if not output_key:
             raise ValueError("AngleToQ output_key must not be empty.")
         output_units = ureg.Unit(self.configuration.get("output_units", "1/nm"))
         factor = q_angle_factor(str(self.configuration.get("angle_convention", "scattering_angle")))
         four_pi = BaseData(signal=np.asarray(4.0 * np.pi), units=ureg.dimensionless)
+        wavelength = self._photon_wavelength()
 
         output: dict[str, DataBundle] = {}
         for processing_key in self._normalised_processing_keys():
             bundle = self.processing_data[processing_key]
             angle = bundle[angle_key].copy(with_axes=True)
-            incident = bundle[incident_key].copy(with_axes=False)
             relative_angle = angle - self._angle_zero(bundle, angle)
-            q = four_pi * (relative_angle * factor).sin() / self._wavelength(incident)
+            q = four_pi * (relative_angle * factor).sin() / wavelength
             q.to_units(output_units)
             bundle[output_key] = q
             output[processing_key] = bundle

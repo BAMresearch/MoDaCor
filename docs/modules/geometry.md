@@ -11,7 +11,11 @@ positions and beam metadata.
 
 [`AngleToQ`](../reference/modules/AngleToQ.md) converts scattering-angle or
 Bragg-angle coordinates to signed Q using a configured or measured centre and
-either photon energy or wavelength. Energy-to-wavelength conversion uses
+photon metadata loaded from an IO source. `AngleToQ` and
+[`XSGeometryFromPixelCoordinates`](../reference/modules/XSGeometryFromPixelCoordinates.md)
+share the same `photon_source`, `photon_units_source`, and
+`photon_uncertainties_sources` interface. Photon energy versus wavelength is
+inferred from Pint dimensionality, and energy-to-wavelength conversion uses
 `BaseData` arithmetic so units and separate uncertainty components propagate.
 Keeping the sign allows asymmetric analyser wings to remain separate until a
 pipeline selects one or combines them deliberately.
