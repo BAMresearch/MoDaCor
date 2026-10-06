@@ -2,6 +2,10 @@
 
 A pipeline YAML document contains a name and a mapping of step identifiers:
 
+Pipelines written for the retired `IndexPixels`, former `IndexedAverager`, or
+former geometry `wavelength_*` interfaces require the
+[breaking interface migration](interface-migrations.md) before they will load.
+
 ```yaml
 name: example
 steps:

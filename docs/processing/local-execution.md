@@ -112,6 +112,8 @@ Semantics:
   `authored/yaml`, `authored/spec`, `expanded/yaml`, and `expanded/spec`.
   The authored pair preserves the submitted compact description; the expanded
   pair records the exact ordinary-step pipeline and executable node/edge graph.
+  This layout replaces the former direct `yaml` and `spec` datasets; see the
+  [breaking interface migration guide](interface-migrations.md).
 - trace output is stored under `processing/tracer/<run-name>/` as raw `events` JSON and indexed `steps/` + `index/`.
 
 ## Shared Python runner API

@@ -71,5 +71,9 @@ python -m sphinx -E -W --keep-going -b html docs dist/docs
 - Use semantic commit prefixes that match the project configuration:
   `fix:`/`perf:` for patch releases, `enh:`/`feat:` for minor releases, and
   `docs:` for documentation entries.
+- Mark an incompatible public interface with a conventional breaking-change
+  marker (`type!:` and/or a `BREAKING CHANGE:` footer), and link its migration
+  guidance from the PR. A plain `feat:` commit does not communicate the
+  required major-version impact.
 - Review and merge the generated release PR before expecting a new version tag
   or PyPI publication.

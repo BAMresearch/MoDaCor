@@ -20,6 +20,14 @@ inferred from Pint dimensionality, and energy-to-wavelength conversion uses
 Keeping the sign allows asymmetric analyser wings to remain separate until a
 pipeline selects one or combines them deliberately.
 
+This is a breaking configuration change for
+`XSGeometryFromPixelCoordinates`: its former `wavelength_source`,
+`wavelength_units_source`, and `wavelength_uncertainties_sources` fields are no
+longer accepted. See the
+[interface migration guide](../processing/interface-migrations.md) for the
+direct replacements. Wavelength-specific fields on other correction modules
+are unaffected.
+
 Prefer NeXus transformation chains when the input describes them correctly.
 Explicit basis vectors, pitches, beam centers, or sample positions remain
 available for non-NeXus data and reviewed overrides.

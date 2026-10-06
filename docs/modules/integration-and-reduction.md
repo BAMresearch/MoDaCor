@@ -9,6 +9,9 @@ scatter-derived components.
 [`IndexByCoordinate`](../reference/modules/IndexByCoordinate.md) assigns one
 arbitrary coordinate to one-dimensional bins. It records the physical edges
 for diagnostics but deliberately does not inspect signals or masks.
+It replaces the retired scattering-specific `IndexPixels` step. Existing
+pipelines must migrate their bin limits and selected coordinate explicitly; see
+the [breaking interface migration guide](../processing/interface-migrations.md).
 
 [`IndexedAverager`](../reference/modules/IndexedAverager.md) groups a configured
 value by that index map. An optional measured axis, such as Q, is averaged over
@@ -17,6 +20,9 @@ reports actual mean coordinates, their spread, and population, weight-sum, and
 effective-sample-size diagnostics rather than substituting nominal bin centres.
 Bins without positive total weight are omitted and their original IDs are
 retained in the output.
+This generic interface replaces the former scattering-specific configuration;
+in particular, `averaging_direction` and the `use_signal_*` fields are no
+longer accepted.
 
 [`ConcatenateDatabundles`](../reference/modules/ConcatenateDatabundles.md)
 pools compatible one-dimensional bundles before indexed reduction. Its
