@@ -7,7 +7,7 @@ Publish a Plotly-compatible 1D data plot payload.
 - **Import path:** `modacor.modules.base_modules.plot_1d_visualization.Plot1DVisualization`
 - **Source:** [`src/modacor/modules/base_modules/plot_1d_visualization.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/plot_1d_visualization.py)
 - **Module ID:** Plot1DVisualization
-- **Module version:** 20260903.1
+- **Module version:** 20261006.1
 - **Keywords:** plot, visualization, plotly, 1d
 
 ## Required data keys
@@ -33,10 +33,12 @@ Publish a Plotly-compatible 1D data plot payload.
   "target": "",
   "title": null,
   "uirevision": null,
+  "x_axis_type": null,
   "x_path": "",
   "x_units": null,
   "xerr_path": null,
   "xerr_uncertainty_names": null,
+  "y_axis_type": null,
   "y_path": "",
   "y_units": null,
   "yerr_path": null,
@@ -56,10 +58,12 @@ Publish a Plotly-compatible 1D data plot payload.
 | `target` | str | Yes |  | - | Sink target in the form 'plot_sink::plot_id'. |
 | `title` | str or NoneType | No | - | - | Optional plot title. |
 | `uirevision` | str or NoneType | No | - | - | Stable Plotly UI revision key. Keep unchanged to preserve zoom/pan during live updates. |
+| `x_axis_type` | str or NoneType | No | - | - | Optional forced x-axis type: 'linear' or 'log'; None/'auto' retains automatic selection. |
 | `x_path` | str | Yes |  | - | ProcessingData path for the x array. |
 | `x_units` | str or NoneType | No | - | - | Optional display units for x values and x error bars. |
 | `xerr_path` | str or NoneType | No | - | - | Optional ProcessingData path for x error bars. |
 | `xerr_uncertainty_names` | list or str or NoneType | No | - | - | Optional uncertainty-name fallbacks below the x BaseData. |
+| `y_axis_type` | str or NoneType | No | - | - | Optional forced y-axis type: 'linear' or 'log'; None/'auto' retains automatic selection. |
 | `y_path` | str | Yes |  | - | ProcessingData path for the y array. |
 | `y_units` | str or NoneType | No | - | - | Optional display units for y values and y error bars. |
 | `yerr_path` | str or NoneType | No | - | - | Optional ProcessingData path for y error bars. |

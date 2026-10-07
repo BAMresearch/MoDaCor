@@ -201,3 +201,44 @@ def test_plot_1d_visualization_converts_x_units_and_uncertainties_for_display():
     np.testing.assert_allclose(trace["error_x"]["array"], [0.1, 0.3])
     assert payload["layout"]["xaxis"]["title"]["text"] == "Q (1/nm)"
     assert payload["metadata"]["x_units"] == "1/nm"
+
+
+def test_plot_1d_visualization_can_force_log_axes_with_nonpositive_values():
+    processing = _processing_data()
+    processing["sample"]["signal"].signal = np.array([10.0, -2.0, 30.0])
+    store = RuntimeBufferStore()
+    step = Plot1DVisualization(processing_data=processing, io_sinks=_sinks(store), step_id="plot")
+    step.modify_config_by_dict(
+        {
+            "target": "plots::forced_log",
+            "x_path": "/sample/Q/signal",
+            "y_path": "/sample/signal/signal",
+            "x_axis_type": "log",
+            "y_axis_type": "log",
+        }
+    )
+
+    step.calculate()
+
+    payload = store.get_metadata("s1", "sink", "plots", "forced_log")
+    assert payload["layout"]["xaxis"]["type"] == "log"
+    assert payload["layout"]["yaxis"]["type"] == "log"
+
+
+def test_plot_1d_visualization_rejects_unknown_axis_type():
+    step = Plot1DVisualization(
+        processing_data=_processing_data(),
+        io_sinks=_sinks(RuntimeBufferStore()),
+        step_id="plot",
+    )
+    step.modify_config_by_dict(
+        {
+            "target": "plots::invalid_axis",
+            "x_path": "/sample/Q/signal",
+            "y_path": "/sample/signal/signal",
+            "x_axis_type": "symlog",
+        }
+    )
+
+    with np.testing.assert_raises_regex(ValueError, "x_axis_type"):
+        step.calculate()

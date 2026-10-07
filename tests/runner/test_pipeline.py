@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from graphlib import TopologicalSorter
 from pathlib import Path
 
@@ -19,6 +20,7 @@ import pytest
 import yaml
 
 from modacor.dataclasses.process_step import ProcessStep
+from modacor.runner import pipeline_graph_rendering
 from modacor.runner.pipeline import Pipeline
 from modacor.runner.process_step_registry import ProcessStepRegistry
 
@@ -490,6 +492,91 @@ def test_graph_renderers_group_expanded_blocks_and_allow_flat_output():
     assert top_down_mermaid.startswith("flowchart TB\n")
     assert "direction TD" not in top_down_mermaid
     assert "direction TB" in top_down_mermaid
+
+
+def test_drawio_renderer_exports_editable_nodes_edges_and_block_containers(monkeypatch):
+    pipeline = Pipeline.from_yaml("""
+        name: grouped
+        step_blocks:
+          prepare:
+            for_each:
+              sample: {processing_key: sample}
+              background: {processing_key: background}
+            steps:
+              first:
+                module: PoissonUncertainties
+                configuration:
+                  with_processing_keys: ["${processing_key}"]
+              second:
+                module: PoissonUncertainties
+                requires_steps: [.first]
+                configuration:
+                  with_processing_keys: ["${processing_key}"]
+        steps:
+          finish:
+            module: PoissonUncertainties
+            requires_steps: [prepare.sample.second, prepare.background.second]
+            configuration:
+              with_processing_keys: [sample]
+        """)
+    positions = {
+        "prepare.sample.first": (100, 330),
+        "prepare.sample.second": (100, 200),
+        "prepare.background.first": (330, 330),
+        "prepare.background.second": (330, 200),
+        "finish": (520, 100),
+    }
+    layout = {
+        "bb": "0,0,600,400",
+        "objects": [
+            {"name": "cluster_block_0", "bb": "20,60,460,390"},
+            {"name": "cluster_block_0_item_0", "bb": "30,70,220,370"},
+            {"name": "cluster_block_0_item_1", "bb": "240,70,450,370"},
+            *[
+                {"name": step_id, "pos": f"{x},{y}", "width": "2", "height": "0.7"}
+                for step_id, (x, y) in positions.items()
+            ],
+        ],
+    }
+    captured = {}
+
+    def fake_layout(dot_source, *, dot_executable):
+        captured["dot_source"] = dot_source
+        captured["dot_executable"] = dot_executable
+        return layout
+
+    monkeypatch.setattr(pipeline_graph_rendering, "_graphviz_layout_json", fake_layout)
+
+    xml_text = pipeline.to_drawio(direction="TB")
+
+    root = ET.fromstring(xml_text)
+    cells = root.findall(".//mxCell")
+    nodes = [cell for cell in cells if cell.get("modacorStepId")]
+    edges = [cell for cell in cells if cell.get("edge") == "1"]
+    assert root.get("compressed") == "false"
+    assert len(nodes) == 5
+    assert len(edges) == 4
+    assert captured["dot_executable"] == "dot"
+    assert 'node [shape=box, style="rounded"]' in captured["dot_source"]
+
+    cells_by_value = {cell.get("value"): cell for cell in cells}
+    block = cells_by_value["prepare (for_each)"]
+    sample_item = cells_by_value["sample"]
+    sample_first = next(cell for cell in nodes if cell.get("modacorStepId") == "prepare.sample.first")
+    finish = next(cell for cell in nodes if cell.get("modacorStepId") == "finish")
+    assert block.get("parent") == "1"
+    assert sample_item.get("parent") == block.get("id")
+    assert sample_first.get("parent") == sample_item.get("id")
+    assert finish.get("parent") == "1"
+    assert "rounded=1" in sample_first.get("style", "")
+    assert sample_first.find("mxGeometry").get("x") is not None
+
+
+def test_drawio_renderer_requires_positive_pixel_scale():
+    pipeline = Pipeline(name="empty")
+
+    with pytest.raises(ValueError, match="pixels_per_inch"):
+        pipeline.to_drawio(pixels_per_inch=0)
 
 
 def test_mermaid_renderer_uses_collision_free_internal_node_ids():

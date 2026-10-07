@@ -28,7 +28,7 @@ from ..dataclasses.pipeline_provenance import PipelineProvenance
 from ..dataclasses.process_step import ProcessStep
 from ..dataclasses.trace_event import TraceEvent
 from ..io.io_sources import IoSources  # noqa: F401  # reserved for future use
-from .pipeline_graph_rendering import render_pipeline_dot, render_pipeline_mermaid
+from .pipeline_graph_rendering import render_pipeline_dot, render_pipeline_drawio, render_pipeline_mermaid
 from .pipeline_schema import StepOrigin, expand_pipeline_yaml
 from .process_step_registry import DEFAULT_PROCESS_STEP_REGISTRY, ProcessStepRegistry
 
@@ -597,6 +597,39 @@ class Pipeline:
             self.to_spec(),
             direction=direction,
             group_step_blocks=group_step_blocks,
+        )
+
+    def to_drawio(
+        self,
+        direction: str = "LR",
+        *,
+        group_step_blocks: bool = True,
+        dot_executable: str = "dot",
+        pixels_per_inch: float = 96.0,
+    ) -> str:
+        """Export the pipeline as editable, uncompressed draw.io XML.
+
+        Graphviz supplies the initial node and cluster layout. Expanded
+        ``step_blocks`` become nested block and item containers, and every
+        pipeline node and dependency remains individually editable.
+
+        Parameters
+        ----------
+        direction:
+            Graphviz rank direction, e.g. ``LR`` or ``TB``.
+        group_step_blocks:
+            Preserve expanded block and item grouping as draw.io containers.
+        dot_executable:
+            Graphviz ``dot`` executable name or path.
+        pixels_per_inch:
+            Conversion scale from Graphviz points to draw.io canvas units.
+        """
+        return render_pipeline_drawio(
+            self.to_spec(),
+            direction=direction,
+            group_step_blocks=group_step_blocks,
+            dot_executable=dot_executable,
+            pixels_per_inch=pixels_per_inch,
         )
 
     # in case we used to and from spec to modify the pipeline, we can
