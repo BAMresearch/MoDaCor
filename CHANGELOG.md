@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## v1.11.0 (2026-10-07)
+
+### Bug fixes
+
+* fix: adding contract to AGENTS.md ([`c78fd81`](https://github.com/BAMresearch/MoDaCor/commit/c78fd81c82c8beee85a57e7232ebb87eb151c03e))
+
+* fix: harmonizing photon energy and wavelength inputs ([`1a9a7a8`](https://github.com/BAMresearch/MoDaCor/commit/1a9a7a85497eb2199679dd83d28281fa0c10a0c3))
+
+* fix: refinement of the scale factor handling of uncertainties ([`b720348`](https://github.com/BAMresearch/MoDaCor/commit/b7203480471f1bf680aff674e6bce54b1c3c3dac))
+
+* fix: small update for concatenating USAXS diode readouts ([`7af5b03`](https://github.com/BAMresearch/MoDaCor/commit/7af5b035fe863db2ed3382a94a1b497fe3abee06))
+
+* fix: yaw to q generalized to angle to q with a separate wavelength energy conversion ([`dbc4f99`](https://github.com/BAMresearch/MoDaCor/commit/dbc4f99fcb1a49a25dbf9806d6b950f11204575c))
+
+### Features
+
+* feat: export pipeline graphs to draw.io XML files and update plotting ([`c9f0d20`](https://github.com/BAMresearch/MoDaCor/commit/c9f0d20c9431645fba0008ab448d9c6ceea03686))
+
+* feat: generalizing the point indexer and indexed averager ([`6fff194`](https://github.com/BAMresearch/MoDaCor/commit/6fff194175f46db3c9aa205071cb49c6785c112c))
+
+* feat: for_each now graphed in blocks and tested on USAXS ([`7366920`](https://github.com/BAMresearch/MoDaCor/commit/7366920a2b8861b69adf733a9b435dbf422d30e7))
+
+* feat: adding 'for_each' capabilities in the pipeline definition ([`55058b9`](https://github.com/BAMresearch/MoDaCor/commit/55058b963a4f9324f296b1a81552199c61b2fc68))
+
+* feat: expanded modules for USAXS ([`cf0e971`](https://github.com/BAMresearch/MoDaCor/commit/cf0e9710c8331bc87acc2bfa4457e74bcd1b5417))
+
+### Unknown Scope
+
+* docsdocument USAXS-driven pipeline interface migrations ([`daf542a`](https://github.com/BAMresearch/MoDaCor/commit/daf542a6ddfe802e850713ada5dd140a1c9ab88c))
+
 ## v1.10.0 (2026-09-28)
 
 ### Bug fixes
