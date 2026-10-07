@@ -51,15 +51,6 @@ def _pipeline_trace_events(pipeline: Pipeline) -> list[Any]:
     return [event for step_events in pipeline.trace_events.values() for event in step_events]
 
 
-def _pipeline_provenance_spec(pipeline: Pipeline) -> dict[str, Any]:
-    """Keep run-specific trace events out of the plan-level pipeline record."""
-
-    pipeline_spec = pipeline.to_spec()
-    for node in pipeline_spec.get("nodes", []):
-        node.pop("trace_events", None)
-    return pipeline_spec
-
-
 @dataclass(frozen=True, slots=True)
 class ChunkPublishRequest:
     output_id: str
@@ -350,6 +341,7 @@ class RuntimeService:
             "sink_write_roots": [str(path) for path in self.policy.sink_write_roots],
             "max_sessions": self.policy.max_sessions,
             "max_pipeline_yaml_bytes": self.policy.max_pipeline_yaml_bytes,
+            "max_expanded_pipeline_steps": self.policy.max_expanded_pipeline_steps,
             "max_buffer_upload_bytes": self.policy.max_buffer_upload_bytes,
         }
 
@@ -766,7 +758,11 @@ class RuntimeService:
         sources: IoSources | None = None
         sinks: IoSinks | None = None
         try:
-            pipeline = Pipeline.from_yaml(session.pipeline_yaml or "", registry=self.process_step_registry)
+            pipeline = Pipeline.from_yaml(
+                session.pipeline_yaml or "",
+                registry=self.process_step_registry,
+                max_expanded_steps=self.policy.max_expanded_pipeline_steps,
+            )
             sources = build_sources_from_session(
                 session,
                 buffer_store=self.manager.buffer_store,
@@ -843,6 +839,7 @@ class RuntimeService:
                 changed_sources=request.changed_sources,
                 changed_keys=request.changed_keys,
                 registry=self.process_step_registry,
+                max_expanded_steps=self.policy.max_expanded_pipeline_steps,
             )
         except Exception as exc:
             raise ApiError(
@@ -1159,7 +1156,6 @@ class RuntimeService:
             request.write_hdf,
             run_name=request.run_name or run_id,
             result=result,
-            pipeline_yaml=session.pipeline_yaml or "",
             runtime_policy=self.policy,
         )
 
@@ -1179,8 +1175,7 @@ class RuntimeService:
                         "source_slices": request.resolved_source_slices,
                         **request.chunk_output.chunk_spec.identity_dict(),
                     },
-                    pipeline_spec=_pipeline_provenance_spec(result.pipeline),
-                    pipeline_yaml=session.pipeline_yaml or "",
+                    pipeline_provenance=result.pipeline.provenance(),
                     trace_events=_pipeline_trace_events(result.pipeline) if session.trace_enabled else None,
                 )
                 if isinstance(request.chunk_output.chunk_spec, ProvisionalChunkSpec):
@@ -1352,7 +1347,11 @@ class RuntimeService:
         )
         fallback_id = str(fallback_run["run_id"])
         try:
-            fallback_pipeline = Pipeline.from_yaml(session.pipeline_yaml or "", registry=self.process_step_registry)
+            fallback_pipeline = Pipeline.from_yaml(
+                session.pipeline_yaml or "",
+                registry=self.process_step_registry,
+                max_expanded_steps=self.policy.max_expanded_pipeline_steps,
+            )
             fallback_t0 = perf_counter()
             fallback_result = run_pipeline_job(
                 fallback_pipeline,
@@ -1375,7 +1374,6 @@ class RuntimeService:
                 request.write_hdf,
                 run_name=request.run_name or fallback_id,
                 result=fallback_result,
-                pipeline_yaml=session.pipeline_yaml or "",
                 runtime_policy=self.policy,
             )
 
@@ -1395,8 +1393,7 @@ class RuntimeService:
                             "source_slices": request.resolved_source_slices,
                             **request.chunk_output.chunk_spec.identity_dict(),
                         },
-                        pipeline_spec=fallback_result.pipeline.to_spec(),
-                        pipeline_yaml=session.pipeline_yaml or "",
+                        pipeline_provenance=fallback_result.pipeline.provenance(),
                     )
                     if isinstance(request.chunk_output.chunk_spec, ProvisionalChunkSpec):
                         resolved = self.chunked_outputs.execution_chunk(

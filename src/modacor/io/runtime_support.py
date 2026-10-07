@@ -269,7 +269,6 @@ def write_processing_data_hdf(
     *,
     run_name: str,
     result: Any,
-    pipeline_yaml: str,
 ) -> str | None:
     """
     Persist ProcessingData to HDF5 using the shared runtime request payload.
@@ -294,8 +293,7 @@ def write_processing_data_hdf(
         result.processing_data,
         data_paths=data_paths or None,
         write_all_processing_data=write_all,
-        pipeline_spec=result.pipeline.to_spec(),
-        pipeline_yaml=pipeline_yaml,
+        pipeline_provenance=result.pipeline.provenance(),
         trace_events=_flatten_pipeline_trace_events(result.pipeline),
         processing_data_snapshots=getattr(result.tracer, "processing_data_snapshots", None),
     )

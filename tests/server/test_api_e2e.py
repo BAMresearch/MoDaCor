@@ -101,6 +101,7 @@ def _trusted_policy_summary() -> dict:
         "sink_write_roots": [],
         "max_sessions": None,
         "max_pipeline_yaml_bytes": None,
+        "max_expanded_pipeline_steps": None,
         "max_buffer_upload_bytes": None,
     }
 
@@ -1821,7 +1822,7 @@ steps:
             h5["processing/result/run1/sample/signal/signal"],
             np.arange(8, dtype=np.float32).reshape(4, 2),
         )
-        pipeline_spec = json.loads(h5["processing/pipeline/run1/spec"][()].decode())
+        pipeline_spec = json.loads(h5["processing/pipeline/run1/expanded/spec"][()].decode())
         assert all("trace_events" not in node for node in pipeline_spec["nodes"])
         execution = json.loads(h5["processing/chunk_plans/server-plan/chunks/c1/execution_json"][()].decode())
         assert execution["effective_mode"] == "partial"
@@ -2009,7 +2010,7 @@ def test_chunked_output_reopens_after_server_restart_and_detaches_safely(monkeyp
     )
     assert finalized["status"] == "complete"
     with h5py.File(out_file, "r") as h5:
-        pipeline = json.loads(h5["processing/pipeline/run1/spec"][()].decode())
+        pipeline = json.loads(h5["processing/pipeline/run1/expanded/spec"][()].decode())
         assert pipeline["name"] == "second"
 
 

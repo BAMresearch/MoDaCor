@@ -10,6 +10,9 @@ units and multiple named uncertainty contributions.
   the [synthetic Quickstart](getting-started/quickstart.md).
 - **Pipeline author:** start with the [data model](data-model/index.md), then
   learn the [processing framework](processing/index.md).
+- **Existing pipeline author:** review the
+  [breaking interface migrations](processing/interface-migrations.md) before
+  running older YAML with the current release.
 - **Facility or service operator:** read the
   [client-server architecture](server/architecture.md) and
   [installation guidance](server/installation-and-deployment.md).

@@ -12,6 +12,7 @@ import pytest
 from modacor import __version__, ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.pipeline_provenance import PipelineProvenance
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.chunk_planning import resolve_chunk_input_plan, resolve_provisional_chunk_plan
 from modacor.io.chunking import (
@@ -42,6 +43,15 @@ def _processing_data(values: np.ndarray) -> ProcessingData:
     bundle.default_plot = "signal"
     processing_data["sample"] = bundle
     return processing_data
+
+
+def _pipeline_provenance() -> PipelineProvenance:
+    return PipelineProvenance(
+        authored_yaml="name: chunk-test\nstep_blocks: {}\n",
+        authored_spec={"name": "chunk-test", "step_blocks": {}},
+        expanded_yaml="name: chunk-test\nsteps: {}\n",
+        expanded_spec={"name": "chunk-test", "nodes": [], "edges": []},
+    )
 
 
 def _provisional_plan() -> ProvisionalChunkPlan:
@@ -154,8 +164,7 @@ def test_hdf_chunked_sink_writes_edge_chunks_out_of_order_and_finalizes(tmp_path
     finalized = sink.finalize_chunked(
         "run1",
         plan=plan,
-        pipeline_spec={"name": "chunk-test"},
-        pipeline_yaml="name: chunk-test\nsteps: {}\n",
+        pipeline_provenance=_pipeline_provenance(),
     )
     assert finalized.status == "complete"
     assert sink.finalize_chunked("run1", plan=plan).status == "complete"
@@ -165,8 +174,7 @@ def test_hdf_chunked_sink_writes_edge_chunks_out_of_order_and_finalizes(tmp_path
         "run1",
         _processing_data(expected),
         data_paths=["/sample/signal"],
-        pipeline_spec={"name": "chunk-test"},
-        pipeline_yaml="name: chunk-test\nsteps: {}\n",
+        pipeline_provenance=_pipeline_provenance(),
     )
 
     with h5py.File(chunked_file, "r") as chunked, h5py.File(ordinary_file, "r") as ordinary:
@@ -179,6 +187,13 @@ def test_hdf_chunked_sink_writes_edge_chunks_out_of_order_and_finalizes(tmp_path
         np.testing.assert_array_equal(chunked["raw/frames"], np.arange(3))
         assert chunked["processing/result/run1"].attrs["modacor_version"] == __version__
         assert _read_text(chunked["processing/program_version"]) == __version__
+        for representation in ("authored", "expanded"):
+            chunked_pipeline = chunked[f"processing/pipeline/run1/{representation}"]
+            ordinary_pipeline = ordinary[f"processing/pipeline/run1/{representation}"]
+            assert _read_text(chunked_pipeline["yaml"]) == _read_text(ordinary_pipeline["yaml"])
+            assert json.loads(_read_text(chunked_pipeline["spec"])) == json.loads(_read_text(ordinary_pipeline["spec"]))
+        assert "spec" not in chunked["processing/pipeline/run1"]
+        assert "yaml" not in chunked["processing/pipeline/run1"]
 
         plan_group = chunked["processing/chunk_plans/assembly-1"]
         assert _read_text(plan_group["status"]) == "complete"

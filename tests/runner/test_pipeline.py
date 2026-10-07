@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from graphlib import TopologicalSorter
 from pathlib import Path
 
@@ -19,6 +20,7 @@ import pytest
 import yaml
 
 from modacor.dataclasses.process_step import ProcessStep
+from modacor.runner import pipeline_graph_rendering
 from modacor.runner.pipeline import Pipeline
 from modacor.runner.process_step_registry import ProcessStepRegistry
 
@@ -185,6 +187,54 @@ def test_pipeline_from_yaml_accepts_tuple_config_from_yaml_sequence():
     assert isinstance(node.configuration["basis_fast"], tuple)
 
 
+def test_pipeline_from_yaml_expands_step_blocks_and_exports_origins():
+    yaml_str = """
+    name: expanded_pipeline
+    step_blocks:
+      uncertainty:
+        for_each:
+          sample: {processing_key: sample}
+          background: {processing_key: background}
+        steps:
+          first:
+            module: PoissonUncertainties
+            configuration:
+              with_processing_keys: ["${processing_key}"]
+          second:
+            module: PoissonUncertainties
+            requires_steps: [.first]
+            configuration:
+              with_processing_keys: ["${processing_key}"]
+    """
+
+    pipeline = Pipeline.from_yaml(yaml_str)
+
+    assert [node.step_id for node in pipeline.static_order()] == [
+        "uncertainty.sample.first",
+        "uncertainty.background.first",
+        "uncertainty.sample.second",
+        "uncertainty.background.second",
+    ]
+    spec = pipeline.to_spec()
+    node_map = {node["id"]: node for node in spec["nodes"]}
+    assert node_map["uncertainty.sample.second"]["origin"] == {
+        "block": "uncertainty",
+        "item": "sample",
+        "local_step": "second",
+        "block_index": 0,
+        "item_index": 0,
+        "local_step_index": 1,
+    }
+    assert "step_blocks" not in yaml.safe_load(pipeline.to_yaml())
+    assert pipeline.authored_yaml == yaml_str
+    assert "step_blocks" in pipeline.authored_spec
+    provenance = pipeline.provenance()
+    assert provenance.authored_yaml == yaml_str
+    assert "step_blocks" in provenance.authored_spec
+    assert "step_blocks" not in yaml.safe_load(provenance.expanded_yaml)
+    assert all("trace_events" not in node for node in provenance.expanded_spec["nodes"])
+
+
 def test_pipeline_static_order_uses_fresh_scheduler_each_call(linear_pipeline):
     pipeline = Pipeline.from_dict(linear_pipeline)
 
@@ -335,6 +385,7 @@ def test_to_dot_matches_spec():
 
     n1 = DummyNode(step_id="1")
     n2 = DummyNode(step_id="2")
+    n2.short_title = "custom purpose"
     graph = {n2: {n1}, n1: set()}
 
     pipeline = Pipeline(graph=graph, name="dot_test")
@@ -347,7 +398,7 @@ def test_to_dot_matches_spec():
 
     # Node labels should include "<id>: <module name>"
     assert '"1" [label="1: DummyNode"];' in dot_src
-    assert '"2" [label="2: DummyNode"];' in dot_src
+    assert '"2" [label="2: DummyNode\\ncustom purpose"];' in dot_src
 
     # Edge representation
     assert '"1" -> "2";' in dot_src
@@ -383,11 +434,165 @@ def test_to_mermaid_flowchart():
     assert mermaid_src.splitlines()[0] == "flowchart TB"
 
     # Nodes: 1 and 2 with labels "1: DummyNode" etc.
-    assert '1["1: DummyNode"]' in mermaid_src
-    assert '2["2: DummyNode<br/>custom purpose"]' in mermaid_src
+    assert 'node_0["1: DummyNode"]' in mermaid_src
+    assert 'node_1["2: DummyNode<br/>custom purpose"]' in mermaid_src
 
     # Edge: 1 --> 2
-    assert "1 --> 2" in mermaid_src
+    assert "node_0 --> node_1" in mermaid_src
+
+
+def test_graph_renderers_group_expanded_blocks_and_allow_flat_output():
+    pipeline = Pipeline.from_yaml("""
+        name: grouped
+        step_blocks:
+          prepare:
+            for_each:
+              sample: {processing_key: sample}
+              background: {processing_key: background}
+            steps:
+              first:
+                module: PoissonUncertainties
+                configuration:
+                  with_processing_keys: ["${processing_key}"]
+              second:
+                module: PoissonUncertainties
+                requires_steps: [.first]
+                configuration:
+                  with_processing_keys: ["${processing_key}"]
+        steps:
+          finish:
+            module: PoissonUncertainties
+            requires_steps:
+              - prepare.sample.second
+              - prepare.background.second
+            configuration:
+              with_processing_keys: [sample]
+        """)
+
+    dot_src = pipeline.to_dot()
+    assert "newrank=true;" in dot_src
+    assert 'subgraph "cluster_block_0"' in dot_src
+    assert 'label="prepare (for_each)";' in dot_src
+    assert 'label="sample";' in dot_src
+    assert 'label="background";' in dot_src
+    assert '{ rank=same; "prepare.sample.first"; "prepare.background.first"; }' in dot_src
+    assert '"prepare.sample.second" -> "finish";' in dot_src
+    flat_dot = pipeline.to_dot(group_step_blocks=False)
+    assert "subgraph" not in flat_dot
+    assert "newrank=true;" not in flat_dot
+
+    mermaid_src = pipeline.to_mermaid()
+    assert 'subgraph block_0["prepare (for_each)"]' in mermaid_src
+    assert 'subgraph block_0_item_0["sample"]' in mermaid_src
+    assert 'subgraph block_0_item_1["background"]' in mermaid_src
+    assert '["prepare.sample.second: PoissonUncertainties"]' in mermaid_src
+    assert "subgraph" not in pipeline.to_mermaid(group_step_blocks=False)
+
+    top_down_mermaid = pipeline.to_mermaid(direction="TD")
+    assert top_down_mermaid.startswith("flowchart TB\n")
+    assert "direction TD" not in top_down_mermaid
+    assert "direction TB" in top_down_mermaid
+
+
+def test_drawio_renderer_exports_editable_nodes_edges_and_block_containers(monkeypatch):
+    pipeline = Pipeline.from_yaml("""
+        name: grouped
+        step_blocks:
+          prepare:
+            for_each:
+              sample: {processing_key: sample}
+              background: {processing_key: background}
+            steps:
+              first:
+                module: PoissonUncertainties
+                configuration:
+                  with_processing_keys: ["${processing_key}"]
+              second:
+                module: PoissonUncertainties
+                requires_steps: [.first]
+                configuration:
+                  with_processing_keys: ["${processing_key}"]
+        steps:
+          finish:
+            module: PoissonUncertainties
+            requires_steps: [prepare.sample.second, prepare.background.second]
+            configuration:
+              with_processing_keys: [sample]
+        """)
+    positions = {
+        "prepare.sample.first": (100, 330),
+        "prepare.sample.second": (100, 200),
+        "prepare.background.first": (330, 330),
+        "prepare.background.second": (330, 200),
+        "finish": (520, 100),
+    }
+    layout = {
+        "bb": "0,0,600,400",
+        "objects": [
+            {"name": "cluster_block_0", "bb": "20,60,460,390"},
+            {"name": "cluster_block_0_item_0", "bb": "30,70,220,370"},
+            {"name": "cluster_block_0_item_1", "bb": "240,70,450,370"},
+            *[
+                {"name": step_id, "pos": f"{x},{y}", "width": "2", "height": "0.7"}
+                for step_id, (x, y) in positions.items()
+            ],
+        ],
+    }
+    captured = {}
+
+    def fake_layout(dot_source, *, dot_executable):
+        captured["dot_source"] = dot_source
+        captured["dot_executable"] = dot_executable
+        return layout
+
+    monkeypatch.setattr(pipeline_graph_rendering, "_graphviz_layout_json", fake_layout)
+
+    xml_text = pipeline.to_drawio(direction="TB")
+
+    root = ET.fromstring(xml_text)
+    cells = root.findall(".//mxCell")
+    nodes = [cell for cell in cells if cell.get("modacorStepId")]
+    edges = [cell for cell in cells if cell.get("edge") == "1"]
+    assert root.get("compressed") == "false"
+    assert len(nodes) == 5
+    assert len(edges) == 4
+    assert captured["dot_executable"] == "dot"
+    assert 'node [shape=box, style="rounded"]' in captured["dot_source"]
+
+    cells_by_value = {cell.get("value"): cell for cell in cells}
+    block = cells_by_value["prepare (for_each)"]
+    sample_item = cells_by_value["sample"]
+    sample_first = next(cell for cell in nodes if cell.get("modacorStepId") == "prepare.sample.first")
+    finish = next(cell for cell in nodes if cell.get("modacorStepId") == "finish")
+    assert block.get("parent") == "1"
+    assert sample_item.get("parent") == block.get("id")
+    assert sample_first.get("parent") == sample_item.get("id")
+    assert finish.get("parent") == "1"
+    assert "rounded=1" in sample_first.get("style", "")
+    assert sample_first.find("mxGeometry").get("x") is not None
+
+
+def test_drawio_renderer_requires_positive_pixel_scale():
+    pipeline = Pipeline(name="empty")
+
+    with pytest.raises(ValueError, match="pixels_per_inch"):
+        pipeline.to_drawio(pixels_per_inch=0)
+
+
+def test_mermaid_renderer_uses_collision_free_internal_node_ids():
+    class DummyNode:
+        def __init__(self, step_id):
+            self.step_id = step_id
+            self.configuration = {}
+
+    dotted = DummyNode("same.id")
+    underscored = DummyNode("same_id")
+    pipeline = Pipeline(graph={dotted: set(), underscored: set()}, name="identifier_test")
+
+    mermaid_src = pipeline.to_mermaid()
+
+    assert 'node_0["same.id: DummyNode"]' in mermaid_src
+    assert 'node_1["same_id: DummyNode"]' in mermaid_src
 
 
 def test_yaml_spec_roundtrip_with_edit():

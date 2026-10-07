@@ -139,7 +139,7 @@ def test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arr
 
     sources = {
         "sample_z": sample_z_bd,
-        "wavelength": wavelength_bd,
+        "photon": wavelength_bd,
         "pixel_pitch_fast": pitch_fast_bd,
         "pixel_pitch_slow": pitch_slow_bd,
     }
@@ -185,6 +185,30 @@ def test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arr
     assert out["Omega"].units == ureg.steradian
 
 
+def test_geometry_from_pixel_coordinates_accepts_equivalent_photon_energy() -> None:
+    common_sources = {
+        "sample_z": BaseData(signal=np.asarray(0.0), units=ureg.m, rank_of_data=0),
+        "pixel_pitch_fast": BaseData(signal=np.asarray(1.0e-3), units=ureg.m, rank_of_data=0),
+        "pixel_pitch_slow": BaseData(signal=np.asarray(2.0e-3), units=ureg.m, rank_of_data=0),
+    }
+    wavelength = BaseData(signal=np.asarray(1.0), units=ureg.angstrom, rank_of_data=0)
+    energy = BaseData(signal=np.asarray(12.398419843320026), units=ureg.keV, rank_of_data=0)
+
+    outputs = []
+    for photon in (wavelength, energy):
+        processing_data = _make_processing_data_with_coords((3, 5), rod=2)
+        step = DummyXSGeometryFromPixelCoordinates(
+            io_sources=IoSources(),
+            sources={**common_sources, "photon": photon},
+        )
+        step.configuration["with_processing_keys"] = ["sample"]
+        step.execute(processing_data)
+        outputs.append(processing_data["sample"]["Q"])
+
+    np.testing.assert_allclose(outputs[0].signal, outputs[1].signal, rtol=2.0e-12)
+    assert outputs[0].units == outputs[1].units
+
+
 def test_geometry_from_pixel_coordinates_detector_normal_is_normalized():
     """
     detector_normal=(0,0,2) should behave identically to (0,0,1).
@@ -193,7 +217,9 @@ def test_geometry_from_pixel_coordinates_detector_normal_is_normalized():
     b = pd["sample"]
 
     sample_z_bd = BaseData(
-        signal=np.array([0.10, 0.12, 0.08, 0.11, 0.09], dtype=float).reshape(5, 1, 1, 1), units=ureg.m, rank_of_data=0
+        signal=np.array([0.10, 0.12, 0.08, 0.11, 0.09], dtype=float).reshape(5, 1, 1, 1),
+        units=ureg.m,
+        rank_of_data=0,
     )
     wavelength_bd = BaseData(signal=np.array(1.0e-10, dtype=float), units=ureg.m, rank_of_data=0)
     pitch_fast_bd = BaseData(signal=np.array(1e-3, dtype=float), units=ureg.m, rank_of_data=0)
@@ -201,7 +227,7 @@ def test_geometry_from_pixel_coordinates_detector_normal_is_normalized():
 
     sources = {
         "sample_z": sample_z_bd,
-        "wavelength": wavelength_bd,
+        "photon": wavelength_bd,
         "pixel_pitch_fast": pitch_fast_bd,
         "pixel_pitch_slow": pitch_slow_bd,
     }
@@ -265,7 +291,7 @@ def test_geometry_from_pixel_coordinates_uses_nexus_detector_frame(tmp_path):
     pd = _make_processing_data_with_coords((3, 5), rod=2)
     b = pd["sample"]
     sources = {
-        "wavelength": BaseData(signal=np.asarray(1.0e-10), units=ureg.m, rank_of_data=0),
+        "photon": BaseData(signal=np.asarray(1.0e-10), units=ureg.m, rank_of_data=0),
     }
     io_sources = IoSources()
     io_sources.register_source(HDFSource(source_reference="calibration", resource_location=calibration_path))
@@ -322,7 +348,7 @@ def test_geometry_from_pixel_coordinates_uses_nexus_sample_z_override(tmp_path):
     pd = _make_processing_data_with_coords((3, 5), rod=2)
     b = pd["sample"]
     sources = {
-        "wavelength": BaseData(signal=np.asarray(1.0e-10), units=ureg.m, rank_of_data=0),
+        "photon": BaseData(signal=np.asarray(1.0e-10), units=ureg.m, rank_of_data=0),
         "pixel_pitch_fast": BaseData(signal=np.asarray(1.0e-3), units=ureg.m, rank_of_data=0),
         "pixel_pitch_slow": BaseData(signal=np.asarray(2.0e-3), units=ureg.m, rank_of_data=0),
     }
@@ -358,7 +384,7 @@ def test_geometry_dependency_contract_tracks_nested_nexus_sources():
     step.modify_config_by_dict(
         {
             "with_processing_keys": ["sample"],
-            "wavelength_source": "measurement::/wavelength",
+            "photon_source": "measurement::/wavelength",
             "detector_frame": {
                 "type": "nexus",
                 "source": "calibration",
@@ -372,7 +398,8 @@ def test_geometry_dependency_contract_tracks_nested_nexus_sources():
         }
     )
 
-    contract = step.dependency_contract()
-
-    assert isinstance(contract, ProcessStepDependencies)
-    assert contract.source_refs == frozenset({"measurement", "calibration", "sample_position"})
+    assert step.dependency_contract() == ProcessStepDependencies(
+        source_refs={"measurement", "calibration", "sample_position"},
+        processing_reads={"sample.*"},
+        processing_writes={"sample.*"},
+    )

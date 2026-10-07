@@ -10,6 +10,7 @@ registered sinks, and emit trace information through a shared runner.
 process-steps
 pipeline-graphs
 pipeline-configuration
+interface-migrations
 sources
 sinks
 local-execution

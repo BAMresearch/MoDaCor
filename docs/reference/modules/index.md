@@ -8,6 +8,7 @@ Configuration tables are generated from each step's `ProcessStepDescriber` metad
 - [AppendProcessingData](AppendProcessingData.md)
 - [AppendSink](AppendSink.md)
 - [AppendSource](AppendSource.md)
+- [ConcatenateDatabundles](ConcatenateDatabundles.md)
 - [CopyDataBundleKeys](CopyDataBundleKeys.md)
 - [SinkProcessingData](SinkProcessingData.md)
 
@@ -18,8 +19,10 @@ Configuration tables are generated from each step's `ProcessStepDescriber` metad
 - [FindScaleFactor1D](FindScaleFactor1D.md)
 - [Multiply](Multiply.md)
 - [MultiplyDatabundles](MultiplyDatabundles.md)
+- [Negate](Negate.md)
 - [Subtract](Subtract.md)
 - [SubtractDatabundles](SubtractDatabundles.md)
+- [SubtractInterpolated1D](SubtractInterpolated1D.md)
 - [UnitsLabelUpdate](UnitsLabelUpdate.md)
 
 ## Masks
@@ -38,12 +41,14 @@ Configuration tables are generated from each step's `ProcessStepDescriber` metad
 
 ## Geometry and coordinates
 
-- [IndexPixels](IndexPixels.md)
 - [PixelCoordinates3D](PixelCoordinates3D.md)
 - [XSGeometryFromPixelCoordinates](XSGeometryFromPixelCoordinates.md)
+- [AngleToQ](AngleToQ.md)
 
 ## Reduction and integration
 
+- [FindCenterOfMass1D](FindCenterOfMass1D.md)
+- [IndexByCoordinate](IndexByCoordinate.md)
 - [IndexedAverager](IndexedAverager.md)
 - [Integrate1D](Integrate1D.md)
 - [ReduceDimensionality](ReduceDimensionality.md)
@@ -68,6 +73,7 @@ Configuration tables are generated from each step's `ProcessStepDescriber` metad
 ```{toctree}
 :maxdepth: 1
 
+AngleToQ
 AppendProcessingData
 AppendSink
 AppendSource
@@ -78,18 +84,21 @@ CapillarySampleContainerCorrection
 CapillarySelfAbsorptionCorrection
 CombineUncertainties
 CombineUncertaintiesMax
+ConcatenateDatabundles
 CopyDataBundleKeys
 DetectorEfficiencyCorrection
 DilateMask
 Divide
 DivideDatabundles
+FindCenterOfMass1D
 FindScaleFactor1D
 FlatPlateSelfAbsorptionCorrection
-IndexPixels
+IndexByCoordinate
 IndexedAverager
 Integrate1D
 Multiply
 MultiplyDatabundles
+Negate
 PixelCoordinates3D
 Plot1DVisualization
 Plot2DVisualization
@@ -101,6 +110,7 @@ SinkProcessingData
 SolidAngleCorrection
 Subtract
 SubtractDatabundles
+SubtractInterpolated1D
 ThresholdMask
 UnitsLabelUpdate
 XSGeometryFromPixelCoordinates

@@ -10,6 +10,7 @@ from threading import RLock
 from typing import Any, Mapping
 from uuid import uuid4
 
+from modacor.dataclasses.pipeline_provenance import PipelineProvenance
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.chunk_planning import materialize_chunk_specs, resolve_provisional_chunk_plan
 from modacor.io.chunking import (
@@ -67,8 +68,7 @@ class ChunkedOutputResource:
     input_plan: ChunkInputPlan | None = None
     chunk_specs: tuple[ChunkSpec, ...] = ()
     created_utc: str = field(default_factory=_utc_now_iso)
-    pipeline_spec: dict[str, Any] | None = field(default=None, repr=False)
-    pipeline_yaml: str | None = field(default=None, repr=False)
+    pipeline_provenance: PipelineProvenance | None = field(default=None, repr=False)
 
 
 class ChunkedOutputManager:
@@ -277,8 +277,7 @@ class ChunkedOutputManager:
         *,
         chunk: ChunkSpec | ProvisionalChunkSpec,
         execution_metadata: dict[str, Any] | None = None,
-        pipeline_spec: dict[str, Any] | None = None,
-        pipeline_yaml: str | None = None,
+        pipeline_provenance: PipelineProvenance | None = None,
         trace_events: Any | None = None,
     ) -> ChunkWriteResult:
         resource = self.get(output_id)
@@ -309,8 +308,7 @@ class ChunkedOutputManager:
                         plan=plan,
                         chunk=resolved_chunk,
                         execution_metadata=resolved_metadata,
-                        pipeline_spec=pipeline_spec,
-                        pipeline_yaml=pipeline_yaml,
+                        pipeline_provenance=pipeline_provenance,
                         trace_events=_resolved_pilot_trace_events(
                             trace_events,
                             resolved_chunk,
@@ -328,10 +326,8 @@ class ChunkedOutputManager:
                     raise
                 resource.plan = plan
                 resource.chunk_specs = specs
-                if pipeline_spec is not None:
-                    resource.pipeline_spec = deepcopy(pipeline_spec)
-                if pipeline_yaml is not None:
-                    resource.pipeline_yaml = str(pipeline_yaml)
+                if pipeline_provenance is not None:
+                    resource.pipeline_provenance = deepcopy(pipeline_provenance)
                 return result
 
             if isinstance(chunk, ProvisionalChunkSpec):
@@ -345,14 +341,11 @@ class ChunkedOutputManager:
                 plan=resource.plan,
                 chunk=chunk,
                 execution_metadata=execution_metadata,
-                pipeline_spec=pipeline_spec,
-                pipeline_yaml=pipeline_yaml,
+                pipeline_provenance=pipeline_provenance,
                 trace_events=trace_events,
             )
-            if pipeline_spec is not None:
-                resource.pipeline_spec = deepcopy(pipeline_spec)
-            if pipeline_yaml is not None:
-                resource.pipeline_yaml = str(pipeline_yaml)
+            if pipeline_provenance is not None:
+                resource.pipeline_provenance = deepcopy(pipeline_provenance)
             return result
 
     def execution_chunk(self, output_id: str, chunk_id: str) -> ChunkSpec | ProvisionalChunkSpec:
@@ -390,6 +383,5 @@ class ChunkedOutputManager:
             return resource.sink.finalize_chunked(
                 resource.subpath,
                 plan=resource.plan,
-                pipeline_spec=resource.pipeline_spec,
-                pipeline_yaml=resource.pipeline_yaml,
+                pipeline_provenance=resource.pipeline_provenance,
             )

@@ -73,6 +73,29 @@ def test_find_dirty_step_ids_with_changed_keys_matches_processing_patterns():
     assert dirty == {"load", "corr"}
 
 
+def test_partial_rerun_keeps_expanded_block_items_independent():
+    pipeline = Pipeline.from_yaml("""
+        step_blocks:
+          uncertainty:
+            for_each:
+              sample: {key: sample}
+              background: {key: background}
+            steps:
+              first:
+                module: PoissonUncertainties
+                configuration: {with_processing_keys: ["${key}"]}
+              second:
+                module: PoissonUncertainties
+                requires_steps: [.first]
+                configuration: {with_processing_keys: ["${key}"]}
+        """)
+
+    assert find_dirty_step_ids(pipeline, changed_keys=["sample.signal"]) == {
+        "uncertainty.sample.first",
+        "uncertainty.sample.second",
+    }
+
+
 def test_append_processing_data_dependency_contract_is_explicit():
     step = AppendProcessingData(step_id="load")
     step.modify_config_by_dict(

@@ -53,6 +53,7 @@ class RuntimePolicy:
     custom_sink_classes: Mapping[str, type] = field(default_factory=dict)
     max_sessions: int | None = None
     max_pipeline_yaml_bytes: int | None = None
+    max_expanded_pipeline_steps: int | None = None
     max_buffer_upload_bytes: int | None = None
 
     def __post_init__(self) -> None:
@@ -62,6 +63,7 @@ class RuntimePolicy:
         for name, value in (
             ("max_sessions", self.max_sessions),
             ("max_pipeline_yaml_bytes", self.max_pipeline_yaml_bytes),
+            ("max_expanded_pipeline_steps", self.max_expanded_pipeline_steps),
             ("max_buffer_upload_bytes", self.max_buffer_upload_bytes),
         ):
             if value is not None and value < 1:

@@ -70,7 +70,7 @@ class CopyDataBundleKeys(ProcessStep):
         step_doc="Copy selected BaseData entries between DataBundles.",
         step_reference="",
         step_note=(
-            "Use this to attach static maps such as Q, Psi, Omega, pixel_index, or masks "
+            "Use this to attach static maps such as Q, Psi, Omega, bin_index, or masks "
             "to each sample without recomputing the static branch."
         ),
     )

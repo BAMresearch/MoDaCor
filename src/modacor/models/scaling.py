@@ -8,6 +8,7 @@ __all__ = [
     "FitData1D",
     "ScaleFitResult",
     "fit_scale_factor_1d",
+    "fit_lognormal_scale_factor_1d",
     "prepare_scale_fit_data",
 ]
 
@@ -44,12 +45,60 @@ class ScaleFitResult:
 
     scale: float
     scale_sigma: float
+    point_count: int
+    reduced_chi_square: float
     background: float | None = None
     background_sigma: float | None = None
 
 
 def _overlap_range(x1: np.ndarray, x2: np.ndarray) -> tuple[float, float]:
     return float(max(np.nanmin(x1), np.nanmin(x2))), float(min(np.nanmax(x1), np.nanmax(x2)))
+
+
+def _prepare_unique_dependent(
+    x: np.ndarray,
+    dependent: DependentData1D,
+    *,
+    require_positive_weights: bool,
+) -> tuple[np.ndarray, DependentData1D]:
+    """Sort, filter, and uncertainty-average repeated coordinates."""
+
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(dependent.y, dtype=float)
+    sigma = np.asarray(dependent.sigma, dtype=float)
+    weights = np.asarray(dependent.weights, dtype=float)
+    if not (x.shape == y.shape == sigma.shape == weights.shape) or x.ndim != 1:
+        raise ValueError("Scale-fit coordinates, values, uncertainties, and weights must be matching 1D arrays.")
+
+    valid = np.isfinite(x) & np.isfinite(y) & np.isfinite(sigma) & (sigma > 0.0)
+    if require_positive_weights:
+        valid &= np.isfinite(weights) & (weights > 0.0)
+    x = x[valid]
+    y = y[valid]
+    sigma = sigma[valid]
+    weights = weights[valid]
+    if x.size < 2:
+        raise ValueError("Not enough valid points for scale fitting.")
+
+    order = np.argsort(x, kind="stable")
+    x = x[order]
+    y = y[order]
+    sigma = sigma[order]
+    weights = weights[order]
+    unique_x, group = np.unique(x, return_inverse=True)
+    if unique_x.size == x.size:
+        return x, DependentData1D(y=y, sigma=sigma, weights=weights)
+
+    precision = 1.0 / sigma**2
+    summed_precision = np.bincount(group, weights=precision)
+    averaged_y = np.bincount(group, weights=precision * y) / summed_precision
+    averaged_sigma = 1.0 / np.sqrt(summed_precision)
+    averaged_weights = np.bincount(group, weights=precision * weights) / summed_precision
+    return unique_x, DependentData1D(
+        y=averaged_y,
+        sigma=averaged_sigma,
+        weights=averaged_weights,
+    )
 
 
 def prepare_scale_fit_data(
@@ -65,6 +114,17 @@ def prepare_scale_fit_data(
     use_weights: bool,
 ) -> FitData1D:
     """Align work data to the selected reference-axis fit window."""
+
+    x_work, dep_work = _prepare_unique_dependent(
+        x_work,
+        dep_work,
+        require_positive_weights=use_weights,
+    )
+    x_ref, dep_ref = _prepare_unique_dependent(
+        x_ref,
+        dep_ref,
+        require_positive_weights=use_weights,
+    )
 
     ov_min, ov_max = _overlap_range(x_ref, x_work)
     if require_overlap and not (ov_min < ov_max):
@@ -84,17 +144,11 @@ def prepare_scale_fit_data(
     sigma_ref = dep_ref.sigma[mask]
     weights_ref = dep_ref.weights[mask]
 
-    order = np.argsort(x_work)
-    x_work = x_work[order]
-    y_work = dep_work.y[order]
-    sigma_work = dep_work.sigma[order]
-    weights_work = dep_work.weights[order]
-
     bounds_error = require_overlap
     fill_value = None if bounds_error else "extrapolate"
     interp_y = interp1d(
         x_work,
-        y_work,
+        dep_work.y,
         kind=interpolation_kind,
         bounds_error=bounds_error,
         fill_value=fill_value,
@@ -102,7 +156,7 @@ def prepare_scale_fit_data(
     )
     interp_sigma = interp1d(
         x_work,
-        sigma_work,
+        dep_work.sigma,
         kind="linear",
         bounds_error=bounds_error,
         fill_value=fill_value,
@@ -110,7 +164,7 @@ def prepare_scale_fit_data(
     )
     interp_weights = interp1d(
         x_work,
-        weights_work,
+        dep_work.weights,
         kind="linear",
         bounds_error=bounds_error,
         fill_value=fill_value,
@@ -182,6 +236,55 @@ def fit_scale_factor_1d(
     return ScaleFitResult(
         scale=float(fitted.x[0]),
         scale_sigma=float(parameter_sigmas[0]),
+        point_count=len(fitted.fun),
+        reduced_chi_square=float(residual_variance),
         background=float(fitted.x[1]) if fit_background else None,
         background_sigma=float(parameter_sigmas[1]) if fit_background else None,
+    )
+
+
+def fit_lognormal_scale_factor_1d(fit_data: FitData1D) -> ScaleFitResult:
+    """Estimate a positive scale from an uncertainty-weighted mean log ratio.
+
+    The diagonal log-ratio variance is obtained by first-order propagation of
+    the selected uncertainty component on the reference and working signals.
+    ``fit_data.weights`` supplies any additional BaseData quality weights.
+    """
+
+    valid = (
+        np.isfinite(fit_data.y_ref)
+        & (fit_data.y_ref > 0.0)
+        & np.isfinite(fit_data.y_work)
+        & (fit_data.y_work > 0.0)
+        & np.isfinite(fit_data.sigma_ref)
+        & (fit_data.sigma_ref > 0.0)
+        & np.isfinite(fit_data.sigma_work)
+        & (fit_data.sigma_work > 0.0)
+        & np.isfinite(fit_data.weights)
+        & (fit_data.weights > 0.0)
+    )
+    if np.count_nonzero(valid) < 2:
+        raise ValueError("Lognormal scaling requires at least two positive valid overlap points.")
+
+    y_ref = fit_data.y_ref[valid]
+    y_work = fit_data.y_work[valid]
+    log_ratio = np.log(y_ref / y_work)
+    log_ratio_variance = (fit_data.sigma_ref[valid] / y_ref) ** 2 + (fit_data.sigma_work[valid] / y_work) ** 2
+    weights = fit_data.weights[valid] / log_ratio_variance
+    finite_weight = np.isfinite(weights) & (weights > 0.0)
+    if np.count_nonzero(finite_weight) < 2:
+        raise ValueError("Lognormal scaling has fewer than two finite positive statistical weights.")
+    weights = weights[finite_weight]
+    log_ratio = log_ratio[finite_weight]
+    sum_weights = float(np.sum(weights))
+    mean_log_scale = float(np.sum(weights * log_ratio) / sum_weights)
+    log_scale_sigma = float(np.sqrt(1.0 / sum_weights))
+    scale = float(np.exp(mean_log_scale))
+    degrees_of_freedom = max(1, log_ratio.size - 1)
+    reduced_chi_square = float(np.sum(weights * (log_ratio - mean_log_scale) ** 2) / degrees_of_freedom)
+    return ScaleFitResult(
+        scale=scale,
+        scale_sigma=scale * log_scale_sigma,
+        point_count=log_ratio.size,
+        reduced_chi_square=reduced_chi_square,
     )

@@ -15,6 +15,7 @@ from attrs import define, field, validators
 from modacor import __version__
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.messagehandler import MessageHandler
+from modacor.dataclasses.pipeline_provenance import PipelineProvenance
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.chunking import (
     AxisSelector,
@@ -33,9 +34,11 @@ from modacor.io.hdf.hdf_processing_sink import (
     _json_dumps_bytes,
     _normalise_subpath,
     _normalise_trace_events,
+    _read_pipeline_provenance,
     _recreate_group,
     _set_array_metadata,
     _set_nexus_default_chain,
+    _write_pipeline_provenance,
     _write_text_dataset,
     _write_text_field,
     _write_trace_indexed,
@@ -627,14 +630,12 @@ def _write_chunk_payload(
 def _write_chunk_provenance(
     plan_group: h5py.Group,
     *,
-    pipeline_spec: dict[str, Any] | None,
-    pipeline_yaml: str | None,
+    pipeline_provenance: PipelineProvenance | None,
 ) -> None:
-    provenance = plan_group.require_group("provenance")
-    if pipeline_spec is not None:
-        _write_text_field(provenance, "pipeline_spec_json", _json_dumps_bytes(pipeline_spec).decode("utf-8"))
-    if pipeline_yaml is not None:
-        _write_text_field(provenance, "pipeline_yaml", pipeline_yaml)
+    if pipeline_provenance is None:
+        return
+    provenance = _recreate_group(plan_group, "provenance")
+    _write_pipeline_provenance(provenance, pipeline_provenance)
 
 
 def _complete_chunk_write(
@@ -1216,8 +1217,7 @@ class HDFChunkedProcessingSink(IoSink):
         plan: ChunkPlan,
         chunk: ChunkSpec,
         execution_metadata: dict[str, Any] | None = None,
-        pipeline_spec: dict[str, Any] | None = None,
-        pipeline_yaml: str | None = None,
+        pipeline_provenance: PipelineProvenance | None = None,
         trace_events: Any | None = None,
         override_resource_location: Path | None = None,
     ) -> ChunkWriteResult:
@@ -1256,7 +1256,7 @@ class HDFChunkedProcessingSink(IoSink):
                 chunk_id=chunk.chunk_id,
                 trace_events=trace_events,
             )
-            _write_chunk_provenance(plan_group, pipeline_spec=pipeline_spec, pipeline_yaml=pipeline_yaml)
+            _write_chunk_provenance(plan_group, pipeline_provenance=pipeline_provenance)
             _complete_chunk_write(h5, plan_group, manifest_entry, pending_writes, plan_id=plan.plan_id)
             return self._result(
                 plan_group,
@@ -1367,8 +1367,7 @@ class HDFChunkedProcessingSink(IoSink):
         subpath: str,
         *,
         plan: ChunkPlan,
-        pipeline_spec: dict[str, Any] | None = None,
-        pipeline_yaml: str | None = None,
+        pipeline_provenance: PipelineProvenance | None = None,
         override_resource_location: Path | None = None,
     ) -> ChunkWriteResult:
         self._validate_supported_plan(plan)
@@ -1399,11 +1398,8 @@ class HDFChunkedProcessingSink(IoSink):
             self._validate_complete_coverage(plan_group, plan, completed_specs)
 
             provenance = plan_group.get("provenance")
-            if isinstance(provenance, h5py.Group):
-                if pipeline_spec is None and "pipeline_spec_json" in provenance:
-                    pipeline_spec = json.loads(_read_text(provenance["pipeline_spec_json"]))
-                if pipeline_yaml is None and "pipeline_yaml" in provenance:
-                    pipeline_yaml = _read_text(provenance["pipeline_yaml"])
+            if pipeline_provenance is None and isinstance(provenance, h5py.Group):
+                pipeline_provenance = _read_pipeline_provenance(provenance)
 
             _set_status(plan_group, "finalizing")
             h5.flush()
@@ -1412,13 +1408,7 @@ class HDFChunkedProcessingSink(IoSink):
             processing_group = h5["processing"]
             pipeline_root = processing_group.require_group("pipeline")
             pipeline_group = _recreate_group(pipeline_root, run_name)
-            if pipeline_spec is None and pipeline_yaml is None:
-                pipeline_group.attrs["empty"] = True
-            else:
-                if pipeline_spec is not None:
-                    pipeline_group.create_dataset("spec", data=_json_dumps_bytes(pipeline_spec))
-                if pipeline_yaml is not None:
-                    _write_text_dataset(pipeline_group, "yaml", pipeline_yaml)
+            _write_pipeline_provenance(pipeline_group, pipeline_provenance)
 
             tracer_root = processing_group.require_group("tracer")
             tracer_group = tracer_root.require_group(run_name)

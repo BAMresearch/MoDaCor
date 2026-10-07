@@ -22,6 +22,7 @@ from modacor.io.hdf.hdf_chunked_processing_sink import HDFChunkedProcessingSink
 from modacor.io.hdf.hdf_processing_sink import HDFProcessingSink
 from modacor.io.io_sink import IoSink
 from modacor.io.runtime_support import build_sinks_from_specs, build_sources_from_specs, write_processing_data_hdf
+from modacor.runner.pipeline import Pipeline
 
 
 @define(kw_only=True)
@@ -164,7 +165,7 @@ def test_write_processing_data_hdf_persists_tracer_snapshots(tmp_path: Path):
     out_file = tmp_path / "snapshot_export.h5"
     result = SimpleNamespace(
         processing_data=processing_data,
-        pipeline=SimpleNamespace(to_spec=lambda: {"name": "demo"}),
+        pipeline=Pipeline.from_yaml("name: demo\nsteps: {}\n"),
         tracer=SimpleNamespace(
             processing_data_snapshots=[
                 {
@@ -183,7 +184,6 @@ def test_write_processing_data_hdf_persists_tracer_snapshots(tmp_path: Path):
         },
         run_name="run1",
         result=result,
-        pipeline_yaml="name: demo\nsteps: {}\n",
     )
 
     with h5py.File(out_file, "r") as h5:

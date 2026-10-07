@@ -34,8 +34,7 @@ __all__ = [
 def _runtime_metadata_flags(value: Any) -> dict[str, bool]:
     if isinstance(value, bool):
         return {
-            "pipeline_yaml": value,
-            "pipeline_spec": value,
+            "pipeline_provenance": value,
             "trace_events": value,
         }
     if isinstance(value, dict):
@@ -67,10 +66,9 @@ def _sink_kwargs_with_runtime_metadata(
         return kwargs
 
     method_kwargs = dict(kwargs.get("iosink_method_kwargs", kwargs))
-    if flags.get("pipeline_yaml"):
-        method_kwargs.setdefault("pipeline_yaml", session.pipeline_yaml or "")
-    if flags.get("pipeline_spec") and pipeline is not None:
-        method_kwargs.setdefault("pipeline_spec", pipeline.to_spec())
+    include_pipeline = any(flags.get(name) for name in ("pipeline_provenance", "pipeline_yaml", "pipeline_spec"))
+    if include_pipeline and pipeline is not None:
+        method_kwargs.setdefault("pipeline_provenance", pipeline.provenance())
     if flags.get("trace_events"):
         trace_events = _flatten_trace_events(pipeline)
         if trace_events:
@@ -291,7 +289,6 @@ def write_hdf_output(
     *,
     run_name: str,
     result: Any,
-    pipeline_yaml: str,
     runtime_policy: RuntimePolicy | None = None,
 ) -> str | None:
     policy = runtime_policy or RuntimePolicy.trusted()
@@ -301,5 +298,4 @@ def write_hdf_output(
         write_hdf,
         run_name=run_name,
         result=result,
-        pipeline_yaml=pipeline_yaml,
     )

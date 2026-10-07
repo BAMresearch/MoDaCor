@@ -12,6 +12,86 @@ Each entry under `steps` is keyed by a `step_id` and supports the following fiel
 - `short_title` (optional): a brief, human-friendly purpose label used in graphs (Mermaid/DOT). This is appended as a
   second line in node labels, e.g. `AU: MultiplyDatabundles` + `scaling to absolute units`.
 
+## Repeated step blocks
+
+The optional top-level `step_blocks` mapping compactly describes repeated
+single steps or subpipelines. Every block has:
+
+- `for_each`: item id to parameter mapping;
+- `steps`: one or more ordinary step templates keyed by local step id.
+
+```yaml
+step_blocks:
+  prepare:
+    for_each:
+      sample:
+        processing_key: sample
+        enabled: true
+      background:
+        processing_key: background
+        enabled: false
+    steps:
+      first:
+        module: SomeStep
+        configuration:
+          with_processing_keys: ["${processing_key}"]
+          enabled: "${enabled}"
+      second:
+        module: AnotherStep
+        requires_steps: [.first]
+        configuration:
+          with_processing_keys: ["${processing_key}"]
+```
+
+Expansion is deterministic. Generated ids have the form
+`<block>.<item>.<local-step>`. A prerequisite beginning with `.` resolves to a
+step in the same item; other prerequisite ids are absolute. Ordinary top-level
+steps may depend on generated ids, and block steps may depend on ordinary
+steps.
+
+### Dependencies on an expanded block
+
+A block is an authoring construct, not an execution node. Consequently,
+`requires_steps: [prepare]` does **not** mean “wait for the prepare block” and
+is invalid unless an ordinary step named `prepare` exists. There is no implicit
+block-wide dependency or wildcard in version 1.
+
+Downstream steps name the generated instances they actually require. Usually
+these are the terminal steps of the relevant item chains:
+
+```yaml
+steps:
+  combine:
+    module: CombinePreparedData
+    requires_steps:
+      - prepare.sample.second
+      - prepare.background.second
+```
+
+Because prerequisites are transitive, the downstream step does not also need
+to list `prepare.sample.first` when `prepare.sample.second` already depends on
+it. If it needs only one lane, it should require only that lane's generated
+terminal step. Within a block template, use the local form `.first`; outside
+the block, use the complete `<block>.<item>.<local-step>` id.
+
+A scalar that consists entirely of `${parameter}` is replaced recursively by
+the native parameter value. Consequently booleans, numbers, lists, and mappings
+remain typed. Partial string interpolation such as `prefix-${parameter}` is not
+supported; provide the complete string as an item parameter instead.
+
+Block, item, and local-step ids contain letters, digits, underscores, or
+hyphens. Version 1 deliberately excludes nested blocks, conditional steps,
+Cartesian products, and expression evaluation. Use another block or an
+explicit ordinary step for exceptional lanes.
+
+Expansion happens before `ProcessStep` instantiation. The scheduler therefore
+receives the same flat DAG as an explicitly written pipeline. Exported expanded
+YAML contains ordinary `steps` only, while graph specs attach `origin` metadata
+to generated nodes for grouping and diagnostics. `Pipeline.to_dot()` and
+`Pipeline.to_mermaid()` use that metadata to group blocks and item lanes by
+default; pass `group_step_blocks=False` to either method for the flat execution
+graph.
+
 ## Step configuration validation
 
 Each `configuration` block is checked when `Pipeline.from_yaml(...)` loads the
@@ -145,9 +225,13 @@ steps:
       sample_z_override:
         value: 0.0
         units: mm
-      wavelength_source: calibration::/entry1/calibration_sample/beam/incident_wavelength
-      wavelength_units_source: calibration::/entry1/calibration_sample/beam/incident_wavelength@units
+      photon_source: calibration::/entry1/calibration_sample/beam/incident_wavelength
+      photon_units_source: calibration::/entry1/calibration_sample/beam/incident_wavelength@units
 ```
+
+`photon_source` may contain photon energy or wavelength. MoDaCor infers the
+representation from the Pint dimensionality of `photon_units_source` and
+converts to wavelength with uncertainty-aware `BaseData` arithmetic.
 
 For measurement files with a NeXus sample-stage transformation chain,
 `sample_z_override` can also resolve the sample position from that chain:

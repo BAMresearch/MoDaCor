@@ -11,7 +11,7 @@ __date__ = "03/09/2026"
 __status__ = "Development"
 
 __all__ = ["Plot1DVisualization"]
-__version__ = "20260903.1"
+__version__ = "20261006.1"
 
 from pathlib import Path
 from typing import Any
@@ -63,6 +63,71 @@ def _normalise_names(value: Any) -> list[str]:
     if isinstance(value, str):
         return [value] if value.strip() else []
     return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _axis_type(value: Any, *, label: str) -> str | None:
+    axis_type = _str_or_none(value)
+    if axis_type is None or axis_type.lower() == "auto":
+        return None
+    axis_type = axis_type.lower()
+    if axis_type not in {"linear", "log"}:
+        raise ValueError(f"Plot1DVisualization {label} must be 'auto', 'linear', or 'log'.")
+    return axis_type
+
+
+def _resolved_axis_type(
+    configured: Any,
+    *,
+    auto_log: bool,
+    valid_values: np.ndarray,
+    label: str,
+) -> str | None:
+    forced = _axis_type(configured, label=label)
+    if forced is not None:
+        return forced
+    if auto_log and valid_values.size and np.all(valid_values > 0):
+        return "log"
+    return None
+
+
+def _plot_layout(
+    *,
+    title: str,
+    x_units: str,
+    y_units: str,
+    uirevision: str,
+    x_valid: np.ndarray,
+    y_valid: np.ndarray,
+    configuration: dict[str, Any],
+) -> dict[str, Any]:
+    layout: dict[str, Any] = {
+        "title": {"text": title},
+        "xaxis": {"title": {"text": f"Q ({x_units})" if x_units else "Q"}, "showgrid": True},
+        "yaxis": {"title": {"text": f"Signal ({y_units})" if y_units else "Signal"}, "showgrid": True},
+        "margin": {"l": 76, "r": 30, "t": 56, "b": 64},
+        "template": "plotly_white",
+        "showlegend": True,
+        "legend": {"groupclick": "togglegroup"},
+        "uirevision": uirevision,
+    }
+    axis_types = {
+        "xaxis": _resolved_axis_type(
+            configuration.get("x_axis_type"),
+            auto_log=bool(configuration.get("auto_log_x", True)),
+            valid_values=x_valid,
+            label="x_axis_type",
+        ),
+        "yaxis": _resolved_axis_type(
+            configuration.get("y_axis_type"),
+            auto_log=bool(configuration.get("auto_log_y", True)),
+            valid_values=y_valid,
+            label="y_axis_type",
+        ),
+    }
+    for axis, axis_type in axis_types.items():
+        if axis_type is not None:
+            layout[axis]["type"] = axis_type
+    return layout
 
 
 def _processing_pattern(path: str | None) -> str | None:
@@ -212,6 +277,16 @@ class Plot1DVisualization(ProcessStep):
                 "type": bool,
                 "default": True,
                 "doc": "Use a logarithmic y axis when all valid y values are positive.",
+            },
+            "x_axis_type": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Optional forced x-axis type: 'linear' or 'log'; None/'auto' retains automatic selection.",
+            },
+            "y_axis_type": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Optional forced y-axis type: 'linear' or 'log'; None/'auto' retains automatic selection.",
             },
         },
         step_keywords=["plot", "visualization", "plotly", "1d"],
@@ -425,20 +500,15 @@ class Plot1DVisualization(ProcessStep):
         x_valid = x[axis_valid]
         y_valid = y[axis_valid]
 
-        layout: dict[str, Any] = {
-            "title": {"text": title},
-            "xaxis": {"title": {"text": f"Q ({x_units})" if x_units else "Q"}, "showgrid": True},
-            "yaxis": {"title": {"text": f"Signal ({y_units})" if y_units else "Signal"}, "showgrid": True},
-            "margin": {"l": 76, "r": 30, "t": 56, "b": 64},
-            "template": "plotly_white",
-            "showlegend": True,
-            "legend": {"groupclick": "togglegroup"},
-            "uirevision": uirevision,
-        }
-        if bool(cfg.get("auto_log_x", True)) and x_valid.size and np.all(x_valid > 0):
-            layout["xaxis"]["type"] = "log"
-        if bool(cfg.get("auto_log_y", True)) and y_valid.size and np.all(y_valid > 0):
-            layout["yaxis"]["type"] = "log"
+        layout = _plot_layout(
+            title=title,
+            x_units=x_units,
+            y_units=y_units,
+            uirevision=uirevision,
+            x_valid=x_valid,
+            y_valid=y_valid,
+            configuration=cfg,
+        )
 
         payload = {
             "schema_version": "modacor.plotly_1d.v1",

@@ -24,9 +24,12 @@ from attrs import define, field
 
 from modacor.debug.pipeline_tracer import tracer_event_to_datasets_payload
 
+from ..dataclasses.pipeline_provenance import PipelineProvenance
 from ..dataclasses.process_step import ProcessStep
 from ..dataclasses.trace_event import TraceEvent
 from ..io.io_sources import IoSources  # noqa: F401  # reserved for future use
+from .pipeline_graph_rendering import render_pipeline_dot, render_pipeline_drawio, render_pipeline_mermaid
+from .pipeline_schema import StepOrigin, expand_pipeline_yaml
 from .process_step_registry import DEFAULT_PROCESS_STEP_REGISTRY, ProcessStepRegistry
 
 __all__ = ["Pipeline"]
@@ -45,6 +48,9 @@ class Pipeline:
     name: str = field(default="Unnamed Pipeline")
     # Optional trace events collected during a run (step_id -> list of events)
     trace_events: dict[str, list[TraceEvent]] = field(factory=dict, repr=False)
+    authored_yaml: str | None = field(default=None, repr=False)
+    authored_spec: dict[str, Any] | None = field(default=None, repr=False)
+    step_origins: dict[str, StepOrigin] = field(factory=dict, repr=False)
     _active_sorter: TopologicalSorter | None = field(default=None, init=False, repr=False)
     _predecessor_order: dict[Any, tuple[Any, ...]] = field(factory=dict, init=False, repr=False)
 
@@ -75,6 +81,8 @@ class Pipeline:
         cls,
         yaml_file: Path | str,
         registry: ProcessStepRegistry | None = None,
+        *,
+        max_expanded_steps: int | None = None,
     ) -> "Pipeline":
         """
         Instantiate a Pipeline from a YAML configuration file.
@@ -89,13 +97,15 @@ class Pipeline:
         """
         yaml_path = Path(yaml_file)
         yaml_string = yaml_path.read_text(encoding="utf-8")
-        return cls.from_yaml(yaml_string, registry=registry)
+        return cls.from_yaml(yaml_string, registry=registry, max_expanded_steps=max_expanded_steps)
 
     @classmethod
     def from_yaml(
         cls,
         yaml_string: str,
         registry: ProcessStepRegistry | None = None,
+        *,
+        max_expanded_steps: int | None = None,
     ) -> "Pipeline":
         """
         Instantiate a Pipeline from a YAML configuration string.
@@ -126,7 +136,8 @@ class Pipeline:
           the outer key (after string conversion), otherwise an error
           is raised to avoid silent mismatches.
         """
-        yaml_obj = yaml.safe_load(yaml_string) or {}
+        expansion = expand_pipeline_yaml(yaml_string, max_expanded_steps=max_expanded_steps)
+        yaml_obj = expansion.expanded_spec
         steps_cfg = yaml_obj.get("steps", {}) or {}
 
         registry = registry or DEFAULT_PROCESS_STEP_REGISTRY
@@ -205,7 +216,13 @@ class Pipeline:
             graph[process_step_instances[step_id]] = {process_step_instances[dep_id] for dep_id in deps}
 
         name = yaml_obj.get("name", "Unnamed Pipeline")
-        return cls(name=name, graph=graph)
+        return cls(
+            name=name,
+            graph=graph,
+            authored_yaml=yaml_string,
+            authored_spec=expansion.authored_spec,
+            step_origins=expansion.origins,
+        )
 
     @classmethod
     def from_dict(
@@ -492,6 +509,9 @@ class Pipeline:
             }
             if getattr(node, "short_title", None):
                 node_spec["short_title"] = node.short_title
+            origin = self.step_origins.get(sid)
+            if origin is not None:
+                node_spec["origin"] = origin.to_dict()
 
             cfg_json = json.dumps(node_spec["config"], sort_keys=True, default=str).encode("utf-8")
             node_spec["config_hash"] = sha256(cfg_json).hexdigest()
@@ -521,7 +541,26 @@ class Pipeline:
 
         return {"name": self.name, "nodes": nodes, "edges": edges}
 
-    def to_dot(self, direction: str = "LR") -> str:
+    def provenance(self, *, include_trace_events: bool = False) -> PipelineProvenance:
+        """Return authored and expanded representations for persistent provenance."""
+
+        expanded_yaml = self.to_yaml()
+        expanded_spec = self.to_spec()
+        if not include_trace_events:
+            for node in expanded_spec.get("nodes", []):
+                node.pop("trace_events", None)
+        authored_yaml = self.authored_yaml if self.authored_yaml is not None else expanded_yaml
+        authored_spec = self.authored_spec
+        if authored_spec is None:
+            authored_spec = yaml.safe_load(authored_yaml) or {}
+        return PipelineProvenance(
+            authored_yaml=authored_yaml,
+            authored_spec=authored_spec,
+            expanded_yaml=expanded_yaml,
+            expanded_spec=expanded_spec,
+        )
+
+    def to_dot(self, direction: str = "LR", *, group_step_blocks: bool = True) -> str:
         """
         Export the pipeline as a Graphviz DOT string for visualization.
 
@@ -532,32 +571,17 @@ class Pipeline:
         direction:
             Graphviz rank direction, e.g. "LR" for left-to-right or "TB" for
             top-to-bottom.
+        group_step_blocks:
+            Group expanded nodes by their authored block and item. Pipelines
+            without expanded blocks render identically either way.
         """
-        spec = self.to_spec()
-        lines: list[str] = [
-            f'digraph "{spec["name"]}" {{',
-            f"  rankdir={direction};",
-        ]
+        return render_pipeline_dot(
+            self.to_spec(),
+            direction=direction,
+            group_step_blocks=group_step_blocks,
+        )
 
-        # Nodes
-        for node in spec["nodes"]:
-            nid = node["id"]
-            # Show both id and label so it's easy to match YAML <-> graph
-            label = f'{node["id"]}: {node["module"]}'
-            short_title = node.get("short_title")
-            if short_title:
-                label = f"{label}\\n{short_title}"
-            esc_label = label.replace('"', '\\"')
-            lines.append(f'  "{nid}" [label="{esc_label}"];')  # noqa: E702, E231
-
-        # Edges
-        for edge in spec["edges"]:
-            lines.append(f'  "{edge["from"]}" -> "{edge["to"]}";')  # noqa: E702, E231
-
-        lines.append("}")
-        return "\n".join(lines)
-
-    def to_mermaid(self, direction: str = "LR") -> str:
+    def to_mermaid(self, direction: str = "LR", *, group_step_blocks: bool = True) -> str:
         """
         Export the pipeline as a Mermaid flowchart definition.
 
@@ -565,38 +589,48 @@ class Pipeline:
         ----------
         direction:
             Mermaid direction: "LR" (left-right), "TB" (top-bottom), etc.
+        group_step_blocks:
+            Group expanded nodes by their authored block and item. Pipelines
+            without expanded blocks render identically either way.
         """
-        spec = self.to_spec()
+        return render_pipeline_mermaid(
+            self.to_spec(),
+            direction=direction,
+            group_step_blocks=group_step_blocks,
+        )
 
-        # Mermaid node IDs must be simple identifiers (no spaces, quotes, etc.).
-        # We'll generate safe IDs but keep the original step_id visible in the label.
-        def sanitize(node_id: str) -> str:
-            return "".join(c if (c.isalnum() or c == "_") else "_" for c in node_id)
+    def to_drawio(
+        self,
+        direction: str = "LR",
+        *,
+        group_step_blocks: bool = True,
+        dot_executable: str = "dot",
+        pixels_per_inch: float = 96.0,
+    ) -> str:
+        """Export the pipeline as editable, uncompressed draw.io XML.
 
-        id_map: dict[str, str] = {}
-        for node in spec["nodes"]:
-            raw = str(node["id"])
-            id_map[node["id"]] = sanitize(raw)
+        Graphviz supplies the initial node and cluster layout. Expanded
+        ``step_blocks`` become nested block and item containers, and every
+        pipeline node and dependency remains individually editable.
 
-        lines: list[str] = [f"flowchart {direction}"]
-
-        # Nodes
-        for node in spec["nodes"]:
-            nid = id_map[node["id"]]
-            label = f'{node["id"]}: {node["module"]}'
-            short_title = node.get("short_title")
-            if short_title:
-                label = f"{label}<br/>{short_title}"
-            esc_label = label.replace('"', '\\"')
-            lines.append(f'    {nid}["{esc_label}"]')
-
-        # Edges
-        for edge in spec["edges"]:
-            src = id_map[edge["from"]]
-            dst = id_map[edge["to"]]
-            lines.append(f"    {src} --> {dst}")
-
-        return "\n".join(lines)
+        Parameters
+        ----------
+        direction:
+            Graphviz rank direction, e.g. ``LR`` or ``TB``.
+        group_step_blocks:
+            Preserve expanded block and item grouping as draw.io containers.
+        dot_executable:
+            Graphviz ``dot`` executable name or path.
+        pixels_per_inch:
+            Conversion scale from Graphviz points to draw.io canvas units.
+        """
+        return render_pipeline_drawio(
+            self.to_spec(),
+            direction=direction,
+            group_step_blocks=group_step_blocks,
+            dot_executable=dot_executable,
+            pixels_per_inch=pixels_per_inch,
+        )
 
     # in case we used to and from spec to modify the pipeline, we can
     # store the new pipeline back to yaml

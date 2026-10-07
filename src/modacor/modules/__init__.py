@@ -19,14 +19,19 @@ from modacor.modules.base_modules.apply_mask import ApplyMask
 from modacor.modules.base_modules.bitwise_or_masks import BitwiseOrMasks
 from modacor.modules.base_modules.combine_uncertainties import CombineUncertainties
 from modacor.modules.base_modules.combine_uncertainties_max import CombineUncertaintiesMax
+from modacor.modules.base_modules.concatenate_databundles import ConcatenateDatabundles
 from modacor.modules.base_modules.copy_databundle_keys import CopyDataBundleKeys
 from modacor.modules.base_modules.dilate_mask import DilateMask
 from modacor.modules.base_modules.divide import Divide
 from modacor.modules.base_modules.divide_databundles import DivideDatabundles
+from modacor.modules.base_modules.find_center_of_mass_1d import FindCenterOfMass1D
 from modacor.modules.base_modules.find_scale_factor1d import FindScaleFactor1D
+from modacor.modules.base_modules.index_by_coordinate import IndexByCoordinate
+from modacor.modules.base_modules.indexed_averager import IndexedAverager
 from modacor.modules.base_modules.integrate_1d import Integrate1D
 from modacor.modules.base_modules.multiply import Multiply
 from modacor.modules.base_modules.multiply_databundles import MultiplyDatabundles
+from modacor.modules.base_modules.negate import Negate
 from modacor.modules.base_modules.plot_1d_visualization import Plot1DVisualization
 from modacor.modules.base_modules.plot_2d_visualization import Plot2DVisualization
 from modacor.modules.base_modules.poisson_uncertainties import PoissonUncertainties
@@ -35,8 +40,10 @@ from modacor.modules.base_modules.reduce_mask import ReduceMask
 from modacor.modules.base_modules.sink_processing_data import SinkProcessingData
 from modacor.modules.base_modules.subtract import Subtract
 from modacor.modules.base_modules.subtract_databundles import SubtractDatabundles
+from modacor.modules.base_modules.subtract_interpolated_1d import SubtractInterpolated1D
 from modacor.modules.base_modules.threshold_mask import ThresholdMask
 from modacor.modules.base_modules.units_label_update import UnitsLabelUpdate
+from modacor.modules.technique_modules.scattering.angle_to_q import AngleToQ
 from modacor.modules.technique_modules.scattering.attenuator_plate_correction import AttenuatorPlateCorrection
 from modacor.modules.technique_modules.scattering.capillary_sample_container_correction import (
     CapillarySampleContainerCorrection,
@@ -48,8 +55,6 @@ from modacor.modules.technique_modules.scattering.detector_efficiency_correction
 from modacor.modules.technique_modules.scattering.flat_plate_self_absorption_correction import (
     FlatPlateSelfAbsorptionCorrection,
 )
-from modacor.modules.technique_modules.scattering.index_pixels import IndexPixels
-from modacor.modules.technique_modules.scattering.indexed_averager import IndexedAverager
 from modacor.modules.technique_modules.scattering.pixel_coordinates_3d import PixelCoordinates3D
 from modacor.modules.technique_modules.scattering.polarization_correction import PolarizationCorrection
 from modacor.modules.technique_modules.scattering.solid_angle_correction import SolidAngleCorrection
@@ -61,6 +66,7 @@ __all__ = [
     "AppendProcessingData",
     "AppendSink",
     "AppendSource",
+    "AngleToQ",
     "AttenuatorPlateCorrection",
     "ApplyMask",
     "BitwiseOrMasks",
@@ -68,18 +74,21 @@ __all__ = [
     "CapillarySampleContainerCorrection",
     "CombineUncertainties",
     "CombineUncertaintiesMax",
+    "ConcatenateDatabundles",
     "CopyDataBundleKeys",
     "DetectorEfficiencyCorrection",
     "FlatPlateSelfAbsorptionCorrection",
     "DilateMask",
     "Divide",
     "DivideDatabundles",
-    "IndexPixels",
+    "IndexByCoordinate",
     "IndexedAverager",
     "FindScaleFactor1D",
+    "FindCenterOfMass1D",
     "Integrate1D",
     "Multiply",
     "MultiplyDatabundles",
+    "Negate",
     "PixelCoordinates3D",
     "PolarizationCorrection",
     "PoissonUncertainties",
@@ -90,6 +99,7 @@ __all__ = [
     "SinkProcessingData",
     "SolidAngleCorrection",
     "SubtractDatabundles",
+    "SubtractInterpolated1D",
     "Subtract",
     "ThresholdMask",
     "UnitsLabelUpdate",

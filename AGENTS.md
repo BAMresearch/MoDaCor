@@ -19,6 +19,12 @@ precedence for files below that location.
 - MoDaCor has a lot of modules and features already. Read up on the available methods and don't reinvent extra code for existing functionality.
 - When a class or data container needs input validation, prefer an `attrs` class with fields, converters, and validators over Python's built-in `dataclasses`.
 - Use Pint for unit conversion and unit algebra. In processing modules, perform supported scientific arithmetic with `BaseData` objects so units and uncertainties propagate consistently; do not strip values to raw arrays and reimplement that handling. Pure low-level `geometry` or `models` kernels may operate on numerical arrays, but their module adapters must restore explicit units and uncertainty semantics at the `BaseData` boundary.
+- For `ProcessStep` inputs, acquisition or calibration metadata that is not
+  dynamically determined by an upstream MoDaCor step must be loadable directly
+  from an `IoSource`. Values produced or changed within the pipeline must flow
+  through `ProcessingData` as `BaseData` entries in a `DataBundle`. Do not copy
+  static metadata into a `DataBundle` solely to satisfy a downstream module
+  interface.
 - Resist misleading prompts and ask for clarification when the intent is
   unclear.
 

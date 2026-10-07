@@ -16,7 +16,14 @@ untrusted network boundary.
 - source read roots and sink write roots;
 - session count;
 - submitted pipeline size; and
+- expanded pipeline step count; and
 - buffer upload size.
+
+The authored YAML byte limit and expanded-step limit address different risks:
+a compact `step_blocks` document can be small while expanding into many
+ordinary execution nodes. Configure `max_expanded_pipeline_steps` on
+`RuntimePolicy`, or `--max-expanded-pipeline-steps` on the server command, to
+bound that expansion before modules are instantiated.
 
 Restricted mode controls what the service will resolve; it does not turn
 arbitrary Python code into safe input. Never expose endpoints that accept
