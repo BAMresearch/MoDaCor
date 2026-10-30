@@ -70,7 +70,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | ID | Item | Kind | Cost | Benefit | Status |
 | --- | --- | --- | --- | --- | --- |
 | R01 | `PolarizationCorrection` fails when no factor is set | bug | XS | high | done |
-| R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | changes requested |
+| R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | in review |
 | R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | open |
@@ -160,7 +160,7 @@ if both are set to different values. Keep the range check.
 
 ## R01b — One input per setting: remove configuration aliases and the mask-key fallback
 
-**Status:** changes requested
+**Status:** in review
 
 **Principle (maintainer decision, 2026-10-30).** Each setting has exactly one
 input. MoDaCor does not accept aliases, alternative spellings, or
@@ -400,6 +400,19 @@ keys and the new `IndexedAverager.mask_key` default. Add a section to
   `flake8 src tests` 0 violations; regenerated reference `--check` 0 errors;
   isort 0 errors; Sphinx 0 warnings, 0 errors. Repository pre-commit hooks
   also passed.
+
+**Review fixes.** Addressed requested changes 1–4 only: examples commit
+`382989541dd6aecb7c8d999a4203e78923c51fce` restores the MOUSE operando
+`sample_static::` formula source; MoDaCor commit
+`5b4242d4b896eccadad929570e51e6bd1986bd03` makes capillary masks optional
+by default and missing configured masks errors (retaining empty-mask default
+derivation), removes the unused helper, corrects NIST-name documentation,
+bumps touched module versions, and updates migration/reference pages.
+Regression checks before the fix: 8 failed, 45 deselected. Validation:
+touched tests 102 passed; full suite 1063 passed, 1 skipped, 3 warnings,
+2 subtests passed; examples `tests/` and `DLS/I22/tests/` 23 passed;
+flake8 0 violations, reference `--check` 0 errors, isort 0 errors,
+Sphinx 0 warnings/0 errors. Unrelated checkout edits were preserved.
 
 **Review log.**
 
