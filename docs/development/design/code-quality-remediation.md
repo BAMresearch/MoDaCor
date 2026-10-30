@@ -234,14 +234,44 @@ for one thing.
    only the specific "not static metadata" error. Describe the approach in the
    notes.
 
-   **2c. Update existing pipelines in step.** `material:` is used in
-   MoDaCor-examples
-   (`DLS/I22/pipelines/I22_SAXS_solids_operando.yaml`,
-   `I22_WAXS_solids_operando_usaxs_saxs_waxs.yaml` and
-   `I22_WAXS_DAWN_crosscheck.yaml`). Rename these to `chemical_formula:` in
-   one commit on a matching branch in MoDaCor-examples, and grep that repo
-   for any other uses. The maintainer's own experiment folders are the
-   maintainer's to update; list the affected files in the notes.
+   **2c. Update existing pipelines in step.** Measurement, calibration and
+   mask files are read-only and are not modified; the I22 and B21 naming is
+   not ours to change. Only pipeline YAMLs change, on branch
+   `quality-remediation-cycle` in MoDaCor-examples, committed as
+   `R01b: rename material to chemical_formula`. The reviewer checked the
+   files on 2026-10-30:
+
+   - **MOUSE** (`BAM/MOUSE/pipelines/MOUSE_solids.yaml`,
+     `MOUSE_solids_operando.yaml`) already read the formula from the
+     measurement file. Rename `material_source:` to
+     `chemical_formula_source: sample::/entry1/instrument/detector00/sensor_material`.
+     The field is NeXus `NXdetector/sensor_material` and holds `'Si'`, a valid
+     formula. Do not use a `sensor/material` path; it does not exist.
+   - **I22** (`DLS/I22/pipelines/`: `I22_SAXS_solids_operando.yaml`,
+     `I22_SAXS_WAXS_solids_operando.yaml`,
+     `I22_WAXS_solids_operando_standard_saxs_waxs.yaml`,
+     `I22_WAXS_solids_operando_usaxs_saxs_waxs.yaml` and
+     `I22_WAXS_DAWN_crosscheck.yaml`). The I22 measurement, calibration and
+     mask files contain no sensor-material or attenuator field, so a
+     `_source` pointer is not possible. Rename `material:` to
+     `chemical_formula:`, keep the literal values (`Si` for the Pilatus
+     sensors, `Al` for the attenuator plate), and make sure each has a
+     provenance comment nearby (detector specification, or the existing DAWN
+     comment for `Al`), as `AGENTS.md` requires for DAWN-derived constants.
+   - Grep the whole examples repository, including notebooks and
+     `i22_helpers.py`, for any remaining `material`, `material_source` or
+     `chemical_composition` configuration keys.
+   - Run the examples repository's own tests (`tests/`) and record the counts.
+   - The maintainer's experiment folders are the maintainer's to update; list
+     the affected files in the notes. Known so far:
+     `20260901_I22_experiments/processing_pipelines/I22_SAXS_solids_operando.yaml`,
+     `I22_WAXS_solids_operando.yaml` and `I22_WAXS_DAWN_crosscheck.yaml`.
+
+   Note for future `_source` use: NeXus string fields may hold a material
+   name rather than a formula. For example, the MOUSE collimator `material`
+   fields hold `'Germanium'` and `'Silicon'`. These are not valid
+   `chemical_formula` values. With point 2's error handling they fail with a
+   clear `ValueError` instead of a misleading element-lookup error.
 
 3. **`ThresholdMask`:** remove the deprecated `threshold` alias for
    `upper_bound`, and update the test that uses it to `upper_bound`.
