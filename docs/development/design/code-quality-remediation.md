@@ -70,7 +70,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | ID | Item | Kind | Cost | Benefit | Status |
 | --- | --- | --- | --- | --- | --- |
 | R01 | `PolarizationCorrection` fails when no factor is set | bug | XS | high | done |
-| R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | in review |
+| R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | open |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | open |
 | R05 | Test coverage for arithmetic steps and low-coverage helpers | tests | S | medium | open |
@@ -158,7 +158,7 @@ if both are set to different values. Keep the range check.
 
 ## R02 — `DilateMask` documents an alias that is rejected
 
-**Status:** in review
+**Status:** done
 
 **Problem.** The `radius` argument documents the aliases `number_of_pixels` and
 `number_of_pixels_to_dilate`, and `calculate()` reads both. Neither is
@@ -212,7 +212,22 @@ Record which route was taken and why.
   isort 0 errors; Sphinx build 0 warnings, 0 errors.
 - Scope is limited to R02; no related items were changed.
 
-**Review log.** _(reviewer)_
+**Review log.**
+
+- 2026-10-30, `d7a33b6`: **done.**
+  - Independent grep for `number_of_pixels` across MoDaCor, MoDaCor-examples
+    and the maintainer's 2025/2026 project folders (YAML, notebooks, Python):
+    the only hits are the new tests. Removal is safe; any pipeline that used
+    an alias already failed with `KeyError`.
+  - `DilateMask` tests: 8 passed. Full suite: 1023 passed, 1 skipped. flake8
+    clean; reference-page `--check` clean.
+  - The rejection test also passes on the old code, because rejection was
+    already the behavior. The documentation assertion is the regression
+    test, and it fails on the old code. Acceptable for a documentation-only
+    defect.
+  - Carried to R03: `_radius_from_config` still uses `cfg.get("radius", 1)`,
+    a literal fallback that duplicates the schema default. R03 removes it.
+  - Process: the commit touched only R02's files. Good.
 
 ---
 
