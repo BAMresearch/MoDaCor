@@ -74,8 +74,8 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
-| R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | in review |
-| R05 | Test coverage for arithmetic steps and low-coverage helpers | tests | S | medium | open |
+| R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
+| R05 | Test coverage for arithmetic steps and low-coverage helpers | tests | S | medium | ready |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
 | R07 | Declarative fixed-key dependencies; retire most `dependency_contract()` overrides | design | M–L | high | decision needed |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | open |
@@ -869,7 +869,7 @@ currently prevents either from recurring.
 
 ## R04 — Derive capillary sample μ through `BaseData`
 
-**Status:** in review
+**Status:** done
 
 **Problem.** `CapillarySelfAbsorptionCorrection._sample_mu` (about lines
 395–440) derives μ = −ln(T)/t from an absorption or transmission and a
@@ -970,13 +970,40 @@ read for it was dead code and was removed in R03b.
   suite 1094 passed, 1 skipped, 3 warnings, 2 subtests passed; `flake8 src tests`
   0 violations. No changes to other remediation items.
 
-**Review log.** _(reviewer)_
+**Review log.**
+
+- 2026-10-30, `063735f`: **done.**
+  - Shared-name semantics: Codex's claim was checked against the source.
+    `BaseData` binary operations are documented as first-order and
+    uncorrelated, with named uncertainties treated as independent sources
+    (`basedata.py`, `_binary_basedata_op` docstring). That equals the
+    previous `np.hypot` combination, so no maintainer decision was needed.
+    The design note now states this explicitly.
+  - `_sample_mu` now computes `-transmission.log() / thickness` (with
+    `1 - absorption`) in `BaseData`, reducing to `_ResolvedSampleMu` only at
+    the kernel boundary. The hand-written derivatives and `np.hypot` are
+    gone. Validation messages are preserved, and the attenuation kernels and
+    their finite-difference propagation are untouched, as scoped.
+  - Extension: `sample_mu_uncertainties_sources` is declared; direct μ now
+    carries named uncertainties through both capillary steps, with tests
+    comparing against the equivalent derived route. The dependency
+    contracts include the new source refs (already covered by the recursive
+    `source_refs_from_references`, now asserted).
+  - Step notes and design note updated; versions bumped to `20261030.4`.
+  - Verified: capillary and guard tests 84 passed; full suite 1094 passed,
+    1 skipped; flake8, reference `--check` and Sphinx `-W` clean.
+  - Scientific note for the maintainer, not a defect: under the uncorrelated
+    rule, two inputs that share an uncertainty *name* (for example both
+    thickness and transmission tagged `"systematic"`) are still combined as
+    independent. Fully correlated propagation would need a change to the
+    `BaseData` uncertainty model, outside R04.
+
 
 ---
 
 ## R05 — Test coverage for arithmetic steps and low-coverage helpers
 
-**Status:** open
+**Status:** ready
 
 **Problem.** Steps that are widely used and simple to test are poorly covered:
 
