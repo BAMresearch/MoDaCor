@@ -75,7 +75,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
-| R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | ready |
+| R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | in review |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
 | R07 | Declarative fixed-key dependencies; retire most `dependency_contract()` overrides | design | M–L | high | decision needed |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | open |
@@ -1003,7 +1003,7 @@ read for it was dead code and was removed in R03b.
 
 ## R05 — Core-container validation and untested contracts (rescoped)
 
-**Status:** ready
+**Status:** in review
 
 **Rescoped 2026-10-30 (reviewer correction).** The original R05 table was
 wrong: the reviewer had read the coverage report's "Missing" column as the
@@ -1061,7 +1061,51 @@ tiled source are lower priority and are not part of this item.
   `.venv-dev/bin/python -m pytest -q --cov=src/modacor --cov-report=term-missing <touched test files>`.
   Read the **Cover** column, not "Missing".
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- Implemented scope points 1–4 only. `ProcessingData` now follows
+  `DataBundle`'s constructor/update/setdefault validation pattern, reusing
+  the existing string-key/DataBundle-value errors. In-place union (`|=`)
+  also routes through validated update; inherited `fromkeys` is covered.
+  Empty string keys remain valid under the existing ProcessingData contract.
+  Only `processing_data.py` gained a behavior version, `20261030.1`.
+- Regression tests were written and run before the implementation changed:
+  **15 failed, 8 passed**; after the fix: **23 passed**. They cover mapping,
+  iterable and keyword insertion, direct assignment, setdefault (including
+  existing keys), union, fromkeys, argument-count errors, and repr.
+- Deleted the unused validators module and commented import. Searched source,
+  tests, documentation, and API references for its module and helper names;
+  only this item's historical scope/acceptance text refers to the removed code.
+- Added solid-angle tests for multiple selected bundles, untouched bundles,
+  signal/Omega units and independent uncertainties on both operands, the
+  returned touched bundles, and missing Omega. Kept the existing exact
+  dependency assertion in `test_fixed_key_dependency_contracts.py`.
+- Added source/sink base-method tests and registry tests for routing, duplicate
+  registration, unknown references, malformed separators, and registration
+  types. The guide documents `ref::path` routing but does **not** specify
+  registry error types, empty subpaths, or repeated separators; these tests
+  characterize current behavior without changing either implementation or guide.
+- **Contract conflict reported for review, not resolved:** the guide's
+  Practical guidance says unsupported interface subsets should raise
+  `NotImplementedError`; all 11 optional sink methods instead raise
+  `UnsupportedSinkCapability`, a `RuntimeError` subclass. The sink section
+  also promises clear unsupported-capability errors without naming an exception
+  type. Eleven strict expected-failure tests preserve the NotImplementedError
+  expectation and accept only `UnsupportedSinkCapability` as the known failure.
+  No implementation or guide change selects either contract. Review must resolve
+  this discrepancy before those expectations can become passing contract tests.
+- Validation (counts only): touched tests **46 passed, 11 xfailed**; full suite
+  **1138 passed, 1 skipped, 11 xfailed, 3 warnings, 2 subtests passed**;
+  `flake8 src tests`: **0 violations**. Unchanged HEAD was measured separately
+  from an archive with its own coverage file: **1094 passed, 1 skipped,
+  3 warnings, 2 subtests passed**.
+- Coverage measured with `--cov=src/modacor --cov-report=term-missing`, reading
+  **Cover** (the repository also enables branch measurement):
+  `processing_data.py`, `solid_angle_correction.py`, `io_source.py`, and
+  `io_sink.py` each **100.00%**, in both focused and full runs.
+  `io_sinks.py`: **80.21%** in the full suite. Overall full-suite Cover rose
+  from **83.19%** to **83.64%**. No unreachable-line exemption is needed for
+  the four files with the 90% acceptance threshold.
 
 **Review log.** _(reviewer)_
 
