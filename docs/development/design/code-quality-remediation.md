@@ -759,6 +759,42 @@ currently prevents either from recurring.
      Fallbacks are removed in the same way; for undeclared reads, stop and
      report before declaring anything new.
 
+- 2026-10-30, R03b checkpoint (uncommitted; Codex stopped as directed): the
+  inherited scan reported 13 new undeclared keys and 14 more fallbacks for
+  `CapillarySampleContainerCorrection`. **Reviewer classification:**
+  - **False positives (4):** `input_state`, `transmission_source`,
+    `transmission_units_source` and `transmission_uncertainties_sources`.
+    These are read only in the parent's `_measured_transmission()` and
+    `calculate()`. The container overrides `calculate()`, never calls
+    `_measured_transmission()`, and deliberately pops these keys from its
+    arguments.
+  - **Already covered by direction 2 (5):** the four `*_uncertainties_sources`
+    reads already known, plus `empty_centre_mu_uncertainties_sources`
+    (the container calls `_scalar("empty_centre_mu", ...)`). All of them
+    disappear when `_scalar()` stops reading uncertainty sources.
+  - **Already covered by direction 3 (4):** the absorption and transmission
+    `_units` and `_units_source` keys. Declaring them in the parent's arguments
+    is enough, because the container copies the parent's arguments at import.
+
+  **Direction 6, revised: scan by reachability, not by MRO membership.**
+  Start from the step's pipeline entry points (`calculate`,
+  `dependency_contract`, `prepare_execution`, each resolved with
+  `getattr(step, name)` so overrides win). Follow `self.<method>(...)` and
+  `cls.<method>(...)` calls by resolving them the same way, plus the
+  shared-helper calls the guard already follows. Do not scan methods that
+  are not reachable. Keep the inherited-method self-test, and add one in
+  which an overridden parent method reads an undeclared key that must
+  **not** be reported. Then remove the remaining fallbacks, including the
+  14 inherited ones, as in direction 1. No maintainer decision is needed;
+  continue with R03b.
+
+  **Design note for later (not R03):** the container subclasses the
+  self-absorption step and pops arguments that some inherited methods still
+  read. It works only because those methods are unreachable. A shared
+  capillary base class (geometry, coefficients, μ resolution, beam profile)
+  with two thin steps would remove that fragility. Consider it alongside R07
+  or R11, or as its own item.
+
 
 ---
 
