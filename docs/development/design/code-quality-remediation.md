@@ -732,9 +732,17 @@ currently prevents either from recurring.
      every other scalar parameter of this step already has. This also lets a
      source supply a transmission in percent. Add a test with a value in
      `percent` that converts correctly.
-  4. Do not add uncertainty support for directly given `sample_mu`. Whether
-     to add it is a maintainer decision and belongs to R04, which rewrites
-     the μ derivation.
+  4. Do not add uncertainty support for directly given `sample_mu`, radius
+     or wall parameters. Maintainer decision, 2026-10-30: this is planned
+     future work, recorded in `capillary-self-absorption.md` ("Uncertainties
+     and diagnostics") as intentionally out of scope for now. Remove the
+     dead reads; do not comment them out.
+  5. State the limitation for users: add one sentence to the `step_note` of
+     both capillary corrections, for example "Uncertainties of directly
+     configured sample/wall μ, capillary radius and wall thickness are not yet
+     propagated; see the capillary design note." Regenerate the reference
+     pages. (In `CapillarySampleContainerCorrection`, name only the
+     parameters it actually has.)
 
 
 ---
