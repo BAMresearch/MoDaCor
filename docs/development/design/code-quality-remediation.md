@@ -70,7 +70,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | ID | Item | Kind | Cost | Benefit | Status |
 | --- | --- | --- | --- | --- | --- |
 | R01 | `PolarizationCorrection` fails when no factor is set | bug | XS | high | done |
-| R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | ready |
+| R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | in review |
 | R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | open |
@@ -160,7 +160,7 @@ if both are set to different values. Keep the range check.
 
 ## R01b — One input per setting: remove configuration aliases and the mask-key fallback
 
-**Status:** ready
+**Status:** in review
 
 **Principle (maintainer decision, 2026-10-30).** Each setting has exactly one
 input. MoDaCor does not accept aliases, alternative spellings, or
@@ -330,7 +330,74 @@ keys and the new `IndexedAverager.mask_key` default. Add a section to
 - Commit as `R01b: <summary>` with the `BREAKING CHANGE:` footer. Touch only
   R01b's files.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- Implemented only R01b. MoDaCor implementation commit:
+  `a573107513411dad297ec502f0053e5bb590d2e3`
+  (`R01b: enforce single configuration inputs and explicit mask selection`),
+  including the `BREAKING CHANGE:` footer and interface-migration section.
+  This follow-up records the completed work and moves the item to review.
+- MoDaCor-examples commit on `quality-remediation-cycle`:
+  `3bd19d04dd00e2136b94685fb69651b6f840abd3`
+  (`R01b: rename material to chemical_formula`). Changed only the seven
+  pipeline YAMLs listed in point 2c; preserved unrelated existing checkout
+  edits. Both MOUSE formula sources now use
+  `sample::/entry1/instrument/detector00/sensor_material`, as specified.
+  I22 retains its Si/Al literals, with nearby Pilatus specification or
+  provisional DAWN provenance comments, including the commented-out Al step.
+  Measurement, calibration and mask files were not modified.
+- Removed the three British configuration spellings (retaining the search
+  keyword), the threshold alias, and the retired material/composition names.
+  Attenuation resolves only `chemical_formula`; the result container uses
+  the same field name and now uses attrs. Bare `Si` works; `Sii` raises a
+  formula-naming `ValueError` chained to xraylib's `ValueError`, with no
+  element-lookup retry.
+- Both shared scalar/text readers reject non-`None` value/source pairs.
+  Text resolution first requests static metadata, catching only
+  `NotImplementedError`, the base `IoSource` unsupported-capability error,
+  before reading data. Missing references, file errors and parse/decode errors
+  propagate instead of triggering a second read. Tests exercise HDF string
+  datasets/attributes, the unsupported-capability path and error propagation.
+- Capillary lookup and dependencies now use only the configured mask key.
+  Existing mask fixtures use lowercase `mask`; regressions verify a lone
+  `Mask` is ignored and that both keys remain distinct when present together.
+  `IndexedAverager.mask_key` defaults to `None`, ignores present masks unless
+  configured, and names the key and input bundle when a configured mask is
+  missing. Its existing dependency builder omits `None`; tests assert this
+  and the configured-mask contract. All seven step versions were bumped;
+  the touched helper also declares `20261030.1`.
+- Configured-key audit: `FindScaleFactor1D` has no mask input and indexes its
+  configured signal/axis keys directly. `ApplyMask`, `ReduceMask`,
+  `BitwiseOrMasks` and `DilateMask` also index their configured inputs
+  directly and raise for missing keys; none silently skip them. No changes
+  were made to these five modules.
+- Scanned the entire examples repository's YAML, Python and notebook code
+  for retired material/material_source/chemical_composition configuration
+  keys: 0 remaining matches. Scanned the maintainer's 2025/2026 experiment
+  trees, decoding notebook code cells to distinguish configuration from
+  prose. Affected experiment files (left for the maintainer to update;
+  paths relative to `/Users/bpauw/Documents/BAM/Projects/2026/`):
+  - `20260901_I22_experiments/processing_pipelines/I22_SAXS_solids_operando.yaml`
+  - `20260901_I22_experiments/processing_pipelines/I22_WAXS_solids_operando.yaml`
+    (including its commented-out Al step)
+  - `20260901_I22_experiments/processing_pipelines/I22_WAXS_DAWN_crosscheck.yaml`
+  - `20260904_MOUSE_modacor/processing_pipelines/MOUSE_solids.yaml`
+  - `20261009_N008_MoDaCor/pipelines/MOUSE_solids.yaml`
+  - `20261009_N008_MoDaCor/pipelines/MOUSE_solids_operando.yaml`
+- Acceptance scans over exported public `ProcessStep.documentation.arguments`:
+  0 descriptions containing `alias` (case-insensitive), 0 schemas containing
+  `material`, `chemical_composition` or `composition`; capillary module
+  source contains 0 `"Mask"` literals. Retired geometry's reference to pixel
+  unit aliases describes accepted values, outside R01b's configuration-key
+  scope.
+- Regression selection against the original committed source: 21 failed,
+  3 passed, 76 deselected. The already-undeclared `composition` rejection
+  passes before the change; the new behaviors fail before it.
+- Validation: touched modules' tests 100 passed; full suite 1047 passed,
+  1 skipped, 3 warnings, 2 subtests passed; examples `tests/` 12 passed;
+  `flake8 src tests` 0 violations; regenerated reference `--check` 0 errors;
+  isort 0 errors; Sphinx 0 warnings, 0 errors. Repository pre-commit hooks
+  also passed._
 
 **Review log.** _(reviewer)_
 
