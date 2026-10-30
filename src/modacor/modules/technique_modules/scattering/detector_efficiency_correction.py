@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 __all__ = ["DetectorEfficiencyCorrection"]
-__version__ = "20260927.2"
+__version__ = "20261030.1"
 
 from pathlib import Path
 
@@ -84,25 +84,15 @@ class DetectorEfficiencyCorrection(ProcessStep):
                 "default": None,
                 "doc": "Optional IoSources key for linear attenuation coefficient units.",
             },
-            "material": {
+            "chemical_formula": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "Sensor material formula or element symbol, used with xraylib lookup.",
+                "doc": "Chemical formula in xraylib syntax, e.g. SiO2; not a material name.",
             },
-            "material_source": {
+            "chemical_formula_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "Optional IoSources key for sensor material formula or element symbol.",
-            },
-            "chemical_composition": {
-                "type": (str, type(None)),
-                "default": None,
-                "doc": "Alias for material.",
-            },
-            "chemical_composition_source": {
-                "type": (str, type(None)),
-                "default": None,
-                "doc": "Optional IoSources key for chemical_composition.",
+                "doc": "Optional IoSources key for a chemical formula in xraylib syntax; not a material name.",
             },
             "density": {
                 "type": (int, float, type(None)),

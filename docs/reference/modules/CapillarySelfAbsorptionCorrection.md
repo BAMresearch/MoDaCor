@@ -7,7 +7,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 - **Import path:** `modacor.modules.technique_modules.scattering.capillary_self_absorption_correction.CapillarySelfAbsorptionCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/capillary_self_absorption_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/capillary_self_absorption_correction.py)
 - **Module ID:** CapillarySelfAbsorptionCorrection
-- **Module version:** 20260906.3
+- **Module version:** 20261030.1
 - **Keywords:** sample, self absorption, capillary, cylinder, transmission
 
 ## Required data keys

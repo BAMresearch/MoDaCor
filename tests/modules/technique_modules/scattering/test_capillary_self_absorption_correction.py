@@ -61,7 +61,7 @@ def _processing_data(*, masked=True, nan_at_mask=False):
         coord_x=BaseData(signal=coord_x, units=ureg.m, rank_of_data=2),
         coord_y=BaseData(signal=coord_y, units=ureg.m, rank_of_data=2),
         coord_z=BaseData(signal=coord_z, units=ureg.m, rank_of_data=2),
-        Mask=BaseData(signal=mask, units=ureg.dimensionless, rank_of_data=2),
+        mask=BaseData(signal=mask, units=ureg.dimensionless, rank_of_data=2),
     )
     processing = ProcessingData()
     processing["sample"] = bundle
@@ -110,7 +110,7 @@ def test_raw_signal_is_corrected_by_absolute_sample_origin_factor():
     bundle = processing["sample"]
     attenuation = bundle["capillary_sample_attenuation"].signal
     correction = bundle["capillary_self_absorption"].signal
-    active = ~bundle["Mask"].signal
+    active = ~bundle["mask"].signal
     assert np.all((attenuation[active] > 0.0) & (attenuation[active] < 1.0))
     np.testing.assert_array_equal(attenuation[~active], 1.0)
     np.testing.assert_array_equal(correction, attenuation)
@@ -157,18 +157,18 @@ def test_adaptive_mode_matches_exact_and_respects_mask_boundary():
     exact = exact_processing["sample"]["capillary_sample_attenuation"].signal
     adaptive_bundle = adaptive_processing["sample"]
     adaptive = adaptive_bundle["capillary_sample_attenuation"].signal
-    active = ~adaptive_bundle["Mask"].signal
+    active = ~adaptive_bundle["mask"].signal
     np.testing.assert_allclose(adaptive[active], exact[active], rtol=6e-4, atol=1e-12)
     assert not np.any(adaptive_bundle["capillary_attenuation_evaluated"].signal[~active])
 
 
 def test_scan_shaped_mask_evaluates_pixels_active_in_any_frame():
     processing = _processing_data(masked=False)
-    static_mask = processing["sample"]["Mask"].signal
+    static_mask = processing["sample"]["mask"].signal
     scan_mask = np.zeros((2, *static_mask.shape), dtype=bool)
     scan_mask[:, 0, 0] = True
     scan_mask[0, 1, 1] = True
-    processing["sample"]["Mask"] = BaseData(
+    processing["sample"]["mask"] = BaseData(
         signal=scan_mask,
         units=ureg.dimensionless,
         rank_of_data=2,
@@ -313,7 +313,7 @@ def test_adaptive_derived_mu_uncertainty_matches_exact_evaluation():
 
     exact_bundle = exact["sample"]
     adaptive_bundle = adaptive["sample"]
-    active = ~exact_bundle["Mask"].signal
+    active = ~exact_bundle["mask"].signal
     for key in ("capillary_sample_attenuation", "signal"):
         np.testing.assert_allclose(
             adaptive_bundle[key].uncertainties["sample_transmission_SEM"][active],
@@ -350,13 +350,13 @@ def test_dependency_contract_tracks_geometry_mask_and_nested_profile_source():
 
     assert isinstance(contract, ProcessStepDependencies)
     assert contract.source_refs == frozenset({"measurement"})
+    assert "sample.Mask" not in contract.processing_reads
     assert {
         "sample.signal",
         "sample.coord_x",
         "sample.coord_y",
         "sample.coord_z",
         "sample.mask",
-        "sample.Mask",
     } <= contract.processing_reads
     assert {
         "sample.signal",
@@ -396,3 +396,14 @@ def test_invalid_configuration_is_rejected(overrides, message):
     processing = _processing_data(masked=False)
     with pytest.raises((ValueError, TypeError), match=message):
         _run(processing, **overrides)
+
+
+def test_configured_mask_does_not_fall_back_to_capitalized_key():
+    processing = _processing_data(masked=True)
+    bundle = processing["sample"]
+    bundle["Mask"] = bundle.pop("mask")
+    step = CapillarySelfAbsorptionCorrection(io_sources=_sources())
+    step.modify_config_by_dict(_configuration(mask_key="mask"))
+    assert np.all(step._active_mask(bundle, bundle["Mask"].shape))
+    bundle["mask"] = BaseData(np.zeros(bundle["Mask"].shape, dtype=bool), ureg.dimensionless, rank_of_data=2)
+    assert np.all(step._active_mask(bundle, bundle["Mask"].shape))

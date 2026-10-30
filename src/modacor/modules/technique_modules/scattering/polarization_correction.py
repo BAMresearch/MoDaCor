@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 __all__ = ["PolarizationCorrection"]
-__version__ = "20261030.1"
+__version__ = "20261030.2"
 
 from pathlib import Path
 from typing import Any
@@ -64,33 +64,18 @@ class PolarizationCorrection(ProcessStep):
                 "type": (int, float, type(None)),
                 "default": None,
                 "doc": (
-                    "Fraction of horizontally polarized intensity. Defaults to 0.5 (unpolarized) when neither spelling is set."
+                    "Fraction of horizontally polarized intensity. Defaults to 0.5 (unpolarized) when unset or None."
                 ),
-            },
-            "polarisation_factor": {
-                "type": (int, float, type(None)),
-                "default": None,
-                "doc": "British-spelling alias for polarization_factor. Both spellings must agree when set.",
             },
             "polarization_angular_offset": {
                 "type": (int, float),
                 "default": 0.0,
                 "doc": "Angular offset between Psi=0 and the horizontal polarization axis.",
             },
-            "polarisation_angular_offset": {
-                "type": (int, float, type(None)),
-                "default": None,
-                "doc": "British-spelling alias for polarization_angular_offset.",
-            },
             "polarization_angular_offset_units": {
                 "type": str,
                 "default": "degree",
                 "doc": "Units for polarization_angular_offset.",
-            },
-            "polarisation_angular_offset_units": {
-                "type": (str, type(None)),
-                "default": None,
-                "doc": "British-spelling alias for polarization_angular_offset_units.",
             },
             "minimum_polarization_factor": {
                 "type": (int, float),
@@ -123,11 +108,6 @@ class PolarizationCorrection(ProcessStep):
     @staticmethod
     def _fraction_from_config(cfg: dict[str, Any]) -> float:
         value = cfg.get("polarization_factor")
-        alias = cfg.get("polarisation_factor")
-        if value is not None and alias is not None and value != alias:
-            raise ValueError("polarization_factor and polarisation_factor must agree when both are set.")
-        if value is None:
-            value = alias
         if value is None:
             value = 0.5
         fraction = float(value)
@@ -138,11 +118,7 @@ class PolarizationCorrection(ProcessStep):
     @staticmethod
     def _offset_from_config(cfg: dict[str, Any]) -> float:
         value = cfg.get("polarization_angular_offset")
-        if cfg.get("polarisation_angular_offset") is not None:
-            value = cfg["polarisation_angular_offset"]
         units = cfg.get("polarization_angular_offset_units", "degree")
-        if cfg.get("polarisation_angular_offset_units") is not None:
-            units = cfg["polarisation_angular_offset_units"]
         return float((float(value) * ureg.Unit(str(units))).to(ureg.radian).magnitude)
 
     def dependency_contract(self) -> ProcessStepDependencies:

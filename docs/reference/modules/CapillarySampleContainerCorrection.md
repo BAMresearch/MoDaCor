@@ -7,7 +7,7 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
 - **Import path:** `modacor.modules.technique_modules.scattering.capillary_sample_container_correction.CapillarySampleContainerCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/capillary_sample_container_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/capillary_sample_container_correction.py)
 - **Module ID:** CapillarySampleContainerCorrection
-- **Module version:** 20260906.3
+- **Module version:** 20261030.1
 - **Keywords:** sample, container, capillary, absorption, subtraction
 
 ## Required data keys

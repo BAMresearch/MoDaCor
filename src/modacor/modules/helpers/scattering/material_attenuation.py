@@ -4,10 +4,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+__version__ = "20261030.1"
+
 from typing import Any
 
 import numpy as np
+from attrs import frozen
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
@@ -16,10 +18,10 @@ from modacor.io.io_sources import IoSources
 from modacor.modules.helpers.scattering.photon_energy import photon_energy_from_wavelength
 
 
-@dataclass(frozen=True)
+@frozen
 class MaterialAttenuation:
     linear_attenuation_coefficient_m_inv: float
-    material: str | None = None
+    chemical_formula: str | None = None
     density_g_cm3: float | None = None
     energy_kev: float | None = None
 
@@ -55,6 +57,8 @@ def scalar_quantity_from_config_or_source(
 ) -> BaseData | None:
     uncertainty_sources = {} if uncertainty_sources is None else uncertainty_sources
     source = cfg.get(f"{name}_source")
+    if source is not None and cfg.get(name) is not None:
+        raise ValueError(f"{name} and {name}_source are mutually exclusive.")
     if source is not None:
         return basedata_from_sources(
             io_sources=io_sources,
@@ -85,18 +89,21 @@ def scalar_in_units(value: BaseData, units: str, *, name: str) -> float:
     return float(_decode_scalar(converted.signal))
 
 
-def text_from_config_or_source(io_sources: IoSources, cfg: dict[str, Any], *names: str) -> str | None:
-    for name in names:
-        if name in cfg and cfg[name] is not None:
-            return str(_decode_scalar(cfg[name]))
-        source = cfg.get(f"{name}_source")
-        if source is None:
-            continue
-        try:
-            return str(_decode_scalar(io_sources.get_static_metadata(str(source))))
-        except Exception:
-            return str(_decode_scalar(io_sources.get_data(str(source))))
-    return None
+def text_from_config_or_source(io_sources: IoSources, cfg: dict[str, Any], name: str) -> str | None:
+    value = cfg.get(name)
+    source = cfg.get(f"{name}_source")
+    if value is not None and source is not None:
+        raise ValueError(f"{name} and {name}_source are mutually exclusive.")
+    if value is not None:
+        return str(_decode_scalar(value))
+    if source is None:
+        return None
+    try:
+        value = io_sources.get_static_metadata(str(source))
+    except NotImplementedError:
+        # IoSource's explicit unsupported-static-metadata capability error.
+        value = io_sources.get_data(str(source))
+    return None if value is None else str(_decode_scalar(value))
 
 
 def energy_kev_from_config_or_wavelength(io_sources: IoSources, cfg: dict[str, Any]) -> float:
@@ -121,7 +128,7 @@ def energy_kev_from_config_or_wavelength(io_sources: IoSources, cfg: dict[str, A
     return scalar_in_units(energy, "keV", name="beam_energy")
 
 
-def _linear_attenuation_from_xraylib(material: str, density_g_cm3: float, energy_kev: float) -> float:
+def _linear_attenuation_from_xraylib(chemical_formula: str, density_g_cm3: float, energy_kev: float) -> float:
     try:
         import xraylib
     except ImportError as exc:
@@ -131,10 +138,9 @@ def _linear_attenuation_from_xraylib(material: str, density_g_cm3: float, energy
         ) from exc
 
     try:
-        mass_attenuation_cm2_g = float(xraylib.CS_Total_CP(material, energy_kev))
-    except Exception:
-        z = xraylib.SymbolToAtomicNumber(material)
-        mass_attenuation_cm2_g = float(xraylib.CS_Total(z, energy_kev))
+        mass_attenuation_cm2_g = float(xraylib.CS_Total_CP(chemical_formula, energy_kev))
+    except ValueError as exc:
+        raise ValueError(f"Invalid chemical_formula {chemical_formula!r} for xraylib attenuation lookup.") from exc
 
     linear_cm_inv = mass_attenuation_cm2_g * density_g_cm3
     return linear_cm_inv * 100.0
@@ -153,9 +159,9 @@ def material_attenuation_from_config(io_sources: IoSources, cfg: dict[str, Any])
             linear_attenuation_coefficient_m_inv=scalar_in_units(linear, "1/m", name="linear_attenuation_coefficient")
         )
 
-    material = text_from_config_or_source(io_sources, cfg, "chemical_composition", "composition", "material")
-    if material is None:
-        raise ValueError("Material attenuation requires material, composition, or chemical_composition.")
+    chemical_formula = text_from_config_or_source(io_sources, cfg, "chemical_formula")
+    if chemical_formula is None:
+        raise ValueError("Material attenuation requires chemical_formula.")
 
     density = scalar_quantity_from_config_or_source(io_sources, cfg, "density", default_units="g/cm^3", required=True)
     density_g_cm3 = scalar_in_units(density, "g/cm^3", name="density")
@@ -167,8 +173,10 @@ def material_attenuation_from_config(io_sources: IoSources, cfg: dict[str, Any])
         raise ValueError("beam energy must be positive.")
 
     return MaterialAttenuation(
-        linear_attenuation_coefficient_m_inv=_linear_attenuation_from_xraylib(material, density_g_cm3, energy_kev),
-        material=material,
+        linear_attenuation_coefficient_m_inv=_linear_attenuation_from_xraylib(
+            chemical_formula, density_g_cm3, energy_kev
+        ),
+        chemical_formula=chemical_formula,
         density_g_cm3=density_g_cm3,
         energy_kev=energy_kev,
     )

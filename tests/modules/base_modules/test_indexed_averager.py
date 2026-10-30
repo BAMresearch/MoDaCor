@@ -58,9 +58,9 @@ def test_indexed_averager_uses_indices_only_for_membership_and_measures_axis() -
 
 def test_indexed_averager_applies_mask_after_indexing() -> None:
     bundle = _bundle()
-    bundle["Mask"] = BaseData(np.array([False, True, False, False]), ureg.dimensionless, rank_of_data=1)
+    bundle["mask"] = BaseData(np.array([False, True, False, False]), ureg.dimensionless, rank_of_data=1)
 
-    _, result = _run(bundle)
+    _, result = _run(bundle, mask_key="mask")
 
     assert_allclose(result["signal"].signal, [1.0, 3.5])
     assert_allclose(result["Q"].signal, [10.0, 35.0])
@@ -199,3 +199,34 @@ def test_indexed_averager_rejects_non_integer_group_indices() -> None:
 
     with pytest.raises(ValueError, match="must be integers"):
         _run(bundle)
+
+
+@pytest.mark.parametrize("configuration", [{}, {"mask_key": None}])
+def test_indexed_averager_without_mask_key_ignores_present_masks(configuration):
+    bundle = _bundle()
+    for key in ("mask", "Mask"):
+        bundle[key] = BaseData(np.ones(4, dtype=bool), ureg.dimensionless, rank_of_data=1)
+    _, result = _run(bundle, **configuration)
+    assert_allclose(result["signal"].signal, [1.5, 3.5])
+
+
+def test_indexed_averager_missing_configured_mask_names_key_and_bundle():
+    with pytest.raises(KeyError, match="excluded.*curve"):
+        _run(_bundle(), mask_key="excluded")
+
+
+def test_indexed_averager_no_mask_dependency_by_default():
+    step = IndexedAverager(io_sources=IoSources(), configuration={"with_processing_keys": ["curve"]})
+    assert step.configuration["mask_key"] is None
+    contract = step.dependency_contract()
+    assert contract.source_refs == frozenset()
+    assert contract.processing_reads == {"curve.signal", "curve.Q", "curve.bin_index"}
+    assert contract.processing_writes == {
+        "curve.signal",
+        "curve.Q",
+        "curve.bin_id",
+        "curve.bin_count",
+        "curve.positive_weight_count",
+        "curve.sum_weights",
+        "curve.effective_sample_size",
+    }

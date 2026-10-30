@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySelfAbsorptionCorrection"]
-__version__ = "20260906.3"
+__version__ = "20261030.1"
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,7 +35,6 @@ from modacor.models.uncertainty import (
     combine_uncertainty_component,
     nominal_and_finite_difference,
 )
-from modacor.modules.helpers import get_first_present
 from modacor.modules.helpers.scattering.material_attenuation import (
     scalar_in_units,
     scalar_quantity_from_config_or_source,
@@ -339,8 +338,6 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         mask_key = cfg.get("mask_key", "mask")
         if mask_key:
             read_keys.append(mask_key)
-            if mask_key in {"mask", "Mask"}:
-                read_keys.append("Mask" if mask_key == "mask" else "mask")
         write_keys = [
             "signal",
             cfg.get("attenuation_key", "capillary_sample_attenuation"),
@@ -571,10 +568,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         mask_key = self.configuration.get("mask_key", "mask")
         if not mask_key:
             return np.ones(detector_shape, dtype=bool)
-        aliases = (str(mask_key),)
-        if mask_key in {"mask", "Mask"}:
-            aliases += ("Mask" if mask_key == "mask" else "mask",)
-        mask_data = get_first_present(databundle, *aliases)
+        mask_data = databundle.get(mask_key)
         if mask_data is None:
             return np.ones(detector_shape, dtype=bool)
         raw_mask = np.asarray(mask_data.signal, dtype=bool)

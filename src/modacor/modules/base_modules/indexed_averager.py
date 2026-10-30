@@ -16,7 +16,7 @@ from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.modules.helpers import finalize_weighted_scatter, normalize_str_list
 
 __all__ = ["IndexedAverager"]
-__version__ = "20261001.1"
+__version__ = "20261030.1"
 
 _DIAGNOSTIC_KEYS = (
     "bin_count",
@@ -148,8 +148,8 @@ class IndexedAverager(ProcessStep):
             },
             "mask_key": {
                 "type": (str, type(None)),
-                "default": "Mask",
-                "doc": "Optional mask BaseData; true values are excluded when the key is present.",
+                "default": None,
+                "doc": "Mask BaseData key; None means no mask. A configured key must exist; true values are excluded.",
             },
             "bin_id_key": {
                 "type": str,
@@ -294,7 +294,7 @@ class IndexedAverager(ProcessStep):
             axis_values = _broadcast(axis.signal, shape, f"axis {axis_key!r}").astype(float)
             valid &= np.isfinite(axis_values)
 
-        if mask_key is not None and mask_key in bundle:
+        if mask_key is not None:
             mask = _broadcast(bundle[mask_key].signal, shape, f"mask {mask_key!r}").astype(bool)
             valid &= ~mask
 
@@ -504,6 +504,9 @@ class IndexedAverager(ProcessStep):
         for processing_key in processing_keys:
             if processing_key not in self.processing_data:
                 raise KeyError(f"IndexedAverager: ProcessingData key {processing_key!r} not found.")
+            mask_key = self.configuration.get("mask_key")
+            if mask_key is not None and mask_key not in self.processing_data[processing_key]:
+                raise KeyError(f"IndexedAverager: mask key {mask_key!r} missing from bundle {processing_key!r}.")
             reduced = self._reduce_bundle(self.processing_data[processing_key])
             destination = output_processing_key or processing_key
             if destination == processing_key:

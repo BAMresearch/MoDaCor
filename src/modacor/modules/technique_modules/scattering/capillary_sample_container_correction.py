@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySampleContainerCorrection"]
-__version__ = "20260906.3"
+__version__ = "20261030.1"
 
 from copy import deepcopy
 from pathlib import Path
@@ -29,7 +29,6 @@ from modacor.models.uncertainty import (
     nominal_and_finite_difference,
     uncertainties_from_derivative,
 )
-from modacor.modules.helpers import get_first_present
 from modacor.modules.technique_modules.scattering.capillary_self_absorption_correction import (
     CapillarySelfAbsorptionCorrection,
 )
@@ -198,13 +197,9 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         filled_reads = {"signal", *coordinate_names}
         if mask_key:
             filled_reads.add(mask_key)
-            if mask_key in {"mask", "Mask"}:
-                filled_reads.add("Mask" if mask_key == "mask" else "mask")
         empty_reads = {"signal"}
         if empty_mask_key:
             empty_reads.add(empty_mask_key)
-            if empty_mask_key in {"mask", "Mask"}:
-                empty_reads.add("Mask" if empty_mask_key == "mask" else "mask")
         output_names = {
             "signal",
             mask_key,
@@ -235,10 +230,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
     def _mask_array(databundle: DataBundle, mask_key: str | None, target_shape) -> np.ndarray:
         if not mask_key:
             return np.zeros(target_shape, dtype=bool)
-        aliases = (str(mask_key),)
-        if mask_key in {"mask", "Mask"}:
-            aliases += ("Mask" if mask_key == "mask" else "mask",)
-        mask_data = get_first_present(databundle, *aliases)
+        mask_data = databundle.get(mask_key)
         if mask_data is None:
             return np.zeros(target_shape, dtype=bool)
         try:

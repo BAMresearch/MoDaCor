@@ -299,6 +299,7 @@ def test_dependency_contract_tracks_both_signals_geometry_masks_and_sources():
 
     assert isinstance(contract, ProcessStepDependencies)
     assert contract.source_refs == frozenset({"measurement"})
+    assert not {"sample.Mask", "background.Mask"} & contract.processing_reads
     assert {
         "sample.signal",
         "sample.coord_x",
@@ -337,3 +338,10 @@ def test_invalid_composite_configuration_is_rejected(overrides, message):
     processing = _processing(np.ones((5, 7)), np.ones((5, 7)))
     with pytest.raises((ValueError, KeyError), match=message):
         _run(processing, **overrides)
+
+
+def test_configured_mask_does_not_fall_back_to_capitalized_key():
+    bundle = DataBundle(Mask=BaseData(np.ones((2, 3), dtype=bool), ureg.dimensionless, rank_of_data=2))
+    assert not np.any(CapillarySampleContainerCorrection._mask_array(bundle, "mask", (2, 3)))
+    bundle["mask"] = BaseData(np.zeros((2, 3), dtype=bool), ureg.dimensionless, rank_of_data=2)
+    assert not np.any(CapillarySampleContainerCorrection._mask_array(bundle, "mask", (2, 3)))

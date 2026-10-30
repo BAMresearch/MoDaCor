@@ -15,7 +15,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["ThresholdMask"]
-__version__ = "20260927.3"
+__version__ = "20261030.1"
 
 from pathlib import Path
 from typing import Any
@@ -82,14 +82,6 @@ class ThresholdMask(ProcessStep):
                 "default": "outside",
                 "doc": "Use 'outside' to mask values below/above the bounds, or 'inside' to mask values within them.",
             },
-            "threshold": {
-                "type": (float, int, type(None)),
-                "default": None,
-                "doc": (
-                    "Deprecated compatibility alias for upper_bound when upper_bound is not set; interpreted "
-                    "in the source signal's current units."
-                ),
-            },
         },
         step_keywords=["mask", "threshold", "databundle"],
         step_doc="Create a uint32 mask by evaluating bounds on a selected BaseData signal array.",
@@ -107,8 +99,7 @@ class ThresholdMask(ProcessStep):
               outside: mask = (source < lower_bound) | (source > upper_bound)
               inside:  mask = (source >= lower_bound) & (source <= upper_bound)
 
-            The legacy threshold option is treated as upper_bound when
-            upper_bound is not configured. Bounds are numeric magnitudes in
+            Bounds are numeric magnitudes in
             the source signal's current units; this step does not convert them.
         """,
     )
@@ -117,16 +108,12 @@ class ThresholdMask(ProcessStep):
     def _resolve_bounds(cfg: dict[str, Any]) -> tuple[float | None, float | None]:
         lower_bound = cfg.get("lower_bound")
         upper_bound = cfg.get("upper_bound")
-        threshold = cfg.get("threshold")
-
-        if upper_bound is None and threshold is not None:
-            upper_bound = threshold
 
         lower = None if lower_bound is None else float(lower_bound)
         upper = None if upper_bound is None else float(upper_bound)
 
         if lower is None and upper is None:
-            raise ValueError("ThresholdMask requires at least one of lower_bound, upper_bound, or threshold.")
+            raise ValueError("ThresholdMask requires at least one of lower_bound or upper_bound.")
         if lower is not None and upper is not None and lower > upper:
             raise ValueError("ThresholdMask requires lower_bound <= upper_bound.")
 
