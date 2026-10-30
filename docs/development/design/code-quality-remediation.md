@@ -703,10 +703,12 @@ currently prevents either from recurring.
     clean. The scanner design is sound: it follows aliases, own methods and
     shared helpers, excludes nested mappings, and has self-tests and probes
     that reproduce the R01, R02 and `composition` defects.
-  - Known limitation, acceptable: only methods in the step's own
-    `__dict__` are scanned, so methods inherited from an intermediate base
-    class are not. No exported step currently inherits configuration reads
-    that way. Add a one-line comment in the test saying so.
+  - ~~Known limitation, acceptable~~ **Correction (reviewer, same day):**
+    only methods in the step's own `__dict__` are scanned. This is *not*
+    harmless. `CapillarySampleContainerCorrection` subclasses
+    `CapillarySelfAbsorptionCorrection` and inherits `_sample_mu`,
+    `_scalar_with_uncertainties`, `_active_mask` and more, so those reads
+    are never checked against the container step's schema. See direction 6.
   - All 248 declared-key fallbacks equal the schema default, so removing
     them changes no behavior.
   - The 8 undeclared reads are dead code, not lost features. The reviewer
@@ -732,17 +734,30 @@ currently prevents either from recurring.
      every other scalar parameter of this step already has. This also lets a
      source supply a transmission in percent. Add a test with a value in
      `percent` that converts correctly.
-  4. Do not add uncertainty support for directly given `sample_mu`, radius
-     or wall parameters. Maintainer decision, 2026-10-30: this is planned
-     future work, recorded in `capillary-self-absorption.md` ("Uncertainties
-     and diagnostics") as intentionally out of scope for now. Remove the
-     dead reads; do not comment them out.
+  4. Do not add uncertainty support in R03b. Maintainer decisions,
+     2026-10-30: `sample_mu_uncertainties_sources` for directly given μ
+     is added in **R04**. Radius, wall μ and wall thickness uncertainty
+     remain planned future work, recorded in `capillary-self-absorption.md`
+     ("Uncertainties and diagnostics"). Remove the four dead reads; do not
+     comment them out.
   5. State the limitation for users: add one sentence to the `step_note` of
      both capillary corrections, for example "Uncertainties of directly
      configured sample/wall μ, capillary radius and wall thickness are not yet
      propagated; see the capillary design note." Regenerate the reference
      pages. (In `CapillarySampleContainerCorrection`, name only the
-     parameters it actually has.)
+     parameters it actually has.) R04 removes "sample μ" from this
+     sentence when it adds that support.
+  6. **Scan inherited methods.** Replace the class-`__dict__` method
+     collection with one that walks the step's MRO and includes methods
+     defined in any class whose module starts with `modacor.modules.`,
+     stopping at `ProcessStep`. Each read must be checked against the
+     *scanned step's* schema. Add a guard self-test with a small subclass
+     that inherits a parent method reading a key the subclass's schema lacks;
+     it must be reported. Then rerun the baseline: list any new inherited
+     violations for `CapillarySampleContainerCorrection` (or any other
+     subclass) in the notes and resolve them as in directions 1–3.
+     Fallbacks are removed in the same way; for undeclared reads, stop and
+     report before declaring anything new.
 
 
 ---
@@ -780,6 +795,29 @@ and its tests. See also `docs/development/design/capillary-self-absorption.md`.
 - Keep all existing validation messages: thickness positive, absorption in
   [0, 1), transmission in (0, 1], and the mutually exclusive inputs.
 
+**Extension (maintainer decision, 2026-10-30): uncertainty for directly
+given μ.** Today a directly configured `sample_mu` is returned with no
+uncertainties (`_ResolvedSampleMu(..., {})`). The `_uncertainties_sources`
+read for it was dead code and was removed in R03b.
+
+- Declare `sample_mu_uncertainties_sources` (type `dict`, default `{}`,
+  "Mapping of uncertainty name to IoSources reference for `sample_mu`"), in
+  the same style as `sample_phase_thickness_uncertainties_sources`.
+- In the new `BaseData` route, load directly given μ with its uncertainty
+  sources, so the direct and derived routes both produce a `_ResolvedSampleMu`
+  with named uncertainties. The existing finite-difference propagation then
+  carries them through the attenuation factors unchanged.
+- This applies to `CapillarySampleContainerCorrection` automatically,
+  because it inherits the method and copies the parent's arguments. Verify
+  this with a test, not by assumption.
+- `dependency_contract()` must include the uncertainty-source refs.
+  Check whether `source_refs_from_references(cfg)` already covers dict values,
+  and assert it in a test.
+- Remove "sample μ" from the limitation sentence in both `step_note`s (added
+  in R03b), and update the "Uncertainties and diagnostics" section of
+  `capillary-self-absorption.md`: direct sample μ is now supported; wall μ
+  and geometry remain out of scope.
+
 **Acceptance criteria.**
 
 - The manual derivative code and `np.hypot` are gone from `_sample_mu`.
@@ -790,6 +828,11 @@ and its tests. See also `docs/development/design/capillary-self-absorption.md`.
   current behavior for a shared uncertainty name, stop and record the
   difference instead of choosing one.
 - All existing capillary tests pass unchanged.
+- Extension tests, for both capillary steps: direct `sample_mu` with an
+  uncertainty source yields named uncertainty components on the corrected
+  signal. For an equivalent μ ± σ, the factor uncertainty matches the
+  derived route within tight tolerance. Without uncertainty sources, results
+  are identical to before.
 
 **Implementation notes.** _(implementer)_
 
