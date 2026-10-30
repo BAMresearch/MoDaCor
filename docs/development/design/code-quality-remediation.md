@@ -75,7 +75,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
-| R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | in review |
+| R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | decision needed (pt 4) |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
 | R07 | Declarative fixed-key dependencies; retire most `dependency_contract()` overrides | design | M–L | high | decision needed |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | open |
@@ -1003,7 +1003,7 @@ read for it was dead code and was removed in R03b.
 
 ## R05 — Core-container validation and untested contracts (rescoped)
 
-**Status:** in review
+**Status:** decision needed (point 4 only); points 1–3 accepted
 
 **Rescoped 2026-10-30 (reviewer correction).** The original R05 table was
 wrong: the reviewer had read the coverage report's "Missing" column as the
@@ -1107,7 +1107,40 @@ tiled source are lower priority and are not part of this item.
   from **83.19%** to **83.64%**. No unreachable-line exemption is needed for
   the four files with the 90% acceptance threshold.
 
-**Review log.** _(reviewer)_
+**Review log.**
+
+- 2026-10-30, `f612c1a`: **points 1–3 accepted; point 4 waiting on a
+  maintainer decision.**
+  - Verified: full suite 1138 passed, 1 skipped, 11 xfailed; flake8,
+    reference `--check` and Sphinx `-W` clean. Coverage claims are
+    consistent with the Cover column.
+  - Point 1: `ProcessingData` now mirrors `DataBundle`'s
+    `__init__`/`update`/`setdefault` pattern line for line, plus `|=`.
+    Accepted. Shared nit, not a defect: in both classes `update()`
+    validates and inserts one item at a time, so a failing item leaves the
+    earlier ones inserted. Make both atomic later if it matters.
+  - Point 2: `validators.py` and its commented import are gone; no
+    references remain.
+  - Point 3: `SolidAngleCorrection.calculate()` is now exercised (units,
+    uncertainties on both operands, multiple bundles, missing `Omega`).
+  - Point 4: Codex correctly reported, without resolving, that the guide
+    says unsupported subsets raise `NotImplementedError`, while all 11
+    optional sink methods raise `UnsupportedSinkCapability(RuntimeError)`.
+    The 11 strict-xfail tests encode the guide's expectation.
+
+  **Reviewer recommendation (option A):** change the base class to
+  `class UnsupportedSinkCapability(NotImplementedError)`. Because
+  `NotImplementedError` subclasses `RuntimeError`, this is fully backward
+  compatible. Every existing catch (`except RuntimeError` in
+  `server/api.py`, `runtime_service.py` ×6 and `process_step_registry.py`)
+  and every `pytest.raises(UnsupportedSinkCapability)` still matches. The
+  only `except NotImplementedError` in `src/` wraps a *source* call
+  (`material_attenuation.py`), so its behaviour is unchanged. Sources and
+  sinks then share one documented signal, the guide stays correct, and the
+  11 xfails become ordinary passing tests (remove the `xfail` markers).
+  Option B, changing the guide to name `UnsupportedSinkCapability`, would
+  leave sources and sinks with different contracts.
+
 
 ---
 
