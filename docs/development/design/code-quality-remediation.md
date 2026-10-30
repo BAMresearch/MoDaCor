@@ -70,7 +70,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | ID | Item | Kind | Cost | Benefit | Status |
 | --- | --- | --- | --- | --- | --- |
 | R01 | `PolarizationCorrection` fails when no factor is set | bug | XS | high | done |
-| R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | in review |
+| R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | changes requested |
 | R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | open |
@@ -160,7 +160,7 @@ if both are set to different values. Keep the range check.
 
 ## R01b — One input per setting: remove configuration aliases and the mask-key fallback
 
-**Status:** in review
+**Status:** changes requested
 
 **Principle (maintainer decision, 2026-10-30).** Each setting has exactly one
 input. MoDaCor does not accept aliases, alternative spellings, or
@@ -203,8 +203,10 @@ for one thing.
    the material input to `chemical_formula` (maintainer decision, 2026-10-30).**
    - What it is: a chemical formula in xraylib syntax (for example `Si`,
      `CdTe`, `SiO2`, `Ca5(PO4)3OH`), passed to `xraylib.CS_Total_CP` and
-     combined with `density` to give μ. It is not a material name (no NIST
-     lookup such as `"Kapton"`) and not a mass-fraction composition.
+     combined with `density` to give μ. It is not a mass-fraction composition. (Correction, 2026-10-30: xraylib's
+     `CS_Total_CP` also accepts *exact* names from its NIST compound database,
+     for example `"Kapton Polyimide Film"`; informal names such as `"Silicon"`
+     or `"Kapton"` are rejected.)
    - Replace `material`, `material_source`, `chemical_composition`,
      `chemical_composition_source` and the undeclared `composition` with exactly
      `chemical_formula` and `chemical_formula_source`. Today
@@ -397,9 +399,58 @@ keys and the new `IndexedAverager.mask_key` default. Add a section to
   1 skipped, 3 warnings, 2 subtests passed; examples `tests/` 12 passed;
   `flake8 src tests` 0 violations; regenerated reference `--check` 0 errors;
   isort 0 errors; Sphinx 0 warnings, 0 errors. Repository pre-commit hooks
-  also passed._
+  also passed.
 
-**Review log.** _(reviewer)_
+**Review log.**
+
+- 2026-10-30, MoDaCor `a573107` + `b0aa410`, MoDaCor-examples `3bd19d0`:
+  **changes requested.**
+
+  Verified: full suite 1047 passed, 1 skipped; flake8 clean; reference
+  `--check` clean; Sphinx `-W` clean; alias scan over exported step
+  arguments clean; no `"Mask"` literals in the capillary modules; examples
+  tests 23 passed (`tests/` and `DLS/I22/tests/`). xraylib behaviour
+  confirmed: `Si`, `Al`, `SiO2` parse; `Sii`, `si`, `Silicon`, `Germanium`
+  raise `ValueError`. `NotImplementedError` is the documented `IoSource`
+  unsupported-capability signal (io-source-sink guide), so the narrowed
+  catch is correct. The `IndexedAverager` missing-key check, the value and
+  `_source` exclusivity, and the `BREAKING CHANGE:` footer are all good.
+  The audit of the other mask steps was useful.
+
+  Requested changes:
+
+  1. **Regression (caused by the reviewer's brief):**
+     `BAM/MOUSE/pipelines/MOUSE_solids_operando.yaml` originally read the
+     formula from `sample_static::`. The brief prescribed `sample::` for both
+     MOUSE files, and the commit followed it. Every other detector input of
+     that step (`thickness_source`, `wavelength_source`, units) reads from
+     `sample_static`. Restore
+     `chemical_formula_source: sample_static::/entry1/instrument/detector00/sensor_material`
+     in that file only. `MOUSE_solids.yaml` correctly uses `sample::`.
+  2. **Capillary missing-mask silent skip** (scope gap in point 5, which
+     named only `IndexedAverager`). `_active_mask` in both capillary
+     corrections returns an all-active mask when the configured `mask_key`
+     (default `"mask"`) is absent. That is the same silent skip R01b removed
+     from `IndexedAverager`. Apply the same rule to `mask_key` in
+     `CapillarySelfAbsorptionCorrection` and to `mask_key` and
+     `empty_mask_key` in `CapillarySampleContainerCorrection`: default `None`
+     means no mask, and a configured key that is missing raises `KeyError`
+     naming the key and bundle. Keep `empty_mask_key: None` meaning "use
+     `mask_key`"; that is a documented default derivation, not an alias.
+     Update the dependency contracts, tests, reference pages and the
+     migration and `BREAKING CHANGE:` text.
+  3. **Dead helper:** `modacor.modules.helpers.get_first_present` has no
+     users left. Remove it, its `__all__` entry and any tests.
+  4. **Documentation accuracy:** the `chemical_formula` and
+     `chemical_formula_source` docs say "not a material name". That wording
+     came from the reviewer's incorrect description. Replace it with:
+     "Chemical formula in xraylib syntax, e.g. `SiO2`. Exact xraylib NIST
+     compound names (e.g. `Kapton Polyimide Film`) are also accepted."
+     Apply this in both steps, then regenerate the reference pages.
+
+  Commit these as `R01b: review fixes` in MoDaCor, plus a separate examples
+  commit for item 1.
+
 
 ---
 
