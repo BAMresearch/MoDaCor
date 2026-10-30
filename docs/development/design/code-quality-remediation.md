@@ -175,7 +175,8 @@ the maintainer's 2025/2026 project folders (YAML, notebooks, Python, Markdown):
 
 - `polarisation_*` keys: no uses outside the step, its tests and its
   reference page.
-- `chemical_composition`: no uses.
+- `chemical_composition`: no uses. `material` (the key it aliased) is used
+  in the I22 pipelines; see point 2c.
 - `ThresholdMask.threshold`: one use, in
   `tests/modules/base_modules/test_threshold_mask.py`.
 - The capillary `mask`/`Mask` fallback: no pipeline uses either capillary
@@ -198,9 +199,50 @@ for one thing.
    (`None` factor → 0.5). Keep `polarisation` in `step_keywords` so search
    still finds the step. Replace R01's alias tests with tests showing that each
    British key is rejected with `KeyError`.
-2. **`AttenuatorPlateCorrection` and `DetectorEfficiencyCorrection`:** remove
-   the `chemical_composition` alias for `material`, including its resolution
-   code and dependency handling.
+2. **`AttenuatorPlateCorrection` and `DetectorEfficiencyCorrection`: rename
+   the material input to `chemical_formula` (maintainer decision, 2026-10-30).**
+   - What it is: a chemical formula in xraylib syntax (for example `Si`,
+     `CdTe`, `SiO2`, `Ca5(PO4)3OH`), passed to `xraylib.CS_Total_CP` and
+     combined with `density` to give μ. It is not a material name (no NIST
+     lookup such as `"Kapton"`) and not a mass-fraction composition.
+   - Replace `material`, `material_source`, `chemical_composition`,
+     `chemical_composition_source` and the undeclared `composition` with exactly
+     `chemical_formula` and `chemical_formula_source`. Today
+     `material_attenuation_from_config` resolves `chemical_composition`, then
+     `composition`, then `material`, so the alias overrides the documented key.
+     Afterwards it reads only the one name.
+   - Document it as: "Chemical formula in xraylib syntax, e.g. `SiO2`; not a
+     material name." Rename the `MaterialAttenuation.material` field to
+     `chemical_formula` for consistency.
+   - Remove the `except Exception` retry through `xraylib.SymbolToAtomicNumber`.
+     `CS_Total_CP` already parses bare element symbols, and the retry turns
+     formula typos into a less clear element-lookup error. A parse failure
+     should raise `ValueError` naming the formula, chained to xraylib's error.
+     Confirm with a test that `"Si"` still works and that `"Sii"` raises.
+
+   **2b. Value and `_source` are mutually exclusive.** In
+   `modules/helpers/scattering/material_attenuation.py`,
+   `scalar_quantity_from_config_or_source` lets `<name>_source` override
+   `<name>`, while `text_from_config_or_source` lets `<name>` override
+   `<name>_source`: opposite rules in one file. Under this item's principle,
+   setting both is a configuration error. Both helpers raise `ValueError`
+   naming the two keys when both are set and not `None`. This also applies to
+   the capillary corrections, which share
+   `scalar_quantity_from_config_or_source`. Also replace the broad
+   `except Exception` in `text_from_config_or_source` (static metadata, then
+   data): ask the source for the reference's capability explicitly, or catch
+   only the specific "not static metadata" error. Describe the approach in the
+   notes.
+
+   **2c. Update existing pipelines in step.** `material:` is used in
+   MoDaCor-examples
+   (`DLS/I22/pipelines/I22_SAXS_solids_operando.yaml`,
+   `I22_WAXS_solids_operando_usaxs_saxs_waxs.yaml` and
+   `I22_WAXS_DAWN_crosscheck.yaml`). Rename these to `chemical_formula:` in
+   one commit on a matching branch in MoDaCor-examples, and grep that repo
+   for any other uses. The maintainer's own experiment folders are the
+   maintainer's to update; list the affected files in the notes.
+
 3. **`ThresholdMask`:** remove the deprecated `threshold` alias for
    `upper_bound`, and update the test that uses it to `upper_bound`.
 4. **Capillary corrections** (`capillary_self_absorption_correction.py` and
@@ -237,6 +279,8 @@ keys and the new `IndexedAverager.mask_key` default. Add a section to
 
 **Acceptance criteria.**
 
+- No step's configuration schema contains `material`, `chemical_composition`
+  or `composition`; the helper resolves only `chemical_formula`.
 - No step's arguments documentation contains "alias" (verify with the
   reviewer's alias scan in the review log), and the capillary modules no
   longer contain `"Mask"`.
@@ -247,6 +291,9 @@ keys and the new `IndexedAverager.mask_key` default. Add a section to
   - `IndexedAverager` with `mask_key=None` ignores a present mask, with a
     configured key it applies the mask, and with a configured but missing key
     it raises `KeyError`;
+  - setting both a value and its `_source` raises `ValueError`, for one
+    scalar parameter and for `chemical_formula`;
+  - `"Si"` resolves and `"Sii"` raises a clear `ValueError`;
   - `dependency_contract()` assertions for the changed steps.
 - Reference pages regenerated (`--check` clean); module `__version__` values
   bumped; full suite and flake8 clean.
