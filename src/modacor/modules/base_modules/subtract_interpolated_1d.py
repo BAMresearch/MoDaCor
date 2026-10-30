@@ -105,8 +105,8 @@ class SubtractInterpolated1D(ProcessStep):
         if len(processing_keys) != 2:
             return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
         sample_key, background_key = processing_keys
-        signal_key = str(self.configuration.get("signal_key", "signal"))
-        axis_key = str(self.configuration.get("axis_key", "Q"))
+        signal_key = str(self.configuration["signal_key"])
+        axis_key = str(self.configuration["axis_key"])
         mask_key = self._optional_key(self.configuration.get("mask_key"))
         read_data_keys = {signal_key, axis_key}
         if mask_key is not None:
@@ -116,7 +116,7 @@ class SubtractInterpolated1D(ProcessStep):
             for processing_key in (sample_key, background_key)
             for data_key in read_data_keys
         }
-        writes = {f"{sample_key}.{self.configuration.get('output_signal_key', 'signal')}"}
+        writes = {f"{sample_key}.{self.configuration['output_signal_key']}"}
         for configured_key in ("remapped_background_key", "output_mask_key"):
             data_key = self._optional_key(self.configuration.get(configured_key))
             if data_key is not None:
@@ -159,12 +159,12 @@ class SubtractInterpolated1D(ProcessStep):
         sample = self.processing_data[sample_processing_key]
         background = self.processing_data[background_processing_key]
 
-        signal_key = str(self.configuration.get("signal_key", "signal"))
-        axis_key = str(self.configuration.get("axis_key", "Q"))
-        output_signal_key = str(self.configuration.get("output_signal_key", "signal")).strip()
+        signal_key = str(self.configuration["signal_key"])
+        axis_key = str(self.configuration["axis_key"])
+        output_signal_key = str(self.configuration["output_signal_key"]).strip()
         if not output_signal_key:
             raise ValueError("SubtractInterpolated1D output_signal_key must not be empty.")
-        mode = str(self.configuration.get("mode", "nearest")).strip().lower()
+        mode = str(self.configuration["mode"]).strip().lower()
         mask_key = self._optional_key(self.configuration.get("mask_key"))
 
         sample_signal = self._one_dimensional(sample, signal_key, "sample")
@@ -235,7 +235,7 @@ class SubtractInterpolated1D(ProcessStep):
         remapped_background_key = self._optional_key(self.configuration.get("remapped_background_key"))
         if remapped_background_key is not None:
             sample[remapped_background_key] = remapped
-        output_mask_key = self._optional_key(self.configuration.get("output_mask_key", "remap_mask"))
+        output_mask_key = self._optional_key(self.configuration["output_mask_key"])
         if output_mask_key is not None:
             sample[output_mask_key] = BaseData(
                 signal=(~valid).astype(np.uint32),

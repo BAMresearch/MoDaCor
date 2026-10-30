@@ -229,7 +229,7 @@ class AppendProcessingData(ProcessStep):
         rank_cfg = cfg["rank_of_data"]
         resolved_rank = self._resolve_rank_of_data(rank_cfg, self.io_sources)
 
-        databundle_output_key = cfg.get("databundle_output_key", "signal")
+        databundle_output_key = cfg["databundle_output_key"]
         if not isinstance(databundle_output_key, str) or not databundle_output_key:
             raise ValueError("AppendProcessingData requires 'databundle_output_key' to be a non-empty string.")
 
@@ -245,7 +245,7 @@ class AppendProcessingData(ProcessStep):
         if weights_location is not None and not isinstance(weights_location, str):
             raise TypeError("'weights_location' must be a string '<source_ref>::<dataset_path>' or None.")
 
-        uncertainties_sources: dict[str, str] = cfg.get("uncertainties_sources", {}) or {}
+        uncertainties_sources: dict[str, str] = cfg["uncertainties_sources"] or {}
         if not isinstance(uncertainties_sources, dict):
             raise TypeError(
                 f"'uncertainties_sources' must be a dict[str, str], got {type(uncertainties_sources).__name__}."

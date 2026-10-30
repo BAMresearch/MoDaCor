@@ -244,14 +244,14 @@ class Plot2DVisualization(ProcessStep):
 
         raw = _resolve_array(self.processing_data, data_path)
         frame, frame_index = _first_2d_frame(raw)
-        if bool(cfg.get("transpose", False)):
+        if bool(cfg["transpose"]):
             frame = frame.T
 
         title = _str_or_none(cfg.get("title")) or data_path
         units = _units_for_path(self.processing_data, data_path)
         finite = np.isfinite(frame)
-        lower_percentile = float(cfg.get("auto_zmin_percentile", 5.0))
-        upper_percentile = float(cfg.get("auto_zmax_percentile", 99.0))
+        lower_percentile = float(cfg["auto_zmin_percentile"])
+        upper_percentile = float(cfg["auto_zmax_percentile"])
         if not 0 <= lower_percentile < 100:
             raise ValueError("Plot2DVisualization auto_zmin_percentile must be in the range [0, 100).")
         if not 0 < upper_percentile <= 100:
@@ -289,7 +289,7 @@ class Plot2DVisualization(ProcessStep):
             "template": "plotly_white",
             "uirevision": _str_or_none(cfg.get("uirevision")) or target,
         }
-        if bool(cfg.get("reverse_y", True)):
+        if bool(cfg["reverse_y"]):
             layout["yaxis"]["autorange"] = "reversed"
 
         payload = {

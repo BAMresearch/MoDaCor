@@ -102,7 +102,7 @@ class ConcatenateDatabundles(ProcessStep):
     )
 
     def _data_keys(self) -> list[str]:
-        configured = self.configuration.get("data_keys", ["signal", "Q"])
+        configured = self.configuration["data_keys"]
         keys = [configured] if isinstance(configured, str) else list(configured)
         keys = [str(key).strip() for key in keys]
         if not keys or any(not key for key in keys):
@@ -112,7 +112,7 @@ class ConcatenateDatabundles(ProcessStep):
         return keys
 
     def _output_key(self) -> str:
-        key = str(self.configuration.get("output_processing_key", "concatenated")).strip()
+        key = str(self.configuration["output_processing_key"]).strip()
         if not key:
             raise ValueError("ConcatenateDatabundles output_processing_key must not be empty.")
         return key
@@ -147,7 +147,7 @@ class ConcatenateDatabundles(ProcessStep):
             raise ValueError("ConcatenateDatabundles requires at least one input processing key.")
         data_keys = self._data_keys()
         output_key = self._output_key()
-        source_index_key = self.configuration.get("source_index_key", "source_index")
+        source_index_key = self.configuration["source_index_key"]
         source_position_key = self.configuration.get("source_position_key")
         generated_keys: dict[str, str] = {}
         for argument, configured in (
@@ -208,7 +208,7 @@ class ConcatenateDatabundles(ProcessStep):
 
         output = DataBundle()
         axis_key_map: dict[str, list[str | None]] = {}
-        uncertainty_key_policy = str(self.configuration.get("uncertainty_key_policy", "require_matching")).strip()
+        uncertainty_key_policy = str(self.configuration["uncertainty_key_policy"]).strip()
         if uncertainty_key_policy not in {"require_matching", "fill_zero"}:
             raise ValueError("ConcatenateDatabundles uncertainty_key_policy must be 'require_matching' or 'fill_zero'.")
         for data_key in data_keys:
@@ -277,7 +277,7 @@ class ConcatenateDatabundles(ProcessStep):
             if sort_by not in output:
                 raise KeyError(f"ConcatenateDatabundles sort_by key {sort_by!r} is not an output data key.")
             values = np.asarray(output[sort_by].signal, dtype=float)
-            order = np.argsort(-values if bool(self.configuration.get("descending", False)) else values, kind="stable")
+            order = np.argsort(-values if bool(self.configuration["descending"]) else values, kind="stable")
             for data_key, basedata in list(output.items()):
                 output[data_key] = basedata.indexed(order, rank_of_data=1)
 

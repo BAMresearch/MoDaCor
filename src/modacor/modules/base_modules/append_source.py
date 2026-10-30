@@ -118,7 +118,7 @@ class AppendSource(ProcessStep):
                     loader_name=iosource_module,
                     source_location=source_location,
                     source_identifier=source_id,
-                    iosource_method_kwargs=self.configuration.get("iosource_method_kwargs", {}),
+                    iosource_method_kwargs=self.configuration["iosource_method_kwargs"],
                 )
         # No data modified – only side-effect is on self.io_sources
         return output

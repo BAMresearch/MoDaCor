@@ -129,13 +129,13 @@ class AngleToQ(ProcessStep):
                 processing_reads={"*"},
                 processing_writes={"*"},
             )
-        angle_key = str(self.configuration.get("angle_key", "angle"))
+        angle_key = str(self.configuration["angle_key"])
         read_keys = {angle_key}
         if self.configuration.get("angle_zero") is None:
-            center_key = self._optional_key(self.configuration.get("center_key", "beam_center"))
+            center_key = self._optional_key(self.configuration["center_key"])
             if center_key is not None:
                 read_keys.add(center_key)
-        output_key = str(self.configuration.get("output_key", "Q"))
+        output_key = str(self.configuration["output_key"])
         return ProcessStepDependencies(
             source_refs=base_contract.source_refs,
             processing_reads={f"{processing_key}.{key}" for processing_key in processing_keys for key in read_keys},
@@ -149,7 +149,7 @@ class AngleToQ(ProcessStep):
             zero = BaseData(np.asarray(float(configured)), units)
             zero.to_units(angle.units)
             return zero
-        center_key = self._optional_key(self.configuration.get("center_key", "beam_center"))
+        center_key = self._optional_key(self.configuration["center_key"])
         if center_key is None:
             return BaseData(np.asarray(0.0), angle.units)
         if center_key not in bundle:
@@ -163,19 +163,19 @@ class AngleToQ(ProcessStep):
             io_sources=self.io_sources,
             signal_source=self.configuration.get("photon_source"),
             units_source=self.configuration.get("photon_units_source"),
-            uncertainty_sources=self.configuration.get("photon_uncertainties_sources", {}),
+            uncertainty_sources=self.configuration["photon_uncertainties_sources"],
         )
 
     def _photon_wavelength(self) -> BaseData:
         return as_photon_wavelength(self._load_photon(), output_units="m")
 
     def calculate(self) -> dict[str, DataBundle]:
-        angle_key = str(self.configuration.get("angle_key", "angle"))
-        output_key = str(self.configuration.get("output_key", "Q")).strip()
+        angle_key = str(self.configuration["angle_key"])
+        output_key = str(self.configuration["output_key"]).strip()
         if not output_key:
             raise ValueError("AngleToQ output_key must not be empty.")
-        output_units = ureg.Unit(self.configuration.get("output_units", "1/nm"))
-        factor = q_angle_factor(str(self.configuration.get("angle_convention", "scattering_angle")))
+        output_units = ureg.Unit(self.configuration["output_units"])
+        factor = q_angle_factor(str(self.configuration["angle_convention"]))
         four_pi = BaseData(signal=np.asarray(4.0 * np.pi), units=ureg.dimensionless)
         wavelength = self._photon_wavelength()
 

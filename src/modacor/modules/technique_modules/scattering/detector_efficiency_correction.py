@@ -197,9 +197,9 @@ class DetectorEfficiencyCorrection(ProcessStep):
     def dependency_contract(self) -> ProcessStepDependencies:
         cfg = self.configuration or {}
         keys = cfg.get("with_processing_keys")
-        cos_alpha_key = cfg.get("cos_alpha_key", "CosAlpha")
+        cos_alpha_key = cfg["cos_alpha_key"]
         signal_paths = processing_key_patterns(keys, basedata_key="signal")
-        correction_paths = processing_key_patterns(keys, basedata_key=cfg.get("correction_key", "detector_efficiency"))
+        correction_paths = processing_key_patterns(keys, basedata_key=cfg["correction_key"])
         return ProcessStepDependencies(
             source_refs=source_refs_from_references(cfg),
             processing_reads=signal_paths | processing_key_patterns(keys, basedata_key=cos_alpha_key),
@@ -210,10 +210,10 @@ class DetectorEfficiencyCorrection(ProcessStep):
         cfg = self.configuration
         attenuation = material_attenuation_from_config(self.io_sources, cfg)
         thickness_m = thickness_m_from_config(self.io_sources, cfg)
-        minimum_cos_alpha = float(cfg.get("minimum_cos_alpha", 1e-12))
-        normalize = bool(cfg.get("normalize_to_normal_incidence", True))
-        cos_alpha_key = cfg.get("cos_alpha_key", "CosAlpha")
-        correction_key = cfg.get("correction_key", "detector_efficiency")
+        minimum_cos_alpha = float(cfg["minimum_cos_alpha"])
+        normalize = bool(cfg["normalize_to_normal_incidence"])
+        cos_alpha_key = cfg["cos_alpha_key"]
+        correction_key = cfg["correction_key"]
 
         output: dict[str, DataBundle] = {}
         for key in self._normalised_processing_keys():

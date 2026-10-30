@@ -73,7 +73,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | done |
 | R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
-| R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | R03a accepted; R03b ready |
+| R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | in review |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | open |
 | R05 | Test coverage for arithmetic steps and low-coverage helpers | tests | S | medium | open |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
@@ -587,7 +587,7 @@ Record which route was taken and why.
 
 ## R03 — One source of truth for configuration defaults, with a guard test
 
-**Status:** ready (R03b); R03a accepted
+**Status:** in review
 
 **Problem.** Defaults are seeded from the schema (`ProcessStepDescriber.arguments`
 plus `CONFIG_KEYS`) when a step is constructed. Even so, modules contain about
@@ -645,9 +645,9 @@ currently prevents either from recurring.
 
 **Implementation notes.**
 
-- R03a adds `tests/modules/test_configuration_defaults.py`; production code,
-  defaults, versions and reference pages are unchanged. R03b has not started:
-  stop here for the requested maintainer checkpoint.
+- R03a checkpoint: added `tests/modules/test_configuration_defaults.py`;
+  production code, defaults, versions and reference pages were unchanged.
+  The following baseline and probe results record that accepted checkpoint.
 - Scans the 41 exported, non-deprecated steps. Tracks `self.configuration`,
   its local aliases (including `or {}`), and parameters receiving that mapping.
   Follows local methods and shared helpers with literal key-name arguments,
@@ -694,6 +694,53 @@ currently prevents either from recurring.
   2 subtests passed**; full suite **1074 passed, 1 skipped, 3 warnings,
   2 subtests passed**; `flake8 src tests` **0 violations**; isort **0 errors**.
 - Scope: only the new guard test and R03's tracker entry/overview status.
+
+**R03b implementation notes.**
+
+- The guard now starts at the three pipeline entry points, resolves inherited
+  and overridden methods with `getattr(step, name)`, and follows reachable
+  `self.`/`cls.` calls and configuration-bearing shared-helper calls. Added
+  self-tests for inherited undeclared reads and exclusion of overridden parent
+  methods; the existing shared-helper and fallback-policy self-tests remain.
+- The reachability baseline was **281 diagnostics**: the original 260 plus
+  **21 inherited diagnostics** for `CapillarySampleContainerCorrection`
+  (**12 literal fallbacks and 9 undeclared reads**). No additional undeclared
+  key required a decision. The four unreachable undeclared reads from the
+  initial MRO checkpoint are excluded, as are its two associated fallback
+  diagnostics (`input_state` and `transmission_uncertainties_sources`).
+- The inherited reachable fallbacks were `capillary_axis`, `capillary_centre`,
+  `capillary_centre_units`, `sample_mu_sensitivity_relative_step`, and the
+  `_uncertainties_sources` reads for `empty_centre_mu`, `sample_mu`,
+  `sample_radius`, `wall_mu`, `wall_thickness`, `sample_phase_absorption`,
+  `sample_phase_transmission` and `sample_phase_thickness`. All 14 fallbacks
+  from the MRO checkpoint, including the two unreachable ones, were removed
+  at their source occurrences. Removed **232 literal fallback calls** across
+  **35 production modules**; `ALLOWED_VIOLATIONS` is empty. No declared default
+  changed and no fallback exception was needed.
+- `_scalar()` now calls the scalar helper without uncertainty sources. The
+  four original dead uncertainty-source reads, plus the inherited
+  `empty_centre_mu` read, disappear rather than being declared or commented
+  out. Existing uncertainty handling for derived phase-factor inputs remains.
+- Declared `sample_phase_{absorption,transmission}_units` (`str`, default
+  `"dimensionless"`) and their `_units_source` keys (default `None`) in the
+  parent's arguments, inherited by the container. This is the only intended
+  behavior change: both corrections accept percent absorption/transmission
+  from configuration or an IoSource. Eight parameterized cases verify the
+  conversion to dimensionless and the source dependency references.
+- Both capillary `step_note`s now state the direct-parameter uncertainty
+  limitation, including empty-centre mu for the container. Only these two
+  modules' versions were bumped, to **20261030.3**, because their public
+  metadata changed. Regenerated both reference pages.
+- AppendSource's tests now use the normal constructor and configuration API
+  instead of `__new__` and replacement dictionaries that bypassed schema
+  defaults; this preserves their existing behavior assertions.
+- Validation: guard **13 passed**; touched-module tests **326 passed,
+  2 subtests passed**; full suite **1084 passed, 1 skipped, 3 warnings,
+  2 subtests passed**; `flake8 src tests` **0 violations**; generated reference
+  `--check` **0 errors**; isort **0 errors**; Sphinx build **0 warnings,
+  0 errors**.
+- Scope: R03 production fallback removals, capillary metadata/scalar adapter,
+  focused tests, generated capillary reference pages, and this tracker entry.
 
 **Review log.**
 
@@ -747,17 +794,16 @@ currently prevents either from recurring.
      pages. (In `CapillarySampleContainerCorrection`, name only the
      parameters it actually has.) R04 removes "sample μ" from this
      sentence when it adds that support.
-  6. **Scan inherited methods.** Replace the class-`__dict__` method
-     collection with one that walks the step's MRO and includes methods
-     defined in any class whose module starts with `modacor.modules.`,
-     stopping at `ProcessStep`. Each read must be checked against the
-     *scanned step's* schema. Add a guard self-test with a small subclass
-     that inherits a parent method reading a key the subclass's schema lacks;
-     it must be reported. Then rerun the baseline: list any new inherited
-     violations for `CapillarySampleContainerCorrection` (or any other
-     subclass) in the notes and resolve them as in directions 1–3.
-     Fallbacks are removed in the same way; for undeclared reads, stop and
-     report before declaring anything new.
+  6. **Scan reachable inherited methods.** Start from `calculate`,
+     `dependency_contract` and `prepare_execution`, resolving each with
+     `getattr(step, name)` so overrides win. Follow `self.`/`cls.` method calls
+     with the same resolution and follow shared-helper calls receiving the
+     configuration. Check each read against the scanned step's schema; do not
+     scan unreachable methods. Test both an inherited undeclared read and an
+     overridden parent method whose undeclared read must not be reported.
+     Rerun the baseline and record inherited violations. Resolve fallbacks as
+     in direction 1 and the checkpoint's nine undeclared keys as in directions
+     2–3; stop and report any other undeclared key before declaring it.
 
 - 2026-10-30, R03b checkpoint (uncommitted; Codex stopped as directed): the
   inherited scan reported 13 new undeclared keys and 14 more fallbacks for

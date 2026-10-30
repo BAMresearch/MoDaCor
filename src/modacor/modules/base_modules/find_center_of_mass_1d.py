@@ -106,8 +106,8 @@ class FindCenterOfMass1D(ProcessStep):
     )
 
     def _output_keys(self) -> tuple[str, str, str, str, str]:
-        output_key = str(self.configuration.get("output_key", "beam_center")).strip()
-        prefix = str(self.configuration.get("diagnostic_prefix", "centroid")).strip()
+        output_key = str(self.configuration["output_key"]).strip()
+        prefix = str(self.configuration["diagnostic_prefix"]).strip()
         if not output_key or not prefix:
             raise ValueError("FindCenterOfMass1D output_key and diagnostic_prefix must not be empty.")
         return output_key, f"{prefix}_count", f"{prefix}_converged", f"{prefix}_window_min", f"{prefix}_window_max"
@@ -116,8 +116,8 @@ class FindCenterOfMass1D(ProcessStep):
         processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
         if not processing_keys:
             return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
-        signal_key = str(self.configuration.get("signal_key", "signal"))
-        axis_key = str(self.configuration.get("axis_key", "yaw"))
+        signal_key = str(self.configuration["signal_key"])
+        axis_key = str(self.configuration["axis_key"])
         mask_key = self.configuration.get("mask_key")
         read_keys = {signal_key, axis_key}
         if mask_key is not None and str(mask_key).strip():
@@ -162,12 +162,12 @@ class FindCenterOfMass1D(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration
-        signal_key = str(cfg.get("signal_key", "signal"))
-        axis_key = str(cfg.get("axis_key", "yaw"))
+        signal_key = str(cfg["signal_key"])
+        axis_key = str(cfg["axis_key"])
         mask_key = cfg.get("mask_key")
         mask_key = str(mask_key).strip() if mask_key is not None else None
         output_key, count_key, converged_key, window_min_key, window_max_key = self._output_keys()
-        maximum_iterations = int(cfg.get("maximum_iterations", 5))
+        maximum_iterations = int(cfg["maximum_iterations"])
         if maximum_iterations < 1:
             raise ValueError("FindCenterOfMass1D maximum_iterations must be positive.")
 
@@ -196,11 +196,11 @@ class FindCenterOfMass1D(ProcessStep):
                 half_width = (float(half_width_cfg) * width_units).to(axis.units).magnitude
                 if not np.isfinite(half_width) or half_width <= 0.0:
                     raise ValueError("FindCenterOfMass1D half_width must be positive and finite.")
-            tolerance = (float(cfg.get("convergence_tolerance", 0.0)) * width_units).to(axis.units).magnitude
+            tolerance = (float(cfg["convergence_tolerance"]) * width_units).to(axis.units).magnitude
             if tolerance < 0.0 or not np.isfinite(tolerance):
                 raise ValueError("FindCenterOfMass1D convergence_tolerance must be finite and non-negative.")
             baseline_units = ureg.Unit(cfg.get("baseline_units") or signal.units)
-            baseline = (float(cfg.get("baseline", 0.0)) * baseline_units).to(signal.units).magnitude
+            baseline = (float(cfg["baseline"]) * baseline_units).to(signal.units).magnitude
 
             valid_indices = np.flatnonzero(valid)
             anchor = int(valid_indices[np.argmax(np.asarray(signal.signal)[valid])])

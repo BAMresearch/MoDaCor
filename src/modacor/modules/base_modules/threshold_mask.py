@@ -147,10 +147,10 @@ class ThresholdMask(ProcessStep):
         if len(keys) != 1:
             raise ValueError("ThresholdMask requires a single databundle processing key.")
         processing_key = keys[0]
-        target_key = cfg.get("target_mask_key", "threshold_mask")
-        source_key = cfg.get("source_basedata_key", "signal")
+        target_key = cfg["target_mask_key"]
+        source_key = cfg["source_basedata_key"]
         lower_bound, upper_bound = self._resolve_bounds(cfg)
-        mask_mode = cfg.get("mask_mode", "outside")
+        mask_mode = cfg["mask_mode"]
 
         bundle = self.processing_data[processing_key]
         source_bd: BaseData = bundle[source_key]

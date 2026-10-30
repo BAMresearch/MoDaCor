@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySelfAbsorptionCorrection"]
-__version__ = "20261030.2"
+__version__ = "20261030.3"
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -179,6 +179,16 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 "default": None,
                 "doc": "Optional IoSources reference for the dimensionless sample-only absorbed fraction.",
             },
+            "sample_phase_absorption_units": {
+                "type": str,
+                "default": "dimensionless",
+                "doc": "Sample-only absorption units, for example dimensionless or percent.",
+            },
+            "sample_phase_absorption_units_source": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Optional IoSources reference for sample-only absorption units.",
+            },
             "sample_phase_absorption_uncertainties_sources": {
                 "type": dict,
                 "default": {},
@@ -193,6 +203,16 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 "type": (str, type(None)),
                 "default": None,
                 "doc": "Optional IoSources reference for the dimensionless sample-only transmission.",
+            },
+            "sample_phase_transmission_units": {
+                "type": str,
+                "default": "dimensionless",
+                "doc": "Sample-only transmission units, for example dimensionless or percent.",
+            },
+            "sample_phase_transmission_units_source": {
+                "type": (str, type(None)),
+                "default": None,
+                "doc": "Optional IoSources reference for sample-only transmission units.",
             },
             "sample_phase_transmission_uncertainties_sources": {
                 "type": dict,
@@ -325,7 +345,9 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             "Measured transmission is an effective whole-beam value, not a centreline estimate of mu. "
             "This step is only for sample-origin scattering after consistent container removal or when wall "
             "scattering is negligible; filled/empty attenuation-aware container subtraction requires the "
-            "separate composite correction."
+            "separate composite correction. "
+            "Uncertainties of directly configured sample/wall mu, capillary radius and wall thickness are not yet "
+            "propagated; see the capillary design note."
         ),
     )
 
@@ -334,21 +356,21 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         keys = cfg.get("with_processing_keys")
         read_keys = [
             "signal",
-            cfg.get("coord_x_key", "coord_x"),
-            cfg.get("coord_y_key", "coord_y"),
-            cfg.get("coord_z_key", "coord_z"),
+            cfg["coord_x_key"],
+            cfg["coord_y_key"],
+            cfg["coord_z_key"],
         ]
         mask_key = cfg.get("mask_key")
         if mask_key is not None:
             read_keys.append(mask_key)
         write_keys = [
             "signal",
-            cfg.get("attenuation_key", "capillary_sample_attenuation"),
-            cfg.get("correction_key", "capillary_self_absorption"),
-            cfg.get("calculated_transmission_key", "capillary_calculated_transmission"),
-            cfg.get("effective_sample_mu_key", "capillary_effective_sample_mu"),
-            cfg.get("profile_retained_fraction_key", "capillary_beam_profile_retained_fraction"),
-            cfg.get("evaluated_mask_key", "capillary_attenuation_evaluated"),
+            cfg["attenuation_key"],
+            cfg["correction_key"],
+            cfg["calculated_transmission_key"],
+            cfg["effective_sample_mu_key"],
+            cfg["profile_retained_fraction_key"],
+            cfg["evaluated_mask_key"],
         ]
         return ProcessStepDependencies(
             source_refs=source_refs_from_references(cfg),
@@ -361,8 +383,14 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         )
 
     def _scalar(self, name: str, units: str, *, required: bool) -> float:
-        value, _uncertainties = self._scalar_with_uncertainties(name, units, required=required)
-        return value
+        data = scalar_quantity_from_config_or_source(
+            self.io_sources,
+            self.configuration,
+            name,
+            default_units=units,
+            required=required,
+        )
+        return 0.0 if data is None else scalar_in_units(data, units, name=name)
 
     def _scalar_with_uncertainties(self, name: str, units: str, *, required: bool) -> tuple[float, dict[str, float]]:
         data = scalar_quantity_from_config_or_source(
@@ -371,7 +399,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             name,
             default_units=units,
             required=required,
-            uncertainty_sources=self.configuration.get(f"{name}_uncertainties_sources", {}),
+            uncertainty_sources=self.configuration[f"{name}_uncertainties_sources"],
         )
         if data is None:
             return 0.0, {}
@@ -462,14 +490,14 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             radii.append(radius + thickness)
             coefficients.append(wall_mu)
         centre = _length_array(
-            self.configuration.get("capillary_centre", (0.0, 0.0, 0.0)),
-            self.configuration.get("capillary_centre_units", "m"),
+            self.configuration["capillary_centre"],
+            self.configuration["capillary_centre_units"],
             name="capillary_centre",
             shape=(3,),
         )
         geometry = ConcentricCylinderGeometry(
             radii=np.asarray(radii),
-            axis=self.configuration.get("capillary_axis", (1.0, 0.0, 0.0)),
+            axis=self.configuration["capillary_axis"],
             centre=centre,
         )
         return geometry, np.asarray(coefficients), resolved_sample_mu
@@ -482,7 +510,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
     ) -> tuple[np.ndarray, float | None, bool]:
         if not sample_mu_uncertainties:
             return coefficients, None, False
-        relative_step = float(self.configuration.get("sample_mu_sensitivity_relative_step", 1e-2))
+        relative_step = float(self.configuration["sample_mu_sensitivity_relative_step"])
         if not np.isfinite(relative_step) or not 0.0 < relative_step < 1.0:
             raise ValueError("sample_mu_sensitivity_relative_step must be finite and in (0, 1).")
         sample_mu = float(coefficients[0])
@@ -592,7 +620,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         return ~mask
 
     def _measured_transmission(self) -> BaseData | None:
-        state = str(self.configuration.get("input_state", "transmission_normalized")).strip().lower()
+        state = str(self.configuration["input_state"]).strip().lower()
         if state not in {"raw", "flux_normalized", "transmission_normalized"}:
             raise ValueError("input_state must be raw, flux_normalized, or transmission_normalized.")
         if state != "transmission_normalized":
@@ -604,7 +632,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             io_sources=self.io_sources,
             signal_source=str(source),
             units_source=self.configuration.get("transmission_units_source"),
-            uncertainty_sources=self.configuration.get("transmission_uncertainties_sources", {}),
+            uncertainty_sources=self.configuration["transmission_uncertainties_sources"],
         )
         value = scalar_in_units(transmission, "dimensionless", name="transmission")
         if not np.isfinite(value) or value <= 0.0 or value > 1.0:
@@ -616,7 +644,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         evaluation_coefficients, mu_delta, central_mu_difference = self._sample_mu_coefficient_sets(
             geometry, coefficients, resolved_sample_mu.uncertainties
         )
-        incident_direction = self.configuration.get("incident_direction", (0.0, 0.0, 1.0))
+        incident_direction = self.configuration["incident_direction"]
         profile = self._beam_profile(geometry.centre, incident_direction)
         scattering_points, volume_weights = beam_chord_quadrature(
             geometry=geometry,
@@ -624,7 +652,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             beam_weights=profile.weights,
             phase_index=0,
             incident_direction=incident_direction,
-            chord_order=self.configuration.get("chord_order", 12),
+            chord_order=self.configuration["chord_order"],
         )
         coefficient_rows = (
             evaluation_coefficients[None, :] if evaluation_coefficients.ndim == 1 else evaluation_coefficients
@@ -654,24 +682,22 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             if measured_transmission is None
             else scalar_in_units(measured_transmission, "dimensionless", name="transmission")
         )
-        evaluation_mode = str(self.configuration.get("evaluation_mode", "adaptive")).strip().lower()
+        evaluation_mode = str(self.configuration["evaluation_mode"]).strip().lower()
         if evaluation_mode not in {"adaptive", "exact"}:
             raise ValueError("evaluation_mode must be adaptive or exact.")
 
         coordinate_keys = (
-            self.configuration.get("coord_x_key", "coord_x"),
-            self.configuration.get("coord_y_key", "coord_y"),
-            self.configuration.get("coord_z_key", "coord_z"),
+            self.configuration["coord_x_key"],
+            self.configuration["coord_y_key"],
+            self.configuration["coord_z_key"],
         )
-        attenuation_key = self.configuration.get("attenuation_key", "capillary_sample_attenuation")
-        correction_key = self.configuration.get("correction_key", "capillary_self_absorption")
-        transmission_key = self.configuration.get("calculated_transmission_key", "capillary_calculated_transmission")
-        effective_mu_key = self.configuration.get("effective_sample_mu_key", "capillary_effective_sample_mu")
-        evaluated_key = self.configuration.get("evaluated_mask_key", "capillary_attenuation_evaluated")
-        retained_fraction_key = self.configuration.get(
-            "profile_retained_fraction_key", "capillary_beam_profile_retained_fraction"
-        )
-        minimum_factor = float(self.configuration.get("minimum_attenuation_factor", 1e-12))
+        attenuation_key = self.configuration["attenuation_key"]
+        correction_key = self.configuration["correction_key"]
+        transmission_key = self.configuration["calculated_transmission_key"]
+        effective_mu_key = self.configuration["effective_sample_mu_key"]
+        evaluated_key = self.configuration["evaluated_mask_key"]
+        retained_fraction_key = self.configuration["profile_retained_fraction_key"]
+        minimum_factor = float(self.configuration["minimum_attenuation_factor"])
         if not np.isfinite(minimum_factor) or minimum_factor <= 0.0:
             raise ValueError("minimum_attenuation_factor must be finite and positive.")
 
@@ -689,10 +715,10 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                     detector_position_grid=detector_grid,
                     active_mask=active,
                     incident_direction=incident_direction,
-                    relative_tolerance=self.configuration.get("relative_tolerance", 1e-3),
-                    absolute_tolerance=self.configuration.get("absolute_tolerance", 1e-12),
-                    max_depth=self.configuration.get("max_depth", 10),
-                    detector_chunk_size=self.configuration.get("detector_chunk_size", 256),
+                    relative_tolerance=self.configuration["relative_tolerance"],
+                    absolute_tolerance=self.configuration["absolute_tolerance"],
+                    max_depth=self.configuration["max_depth"],
+                    detector_chunk_size=self.configuration["detector_chunk_size"],
                 )
                 attenuation_values = adaptive.factors
                 evaluated = adaptive.evaluated_mask
@@ -704,7 +730,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                     volume_weights=volume_weights,
                     detector_positions=detector_grid[active],
                     incident_direction=incident_direction,
-                    detector_chunk_size=self.configuration.get("detector_chunk_size", 256),
+                    detector_chunk_size=self.configuration["detector_chunk_size"],
                 )
                 if evaluation_coefficients.ndim == 1:
                     attenuation_values = np.ones(detector_grid.shape[:2], dtype=float)

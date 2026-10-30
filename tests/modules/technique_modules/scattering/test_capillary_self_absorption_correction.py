@@ -11,6 +11,9 @@ from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_source import IoSource
 from modacor.io.io_sources import IoSources
+from modacor.modules.technique_modules.scattering.capillary_sample_container_correction import (
+    CapillarySampleContainerCorrection,
+)
 from modacor.modules.technique_modules.scattering.capillary_self_absorption_correction import (
     CapillarySelfAbsorptionCorrection,
 )
@@ -21,6 +24,7 @@ class CapillarySource(IoSource):
         values = {
             "/transmission": np.asarray(0.5),
             "/transmission_sem": np.asarray(0.01),
+            "/phase_percent": np.asarray(50.0),
             "/beam": np.asarray([[1.0, 2.0], [2.0, 1.0]]),
             "/sample_phase_absorption": np.asarray(1.0 - np.exp(-0.5)),
             "/sample_phase_transmission": np.asarray(np.exp(-0.5)),
@@ -31,6 +35,8 @@ class CapillarySource(IoSource):
         return values[data_key]
 
     def get_static_metadata(self, data_key):
+        if "phase_percent" in data_key:
+            return "percent"
         return "m" if "thickness" in data_key else "dimensionless"
 
 
@@ -456,3 +462,29 @@ def test_optional_mask_dependency_contract(mask_key):
         "sample.capillary_beam_profile_retained_fraction",
         "sample.capillary_attenuation_evaluated",
     }
+
+
+@pytest.mark.parametrize("step_type", [CapillarySelfAbsorptionCorrection, CapillarySampleContainerCorrection])
+@pytest.mark.parametrize("factor", ["absorption", "transmission"])
+@pytest.mark.parametrize("from_source", [False, True])
+def test_phase_factor_percent_units_convert_to_dimensionless(step_type, factor, from_source):
+    name = f"sample_phase_{factor}"
+    config = {"sample_phase_thickness": 1.0e-3}
+    if from_source:
+        config.update(
+            {
+                f"{name}_source": "measurement::/phase_percent",
+                f"{name}_units_source": "measurement::/phase_percent@units",
+            }
+        )
+    else:
+        config.update({name: 50.0, f"{name}_units": "percent"})
+    step = step_type(io_sources=_sources(), configuration=config)
+
+    resolved = step._sample_mu()
+
+    assert resolved.value == pytest.approx(-np.log(0.5) / 1.0e-3)
+    assert resolved.uncertainties == {}
+    contract = step.dependency_contract()
+    expected_sources = {"measurement"} if from_source else set()
+    assert contract.source_refs == frozenset(expected_sources)

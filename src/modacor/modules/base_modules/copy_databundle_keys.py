@@ -76,8 +76,8 @@ class CopyDataBundleKeys(ProcessStep):
     )
 
     def _key_pairs(self) -> list[tuple[str, str]]:
-        data_keys = self.configuration.get("data_keys", None)
-        key_map = self.configuration.get("key_map", None)
+        data_keys = self.configuration["data_keys"]
+        key_map = self.configuration["key_map"]
 
         if data_keys is not None and key_map is not None:
             raise ValueError("CopyDataBundleKeys accepts either data_keys or key_map, not both.")
@@ -102,12 +102,12 @@ class CopyDataBundleKeys(ProcessStep):
         return [(str(key), str(key)) for key in keys]
 
     def _copy_value(self, value: Any) -> Any:
-        if not bool(self.configuration.get("copy", True)):
+        if not bool(self.configuration["copy"]):
             return value
 
         if hasattr(value, "copy"):
             try:
-                return value.copy(with_axes=bool(self.configuration.get("copy_axes", True)))
+                return value.copy(with_axes=bool(self.configuration["copy_axes"]))
             except TypeError:
                 return value.copy()
 

@@ -318,10 +318,10 @@ class IndexedAverager(ProcessStep):
         value_key = inputs.value_key
 
         weights = np.ones(inputs.values.shape, dtype=float)
-        if self.configuration.get("use_value_weights", True):
+        if self.configuration["use_value_weights"]:
             weights *= _broadcast(value.weights, shape, f"weights for {value_key!r}").astype(float)
 
-        if self.configuration.get("use_value_uncertainty_weights", False):
+        if self.configuration["use_value_uncertainty_weights"]:
             uncertainty_key = self.configuration.get("uncertainty_weight_key")
             if not uncertainty_key:
                 raise ValueError("IndexedAverager: uncertainty_weight_key is required for uncertainty weighting.")

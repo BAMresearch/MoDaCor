@@ -114,7 +114,7 @@ class DilateMask(ProcessStep):
 
     @staticmethod
     def _radius_from_config(cfg: dict[str, Any]) -> int:
-        value = cfg.get("radius", 1)
+        value = cfg["radius"]
         radius = int(value)
         if radius < 0:
             raise ValueError("DilateMask radius must be >= 0.")
@@ -173,8 +173,8 @@ class DilateMask(ProcessStep):
     def dependency_contract(self) -> ProcessStepDependencies:
         cfg = self.configuration or {}
         keys = cfg.get("with_processing_keys")
-        source_key = cfg.get("source_mask_key", "mask")
-        target_key = cfg.get("target_mask_key", "mask")
+        source_key = cfg["source_mask_key"]
+        target_key = cfg["target_mask_key"]
         return ProcessStepDependencies(
             source_refs=(),
             processing_reads=processing_key_patterns(keys, basedata_key=source_key),
@@ -187,11 +187,11 @@ class DilateMask(ProcessStep):
             raise ValueError("DilateMask requires a single databundle processing key.")
 
         processing_key = keys[0]
-        source_key = self.configuration.get("source_mask_key", "mask")
-        target_key = self.configuration.get("target_mask_key", "mask")
+        source_key = self.configuration["source_mask_key"]
+        target_key = self.configuration["target_mask_key"]
         radius = self._radius_from_config(self.configuration)
-        footprint = self._footprint(radius, self.configuration.get("footprint_shape", "square"))
-        backend = self.configuration.get("backend", "auto")
+        footprint = self._footprint(radius, self.configuration["footprint_shape"])
+        backend = self.configuration["backend"]
 
         bundle = self.processing_data[processing_key]
         source_mask: BaseData = bundle[source_key]

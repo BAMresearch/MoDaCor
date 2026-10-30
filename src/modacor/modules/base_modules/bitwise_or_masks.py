@@ -87,7 +87,7 @@ class BitwiseOrMasks(ProcessStep):
         if len(keys) != 1:
             raise ValueError("BitwiseOrMasks requires a single databundle processing key.")
         processing_key = keys[0]
-        target_key = cfg.get("target_mask_key", "mask")
+        target_key = cfg["target_mask_key"]
         source_keys = cfg["source_mask_keys"]
 
         if not isinstance(source_keys, list):

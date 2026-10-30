@@ -698,7 +698,7 @@ class ReduceDimensionality(ProcessStep):
     def prepare_execution(self) -> None:
         """Validate estimator configuration before processing data."""
 
-        reduction = self.configuration.get("reduction", "mean")
+        reduction = self.configuration["reduction"]
         if reduction not in {"mean", "sum"}:
             raise ValueError(f"Invalid reduction: {reduction!r}. Use 'mean' or 'sum'.")
         self._normalize_uncertainty_estimation(
@@ -712,9 +712,9 @@ class ReduceDimensionality(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         axes_spec = self.configuration.get("axes")
-        use_weights = bool(self.configuration.get("use_weights", True))
-        nan_policy = self.configuration.get("nan_policy", "omit")
-        reduction = self.configuration.get("reduction", "mean")
+        use_weights = bool(self.configuration["use_weights"])
+        nan_policy = self.configuration["nan_policy"]
+        reduction = self.configuration["reduction"]
         if nan_policy not in {"omit", "propagate"}:
             raise ValueError(f"Invalid nan_policy: {nan_policy!r}. Use 'omit' or 'propagate'.")
         if reduction not in {"mean", "sum"}:

@@ -49,7 +49,7 @@ class UnitsLabelUpdate(ProcessStep):
 
     def dependency_contract(self) -> ProcessStepDependencies:
         processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
-        basedata_keys = {str(key).strip() for key in self.configuration.get("update_pairs", {}) if str(key).strip()}
+        basedata_keys = {str(key).strip() for key in self.configuration["update_pairs"] if str(key).strip()}
         paths = {
             f"{processing_key}.{basedata_key}" for processing_key in processing_keys for basedata_key in basedata_keys
         }

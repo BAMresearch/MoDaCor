@@ -118,15 +118,15 @@ class PolarizationCorrection(ProcessStep):
     @staticmethod
     def _offset_from_config(cfg: dict[str, Any]) -> float:
         value = cfg.get("polarization_angular_offset")
-        units = cfg.get("polarization_angular_offset_units", "degree")
+        units = cfg["polarization_angular_offset_units"]
         return float((float(value) * ureg.Unit(str(units))).to(ureg.radian).magnitude)
 
     def dependency_contract(self) -> ProcessStepDependencies:
         cfg = self.configuration or {}
         keys = cfg.get("with_processing_keys")
-        two_theta_key = cfg.get("two_theta_key", "TwoTheta")
-        psi_key = cfg.get("psi_key", "Psi")
-        correction_key = cfg.get("correction_key", "polarization_factor_map")
+        two_theta_key = cfg["two_theta_key"]
+        psi_key = cfg["psi_key"]
+        correction_key = cfg["correction_key"]
         return ProcessStepDependencies(
             source_refs=(),
             processing_reads=(
@@ -142,7 +142,7 @@ class PolarizationCorrection(ProcessStep):
 
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration
-        mode = str(cfg.get("mode", "linear_fraction")).strip().lower()
+        mode = str(cfg["mode"]).strip().lower()
         if mode == "stokes":
             raise NotImplementedError(
                 "PolarizationCorrection mode='stokes' is reserved until the Stokes reference-frame convention is set."
@@ -152,13 +152,13 @@ class PolarizationCorrection(ProcessStep):
 
         fraction = self._fraction_from_config(cfg)
         offset_radian = self._offset_from_config(cfg)
-        minimum = float(cfg.get("minimum_polarization_factor", 1e-12))
+        minimum = float(cfg["minimum_polarization_factor"])
         if minimum <= 0:
             raise ValueError("minimum_polarization_factor must be positive.")
 
-        two_theta_key = cfg.get("two_theta_key", "TwoTheta")
-        psi_key = cfg.get("psi_key", "Psi")
-        correction_key = cfg.get("correction_key", "polarization_factor_map")
+        two_theta_key = cfg["two_theta_key"]
+        psi_key = cfg["psi_key"]
+        correction_key = cfg["correction_key"]
 
         output: dict[str, DataBundle] = {}
         for key in self._normalised_processing_keys():

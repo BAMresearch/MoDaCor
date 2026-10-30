@@ -72,26 +72,17 @@ def _install_dummy_iosource_module(monkeypatch) -> Tuple[str, List[tuple]]:
     return loader_path, calls
 
 
-def _make_append_source_instance() -> AppendSource:
-    """
-    Create an AppendSource instance without going through ProcessStep.__init__.
-
-    We only need 'configuration' and 'io_sources' for these tests, so __new__
-    is sufficient and avoids coupling to ProcessStep's constructor signature.
-    """
-    instance = AppendSource.__new__(AppendSource)
-    return instance
-
-
 def test_append_single_source(monkeypatch):
     loader_path, calls = _install_dummy_iosource_module(monkeypatch)
 
-    step = _make_append_source_instance()
-    step.configuration = {
-        "source_identifier": "sample_source",
-        "source_location": "/tmp/sample.dat",
-        "iosource_module": loader_path,
-    }
+    step = AppendSource()
+    step.modify_config_by_dict(
+        {
+            "source_identifier": "sample_source",
+            "source_location": "/tmp/sample.dat",
+            "iosource_module": loader_path,
+        }
+    )
     step.io_sources = IoSources()
 
     result = step.calculate()
@@ -109,12 +100,14 @@ def test_append_single_source(monkeypatch):
 def test_append_multiple_sources(monkeypatch):
     loader_path, calls = _install_dummy_iosource_module(monkeypatch)
 
-    step = _make_append_source_instance()
-    step.configuration = {
-        "source_identifier": ["src1", "src2"],
-        "source_location": ["/tmp/file1.dat", "/tmp/file2.dat"],
-        "iosource_module": loader_path,
-    }
+    step = AppendSource()
+    step.modify_config_by_dict(
+        {
+            "source_identifier": ["src1", "src2"],
+            "source_location": ["/tmp/file1.dat", "/tmp/file2.dat"],
+            "iosource_module": loader_path,
+        }
+    )
     step.io_sources = IoSources()
 
     result = step.calculate()
@@ -136,12 +129,14 @@ def test_append_multiple_sources(monkeypatch):
 def test_mismatched_source_lengths_raises(monkeypatch):
     loader_path, _ = _install_dummy_iosource_module(monkeypatch)
 
-    step = _make_append_source_instance()
-    step.configuration = {
-        "source_identifier": ["src1", "src2"],
-        "source_location": ["/tmp/only_one.dat"],
-        "iosource_module": loader_path,
-    }
+    step = AppendSource()
+    step.modify_config_by_dict(
+        {
+            "source_identifier": ["src1", "src2"],
+            "source_location": ["/tmp/only_one.dat"],
+            "iosource_module": loader_path,
+        }
+    )
     step.io_sources = IoSources()
 
     with pytest.raises(ValueError, match="counts must match"):
@@ -151,7 +146,7 @@ def test_mismatched_source_lengths_raises(monkeypatch):
 def test_existing_source_is_not_overwritten(monkeypatch):
     loader_path, calls = _install_dummy_iosource_module(monkeypatch)
 
-    step = _make_append_source_instance()
+    step = AppendSource()
     step.io_sources = IoSources()
 
     class PreExistingSource(IoSource):
@@ -167,11 +162,13 @@ def test_existing_source_is_not_overwritten(monkeypatch):
     step.io_sources.register_source(PreExistingSource(ref="existing", loc="/tmp/original.dat"))
 
     # Configuration attempts to append a source with the same identifier
-    step.configuration = {
-        "source_identifier": "existing",
-        "source_location": "/tmp/new_location.dat",
-        "iosource_module": loader_path,
-    }
+    step.modify_config_by_dict(
+        {
+            "source_identifier": "existing",
+            "source_location": "/tmp/new_location.dat",
+            "iosource_module": loader_path,
+        }
+    )
 
     result = step.calculate()
 

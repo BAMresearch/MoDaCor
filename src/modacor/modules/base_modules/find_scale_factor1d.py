@@ -217,12 +217,12 @@ class FindScaleFactor1D(ProcessStep):
         if len(processing_keys) != 2:
             return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
         work_key, reference_key = processing_keys
-        signal_key = str(self.configuration.get("signal_key", "signal"))
-        axis_key = str(self.configuration.get("independent_axis_key", "Q"))
-        scale_key = str(self.configuration.get("scale_output_key", "scale_factor"))
+        signal_key = str(self.configuration["signal_key"])
+        axis_key = str(self.configuration["independent_axis_key"])
+        scale_key = str(self.configuration["scale_output_key"])
         writes = {f"{work_key}.{scale_key}"}
-        if bool(self.configuration.get("fit_background", False)):
-            background_key = str(self.configuration.get("background_output_key", "scale_background"))
+        if bool(self.configuration["fit_background"]):
+            background_key = str(self.configuration["background_output_key"])
             writes.add(f"{work_key}.{background_key}")
         diagnostic_prefix = self.configuration.get("diagnostic_prefix")
         if diagnostic_prefix is not None:
@@ -253,8 +253,8 @@ class FindScaleFactor1D(ProcessStep):
             raise ValueError("FindScaleFactor1D requires exactly two processing keys in 'with_processing_keys'.")
         work_key, ref_key = keys
 
-        sig_key = cfg.get("signal_key", "signal")
-        axis_key = cfg.get("independent_axis_key", "Q")
+        sig_key = cfg["signal_key"]
+        axis_key = cfg["independent_axis_key"]
 
         work_db = self.processing_data[work_key]
         ref_db = self.processing_data[ref_key]
@@ -274,7 +274,7 @@ class FindScaleFactor1D(ProcessStep):
         x_work = x_work_bd.signal.squeeze()
         x_ref = x_ref_bd.signal.squeeze()
 
-        fit_model = str(cfg.get("fit_model", "normal")).strip().lower()
+        fit_model = str(cfg["fit_model"]).strip().lower()
         if fit_model not in {"normal", "lognormal"}:
             raise ValueError("FindScaleFactor1D fit_model must be 'normal' or 'lognormal'.")
         uncertainty_weight_key = cfg.get("uncertainty_weight_key")
@@ -305,14 +305,14 @@ class FindScaleFactor1D(ProcessStep):
             dep_work=dep_work,
             x_ref=x_ref,
             dep_ref=dep_ref,
-            require_overlap=cfg.get("require_overlap", True),
-            interpolation_kind=cfg.get("interpolation_kind", "linear"),
+            require_overlap=cfg["require_overlap"],
+            interpolation_kind=cfg["interpolation_kind"],
             fit_min=float(fit_min),
             fit_max=float(fit_max),
-            use_weights=cfg.get("use_basedata_weights", True),
+            use_weights=cfg["use_basedata_weights"],
         )
 
-        fit_background = bool(cfg.get("fit_background", False))
+        fit_background = bool(cfg["fit_background"])
         if fit_model == "lognormal":
             if fit_background:
                 raise ValueError("FindScaleFactor1D lognormal fitting does not support fit_background.")
@@ -321,12 +321,12 @@ class FindScaleFactor1D(ProcessStep):
             fit_result = fit_scale_factor_1d(
                 fit_data,
                 fit_background=fit_background,
-                robust_loss=cfg.get("robust_loss", "huber"),
-                robust_fscale=float(cfg.get("robust_fscale", 1.0)),
+                robust_loss=cfg["robust_loss"],
+                robust_fscale=float(cfg["robust_fscale"]),
             )
 
-        out_key = cfg.get("scale_output_key", "scale_factor")
-        scale_uncertainty_key = str(cfg.get("scale_uncertainty_key", "propagate_to_all")).strip()
+        out_key = cfg["scale_output_key"]
+        scale_uncertainty_key = str(cfg["scale_uncertainty_key"]).strip()
         if not scale_uncertainty_key:
             raise ValueError("FindScaleFactor1D scale_uncertainty_key must not be empty.")
         work_db[out_key] = BaseData(
@@ -337,8 +337,8 @@ class FindScaleFactor1D(ProcessStep):
         )
 
         if fit_background:
-            bg_key = cfg.get("background_output_key", "scale_background")
-            background_uncertainty_key = str(cfg.get("background_uncertainty_key", "propagate_to_all")).strip()
+            bg_key = cfg["background_output_key"]
+            background_uncertainty_key = str(cfg["background_uncertainty_key"]).strip()
             if not background_uncertainty_key:
                 raise ValueError("FindScaleFactor1D background_uncertainty_key must not be empty.")
             work_db[bg_key] = BaseData(
