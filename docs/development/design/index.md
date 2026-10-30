@@ -11,6 +11,7 @@ source of truth when they differ from runtime code or maintainer documentation.
 :maxdepth: 1
 
 documentation-architecture
+code-quality-remediation
 capillary-self-absorption
 pixel-unit-removal
 tiled-io-upgrade
