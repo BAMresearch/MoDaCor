@@ -73,7 +73,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | done |
 | R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
-| R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | in review |
+| R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | R03a accepted; R03b ready |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | open |
 | R05 | Test coverage for arithmetic steps and low-coverage helpers | tests | S | medium | open |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
@@ -587,7 +587,7 @@ Record which route was taken and why.
 
 ## R03 — One source of truth for configuration defaults, with a guard test
 
-**Status:** in review (R03a only; R03b pending the maintainer checkpoint).
+**Status:** ready (R03b); R03a accepted
 
 **Problem.** Defaults are seeded from the schema (`ProcessStepDescriber.arguments`
 plus `CONFIG_KEYS`) when a step is constructed. Even so, modules contain about
@@ -695,7 +695,47 @@ currently prevents either from recurring.
   2 subtests passed**; `flake8 src tests` **0 violations**; isort **0 errors**.
 - Scope: only the new guard test and R03's tracker entry/overview status.
 
-**Review log.** _(reviewer)_
+**Review log.**
+
+- 2026-10-30, `a0740b6` (R03a, checkpoint): **accepted; proceed to R03b
+  with the directions below.**
+  - Verified: guard 11 passed; full suite 1074 passed, 1 skipped; flake8
+    clean. The scanner design is sound: it follows aliases, own methods and
+    shared helpers, excludes nested mappings, and has self-tests and probes
+    that reproduce the R01, R02 and `composition` defects.
+  - Known limitation, acceptable: only methods in the step's own
+    `__dict__` are scanned, so methods inherited from an intermediate base
+    class are not. No exported step currently inherits configuration reads
+    that way. Add a one-line comment in the test saying so.
+  - All 248 declared-key fallbacks equal the schema default, so removing
+    them changes no behavior.
+  - The 8 undeclared reads are dead code, not lost features. The reviewer
+    confirmed that configuring any of them raises `KeyError`:
+    - the four `{sample_mu, sample_radius, wall_mu, wall_thickness}_uncertainties_sources`
+      reads happen in `_scalar_with_uncertainties`, called via `_scalar()`,
+      which then discards the uncertainties (`sample_mu` given directly is
+      returned with `{}`, about line 405);
+    - the four `sample_phase_{absorption,transmission}_units[_source]` reads
+      come from the generic scalar helper for parameters that do not declare
+      units.
+
+  **R03b directions:**
+
+  1. Remove all literal fallbacks (mechanical, no behavior change). Empty
+     the allowlist.
+  2. Make `_scalar()` stop reading `<name>_uncertainties_sources`: call the
+     scalar helper without uncertainty sources instead of discarding them
+     afterwards. No behavior change.
+  3. Declare `sample_phase_absorption_units` and
+     `sample_phase_transmission_units` (type `str`, default
+     `"dimensionless"`) and their `_units_source` keys (default `None`), as
+     every other scalar parameter of this step already has. This also lets a
+     source supply a transmission in percent. Add a test with a value in
+     `percent` that converts correctly.
+  4. Do not add uncertainty support for directly given `sample_mu`. Whether
+     to add it is a maintainer decision and belongs to R04, which rewrites
+     the μ derivation.
+
 
 ---
 
