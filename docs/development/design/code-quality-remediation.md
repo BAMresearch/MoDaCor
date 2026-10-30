@@ -70,6 +70,8 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | ID | Item | Kind | Cost | Benefit | Status |
 | --- | --- | --- | --- | --- | --- |
 | R01 | `PolarizationCorrection` fails when no factor is set | bug | XS | high | done |
+| R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | ready |
+| R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | open |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | open |
@@ -153,6 +155,131 @@ if both are set to different values. Keep the range check.
     orphan document. The entry is committed with this review.
   - Future items: commit only the item's own files; the reviewer commits
     tracker updates.
+
+---
+
+## R01b — One input per setting: remove configuration aliases and the mask-key fallback
+
+**Status:** ready
+
+**Principle (maintainer decision, 2026-10-30).** Each setting has exactly one
+input. MoDaCor does not accept aliases, alternative spellings, or
+case-variant fallbacks for configuration keys or `BaseData` keys. Every alias
+needs a precedence rule, a conflict check and tests. The existing aliases
+already disagree: `PolarizationCorrection` lets the American factor spelling
+win and rejects conflicts (R01), while the British offset spellings silently
+override the American ones.
+
+**Usage check (reviewer, 2026-10-30).** Searched MoDaCor, MoDaCor-examples and
+the maintainer's 2025/2026 project folders (YAML, notebooks, Python, Markdown):
+
+- `polarisation_*` keys: no uses outside the step, its tests and its
+  reference page.
+- `chemical_composition`: no uses.
+- `ThresholdMask.threshold`: one use, in
+  `tests/modules/base_modules/test_threshold_mask.py`.
+- The capillary `mask`/`Mask` fallback: no pipeline uses either capillary
+  correction.
+
+**Mask-key convention (maintainer delegated, reviewer decided).** The canonical
+key is lowercase `mask`. Fixed core keys are lowercase (`signal`,
+`uncertainties`, and NeXus `mask`); capitalized keys are derived physical
+quantities (`Q`, `Psi`, `TwoTheta`, `Omega`, `CosAlpha`). Seven of the eight
+mask-key defaults are already `mask`. Case-insensitive lookup (`.lower()`) was
+rejected. `DataBundle` keys are case-sensitive, so `mask` and `Mask` can both
+exist in one bundle, and a case-insensitive lookup would reintroduce two names
+for one thing.
+
+**Scope.**
+
+1. **`PolarizationCorrection`:** remove `polarisation_factor`,
+   `polarisation_angular_offset` and `polarisation_angular_offset_units`, and
+   simplify `_fraction_from_config` and `_offset_from_config` to one key each
+   (`None` factor → 0.5). Keep `polarisation` in `step_keywords` so search
+   still finds the step. Replace R01's alias tests with tests showing that each
+   British key is rejected with `KeyError`.
+2. **`AttenuatorPlateCorrection` and `DetectorEfficiencyCorrection`:** remove
+   the `chemical_composition` alias for `material`, including its resolution
+   code and dependency handling.
+3. **`ThresholdMask`:** remove the deprecated `threshold` alias for
+   `upper_bound`, and update the test that uses it to `upper_bound`.
+4. **Capillary corrections** (`capillary_self_absorption_correction.py` and
+   `capillary_sample_container_correction.py`): remove the `mask`/`Mask`
+   fallback in the mask lookup (`get_first_present` with aliases) and the
+   matching special case in `dependency_contract()`. Read exactly the
+   configured key.
+5. **`IndexedAverager.mask_key`:** today it defaults to `"Mask"` and silently
+   skips masking when that key is absent
+   (`indexed_averager.py`, about line 297).
+   A pipeline that names its mask `mask` (the default everywhere else) but
+   omits `mask_key` gets no averager masking and no warning. Every maintained
+   MoDaCor-examples pipeline sets `mask_key` explicitly to avoid this.
+   Change it to:
+   - default `None`, meaning no mask, with the documentation saying so;
+   - a configured `mask_key` that is missing from the bundle raises
+     `KeyError` naming the key and the bundle, instead of being skipped;
+   - an updated dependency contract, so `None` adds no read.
+
+   Check `FindScaleFactor1D`, `ApplyMask`, `ReduceMask`, `BitwiseOrMasks` and
+   `DilateMask` for the same "skip if absent" pattern on configured keys.
+   Report what you find in the notes, but change only `IndexedAverager`.
+
+**Out of scope.** Configuration keys whose values legitimately accept several
+forms, such as `XSGeometryFromPixelCoordinates.sample_z_override` taking a
+value/units or NeXus mapping. They are one input with a structured value, not
+aliases.
+
+**Compatibility.** This removes public configuration keys and changes a
+default, so it is a breaking change for semantic-release. The commit or the
+pull-request merge must carry a `BREAKING CHANGE:` footer listing the removed
+keys and the new `IndexedAverager.mask_key` default. Add a section to
+`docs/processing/interface-migrations.md`, following its existing style.
+
+**Acceptance criteria.**
+
+- No step's arguments documentation contains "alias" (verify with the
+  reviewer's alias scan in the review log), and the capillary modules no
+  longer contain `"Mask"`.
+- Tests:
+  - each removed key is rejected with `KeyError`;
+  - the capillary steps do not find a `Mask` entry when configured for
+    `mask`;
+  - `IndexedAverager` with `mask_key=None` ignores a present mask, with a
+    configured key it applies the mask, and with a configured but missing key
+    it raises `KeyError`;
+  - `dependency_contract()` assertions for the changed steps.
+- Reference pages regenerated (`--check` clean); module `__version__` values
+  bumped; full suite and flake8 clean.
+- Commit as `R01b: <summary>` with the `BREAKING CHANGE:` footer. Touch only
+  R01b's files.
+
+**Implementation notes.** _(implementer)_
+
+**Review log.** _(reviewer)_
+
+---
+
+## R01c — "Did you mean …?" hint for unknown configuration keys
+
+**Status:** open (optional; after R01b)
+
+**Problem.** With aliases removed, a misspelled key (for example
+`polarisation_factor`) fails at construction with `KeyError` listing every
+known key. That is correct but noisy for steps with many arguments.
+
+**Approach.** In `ProcessStep`'s unknown-key check, add the closest matches from
+`difflib.get_close_matches(key, known_keys, n=3, cutoff=0.6)` to the message,
+for example `Unknown key 'polarisation_factor'. Did you mean
+'polarization_factor'?`. Keep the existing message and exception type, so that
+`KeyError` and its match patterns in tests keep working.
+
+**Acceptance criteria.** A focused test in `tests/dataclasses/` shows the hint
+for a near miss and no hint for an unrelated key; existing tests pass
+unchanged.
+
+**Implementation notes.** _(implementer)_
+
+**Review log.** _(reviewer)_
 
 ---
 
@@ -632,6 +759,11 @@ that an existing MoDaCor step already does, which should be replaced; or
 (c) numerics with no MoDaCor equivalent, which is a candidate for a new step in
 MoDaCor. The reviewer and maintainer then decide what to migrate. Validate any
 replacement against the existing I22 run outputs within stated tolerances.
+
+Also found on 2026-10-30: `DLS/B21/pipelines/B21_frame_prefilter.yaml` uses
+`module: FramewiseIndexedAverager`, which does not exist in MoDaCor, so that
+pipeline cannot run. Include it in the inventory: either port it to
+`IndexedAverager` or mark it as unmaintained.
 
 **Acceptance criteria.** Inventory reviewed; migrated paths reproduce previous
 outputs; any remaining DAWN-derived constants keep their provenance comments.
