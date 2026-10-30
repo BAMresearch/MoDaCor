@@ -70,7 +70,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | ID | Item | Kind | Cost | Benefit | Status |
 | --- | --- | --- | --- | --- | --- |
 | R01 | `PolarizationCorrection` fails when no factor is set | bug | XS | high | done |
-| R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | open |
+| R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | in review |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | open |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | open |
 | R05 | Test coverage for arithmetic steps and low-coverage helpers | tests | S | medium | open |
@@ -158,7 +158,7 @@ if both are set to different values. Keep the range check.
 
 ## R02 — `DilateMask` documents an alias that is rejected
 
-**Status:** open
+**Status:** in review
 
 **Problem.** The `radius` argument documents the aliases `number_of_pixels` and
 `number_of_pixels_to_dilate`, and `calculate()` reads both. Neither is
@@ -190,7 +190,27 @@ Record which route was taken and why.
   or the alias taking effect.
 - The reference page is regenerated and passes `--check`.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- Searched both `/Users/bpauw/Code/MoDaCor` and
+  `/Users/bpauw/Documents/BAM/Projects/2026/MoDaCor_examples` with
+  `rg -n --hidden -g '!.git/**' 'number_of_pixels' <repo roots>` before
+  editing. Found 6 matching lines in MoDaCor: 2 in `dilate_mask.py`, 1 in
+  `docs/reference/modules/DilateMask.md`, and 3 in this tracker. The examples
+  checkout had 0 matches; neither checkout had pipeline YAML using either
+  alias.
+- Chose the preferred removal route: removed the dead alias fallback and the
+  alias documentation. `radius` remains the supported key; both aliases
+  continue to raise `KeyError` at construction.
+- Added tests for rejection of both aliases and for radius documentation that
+  does not advertise them. Before the fix: 1 failed, 1 passed, 6 deselected,
+  2 subtests passed. The documentation regression fails on the original code.
+- Bumped the module version to `20261030.1` and regenerated the reference pages.
+- Validation: DilateMask tests 8 passed, 2 subtests passed; full suite
+  1023 passed, 1 skipped, 3 warnings, 2 subtests passed;
+  `flake8 src tests` 0 violations; reference `--check` 0 errors;
+  isort 0 errors; Sphinx build 0 warnings, 0 errors.
+- Scope is limited to R02; no related items were changed.
 
 **Review log.** _(reviewer)_
 

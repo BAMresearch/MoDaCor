@@ -62,6 +62,17 @@ class TestDilateMaskProcessingStep(unittest.TestCase):
         self.assertEqual(out.dtype, np.uint32)
         np.testing.assert_array_equal(out, expected)
 
+    def test_rejects_unsupported_radius_aliases(self):
+        for alias in ("number_of_pixels", "number_of_pixels_to_dilate"):
+            with self.subTest(alias=alias):
+                with self.assertRaisesRegex(KeyError, alias):
+                    DilateMask(io_sources=IoSources(), configuration={alias: 2})
+
+    def test_radius_documentation_does_not_advertise_unsupported_aliases(self):
+        radius_doc = DilateMask.documentation.arguments["radius"]["doc"]
+
+        self.assertNotIn("number_of_pixels", radius_doc)
+
     def test_preserves_bitfield_reasons_independently(self):
         source = np.zeros((5, 5), dtype=np.uint32)
         source[2, 2] = 1

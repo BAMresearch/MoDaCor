@@ -11,7 +11,7 @@ __date__ = "02/09/2026"
 __status__ = "Development"
 
 __all__ = ["DilateMask"]
-__version__ = "20260927.2"
+__version__ = "20261030.1"
 
 from pathlib import Path
 from typing import Any
@@ -60,7 +60,7 @@ class DilateMask(ProcessStep):
             "radius": {
                 "type": int,
                 "default": 1,
-                "doc": "Dilation radius in pixels. Aliases: number_of_pixels, number_of_pixels_to_dilate.",
+                "doc": "Dilation radius in pixels.",
             },
             "footprint_shape": {
                 "type": str,
@@ -114,7 +114,7 @@ class DilateMask(ProcessStep):
 
     @staticmethod
     def _radius_from_config(cfg: dict[str, Any]) -> int:
-        value = cfg.get("radius", cfg.get("number_of_pixels", cfg.get("number_of_pixels_to_dilate", 1)))
+        value = cfg.get("radius", 1)
         radius = int(value)
         if radius < 0:
             raise ValueError("DilateMask radius must be >= 0.")
