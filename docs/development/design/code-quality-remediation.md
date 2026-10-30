@@ -160,7 +160,7 @@ if both are set to different values. Keep the range check.
 
 ## R01b — One input per setting: remove configuration aliases and the mask-key fallback
 
-**Status:** in review
+**Status:** done
 
 **Principle (maintainer decision, 2026-10-30).** Each setting has exactly one
 input. MoDaCor does not accept aliases, alternative spellings, or
@@ -464,6 +464,25 @@ Sphinx 0 warnings/0 errors. Unrelated checkout edits were preserved.
   Commit these as `R01b: review fixes` in MoDaCor, plus a separate examples
   commit for item 1.
 
+- 2026-10-30, MoDaCor `5b4242d` + `5432355`, MoDaCor-examples `3829895`:
+  **done.**
+  - Item 1: `MOUSE_solids_operando.yaml` reads from `sample_static::` again;
+    `MOUSE_solids.yaml` still uses `sample::`.
+  - Item 2: the schema defaults for both capillary `mask_key` settings are
+    now `None`, as is `empty_mask_key` (which falls back to `mask_key`). A
+    configured key that is missing raises `KeyError` naming the key and the
+    bundle. Tests cover the default with no mask, applied masks, missing
+    configured and inherited keys, and the dependency contracts.
+    `BREAKING CHANGE:` footer and migration text present.
+  - Item 3: `get_first_present` removed; no references remain.
+  - Item 4: the NIST-name wording is corrected in both steps.
+  - Verified: full suite 1063 passed, 1 skipped; flake8 clean; reference
+    `--check` clean; Sphinx `-W` clean; examples tests 23 passed.
+  - Maintainer action after merge: rename `material` / `material_source` in
+    the six experiment pipelines listed in the Implementation notes. Any
+    experiment pipeline using a capillary correction must now set
+    `mask_key: mask` to keep masking; none were found on 2026-10-30.
+
 
 ---
 
@@ -596,6 +615,14 @@ currently prevents either from recurring.
    - no `.get(key, fallback)` is used where the fallback is a literal. Allow a
      fallback only where the schema default is `None` and the `None` case is
      handled explicitly, and mark it inline with a short reason comment.
+
+   Also treat as reads the key names passed as string literals to the shared
+   configuration helpers (`scalar_quantity_from_config_or_source`,
+   `text_from_config_or_source`, and any other helper taking `cfg` plus a
+   key name), including the derived `<name>_source`, `<name>_units` and
+   `<name>_units_source` keys those helpers read. The undeclared
+   `composition` key found during R01b was read through such a helper, so a
+   scan limited to `self.configuration` would have missed it.
 
    Reads from nested configuration dictionaries (for example
    `ReduceDimensionality`'s `uncertainty_estimation` mapping) are not reads of
