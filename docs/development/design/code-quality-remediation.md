@@ -73,7 +73,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | done |
 | R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
-| R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | open |
+| R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | in review |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | open |
 | R05 | Test coverage for arithmetic steps and low-coverage helpers | tests | S | medium | open |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
@@ -587,7 +587,7 @@ Record which route was taken and why.
 
 ## R03 — One source of truth for configuration defaults, with a guard test
 
-**Status:** open. Do this after R01 and R02.
+**Status:** in review (R03a only; R03b pending the maintainer checkpoint).
 
 **Problem.** Defaults are seeded from the schema (`ProcessStepDescriber.arguments`
 plus `CONFIG_KEYS`) when a step is constructed. Even so, modules contain about
@@ -643,7 +643,57 @@ currently prevents either from recurring.
   have a test.
 - Reference pages are regenerated if any default changed.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- R03a adds `tests/modules/test_configuration_defaults.py`; production code,
+  defaults, versions and reference pages are unchanged. R03b has not started:
+  stop here for the requested maintainer checkpoint.
+- Scans the 41 exported, non-deprecated steps. Tracks `self.configuration`,
+  its local aliases (including `or {}`), and parameters receiving that mapping.
+  Follows local methods and shared helpers with literal key-name arguments,
+  including derived `_source`, `_units` and `_units_source` reads. Nested
+  mappings and unrelated local dictionaries are excluded. Shared helpers are
+  checked for declared reads, not for their reusable fallback policy.
+- Baseline: **260 violations**, each explicitly listed by step, key, problem
+  and source location in an exact allowlist: **252 literal fallback diagnostics
+  and 8 undeclared-key diagnostics**. Four occurrences have both problems.
+  New diagnostics and stale allowlist entries fail. R03b must empty this list.
+- **Fallback/default differences:** none for declared keys; all 248 literal
+  fallback diagnostics for declared keys equal the effective schema default.
+  No changed default has been chosen in R03a.
+- Four additional `{}` fallbacks have **no schema entry**, rather than a
+  differing schema default, all in
+  `CapillarySelfAbsorptionCorrection._scalar_with_uncertainties`:
+  `sample_mu_uncertainties_sources`, `sample_radius_uncertainties_sources`,
+  `wall_mu_uncertainties_sources`, `wall_thickness_uncertainties_sources`.
+  Fallback: `{}`; schema: undeclared; chosen value: deferred to R03b.
+- The other four undeclared helper reads are
+  `sample_phase_absorption_units`, `sample_phase_absorption_units_source`,
+  `sample_phase_transmission_units`, `sample_phase_transmission_units_source`
+  in `CapillarySelfAbsorptionCorrection`. R03b must resolve these reads as
+  part of emptying the allowlist; no scientific behavior was changed here.
+- Temporary regression probes each produced **1 failed** guard test, then
+  were reverted before validation and commit. Representative failing lines:
+
+  ```text
+  DilateMask: number_of_pixels: undeclared configuration key (dilate_mask.py:117)
+  AttenuatorPlateCorrection: composition: undeclared configuration key (material_attenuation.py:93)
+  PolarizationCorrection: polarization_factor: literal fallback 0.5; schema default None (polarization_correction.py:110)
+  ```
+
+  The R02 probe nested `cfg.get("number_of_pixels", 1)` in the radius read.
+  The helper probe replaced the `chemical_formula` text-helper argument with
+  `composition`; it also caught `composition_source` and both reads for
+  `DetectorEfficiencyCorrection`. The R01 probe restored the misleading 0.5
+  fallback against the seeded `None` default.
+- Guard self-tests check all four scalar-helper key forms and both text-helper
+  forms, exclusion of nested mappings, and the requirement for a `None` schema
+  default plus an inline `# config-default: <reason>` marker for exceptions.
+  Any such R03b exception must also retain explicit handling of `None`.
+- Validation: guard **11 passed**; affected-module tests **76 passed,
+  2 subtests passed**; full suite **1074 passed, 1 skipped, 3 warnings,
+  2 subtests passed**; `flake8 src tests` **0 violations**; isort **0 errors**.
+- Scope: only the new guard test and R03's tracker entry/overview status.
 
 **Review log.** _(reviewer)_
 
