@@ -73,8 +73,8 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | done |
 | R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
-| R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | in review |
-| R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | open |
+| R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
+| R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | ready |
 | R05 | Test coverage for arithmetic steps and low-coverage helpers | tests | S | medium | open |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
 | R07 | Declarative fixed-key dependencies; retire most `dependency_contract()` overrides | design | M–L | high | decision needed |
@@ -587,7 +587,7 @@ Record which route was taken and why.
 
 ## R03 — One source of truth for configuration defaults, with a guard test
 
-**Status:** in review
+**Status:** done
 
 **Problem.** Defaults are seeded from the schema (`ProcessStepDescriber.arguments`
 plus `CONFIG_KEYS`) when a step is constructed. Even so, modules contain about
@@ -844,9 +844,32 @@ currently prevents either from recurring.
 
 ---
 
+- 2026-10-30, `c6fe394` (R03b): **done.**
+  - Verified independently: guard 13 passed with an empty
+    `ALLOWED_VIOLATIONS`; full suite 1084 passed, 1 skipped; flake8 clean;
+    reference `--check` clean; Sphinx `-W` clean. The reviewer's original
+    AST drift script finds 0 fallbacks; its only remaining hits are the
+    nested `ReduceDimensionality` estimator mapping, which the guard
+    correctly excludes.
+  - The reachability scan matches the checkpoint classification: the 4
+    unreachable `_measured_transmission` reads are excluded, and the 9
+    reachable undeclared reads are resolved by directions 2 and 3.
+  - Versions: only the two capillary modules were bumped (metadata changed);
+    pure fallback removals were not. As directed.
+  - `AppendSource` tests now use the real constructor and
+    `modify_config_by_dict` instead of `__new__` plus a replacement dict.
+    That is correct: removing fallbacks means code relies on seeded
+    defaults. The reviewer checked that no production code (runner, server,
+    client, MoDaCor-examples) replaces `step.configuration` wholesale; only
+    `ProcessStep.__attrs_post_init__` assigns it.
+  - Consequence worth knowing: steps now rely on `ProcessStep` seeding every
+    declared default. Code that builds steps while bypassing the
+    constructor, as the old `AppendSource` tests did, will get `KeyError`.
+    That is acceptable and arguably desirable.
+
 ## R04 — Derive capillary sample μ through `BaseData`
 
-**Status:** open
+**Status:** ready
 
 **Problem.** `CapillarySelfAbsorptionCorrection._sample_mu` (about lines
 395–440) derives μ = −ln(T)/t from an absorption or transmission and a
