@@ -75,7 +75,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
-| R05 | Test coverage for arithmetic steps and low-coverage helpers | tests | S | medium | ready |
+| R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | ready |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
 | R07 | Declarative fixed-key dependencies; retire most `dependency_contract()` overrides | design | M–L | high | decision needed |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | open |
@@ -1001,39 +1001,65 @@ read for it was dead code and was removed in R03b.
 
 ---
 
-## R05 — Test coverage for arithmetic steps and low-coverage helpers
+## R05 — Core-container validation and untested contracts (rescoped)
 
 **Status:** ready
 
-**Problem.** Steps that are widely used and simple to test are poorly covered:
+**Rescoped 2026-10-30 (reviewer correction).** The original R05 table was
+wrong: the reviewer had read the coverage report's "Missing" column as the
+percentage. For example, "divide_databundles 63 %" meant "line 63 uncovered".
+Re-measured, the `*_databundles` steps, `negate`, `models/integration`,
+`helpers/statistics` and `io/buffer/codec` are all at 87–96 %. The real
+gaps found by re-measuring (overall coverage 83.2 %) are below.
 
-| File | Line coverage |
-| --- | --- |
-| `divide_databundles.py` | 63 % |
-| `multiply_databundles.py` | 61 % |
-| `subtract_databundles.py` | 57 % |
-| `negate.py` | 45 % |
-| `solid_angle_correction.py` | about 70 % |
-| `models/centroid.py` | 51 % |
-| `models/integration.py` | partial |
-| `modules/helpers/statistics.py` | 40 % |
-| `io/buffer/codec.py` | 26 % |
+**Scope.**
 
-**Approach.** Add focused tests only. Production changes are limited to fixing
-genuine bugs that the tests expose, recorded in the notes. For each step, cover:
+1. **Bug: `ProcessingData` validation can be bypassed.** `__setitem__`
+   enforces "string key, `DataBundle` value", but `ProcessingData({"a": 1})`,
+   `.update({"a": 1})` and `.setdefault("a", 1)` all accept a non-`DataBundle`
+   (verified). `DataBundle` already rejects these routes for its own
+   contract; follow its implementation pattern. Cover the constructor,
+   `update`, `setdefault`, `__setitem__` and `__repr__`. The file is at
+   52 %; the lines in `__setitem__`'s error branches and `__repr__` are
+   untested.
+2. **Dead code: `dataclasses/validators.py`** (38 %). None of its four
+   functions (`is_list_of_ints`, `check_data`, `arrays_are_equal_shape`,
+   `check_data_element_and_units`) is used anywhere in `src/` or `tests/`.
+   The only reference is a commented-out import in `process_step.py`.
+   Delete the module and that comment. Check the docs and API reference
+   pages for references and remove them.
+3. **`SolidAngleCorrection.calculate()` is never executed by any test.** It
+   is the only exported step in that position (the reviewer measured every
+   step's `calculate()` coverage). The only reference is a dependency-contract
+   test. Add `tests/modules/technique_modules/scattering/test_solid_angle_correction.py`:
+   signal ÷ Omega with units and uncertainty propagation through `BaseData`,
+   several processing keys, the error when `Omega` is missing, and the
+   existing contract assertion kept or moved there.
+4. **`IoSource`/`IoSink` base contracts** (`io_source.py` 75 %,
+   `io_sink.py` 73 %, `io_sinks.py` 70 %): add focused tests that the base
+   classes raise the documented unsupported-capability `NotImplementedError`
+   for each optional method, and that the `IoSinks` registry's error paths
+   (unknown ref, duplicate registration, malformed `ref::path`) behave as
+   `docs/development/io-source-sink-guide.md` describes. If the
+   implementation and the guide disagree, report it; do not pick one.
 
-- units and uncertainty propagation through `BaseData`;
-- the error paths (missing keys, incompatible shapes or units); and
-- a `dependency_contract()` assertion of `source_refs`, `processing_reads`, and
-  `processing_writes`, following `tests/modules/base_modules/test_apply_mask.py`.
+**Out of scope.** `server/runtime_service.py` (67 % of 744 statements) and
+the `client/` modules (48–76 %) move to **R11 step 0** as characterization
+tests before the split. `cli.py`, `debug/`, the plotting steps and the
+tiled source are lower priority and are not part of this item.
 
 **Acceptance criteria.**
 
-- Each listed file reaches at least 90 % line coverage, or the notes explain
+- `ProcessingData` rejects invalid entries on every insertion route, with
+  regression tests that fail on the current code.
+- `validators.py` is gone and nothing references it.
+- `solid_angle_correction.py`, `processing_data.py`, `io_source.py` and
+  `io_sink.py` reach at least 90 % line coverage, or the notes explain
   which lines are unreachable.
-- Overall coverage does not drop.
+- Overall coverage does not drop. Full suite and flake8 clean.
 - Command:
-  `.venv-dev/bin/python -m pytest -q --cov=src/modacor --cov-report=term-missing <touched test files>`
+  `.venv-dev/bin/python -m pytest -q --cov=src/modacor --cov-report=term-missing <touched test files>`.
+  Read the **Cover** column, not "Missing".
 
 **Implementation notes.** _(implementer)_
 
@@ -1241,6 +1267,14 @@ change to the server's API error responses (`tests/server` unchanged).
 It covers health and policy, session CRUD, source and sink management, buffer
 I/O, chunked-output lifecycle, process planning, execution, failure handling,
 and the auto-fallback path. This makes changes risky and review hard.
+
+**Step 0 (added 2026-10-30): characterization tests first.**
+`runtime_service.py` is at 67 % line coverage (744 statements) and the
+`client/` modules at 48–76 %. Before moving any code, raise
+`runtime_service.py` to at least 85 % with tests through the public
+`RuntimeService` methods and `server/api.py`, focusing on the uncovered
+failure, recovery and fallback paths. These tests are the safety net for the
+split and must pass unchanged after every extraction commit.
 
 **Approach.** A behavior-preserving extraction, keeping `RuntimeService` as a
 thin facade so `server/api.py` and the client are untouched:
