@@ -70,7 +70,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | ID | Item | Kind | Cost | Benefit | Status |
 | --- | --- | --- | --- | --- | --- |
 | R01 | `PolarizationCorrection` fails when no factor is set | bug | XS | high | done |
-| R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | in review |
+| R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | done |
 | R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | open |
