@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySampleContainerCorrection"]
-__version__ = "20261030.3"
+__version__ = "20261030.4"
 
 from copy import deepcopy
 from pathlib import Path
@@ -182,7 +182,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             "The filled and empty signals must already have comparable exposure and incident-flux normalization. "
             "Do not include a separate normalization by measured sample or empty-capillary transmission in the "
             "same correction pipeline. The operation is [F - (A_c,sc/A_c,c) E] / A_s,sc. "
-            "Uncertainties of directly configured sample/wall mu, empty-centre mu, capillary radius and wall "
+            "Uncertainties of directly configured wall mu, empty-centre mu, capillary radius and wall "
             "thickness are not yet propagated; see the capillary design note."
         ),
     )

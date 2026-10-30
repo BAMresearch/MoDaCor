@@ -7,7 +7,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 - **Import path:** `modacor.modules.technique_modules.scattering.capillary_self_absorption_correction.CapillarySelfAbsorptionCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/capillary_self_absorption_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/capillary_self_absorption_correction.py)
 - **Module ID:** CapillarySelfAbsorptionCorrection
-- **Module version:** 20261030.3
+- **Module version:** 20261030.4
 - **Keywords:** sample, self absorption, capillary, cylinder, transmission
 
 ## Required data keys
@@ -70,6 +70,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
   "sample_mu": null,
   "sample_mu_sensitivity_relative_step": 0.01,
   "sample_mu_source": null,
+  "sample_mu_uncertainties_sources": {},
   "sample_mu_units": "1/m",
   "sample_mu_units_source": null,
   "sample_phase_absorption": null,
@@ -137,6 +138,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 | `sample_mu` | int or float or NoneType | No | - | - | Sample linear attenuation coefficient; alternatively use its source or phase-factor inputs. |
 | `sample_mu_sensitivity_relative_step` | int or float | No | 0.01 | - | Relative finite-difference step for derived-sample-mu uncertainty propagation. |
 | `sample_mu_source` | str or NoneType | No | - | - | Optional IoSources reference for sample linear attenuation coefficient. |
+| `sample_mu_uncertainties_sources` | dict | No | {} | - | Mapping of uncertainty name to IoSources reference for sample_mu. |
 | `sample_mu_units` | str | No | 1/m | - | Sample-mu reciprocal-length units. |
 | `sample_mu_units_source` | str or NoneType | No | - | - | Optional IoSources reference for sample-mu units. |
 | `sample_phase_absorption` | int or float or NoneType | No | - | - | Sample-only absorbed fraction A=1-T; use with sample_phase_thickness instead of sample_mu. |
@@ -175,4 +177,4 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 https://doi.org/10.1021/acs.cgd.5c00551
 
 ## Notes
-The default capillary axis is horizontal; tilted straight capillaries are supported. Measured transmission is an effective whole-beam value, not a centreline estimate of mu. This step is only for sample-origin scattering after consistent container removal or when wall scattering is negligible; filled/empty attenuation-aware container subtraction requires the separate composite correction. Uncertainties of directly configured sample/wall mu, capillary radius and wall thickness are not yet propagated; see the capillary design note.
+The default capillary axis is horizontal; tilted straight capillaries are supported. Measured transmission is an effective whole-beam value, not a centreline estimate of mu. This step is only for sample-origin scattering after consistent container removal or when wall scattering is negligible; filled/empty attenuation-aware container subtraction requires the separate composite correction. Uncertainties of directly configured wall mu, capillary radius and wall thickness are not yet propagated; see the capillary design note.

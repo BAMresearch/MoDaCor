@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySelfAbsorptionCorrection"]
-__version__ = "20261030.3"
+__version__ = "20261030.4"
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -168,6 +168,11 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 "type": (str, type(None)),
                 "default": None,
                 "doc": "Optional IoSources reference for sample-mu units.",
+            },
+            "sample_mu_uncertainties_sources": {
+                "type": dict,
+                "default": {},
+                "doc": "Mapping of uncertainty name to IoSources reference for sample_mu.",
             },
             "sample_phase_absorption": {
                 "type": (int, float, type(None)),
@@ -346,7 +351,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             "This step is only for sample-origin scattering after consistent container removal or when wall "
             "scattering is negligible; filled/empty attenuation-aware container subtraction requires the "
             "separate composite correction. "
-            "Uncertainties of directly configured sample/wall mu, capillary radius and wall thickness are not yet "
+            "Uncertainties of directly configured wall mu, capillary radius and wall thickness are not yet "
             "propagated; see the capillary design note."
         ),
     )
@@ -392,7 +397,8 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         )
         return 0.0 if data is None else scalar_in_units(data, units, name=name)
 
-    def _scalar_with_uncertainties(self, name: str, units: str, *, required: bool) -> tuple[float, dict[str, float]]:
+    def _scalar_basedata(self, name: str, units: str, *, required: bool) -> BaseData:
+        """Load a scalar quantity, retaining units and named uncertainties for arithmetic."""
         data = scalar_quantity_from_config_or_source(
             self.io_sources,
             self.configuration,
@@ -402,7 +408,20 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             uncertainty_sources=self.configuration[f"{name}_uncertainties_sources"],
         )
         if data is None:
-            return 0.0, {}
+            return BaseData(signal=np.asarray(0.0), units=ureg.Unit(units))
+        value, uncertainties = self._scalar_components(data, units, name=name)
+        return BaseData(
+            signal=np.asarray(value),
+            units=ureg.Unit(units),
+            uncertainties={key: np.asarray(sigma) for key, sigma in uncertainties.items()},
+        )
+
+    def _scalar_with_uncertainties(self, name: str, units: str, *, required: bool) -> tuple[float, dict[str, float]]:
+        return self._scalar_components(self._scalar_basedata(name, units, required=required), units, name=name)
+
+    @staticmethod
+    def _scalar_components(data: BaseData, units: str, *, name: str) -> tuple[float, dict[str, float]]:
+        """Validate constant-valued input or reduce a quantity at the numerical boundary."""
         value = scalar_in_units(data, units, name=name)
         converted = data.copy(with_axes=False)
         converted.to_units(ureg.Unit(units))
@@ -430,7 +449,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         if derived_count > 1:
             raise ValueError("Configure only one of sample_phase_absorption and sample_phase_transmission.")
         if has_mu:
-            return _ResolvedSampleMu(self._scalar("sample_mu", "1/m", required=True), {})
+            return _ResolvedSampleMu(*self._scalar_with_uncertainties("sample_mu", "1/m", required=True))
         if not derived_count:
             raise ValueError("Configure sample_mu, sample_phase_absorption, or sample_phase_transmission.")
         if not self._is_configured("sample_phase_thickness"):
@@ -438,34 +457,20 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 "sample_phase_thickness is required when deriving sample_mu from absorption or transmission."
             )
 
-        thickness, thickness_uncertainties = self._scalar_with_uncertainties(
-            "sample_phase_thickness", "m", required=True
-        )
-        if not np.isfinite(thickness) or thickness <= 0.0:
+        thickness = self._scalar_basedata("sample_phase_thickness", "m", required=True)
+        if not np.isfinite(thickness.signal) or thickness.signal <= 0.0:
             raise ValueError("sample_phase_thickness must be finite and positive.")
         if has_absorption:
-            absorption, factor_uncertainties = self._scalar_with_uncertainties(
-                "sample_phase_absorption", "dimensionless", required=True
-            )
-            if not np.isfinite(absorption) or not 0.0 <= absorption < 1.0:
+            absorption = self._scalar_basedata("sample_phase_absorption", "dimensionless", required=True)
+            if not np.isfinite(absorption.signal) or not 0.0 <= absorption.signal < 1.0:
                 raise ValueError("sample_phase_absorption must be finite and in [0, 1).")
-            transmission = 1.0 - absorption
-            factor_derivative = 1.0 / (thickness * transmission)
+            transmission = 1 - absorption
         else:
-            transmission, factor_uncertainties = self._scalar_with_uncertainties(
-                "sample_phase_transmission", "dimensionless", required=True
-            )
-            if not np.isfinite(transmission) or not 0.0 < transmission <= 1.0:
+            transmission = self._scalar_basedata("sample_phase_transmission", "dimensionless", required=True)
+            if not np.isfinite(transmission.signal) or not 0.0 < transmission.signal <= 1.0:
                 raise ValueError("sample_phase_transmission must be finite and in (0, 1].")
-            factor_derivative = -1.0 / (thickness * transmission)
-        sample_mu = float(-np.log(transmission) / thickness)
-        thickness_derivative = -sample_mu / thickness
-        uncertainties = {}
-        for uncertainty_name in factor_uncertainties.keys() | thickness_uncertainties.keys():
-            factor_component = factor_derivative * factor_uncertainties.get(uncertainty_name, 0.0)
-            thickness_component = thickness_derivative * thickness_uncertainties.get(uncertainty_name, 0.0)
-            uncertainties[uncertainty_name] = float(np.hypot(factor_component, thickness_component))
-        return _ResolvedSampleMu(sample_mu, uncertainties)
+        sample_mu = -transmission.log() / thickness
+        return _ResolvedSampleMu(*self._scalar_components(sample_mu, "1/m", name="sample_mu"))
 
     def _geometry_and_coefficients(
         self,

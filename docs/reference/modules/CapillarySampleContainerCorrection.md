@@ -7,7 +7,7 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
 - **Import path:** `modacor.modules.technique_modules.scattering.capillary_sample_container_correction.CapillarySampleContainerCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/capillary_sample_container_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/capillary_sample_container_correction.py)
 - **Module ID:** CapillarySampleContainerCorrection
-- **Module version:** 20261030.3
+- **Module version:** 20261030.4
 - **Keywords:** sample, container, capillary, absorption, subtraction
 
 ## Required data keys
@@ -83,6 +83,7 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
   "sample_mu": null,
   "sample_mu_sensitivity_relative_step": 0.01,
   "sample_mu_source": null,
+  "sample_mu_uncertainties_sources": {},
   "sample_mu_units": "1/m",
   "sample_mu_units_source": null,
   "sample_phase_absorption": null,
@@ -156,6 +157,7 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
 | `sample_mu` | int or float or NoneType | No | - | - | Sample linear attenuation coefficient; alternatively use its source or phase-factor inputs. |
 | `sample_mu_sensitivity_relative_step` | int or float | No | 0.01 | - | Relative finite-difference step for derived-sample-mu uncertainty propagation. |
 | `sample_mu_source` | str or NoneType | No | - | - | Optional IoSources reference for sample linear attenuation coefficient. |
+| `sample_mu_uncertainties_sources` | dict | No | {} | - | Mapping of uncertainty name to IoSources reference for sample_mu. |
 | `sample_mu_units` | str | No | 1/m | - | Sample-mu reciprocal-length units. |
 | `sample_mu_units_source` | str or NoneType | No | - | - | Optional IoSources reference for sample-mu units. |
 | `sample_phase_absorption` | int or float or NoneType | No | - | - | Sample-only absorbed fraction A=1-T; use with sample_phase_thickness instead of sample_mu. |
@@ -196,4 +198,4 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
 https://doi.org/10.1107/S0021889810021114
 
 ## Notes
-The filled and empty signals must already have comparable exposure and incident-flux normalization. Do not include a separate normalization by measured sample or empty-capillary transmission in the same correction pipeline. The operation is [F - (A_c,sc/A_c,c) E] / A_s,sc. Uncertainties of directly configured sample/wall mu, empty-centre mu, capillary radius and wall thickness are not yet propagated; see the capillary design note.
+The filled and empty signals must already have comparable exposure and incident-flux normalization. Do not include a separate normalization by measured sample or empty-capillary transmission in the same correction pipeline. The operation is [F - (A_c,sc/A_c,c) E] / A_s,sc. Uncertainties of directly configured wall mu, empty-centre mu, capillary radius and wall thickness are not yet propagated; see the capillary design note.

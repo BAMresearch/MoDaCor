@@ -74,7 +74,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
-| R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | ready |
+| R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | in review |
 | R05 | Test coverage for arithmetic steps and low-coverage helpers | tests | S | medium | open |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
 | R07 | Declarative fixed-key dependencies; retire most `dependency_contract()` overrides | design | M–L | high | decision needed |
@@ -869,7 +869,7 @@ currently prevents either from recurring.
 
 ## R04 — Derive capillary sample μ through `BaseData`
 
-**Status:** ready
+**Status:** in review
 
 **Problem.** `CapillarySelfAbsorptionCorrection._sample_mu` (about lines
 395–440) derives μ = −ln(T)/t from an absorption or transmission and a
@@ -939,7 +939,36 @@ read for it was dead code and was removed in R03b.
   derived route within tight tolerance. Without uncertainty sources, results
   are identical to before.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- 2026-10-30: wrote and ran the analytic comparison tests before changing
+  runtime code: 4 passed. Both absorption and transmission routes match the
+  analytic μ and uncertainty components at `rel=1e-14`, with distinct names
+  and a shared name. `BaseData` and the previous implementation both combine
+  shared-name operand contributions in quadrature; no correlation decision
+  was required.
+- Added `_scalar_basedata` for validated, constant-valued input quantities and
+  reused the scalar uncertainty validation at the numerical boundary. The
+  derivation is now `-transmission.log() / thickness`, with `1 - absorption`
+  for absorbed fractions. Reduction to `_ResolvedSampleMu` converts to `1/m`.
+  Existing domain validation messages are preserved. The attenuation kernels
+  and their finite-difference uncertainty propagation are unchanged.
+- Declared `sample_mu_uncertainties_sources`; configured and source-loaded
+  direct μ now carry named components through both capillary steps. Extension
+  and dependency regression tests failed before implementation: 6 failed.
+  Tests compare direct and equivalent derived μ uncertainties on the resolved
+  coefficient, attenuation factor and corrected signal, and verify identical
+  nominal results with no uncertainty sources.
+- Confirmed `source_refs_from_references(cfg)` recursively visits dictionary
+  values; both dependency-contract tests assert the new uncertainty source
+  refs and unchanged processing reads/writes. No dependency implementation
+  change was needed.
+- Updated both `step_note`s and the capillary design note. Bumped both
+  capillary module versions to `20261030.4`. Regenerated the reference pages
+  and checked them: 0 mismatches. Sphinx build: 0 warnings.
+- Validation: capillary tests 71 passed; configuration guard 13 passed; full
+  suite 1094 passed, 1 skipped, 3 warnings, 2 subtests passed; `flake8 src tests`
+  0 violations. No changes to other remediation items.
 
 **Review log.** _(reviewer)_
 

@@ -19,10 +19,15 @@ from modacor.modules.technique_modules.scattering.capillary_sample_container_cor
 class CompositeUncertaintySource(IoSource):
     def get_data(self, data_key, load_slice=...):
         values = {
+            "/sample_mu": np.asarray(500.0),
+            "/sample_mu_sem": np.asarray(5.0),
             "/sample_transmission_sem": np.asarray(2.0e-3),
             "/sample_thickness_sem": np.asarray(1.0e-2),
         }
         return values[data_key]
+
+    def get_static_metadata(self, data_key):
+        return "1/m"
 
 
 def _processing(filled_signal, empty_signal, *, filled_mask=None, empty_mask=None):
@@ -431,3 +436,50 @@ def test_optional_mask_dependency_contract(mask_key, empty_mask_key):
     assert contract.source_refs == frozenset()
     assert contract.processing_reads == expected_reads
     assert contract.processing_writes == expected_writes
+
+
+@pytest.mark.parametrize("from_source", [False, True])
+def test_direct_mu_uncertainty_matches_derived_route(from_source):
+    direct = _processing(np.full((3, 3), 10.0), np.full((3, 3), 2.0))
+    derived = _processing(np.full((3, 3), 10.0), np.full((3, 3), 2.0))
+    nominal = _processing(np.full((3, 3), 10.0), np.full((3, 3), 2.0))
+    config = {"sample_mu_uncertainties_sources": {"mu_SEM": "measurement::/sample_mu_sem"}}
+    if from_source:
+        config.update(
+            sample_mu=None,
+            sample_mu_source="measurement::/sample_mu",
+            sample_mu_units_source="measurement::/sample_mu@units",
+        )
+    _run(direct, **config)
+    _run(
+        derived,
+        sample_mu=None,
+        sample_phase_transmission=float(np.exp(-0.5)),
+        sample_phase_thickness=1.0,
+        sample_phase_thickness_units="mm",
+        sample_phase_thickness_uncertainties_sources={"mu_SEM": "measurement::/sample_thickness_sem"},
+    )
+    _run(nominal)
+    for key in ("capillary_effective_sample_mu", "capillary_sample_attenuation", "signal"):
+        actual = direct["sample"][key]
+        expected = derived["sample"][key]
+        np.testing.assert_allclose(actual.signal, nominal["sample"][key].signal, rtol=0, atol=0)
+        np.testing.assert_allclose(actual.signal, expected.signal, rtol=1e-13)
+        np.testing.assert_allclose(
+            actual.uncertainties["mu_SEM"], expected.uncertainties["mu_SEM"], rtol=1e-13, atol=1e-15
+        )
+        assert "mu_SEM" not in nominal["sample"][key].uncertainties
+    assert np.any(direct["sample"]["signal"].uncertainties["mu_SEM"] > 0)
+
+
+def test_dependency_contract_includes_direct_mu_uncertainty_sources():
+    step = CapillarySampleContainerCorrection(
+        configuration={"sample_mu_uncertainties_sources": {"mu_SEM": "calibration::/mu_sem"}},
+    )
+    baseline = CapillarySampleContainerCorrection().dependency_contract()
+    contract = step.dependency_contract()
+    assert contract == ProcessStepDependencies(
+        source_refs=frozenset({"calibration"}),
+        processing_reads=baseline.processing_reads,
+        processing_writes=baseline.processing_writes,
+    )
