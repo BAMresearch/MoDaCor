@@ -7,7 +7,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 - **Import path:** `modacor.modules.technique_modules.scattering.capillary_self_absorption_correction.CapillarySelfAbsorptionCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/capillary_self_absorption_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/capillary_self_absorption_correction.py)
 - **Module ID:** CapillarySelfAbsorptionCorrection
-- **Module version:** 20261030.1
+- **Module version:** 20261030.2
 - **Keywords:** sample, self absorption, capillary, cylinder, transmission
 
 ## Required data keys
@@ -62,7 +62,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
     1.0
   ],
   "input_state": "transmission_normalized",
-  "mask_key": "mask",
+  "mask_key": null,
   "max_depth": 10,
   "minimum_attenuation_factor": 1e-12,
   "profile_retained_fraction_key": "capillary_beam_profile_retained_fraction",
@@ -125,7 +125,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 | `evaluation_mode` | str | No | adaptive | - | Adaptive detector-grid interpolation or exact active-pixel point rays. |
 | `incident_direction` | tuple | No | [0.0, 0.0, 1.0] | - | Incident beam propagation direction in the lab frame. |
 | `input_state` | str | No | transmission_normalized | - | One of raw, flux_normalized, or transmission_normalized. |
-| `mask_key` | str or NoneType | No | mask | - | Optional boolean mask key; True pixels are inactive and retain identity factors. |
+| `mask_key` | str or NoneType | No | - | - | Boolean mask key; None means no mask. A configured key must exist; True pixels retain identity factors. |
 | `max_depth` | int | No | 10 | - | Maximum adaptive subdivision depth. |
 | `minimum_attenuation_factor` | int or float | No | 1e-12 | - | Minimum allowed active-pixel attenuation divisor. |
 | `profile_retained_fraction_key` | str | No | capillary_beam_profile_retained_fraction | - | Retained incident-weight fraction after beam-profile truncation or thresholding. |

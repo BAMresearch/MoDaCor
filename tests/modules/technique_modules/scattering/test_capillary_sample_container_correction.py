@@ -65,6 +65,7 @@ def _processing(filled_signal, empty_signal, *, filled_mask=None, empty_mask=Non
 def _configuration(**overrides):
     config = {
         "filled_processing_key": "sample",
+        "mask_key": "mask",
         "empty_processing_key": "background",
         "sample_radius": 1.0,
         "sample_radius_units": "mm",
@@ -342,6 +343,91 @@ def test_invalid_composite_configuration_is_rejected(overrides, message):
 
 def test_configured_mask_does_not_fall_back_to_capitalized_key():
     bundle = DataBundle(Mask=BaseData(np.ones((2, 3), dtype=bool), ureg.dimensionless, rank_of_data=2))
-    assert not np.any(CapillarySampleContainerCorrection._mask_array(bundle, "mask", (2, 3)))
+    with pytest.raises(KeyError, match="mask.*sample"):
+        CapillarySampleContainerCorrection._mask_array(bundle, "mask", (2, 3), bundle_key="sample")
     bundle["mask"] = BaseData(np.zeros((2, 3), dtype=bool), ureg.dimensionless, rank_of_data=2)
-    assert not np.any(CapillarySampleContainerCorrection._mask_array(bundle, "mask", (2, 3)))
+    assert not np.any(CapillarySampleContainerCorrection._mask_array(bundle, "mask", (2, 3), bundle_key="sample"))
+
+
+@pytest.mark.parametrize("present_mask", [False, True])
+def test_no_mask_by_default_ignores_present_masks(present_mask):
+    processing = _processing(np.ones((5, 7)), np.zeros((5, 7)))
+    for bundle in processing.values():
+        if present_mask:
+            bundle["mask"].signal[:] = True
+        else:
+            bundle.pop("mask")
+    cfg = _configuration()
+    cfg.pop("mask_key")
+    step = CapillarySampleContainerCorrection(io_sources=IoSources(), configuration=cfg)
+    assert step.configuration["mask_key"] is None
+    assert step.configuration["empty_mask_key"] is None
+    step.processing_data = processing
+    step.calculate()
+    assert np.all(processing["sample"]["capillary_sample_attenuation"].signal < 1.0)
+
+
+@pytest.mark.parametrize("bundle_key, mask_key", [("sample", "filled_excluded"), ("background", "empty_excluded")])
+def test_missing_configured_mask_names_key_and_bundle(bundle_key, mask_key):
+    cfg = {"mask_key": None}
+    cfg["mask_key" if bundle_key == "sample" else "empty_mask_key"] = mask_key
+    with pytest.raises(KeyError, match=f"{mask_key}.*{bundle_key}"):
+        _run(_processing(np.ones((5, 7)), np.zeros((5, 7))), **cfg)
+
+
+def test_missing_inherited_empty_mask_names_key_and_bundle():
+    processing = _processing(np.ones((5, 7)), np.zeros((5, 7)))
+    processing["background"].pop("mask")
+    with pytest.raises(KeyError, match="mask.*background"):
+        _run(processing, mask_key="mask", empty_mask_key=None)
+
+
+def test_separate_empty_mask_is_applied_without_filled_mask():
+    processing = _processing(np.ones((5, 7)), np.zeros((5, 7)))
+    processing["background"]["excluded"] = processing["background"].pop("mask")
+    processing["background"]["excluded"].signal[1, 2] = True
+    _run(processing, mask_key=None, empty_mask_key="excluded")
+    factors = processing["sample"]["capillary_sample_attenuation"].signal
+    assert factors[1, 2] == 1.0
+    assert factors[0, 0] < 1.0
+
+
+@pytest.mark.parametrize(
+    "mask_key, empty_mask_key",
+    [(None, None), ("excluded", None), ("excluded", "empty_excluded"), (None, "empty_excluded")],
+)
+def test_optional_mask_dependency_contract(mask_key, empty_mask_key):
+    step = CapillarySampleContainerCorrection(
+        io_sources=IoSources(), configuration=_configuration(mask_key=mask_key, empty_mask_key=empty_mask_key)
+    )
+    contract = step.dependency_contract()
+    expected_reads = {
+        "sample.signal",
+        "sample.coord_x",
+        "sample.coord_y",
+        "sample.coord_z",
+        "background.signal",
+    }
+    expected_writes = {
+        "sample.signal",
+        "sample.capillary_sample_attenuation",
+        "sample.capillary_wall_attenuation_filled",
+        "sample.capillary_wall_attenuation_empty",
+        "sample.capillary_wall_subtraction_scale",
+        "sample.capillary_filled_calculated_transmission",
+        "sample.capillary_empty_calculated_transmission",
+        "sample.capillary_effective_sample_mu",
+        "sample.capillary_beam_profile_retained_fraction",
+        "sample.capillary_sample_attenuation_evaluated",
+        "sample.capillary_wall_filled_attenuation_evaluated",
+        "sample.capillary_wall_empty_attenuation_evaluated",
+    }
+    if mask_key is not None:
+        expected_reads.add(f"sample.{mask_key}")
+        expected_writes.add(f"sample.{mask_key}")
+    resolved_empty_key = mask_key if empty_mask_key is None else empty_mask_key
+    if resolved_empty_key is not None:
+        expected_reads.add(f"background.{resolved_empty_key}")
+    assert contract.source_refs == frozenset()
+    assert contract.processing_reads == expected_reads
+    assert contract.processing_writes == expected_writes

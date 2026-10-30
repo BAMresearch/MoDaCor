@@ -71,6 +71,7 @@ def _processing_data(*, masked=True, nan_at_mask=False):
 def _configuration(**overrides):
     config = {
         "with_processing_keys": ["sample"],
+        "mask_key": "mask",
         "sample_radius": 1.0,
         "sample_radius_units": "mm",
         "wall_thickness": 0.1,
@@ -404,6 +405,54 @@ def test_configured_mask_does_not_fall_back_to_capitalized_key():
     bundle["Mask"] = bundle.pop("mask")
     step = CapillarySelfAbsorptionCorrection(io_sources=_sources())
     step.modify_config_by_dict(_configuration(mask_key="mask"))
-    assert np.all(step._active_mask(bundle, bundle["Mask"].shape))
+    with pytest.raises(KeyError, match="mask.*sample"):
+        step._active_mask(bundle, bundle["Mask"].shape, bundle_key="sample")
     bundle["mask"] = BaseData(np.zeros(bundle["Mask"].shape, dtype=bool), ureg.dimensionless, rank_of_data=2)
-    assert np.all(step._active_mask(bundle, bundle["Mask"].shape))
+    assert np.all(step._active_mask(bundle, bundle["Mask"].shape, bundle_key="sample"))
+
+
+@pytest.mark.parametrize("present_mask", [False, True])
+def test_no_mask_by_default_ignores_present_mask(present_mask):
+    processing = _processing_data(masked=True)
+    if not present_mask:
+        processing["sample"].pop("mask")
+    cfg = _configuration()
+    cfg.pop("mask_key")
+    step = CapillarySelfAbsorptionCorrection(io_sources=_sources(), configuration=cfg)
+    assert step.configuration["mask_key"] is None
+    step.processing_data = processing
+    step.calculate()
+    assert processing["sample"]["capillary_sample_attenuation"].signal[3, 4] < 1.0
+
+
+def test_configured_mask_is_applied():
+    processing = _processing_data(masked=True)
+    _run(processing, mask_key="mask")
+    assert processing["sample"]["capillary_sample_attenuation"].signal[3, 4] == 1.0
+
+
+def test_missing_configured_mask_names_key_and_bundle():
+    with pytest.raises(KeyError, match="excluded.*sample"):
+        _run(_processing_data(), mask_key="excluded")
+
+
+@pytest.mark.parametrize("mask_key", [None, "excluded"])
+def test_optional_mask_dependency_contract(mask_key):
+    step = CapillarySelfAbsorptionCorrection(io_sources=_sources(), configuration=_configuration(mask_key=mask_key))
+    contract = step.dependency_contract()
+    assert contract.source_refs == frozenset()
+    assert contract.processing_reads == {
+        "sample.signal",
+        "sample.coord_x",
+        "sample.coord_y",
+        "sample.coord_z",
+    } | ({f"sample.{mask_key}"} if mask_key is not None else set())
+    assert contract.processing_writes == {
+        "sample.signal",
+        "sample.capillary_sample_attenuation",
+        "sample.capillary_self_absorption",
+        "sample.capillary_calculated_transmission",
+        "sample.capillary_effective_sample_mu",
+        "sample.capillary_beam_profile_retained_fraction",
+        "sample.capillary_attenuation_evaluated",
+    }

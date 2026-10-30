@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping, MutableMapping, Sequence, TypeVar
+__version__ = "20261030.1"
+
+from typing import Any, Mapping, MutableMapping, Sequence
 
 from modacor.modules.helpers.statistics import WeightedScatterEstimates, finalize_weighted_scatter
 
@@ -12,12 +14,9 @@ __all__ = [
     "WeightedScatterEstimates",
     "attach_prepared_data",
     "finalize_weighted_scatter",
-    "get_first_present",
     "leading_non_data_axes",
     "normalize_str_list",
 ]
-
-T = TypeVar("T")
 
 
 def leading_non_data_axes(ndim: int, rank_of_data: int) -> tuple[int, ...]:
@@ -38,13 +37,6 @@ def normalize_str_list(value: Sequence[str] | str | None) -> list[str] | None:
     if isinstance(value, str):
         return [value]
     return [str(item) for item in value]
-
-
-def get_first_present(mapping: Mapping[str, T], *keys: str) -> T | None:
-    for key in keys:
-        if key in mapping:
-            return mapping[key]
-    return None
 
 
 def attach_prepared_data(

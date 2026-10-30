@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 __all__ = ["AttenuatorPlateCorrection"]
-__version__ = "20261030.1"
+__version__ = "20261030.2"
 
 from pathlib import Path
 
@@ -94,12 +94,18 @@ class AttenuatorPlateCorrection(ProcessStep):
             "chemical_formula": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "Chemical formula in xraylib syntax, e.g. SiO2; not a material name.",
+                "doc": (
+                    "Chemical formula in xraylib syntax, e.g. SiO2. Exact xraylib NIST "
+                    "compound names (e.g. Kapton Polyimide Film) are also accepted."
+                ),
             },
             "chemical_formula_source": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "Optional IoSources key for a chemical formula in xraylib syntax; not a material name.",
+                "doc": (
+                    "Optional IoSources key for a chemical formula in xraylib syntax, e.g. SiO2. Exact xraylib NIST "
+                    "compound names (e.g. Kapton Polyimide Film) are also accepted."
+                ),
             },
             "density": {
                 "type": (int, float, type(None)),

@@ -23,8 +23,9 @@ Removed configuration keys raise `KeyError`; update existing YAML as follows:
 | `AttenuatorPlateCorrection`, `DetectorEfficiencyCorrection` | `material_source`, `chemical_composition_source` | `chemical_formula_source` |
 | `ThresholdMask` | `threshold` | `upper_bound` |
 
-`chemical_formula` is a chemical formula in xraylib syntax, e.g. `SiO2`;
-not a material name. Bare element symbols such as `Si` are valid. Names such
+`chemical_formula` is a chemical formula in xraylib syntax, e.g. `SiO2`.
+Exact xraylib NIST compound names (e.g. `Kapton Polyimide Film`) are also
+accepted. Bare element symbols such as `Si` are valid; informal names such
 as `Silicon` or `Kapton` are not supported. Invalid formulas raise `ValueError`
 naming the formula and preserve xraylib's original error as the cause.
 The helper result field `MaterialAttenuation.material` is also renamed to
@@ -37,6 +38,15 @@ now raises `ValueError` naming the conflicting keys.
 Both capillary corrections read exactly the configured mask key. They no
 longer search for `Mask` when configured for `mask`, or vice versa. Lowercase
 `mask` is the canonical convention; keys remain case-sensitive.
+
+`CapillarySelfAbsorptionCorrection.mask_key` and
+`CapillarySampleContainerCorrection.mask_key` now default to `None`, meaning
+no masking even if a mask is present. Set `mask_key: mask` to enable masking.
+Any configured mask key that is absent raises `KeyError` naming the key and
+its input bundle. `CapillarySampleContainerCorrection.empty_mask_key` still
+defaults to `None`, meaning use `mask_key` for the empty bundle as well.
+With both keys `None`, neither bundle is masked. To mask only the empty
+bundle, set `mask_key: null` and `empty_mask_key` to its mask's key.
 
 `IndexedAverager.mask_key` now defaults to `None`, meaning no masking even if
 a mask is present. Set `mask_key: mask` to use the canonical mask, or explicitly

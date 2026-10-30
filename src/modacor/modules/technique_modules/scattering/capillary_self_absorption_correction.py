@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySelfAbsorptionCorrection"]
-__version__ = "20261030.1"
+__version__ = "20261030.2"
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -99,8 +99,11 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             "coord_z_key": {"type": str, "default": "coord_z", "doc": "Detector lab z-coordinate key."},
             "mask_key": {
                 "type": (str, type(None)),
-                "default": "mask",
-                "doc": "Optional boolean mask key; True pixels are inactive and retain identity factors.",
+                "default": None,
+                "doc": (
+                    "Boolean mask key; None means no mask. A configured key must exist; True pixels retain identity"
+                    " factors."
+                ),
             },
             "capillary_axis": {
                 "type": tuple,
@@ -335,8 +338,8 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             cfg.get("coord_y_key", "coord_y"),
             cfg.get("coord_z_key", "coord_z"),
         ]
-        mask_key = cfg.get("mask_key", "mask")
-        if mask_key:
+        mask_key = cfg.get("mask_key")
+        if mask_key is not None:
             read_keys.append(mask_key)
         write_keys = [
             "signal",
@@ -564,13 +567,15 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             raise ValueError(f"Detector coordinates must broadcast to a two-dimensional grid, got {x.shape}.")
         return np.stack((x, y, z), axis=-1)
 
-    def _active_mask(self, databundle: DataBundle, detector_shape: tuple[int, int]) -> np.ndarray:
-        mask_key = self.configuration.get("mask_key", "mask")
-        if not mask_key:
+    def _active_mask(self, databundle: DataBundle, detector_shape: tuple[int, int], *, bundle_key: str) -> np.ndarray:
+        mask_key = self.configuration.get("mask_key")
+        if mask_key is None:
             return np.ones(detector_shape, dtype=bool)
-        mask_data = databundle.get(mask_key)
-        if mask_data is None:
-            return np.ones(detector_shape, dtype=bool)
+        if mask_key not in databundle:
+            raise KeyError(
+                f"CapillarySelfAbsorptionCorrection: mask key {mask_key!r} missing from bundle {bundle_key!r}."
+            )
+        mask_data = databundle[mask_key]
         raw_mask = np.asarray(mask_data.signal, dtype=bool)
         if raw_mask.ndim > 2 and raw_mask.shape[-2:] == detector_shape:
             # A detector pixel is globally inactive only when it is masked in
@@ -674,7 +679,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         for key in self._normalised_processing_keys():
             databundle = self.processing_data[key]
             detector_grid = self._coordinate_grid(databundle, coordinate_keys)
-            active = self._active_mask(databundle, detector_grid.shape[:2])
+            active = self._active_mask(databundle, detector_grid.shape[:2], bundle_key=key)
             if evaluation_mode == "adaptive":
                 adaptive = adaptive_attenuation_factors_on_grid(
                     geometry=geometry,

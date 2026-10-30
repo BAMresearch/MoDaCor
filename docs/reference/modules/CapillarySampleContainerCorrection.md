@@ -7,7 +7,7 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
 - **Import path:** `modacor.modules.technique_modules.scattering.capillary_sample_container_correction.CapillarySampleContainerCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/capillary_sample_container_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/capillary_sample_container_correction.py)
 - **Module ID:** CapillarySampleContainerCorrection
-- **Module version:** 20261030.1
+- **Module version:** 20261030.2
 - **Keywords:** sample, container, capillary, absorption, subtraction
 
 ## Required data keys
@@ -73,7 +73,7 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
     0.0,
     1.0
   ],
-  "mask_key": "mask",
+  "mask_key": null,
   "max_depth": 10,
   "minimum_attenuation_factor": 1e-12,
   "profile_retained_fraction_key": "capillary_beam_profile_retained_fraction",
@@ -136,13 +136,13 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
 | `empty_centre_mu_source` | str or NoneType | No | - | - | Optional IoSources reference for empty-centre attenuation. |
 | `empty_centre_mu_units` | str | No | 1/m | - | Empty-centre-mu reciprocal-length units. |
 | `empty_centre_mu_units_source` | str or NoneType | No | - | - | Optional IoSources reference for empty-centre-mu units. |
-| `empty_mask_key` | str or NoneType | No | - | - | Empty-capillary mask key; defaults to mask_key. |
+| `empty_mask_key` | str or NoneType | No | - | - | Empty-capillary mask key; None uses mask_key (no mask if both are None). A configured key must exist. |
 | `empty_processing_key` | str | Yes | background | - | DataBundle containing the matching empty-capillary measurement. |
 | `evaluation_mode` | str | No | adaptive | - | Adaptive detector-grid interpolation or exact active-pixel point rays. |
 | `filled_calculated_transmission_key` | str | No | capillary_filled_calculated_transmission | - | Output key for calculated filled-capillary transmission. |
 | `filled_processing_key` | str | Yes | sample | - | DataBundle containing the filled-capillary measurement and output signal. |
 | `incident_direction` | tuple | No | [0.0, 0.0, 1.0] | - | Incident beam propagation direction in the lab frame. |
-| `mask_key` | str or NoneType | No | mask | - | Optional boolean mask key; True pixels are inactive and retain identity factors. |
+| `mask_key` | str or NoneType | No | - | - | Boolean mask key; None means no mask. A configured key must exist; True pixels retain identity factors. |
 | `max_depth` | int | No | 10 | - | Maximum adaptive subdivision depth. |
 | `minimum_attenuation_factor` | int or float | No | 1e-12 | - | Minimum allowed active-pixel attenuation divisor. |
 | `profile_retained_fraction_key` | str | No | capillary_beam_profile_retained_fraction | - | Output key for retained beam-profile incident weight. |

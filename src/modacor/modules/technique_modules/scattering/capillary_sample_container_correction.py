@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySampleContainerCorrection"]
-__version__ = "20261030.1"
+__version__ = "20261030.2"
 
 from copy import deepcopy
 from pathlib import Path
@@ -64,7 +64,9 @@ _ARGUMENTS.update(
         "empty_mask_key": {
             "type": (str, type(None)),
             "default": None,
-            "doc": "Empty-capillary mask key; defaults to mask_key.",
+            "doc": (
+                "Empty-capillary mask key; None uses mask_key (no mask if both are None). A configured key must exist."
+            ),
         },
         "empty_centre_mu": {
             "type": (int, float, type(None)),
@@ -192,13 +194,15 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             cfg.get("coord_y_key", "coord_y"),
             cfg.get("coord_z_key", "coord_z"),
         )
-        mask_key = cfg.get("mask_key", "mask")
-        empty_mask_key = cfg.get("empty_mask_key") or mask_key
+        mask_key = cfg.get("mask_key")
+        empty_mask_key = cfg.get("empty_mask_key")
+        if empty_mask_key is None:
+            empty_mask_key = mask_key
         filled_reads = {"signal", *coordinate_names}
-        if mask_key:
+        if mask_key is not None:
             filled_reads.add(mask_key)
         empty_reads = {"signal"}
-        if empty_mask_key:
+        if empty_mask_key is not None:
             empty_reads.add(empty_mask_key)
         output_names = {
             "signal",
@@ -227,12 +231,14 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         )
 
     @staticmethod
-    def _mask_array(databundle: DataBundle, mask_key: str | None, target_shape) -> np.ndarray:
-        if not mask_key:
+    def _mask_array(databundle: DataBundle, mask_key: str | None, target_shape, *, bundle_key: str) -> np.ndarray:
+        if mask_key is None:
             return np.zeros(target_shape, dtype=bool)
-        mask_data = databundle.get(mask_key)
-        if mask_data is None:
-            return np.zeros(target_shape, dtype=bool)
+        if mask_key not in databundle:
+            raise KeyError(
+                f"CapillarySampleContainerCorrection: mask key {mask_key!r} missing from bundle {bundle_key!r}."
+            )
+        mask_data = databundle[mask_key]
         try:
             return np.broadcast_to(np.asarray(mask_data.signal, dtype=bool), target_shape).copy()
         except ValueError as error:
@@ -383,10 +389,12 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
                 "The last two filled-signal axes must match the detector-coordinate grid; "
                 f"got {filled_signal.signal.shape} and {detector_grid.shape[:2]}."
             )
-        mask_key = self.configuration.get("mask_key", "mask")
-        empty_mask_key = self.configuration.get("empty_mask_key") or mask_key
-        filled_mask = self._mask_array(filled, mask_key, filled_signal.shape)
-        empty_mask = self._mask_array(empty, empty_mask_key, empty_signal.shape)
+        mask_key = self.configuration.get("mask_key")
+        empty_mask_key = self.configuration.get("empty_mask_key")
+        if empty_mask_key is None:
+            empty_mask_key = mask_key
+        filled_mask = self._mask_array(filled, mask_key, filled_signal.shape, bundle_key=filled_key)
+        empty_mask = self._mask_array(empty, empty_mask_key, empty_signal.shape, bundle_key=empty_key)
         combined_mask = filled_mask | empty_mask
         active = (
             ~np.all(combined_mask, axis=tuple(range(combined_mask.ndim - 2)))
@@ -511,7 +519,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         )
 
         filled["signal"] = corrected
-        if mask_key:
+        if mask_key is not None:
             filled[mask_key] = BaseData(
                 signal=combined_mask,
                 units=ureg.dimensionless,

@@ -7,7 +7,7 @@ Divide signal by angle-dependent detector absorption efficiency.
 - **Import path:** `modacor.modules.technique_modules.scattering.detector_efficiency_correction.DetectorEfficiencyCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/detector_efficiency_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/detector_efficiency_correction.py)
 - **Module ID:** DetectorEfficiencyCorrection
-- **Module version:** 20261030.1
+- **Module version:** 20261030.2
 - **Keywords:** detector, efficiency, attenuation, absorption
 
 ## Required data keys
@@ -63,8 +63,8 @@ Divide signal by angle-dependent detector absorption efficiency.
 | `beam_energy_source` | str or NoneType | No | - | - | Optional IoSources key for incident beam energy. |
 | `beam_energy_units` | str | No | keV | - | Units for beam_energy. |
 | `beam_energy_units_source` | str or NoneType | No | - | - | Optional IoSources key for beam energy units. |
-| `chemical_formula` | str or NoneType | No | - | - | Chemical formula in xraylib syntax, e.g. SiO2; not a material name. |
-| `chemical_formula_source` | str or NoneType | No | - | - | Optional IoSources key for a chemical formula in xraylib syntax; not a material name. |
+| `chemical_formula` | str or NoneType | No | - | - | Chemical formula in xraylib syntax, e.g. SiO2. Exact xraylib NIST compound names (e.g. Kapton Polyimide Film) are also accepted. |
+| `chemical_formula_source` | str or NoneType | No | - | - | Optional IoSources key for a chemical formula in xraylib syntax, e.g. SiO2. Exact xraylib NIST compound names (e.g. Kapton Polyimide Film) are also accepted. |
 | `correction_key` | str | No | detector_efficiency | - | BaseData key used to store the applied relative or absolute efficiency map. |
 | `cos_alpha_key` | str | No | CosAlpha | - | BaseData key containing the incidence cosine n dot rhat. |
 | `density` | int or float or NoneType | No | - | - | Sensor material density. |
