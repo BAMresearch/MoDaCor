@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 __all__ = ["PolarizationCorrection"]
-__version__ = "20260927.2"
+__version__ = "20261030.1"
 
 from pathlib import Path
 from typing import Any
@@ -63,12 +63,14 @@ class PolarizationCorrection(ProcessStep):
             "polarization_factor": {
                 "type": (int, float, type(None)),
                 "default": None,
-                "doc": "Fraction of horizontally polarized intensity. 0.5 is unpolarized.",
+                "doc": (
+                    "Fraction of horizontally polarized intensity. Defaults to 0.5 (unpolarized) when neither spelling is set."
+                ),
             },
             "polarisation_factor": {
                 "type": (int, float, type(None)),
                 "default": None,
-                "doc": "British-spelling alias for polarization_factor.",
+                "doc": "British-spelling alias for polarization_factor. Both spellings must agree when set.",
             },
             "polarization_angular_offset": {
                 "type": (int, float),
@@ -121,8 +123,13 @@ class PolarizationCorrection(ProcessStep):
     @staticmethod
     def _fraction_from_config(cfg: dict[str, Any]) -> float:
         value = cfg.get("polarization_factor")
+        alias = cfg.get("polarisation_factor")
+        if value is not None and alias is not None and value != alias:
+            raise ValueError("polarization_factor and polarisation_factor must agree when both are set.")
         if value is None:
-            value = cfg.get("polarisation_factor", 0.5)
+            value = alias
+        if value is None:
+            value = 0.5
         fraction = float(value)
         if fraction < 0.0 or fraction > 1.0:
             raise ValueError("polarization_factor must be between 0 and 1.")

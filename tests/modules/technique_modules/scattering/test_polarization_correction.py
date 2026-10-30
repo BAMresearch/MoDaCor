@@ -49,6 +49,44 @@ def _run_step(pd: ProcessingData, **configuration) -> None:
     step.calculate()
 
 
+def test_no_factor_defaults_to_unpolarized_correction():
+    step = PolarizationCorrection(io_sources=IoSources())
+    assert step._fraction_from_config(step.configuration) == 0.5
+
+    pd = _processing_data()
+    step.processing_data = pd
+    step.calculate()
+
+    np.testing.assert_allclose(pd["sample"]["polarization_factor_map"].signal, [0.75, 0.75])
+    np.testing.assert_allclose(pd["sample"]["signal"].signal, np.array([10.0, 10.0]) / 0.75)
+    np.testing.assert_allclose(pd["sample"]["signal"].uncertainties["Poisson"], np.array([1.0, 1.0]) / 0.75)
+
+
+@pytest.mark.parametrize(
+    "configuration, expected",
+    [
+        ({"polarization_factor": None, "polarisation_factor": None}, 0.5),
+        ({"polarization_factor": 0.0}, 0.0),
+        ({"polarisation_factor": 1.0}, 1.0),
+        ({"polarization_factor": 0.9, "polarisation_factor": 0.9}, 0.9),
+    ],
+)
+def test_fraction_resolves_optional_aliases(configuration, expected):
+    step = PolarizationCorrection(io_sources=IoSources(), configuration=configuration)
+
+    assert step._fraction_from_config(step.configuration) == expected
+
+
+def test_fraction_rejects_conflicting_aliases():
+    step = PolarizationCorrection(
+        io_sources=IoSources(),
+        configuration={"polarization_factor": 0.9, "polarisation_factor": 0.1},
+    )
+
+    with pytest.raises(ValueError, match="polarization_factor.*polarisation_factor"):
+        step._fraction_from_config(step.configuration)
+
+
 def test_linear_fraction_polarization_correction_matches_formula():
     pd = _processing_data()
 

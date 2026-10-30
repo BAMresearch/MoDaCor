@@ -7,7 +7,7 @@ Divide signal by the linear-polarization intensity factor.
 - **Import path:** `modacor.modules.technique_modules.scattering.polarization_correction.PolarizationCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/polarization_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/polarization_correction.py)
 - **Module ID:** PolarizationCorrection
-- **Module version:** 20260927.2
+- **Module version:** 20261030.1
 - **Keywords:** polarization, polarisation, scattering, correction
 
 ## Required data keys
@@ -50,10 +50,10 @@ Divide signal by the linear-polarization intensity factor.
 | `mode` | str | No | linear_fraction | - | Polarization model. Currently supports 'linear_fraction'; 'stokes' is reserved. |
 | `polarisation_angular_offset` | int or float or NoneType | No | - | - | British-spelling alias for polarization_angular_offset. |
 | `polarisation_angular_offset_units` | str or NoneType | No | - | - | British-spelling alias for polarization_angular_offset_units. |
-| `polarisation_factor` | int or float or NoneType | No | - | - | British-spelling alias for polarization_factor. |
+| `polarisation_factor` | int or float or NoneType | No | - | - | British-spelling alias for polarization_factor. Both spellings must agree when set. |
 | `polarization_angular_offset` | int or float | No | 0.0 | - | Angular offset between Psi=0 and the horizontal polarization axis. |
 | `polarization_angular_offset_units` | str | No | degree | - | Units for polarization_angular_offset. |
-| `polarization_factor` | int or float or NoneType | No | - | - | Fraction of horizontally polarized intensity. 0.5 is unpolarized. |
+| `polarization_factor` | int or float or NoneType | No | - | - | Fraction of horizontally polarized intensity. Defaults to 0.5 (unpolarized) when neither spelling is set. |
 | `psi_key` | str | No | Psi | - | BaseData key containing the detector azimuth. |
 | `two_theta_key` | str | No | TwoTheta | - | BaseData key containing the scattering angle 2theta. |
 | `with_processing_keys` | list | Yes | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
