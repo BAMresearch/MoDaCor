@@ -75,7 +75,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
-| R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | decision needed (pt 4) |
+| R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | in review |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
 | R07 | Declarative fixed-key dependencies; retire most `dependency_contract()` overrides | design | M–L | high | decision needed |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | open |
@@ -1003,7 +1003,7 @@ read for it was dead code and was removed in R03b.
 
 ## R05 — Core-container validation and untested contracts (rescoped)
 
-**Status:** decision needed (point 4 only); points 1–3 accepted
+**Status:** in review
 
 **Rescoped 2026-10-30 (reviewer correction).** The original R05 table was
 wrong: the reviewer had read the coverage report's "Missing" column as the
@@ -1106,6 +1106,16 @@ tiled source are lower priority and are not part of this item.
   `io_sinks.py`: **80.21%** in the full suite. Overall full-suite Cover rose
   from **83.19%** to **83.64%**. No unreachable-line exemption is needed for
   the four files with the 90% acceptance threshold.
+
+- Option A follow-up (2026-10-30): changed `UnsupportedSinkCapability` to
+  inherit `NotImplementedError`, removed the strict xfail marker from the 11
+  optional-method cases, and added the explicit RuntimeError subclass guard.
+  The sink guide now names the exception and its base class. `chunking.py`
+  has no `__version__` field, so no version field was added. Before the fix,
+  the unmarked sink tests reported **11 failed, 2 passed**. Validation:
+  I/O **155 passed**; server **58 passed**; full suite **1150 passed,
+  1 skipped, 3 warnings, 2 subtests passed, 0 xfailed**;
+  `flake8 src tests`: **0 violations**.
 
 **Review log.**
 

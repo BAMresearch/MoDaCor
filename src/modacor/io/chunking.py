@@ -40,7 +40,7 @@ PlacementKind = Literal["direct", "static", "broadcast", "axis_map"]
 SourceBindingRole = Literal["aligned", "static", "explicit"]
 
 
-class UnsupportedSinkCapability(RuntimeError):
+class UnsupportedSinkCapability(NotImplementedError):
     """Raised when an optional operation is requested from an incapable sink."""
 
     def __init__(self, sink_type: type[Any], capability: str) -> None:

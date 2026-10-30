@@ -4,12 +4,6 @@ from modacor.io.chunking import UnsupportedSinkCapability
 from modacor.io.io_sink import IoSink
 
 
-# R05: guide requires NotImplementedError for unsupported interface subsets;
-# UnsupportedSinkCapability currently derives from RuntimeError instead.
-# Keep the guide expectation visible until the maintainer resolves the conflict.
-@pytest.mark.xfail(
-    strict=True, raises=UnsupportedSinkCapability, reason="R05: guide/runtime unsupported-capability conflict"
-)
 @pytest.mark.parametrize(
     "method,args,kwargs",
     [
@@ -38,3 +32,7 @@ def test_optional_sink_methods_follow_guide(method, args, kwargs):
 def test_base_write_requires_implementation():
     with pytest.raises(NotImplementedError, match="implemented in subclasses"):
         IoSink().write("/out")
+
+
+def test_unsupported_sink_capability_remains_a_runtime_error():
+    assert issubclass(UnsupportedSinkCapability, RuntimeError)

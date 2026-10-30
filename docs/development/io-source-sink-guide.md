@@ -45,6 +45,7 @@ Persistent backends should also implement `load_chunked_plan(...)` so a new
 server process can reconstruct a handle, and `recover_chunked(...)` for
 backend-specific reconciliation, abandonment, and resumption. Ordinary sinks
 inherit clear unsupported-capability errors for all optional chunk methods.
+These errors are `UnsupportedSinkCapability`, a `NotImplementedError` subclass.
 
 `IoSinks` routes writes through `sink_ref::subpath`. The current built-in sink
 examples are:
