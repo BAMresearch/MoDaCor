@@ -75,7 +75,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
-| R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | in review |
+| R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | done |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
 | R07 | Declarative fixed-key dependencies; retire most `dependency_contract()` overrides | design | M–L | high | decision needed |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | open |
@@ -1003,7 +1003,7 @@ read for it was dead code and was removed in R03b.
 
 ## R05 — Core-container validation and untested contracts (rescoped)
 
-**Status:** in review
+**Status:** done
 
 **Rescoped 2026-10-30 (reviewer correction).** The original R05 table was
 wrong: the reviewer had read the coverage report's "Missing" column as the
@@ -1153,6 +1153,15 @@ tiled source are lower priority and are not part of this item.
 
 
 ---
+
+- 2026-10-30, `7537297` (option A, maintainer-approved): **done.**
+  `UnsupportedSinkCapability` now subclasses `NotImplementedError`. The 11
+  xfail markers are removed and those tests pass as normal tests. A new
+  test pins `issubclass(UnsupportedSinkCapability, RuntimeError)` so the
+  existing `except RuntimeError` catches stay covered, and the guide names
+  the type. Verified: io and server tests 213 passed; full suite 1150
+  passed, 1 skipped, 0 xfailed; flake8 and Sphinx `-W` clean.
+  `chunking.py` has no `__version__`.
 
 ## R06 — Repository hygiene
 
