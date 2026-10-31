@@ -2274,6 +2274,14 @@ said what went wrong.
   No existing server test expectations or ApiError responses needed changes;
   no stop condition was hit.
 
+Follow-up fixes (2026-10-31): registration RuntimeWarnings are now emitted
+only by SessionClient's registration/sample/patch methods, preserving generic
+responses and dry-run string warnings unchanged. For a new file sink, check
+the nearest existing ancestor for directory type and write/execute access;
+missing intermediate directories are allowed. This supersedes the original
+parent-must-exist check. Real HDF/CSV runs into new nested directories and
+unwritable-ancestor failures are covered by focused tests.
+
 **Review log.**
 
 - **(2026-10-31): changes requested.** Commits `07aa04d`, `94b0a56` and

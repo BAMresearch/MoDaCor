@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import warnings
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from time import monotonic, sleep
@@ -101,13 +100,6 @@ class RuntimeClient:
             )
         if raw and "application/x-npy" in self._content_type(response_headers):
             return decode_npy(raw)
-        if isinstance(decoded, Mapping):
-            for warning in decoded.get("warnings", []):
-                warnings.warn(
-                    f"{warning['kind'].capitalize()} '{warning['ref']}' ({warning['location']}): {warning['problem']}",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
         return decoded
 
     @staticmethod

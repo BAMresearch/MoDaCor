@@ -137,10 +137,55 @@ def test_missing_source_warns_then_fails_with_identity(client, caplog, tmp_path)
     _assert_unavailable(client, caplog, kind="source", path=tmp_path / "missing.h5", exception_type="FileNotFoundError")
 
 
-def test_missing_sink_parent_warns_then_fails_with_identity(client, caplog, tmp_path):
-    _assert_unavailable(
-        client, caplog, kind="sink", path=tmp_path / "missing" / "out.h5", exception_type="FileNotFoundError"
+@pytest.mark.parametrize("sink_type", ["hdf", "csv"])
+def test_sink_creates_new_nested_directories(client, tmp_path, sink_type):
+    import h5py
+    import numpy as np
+
+    input_file = tmp_path / "input.h5"
+    with h5py.File(input_file, "w") as handle:
+        handle["data"] = np.array([1.0, 2.0, 3.0])
+    pipeline = """name: nested-output
+steps:
+  load:
+    module: AppendProcessingData
+    configuration:
+      processing_key: sample
+      signal_location: sample::data
+      units_override: count
+      rank_of_data: 1
+  export:
+    module: SinkProcessingData
+    requires_steps: [load]
+    configuration:
+      target: "export::"
+      data_paths: [/sample/signal/signal]
+"""
+    if sink_type == "hdf":
+        pipeline = pipeline.replace("data_paths: [/sample/signal/signal]", "data_paths: [/sample]")
+    response = client.post("/v1/sessions", json={"session_id": "nested", "pipeline": {"yaml_text": pipeline}})
+    assert response.status_code == 200
+    assert (
+        client.put(
+            "/v1/sessions/nested/sources",
+            json={"sources": [{"ref": "sample", "type": "hdf", "location": str(input_file)}]},
+        ).status_code
+        == 200
     )
+    output = tmp_path / "new" / "nested" / ("out.h5" if sink_type == "hdf" else "out.csv")
+    response = client.put(
+        "/v1/sessions/nested/sinks", json={"sinks": [{"ref": "export", "type": sink_type, "location": str(output)}]}
+    )
+    assert response.status_code == 200
+    assert response.json()["warnings"] == []
+    response = client.post("/v1/sessions/nested/process", json={"mode": "full"})
+    assert response.status_code == 200, response.text
+    assert output.is_file()
+    if sink_type == "hdf":
+        with h5py.File(output) as handle:
+            np.testing.assert_array_equal(handle["processing/result/default/sample/signal/signal"], [1.0, 2.0, 3.0])
+    else:
+        assert output.stat().st_size > 0
 
 
 @pytest.mark.parametrize("kind", ["source", "sink"])
@@ -152,15 +197,15 @@ def test_permission_failure_warns_then_fails(client, caplog, tmp_path, kind):
 
     if sys.platform == "win32" or os.geteuid() == 0:
         pytest.skip("chmod permission checks require a non-root POSIX user")
-    path = tmp_path / "input.h5" if kind == "source" else tmp_path / "readonly" / "out.h5"
+    path = tmp_path / "input.h5" if kind == "source" else tmp_path / "readonly" / "new" / "nested" / "out.h5"
     if kind == "source":
         with h5py.File(path, "w"):
             pass
         protected = path
         mode = 0
     else:
-        path.parent.mkdir()
-        protected = path.parent
+        protected = tmp_path / "readonly"
+        protected.mkdir()
         mode = 0o555
     protected.chmod(mode)
     try:
@@ -178,7 +223,7 @@ def test_permission_failure_warns_then_fails(client, caplog, tmp_path, kind):
     ],
 )
 def test_patch_and_sample_registration_return_warnings(client, tmp_path, endpoint, payload):
-    path = tmp_path / "missing" / "data.h5"
+    path = tmp_path if endpoint == "sinks/patch" else tmp_path / "missing" / "data.h5"
     response = client.post(f"/v1/sessions/diagnostics/{endpoint}", json={**payload, "location": str(path)})
     assert response.status_code == 200
     assert response.json()["warnings"][0]["location"] == str(path)

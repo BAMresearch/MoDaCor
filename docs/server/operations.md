@@ -42,7 +42,9 @@ Source and sink registrations and updates return an additive `warnings` list.
 Each entry contains `ref`, `kind`, `location` and `problem`. Missing, non-file
 or unreadable file sources and unwritable file destinations produce warnings
 without rejecting registration, allowing files to arrive during acquisition.
-File sinks require an existing parent directory, or a writable existing file.
+File sinks require a writable existing file, or a nearest existing ancestor
+directory with write and execute access; missing intermediate directories are
+created by the sink.
 Buffer, Tiled and custom backends are not checked at registration. The Python
 runtime/session client displays these problems as `RuntimeWarning`.
 

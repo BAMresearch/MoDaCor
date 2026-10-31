@@ -31,7 +31,10 @@ def check_file_location(*, kind: str, io_type: str, location: str) -> None:
         if not os.access(path, os.W_OK):
             raise PermissionError(f"Sink file is not writable: {path}")
     else:
-        if not path.parent.is_dir():
-            raise FileNotFoundError(f"Sink parent directory does not exist: {path.parent}")
-        if not os.access(path.parent, os.W_OK):
-            raise PermissionError(f"Sink parent directory is not writable: {path.parent}")
+        ancestor = path.parent
+        while not ancestor.exists() and not ancestor.is_symlink():
+            ancestor = ancestor.parent
+        if not ancestor.is_dir():
+            raise NotADirectoryError(f"Sink ancestor is not a directory: {ancestor}")
+        if not os.access(ancestor, os.W_OK | os.X_OK):
+            raise PermissionError(f"Sink ancestor directory is not writable and searchable: {ancestor}")
