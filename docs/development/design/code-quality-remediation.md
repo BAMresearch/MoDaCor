@@ -1395,7 +1395,8 @@ One branch and one pull request, with one commit per sub-step.
    group (c) to extension overrides. The snapshot must stay identical; any
    difference is listed and justified.
 4. **R07d: `output_processing_key`.** Move it from the base schema into
-   `ConcatenateDatabundles` and `IndexedAverager`. Add an entry to
+   `ConcatenateDatabundles` and `IndexedAverager`. `ConcatenateDatabundles`
+   must reject `None` (`allow_none=False`). Add an entry to
    `docs/processing/interface-migrations.md`; this is a minor release under the
    versioning policy.
 5. **R07e: docs.**
@@ -1446,7 +1447,28 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
   snapshot preserves; conftest must defer MoDaCor imports until fixture setup
   to avoid installed-wheel/source-doctest collection conflicts in tox.
 
-**Review log.** _(reviewer)_
+**Review log.**
+
+- **R07a (2026-10-31): approved.** Commits `f2d9b37` (step fixes) and
+  `77f5151` (snapshot and trace).
+  - Re-run independently: full suite with the trace active, 1191 passed and
+    1 skipped; `tox -e py312`, 1188 passed and 4 skipped; `tox -e lint` clean.
+  - Mutation check: I removed the `Omega` read from `SolidAngleCorrection`
+    and the prefix-derived diagnostic writes from `FindScaleFactor1D`. The
+    trace failed the execution tests of both steps, and the snapshot test
+    failed too, so both checks catch real omissions, including derived keys.
+  - The step fixes do not change the results of successful runs. An axis
+    outside `data_keys` is now rejected during lookup instead of after
+    concatenation.
+  - Known limitations of the trace, accepted:
+    - A step executed in a thread that does not copy the context variables
+      is skipped, not falsely failed. The server tests run through anyio,
+      which copies them, so they are traced.
+    - A bundle inserted with `ProcessingData.setdefault` is not attributed.
+      No step does this.
+  - Follow-up for R07d, noted by Codex: `ConcatenateDatabundles` accepts
+    `output_processing_key=None`, and `_output_key()` then writes to a bundle
+    literally named `"None"`.
 
 ---
 
