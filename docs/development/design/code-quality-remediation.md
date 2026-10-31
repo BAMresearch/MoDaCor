@@ -99,7 +99,8 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R14 | The `required` argument flag is never enforced | contract | S | medium | open |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
-| R17 | BaseData silently drops `propagate_to_all` uncertainties | bug | S | high | in progress |
+| R17 | BaseData silently drops `propagate_to_all` uncertainties | bug | S | high | done |
+| R18 | Transmission uncertainties left in percent while the value is converted | bug | XS | high | in progress |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -2445,8 +2446,7 @@ finite-difference test.
 
 ## R17 — BaseData silently drops `propagate_to_all` uncertainties
 
-**Status:** approved (maintainer, 2026-10-31); in progress on branch
-`quality-remediation-r08-r13-r15`. Found when R08's equivalence guard stopped
+**Status:** done on branch `quality-remediation-r08-r13-r15` (commit `3ea4ec2`). Found when R08's equivalence guard stopped
 the `SubtractInterpolated1D` refactor.
 
 **Problem.** `propagate_to_all` is a special uncertainty key: when it is an
@@ -2540,6 +2540,58 @@ integration tests. The resumed R08 guard found a separate percent-transmission
 uncertainty conversion difference, documented in R08 above; implementation
 stopped before Commit B and kernel moves. No additional source changes were
 made after the R17 commit.
+
+**Review log.**
+
+- **(2026-10-31): approved.** Commit `3ea4ec2`.
+  - Re-ran the reproduction:
+    - `g*e`, `e*g` and `g*2.0` now give identical `propagate_to_all`
+      components;
+    - `g/e`, `g+e` and `e-g` keep it;
+    - `mixed*e` keeps both `Poisson` and `propagate_to_all`;
+    - the in-place `*=` and `+=` match the ordinary operators.
+  - One `_uncertainty_key_plan` now serves the ordinary operators and the
+    in-place paths.
+  - `uncertainty-propagation.md` shows the contract table, a √k warning
+    admonition and a "Changed" note. `CombineUncertainties` carries the same
+    caution.
+  - No existing test expectation changed. The MoDaCor-examples tests (23)
+    pass before and after.
+
+---
+
+## R18 — Transmission uncertainties left in percent while the value is converted
+
+**Status:** in progress on branch `quality-remediation-r08-r13-r15`. Found
+2026-10-31 by R08's capillary equivalence guard.
+
+**Problem.** Two steps convert the measured transmission's nominal value to
+dimensionless, but read its uncertainties from the unconverted BaseData. A
+transmission given in percent therefore enters with σ in percentage points
+against a dimensionless value, which makes the transmission uncertainty
+contribution 100 times too large.
+
+- `CapillarySelfAbsorptionCorrection`, with `input_state:
+  transmission_normalized`: `_measured_transmission()` returns the BaseData
+  in its configured units. `measured_value` is converted with
+  `scalar_in_units`, but line ~757 uses `measured_transmission.uncertainties`
+  as they are. For T = 50 % ± 1 pp the active-pixel contribution is
+  1.1909, where 0.0119 is correct (reproduced by Codex).
+- `FlatPlateSelfAbsorptionCorrection`: line 104 converts the value, line 127
+  uses `transmission_data.uncertainties` raw. Reproduced: 0.5 ± 0.01
+  (dimensionless) and 50 ± 1 (percent) give identical factors, but σ is
+  [0.00223, 0.00106] against [0.223, 0.106], exactly 100 times larger.
+
+The sample-μ path (`_scalar_components`) converts a copy with `to_units`, so
+it is correct. Inputs that are already dimensionless are unaffected.
+
+**Fix.** Convert the transmission BaseData (value and uncertainties together)
+to dimensionless once, and use that object for both. Test that percent and
+dimensionless inputs give identical factors and uncertainties for both steps.
+This changes results only for non-dimensionless transmission inputs, so it is
+a `fix:`.
+
+**Implementation notes.** _(implementer)_
 
 **Review log.** _(reviewer)_
 
