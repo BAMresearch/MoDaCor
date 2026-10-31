@@ -35,9 +35,11 @@ class SessionClient:
         self.runtime.request("DELETE", self._path)
 
     def register_sources(self, *sources: Mapping[str, Any]) -> dict[str, Any]:
+        """Register inputs; the runtime client emits location warnings as RuntimeWarning."""
         return self.runtime.request("PUT", f"{self._path}/sources", payload={"sources": list(sources)})
 
     def register_sinks(self, *sinks: Mapping[str, Any]) -> dict[str, Any]:
+        """Register outputs; the runtime client emits location warnings as RuntimeWarning."""
         return self.runtime.request("PUT", f"{self._path}/sinks", payload={"sinks": list(sinks)})
 
     def register_source(self, source: Mapping[str, Any]) -> dict[str, Any]:

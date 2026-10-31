@@ -20,6 +20,8 @@ from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
 from modacor.io.runtime_support import build_sink_from_spec, build_source_from_spec, write_processing_data_hdf
 
+from .errors import IOBuildError
+from .io_diagnostics import check_file_location
 from .runtime_policy import RuntimePolicy
 from .session_manager import PipelineSession
 
@@ -170,12 +172,18 @@ def build_sources_from_session(
     sources = IoSources()
     for ref in sorted(session.sources.keys()):
         reg = session.sources[ref]
-        source = _source_from_session_cache(
-            session,
-            _source_spec_from_registration(ref, reg),
-            buffer_store=buffer_store,
-            runtime_policy=runtime_policy,
-        )
+        try:
+            check_file_location(kind="source", io_type=str(reg["type"]), location=str(reg["location"]))
+            source = _source_from_session_cache(
+                session,
+                _source_spec_from_registration(ref, reg),
+                buffer_store=buffer_store,
+                runtime_policy=runtime_policy,
+            )
+        except Exception as exc:
+            raise IOBuildError(
+                ref=ref, kind="source", io_type=str(reg["type"]), location=str(reg["location"]), cause=exc
+            ) from exc
         sources.register_source(source)
     return sources
 
@@ -260,26 +268,32 @@ def build_sinks_from_session(
     sinks = IoSinks()
     for ref in sorted(session.sinks.keys()):
         reg = session.sinks[ref]
-        policy.validate_sink_registration({"ref": ref, **reg})
-        sink_type = str(reg["type"]).strip().lower()
-        kwargs = dict(reg.get("kwargs", {}) or {})
-        if sink_type in {"hdf", "hdf_processing"}:
-            kwargs = _sink_kwargs_with_runtime_metadata(
-                kwargs,
-                session=session,
-                pipeline=pipeline,
+        try:
+            check_file_location(kind="sink", io_type=str(reg["type"]), location=str(reg["location"]))
+            policy.validate_sink_registration({"ref": ref, **reg})
+            sink_type = str(reg["type"]).strip().lower()
+            kwargs = dict(reg.get("kwargs", {}) or {})
+            if sink_type in {"hdf", "hdf_processing"}:
+                kwargs = _sink_kwargs_with_runtime_metadata(
+                    kwargs,
+                    session=session,
+                    pipeline=pipeline,
+                )
+            sink = build_sink_from_spec(
+                {
+                    "ref": ref,
+                    "type": reg["type"],
+                    "location": reg["location"],
+                    "kwargs": kwargs,
+                },
+                buffer_store=buffer_store,
+                session_id=session.session_id,
+                **policy.sink_builder_kwargs(),
             )
-        sink = build_sink_from_spec(
-            {
-                "ref": ref,
-                "type": reg["type"],
-                "location": reg["location"],
-                "kwargs": kwargs,
-            },
-            buffer_store=buffer_store,
-            session_id=session.session_id,
-            **policy.sink_builder_kwargs(),
-        )
+        except Exception as exc:
+            raise IOBuildError(
+                ref=ref, kind="sink", io_type=str(reg["type"]), location=str(reg["location"]), cause=exc
+            ) from exc
         sinks.register_sink(sink)
     return sinks
 

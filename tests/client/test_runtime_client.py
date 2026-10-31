@@ -167,3 +167,23 @@ def test_reopen_detects_provisional_output_and_finalize_resolves_hash():
     assert output.plan_hash == "resolved"
     assert result["status"] == "complete"
     assert json.loads(transport.calls[2]["data"]) == {"plan_hash": "resolved"}
+
+
+@pytest.mark.parametrize(
+    "operation", ["request", "register_sources", "register_sinks", "register_source", "register_sink", "set_sample"]
+)
+def test_registration_warnings_surface_once(operation):
+    warning = {"ref": "sample", "kind": "source", "location": "/data/missing.h5", "problem": "file does not exist"}
+    transport = StubTransport([response(200, {"warnings": [warning]})])
+    runtime = RuntimeClient("http://runtime", transport=transport)
+    session = runtime.session("demo")
+    registration = {"ref": "sample", "type": "hdf", "location": warning["location"]}
+    with pytest.warns(RuntimeWarning, match="sample.*missing.h5.*file does not exist") as caught:
+        if operation == "request":
+            result = runtime.request("PUT", "/v1/sessions/demo/sources", payload={"sources": [registration]})
+        elif operation == "set_sample":
+            result = session.set_sample(warning["location"])
+        else:
+            result = getattr(session, operation)(registration)
+    assert len(caught) == 1
+    assert result["warnings"] == [warning]

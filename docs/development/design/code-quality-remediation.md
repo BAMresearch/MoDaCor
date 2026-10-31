@@ -1938,6 +1938,24 @@ said what went wrong.
   `message` (`ExceptionType: message`) and request context in `details` inside
   the usual HTTP `detail` envelope, with an ERROR traceback.
 
+- File registrations now add `warnings` (always a list) with `ref`, `kind`,
+  `location`, `problem`, logging each problem at WARNING. Checks are advisory
+  at registration and repeated at runtime; buffer, Tiled and custom types are
+  excluded. The runtime Python client emits each warning once as RuntimeWarning,
+  including when called through SessionClient.
+- Source/sink construction failures carry their registration and original cause.
+  Runs return `SOURCE_UNAVAILABLE` / `SINK_UNAVAILABLE`; their HTTP error
+  `details` add `ref`, `type`, `location`, `exception_type` alongside session/run
+  IDs. The stored latest-error details also retain the traceback. Existing
+  non-I/O ApiError payloads and provisional-plan error mappings are preserved.
+- File sinks open lazily, so runtime builders explicitly check destination
+  access without creating files/directories. A missing parent also warns and
+  fails at runtime; it must exist when processing begins. Source checks avoid
+  HDFSource's historical missing-file assertion / permission-error logging bug.
+- Focused server/client verification at this stage: **100 passed**, including
+  real chmod checks as a non-root POSIX user, late-arriving files, all registration
+  routes, excluded backends, and single Python warning emission.
+
 **Review log.** _(reviewer)_
 
 ---

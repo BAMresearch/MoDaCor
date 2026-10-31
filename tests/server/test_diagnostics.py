@@ -96,3 +96,122 @@ def test_run_failure_logs_traceback_and_keeps_api_error_payload(client, caplog, 
     assert run_record.run_id == detail["details"]["run_id"]
     assert run_record.error_code == "RUN_FAILED"
     assert "ValueError: scientific failure" in caplog.text
+
+
+def _assert_unavailable(client, caplog, *, kind, path, exception_type):
+    registration = {"ref": "sample" if kind == "source" else "export", "type": "hdf", "location": str(path)}
+    with caplog.at_level(logging.INFO, logger="modacor.server"):
+        response = client.put(f"/v1/sessions/diagnostics/{kind}s", json={f"{kind}s": [registration]})
+    assert response.status_code == 200
+    warnings = response.json()["warnings"]
+    assert len(warnings) == 1
+    assert {key: warnings[0][key] for key in ("ref", "kind", "location")} == {
+        "ref": registration["ref"],
+        "kind": kind,
+        "location": str(path),
+    }
+    assert warnings[0]["problem"]
+    assert any(record.levelno == logging.WARNING and str(path) in record.message for record in caplog.records)
+    response = client.post("/v1/sessions/diagnostics/process", json={"mode": "full"})
+    assert response.status_code == 500
+    detail = response.json()["detail"]
+    assert detail["code"] == f"{kind.upper()}_UNAVAILABLE"
+    assert registration["ref"] in detail["message"]
+    assert str(path) in detail["message"]
+    assert (
+        detail["details"].items()
+        >= {
+            "ref": registration["ref"],
+            "type": "hdf",
+            "location": str(path),
+            "exception_type": exception_type,
+        }.items()
+    )
+    latest = client.get("/v1/sessions/diagnostics/errors/latest").json()["latest_error"]
+    assert latest["code"] == detail["code"]
+    assert latest["details"]["exception_type"] == exception_type
+    assert exception_type in latest["details"]["traceback"]
+
+
+def test_missing_source_warns_then_fails_with_identity(client, caplog, tmp_path):
+    _assert_unavailable(client, caplog, kind="source", path=tmp_path / "missing.h5", exception_type="FileNotFoundError")
+
+
+def test_missing_sink_parent_warns_then_fails_with_identity(client, caplog, tmp_path):
+    _assert_unavailable(
+        client, caplog, kind="sink", path=tmp_path / "missing" / "out.h5", exception_type="FileNotFoundError"
+    )
+
+
+@pytest.mark.parametrize("kind", ["source", "sink"])
+def test_permission_failure_warns_then_fails(client, caplog, tmp_path, kind):
+    import os
+    import sys
+
+    import h5py
+
+    if sys.platform == "win32" or os.geteuid() == 0:
+        pytest.skip("chmod permission checks require a non-root POSIX user")
+    path = tmp_path / "input.h5" if kind == "source" else tmp_path / "readonly" / "out.h5"
+    if kind == "source":
+        with h5py.File(path, "w"):
+            pass
+        protected = path
+        mode = 0
+    else:
+        path.parent.mkdir()
+        protected = path.parent
+        mode = 0o555
+    protected.chmod(mode)
+    try:
+        _assert_unavailable(client, caplog, kind=kind, path=path, exception_type="PermissionError")
+    finally:
+        protected.chmod(0o700)
+
+
+@pytest.mark.parametrize(
+    "endpoint,payload",
+    [
+        ("sources/patch", {"ref": "sample", "type": "hdf"}),
+        ("sinks/patch", {"ref": "export", "type": "hdf"}),
+        ("sample", {"type": "hdf"}),
+    ],
+)
+def test_patch_and_sample_registration_return_warnings(client, tmp_path, endpoint, payload):
+    path = tmp_path / "missing" / "data.h5"
+    response = client.post(f"/v1/sessions/diagnostics/{endpoint}", json={**payload, "location": str(path)})
+    assert response.status_code == 200
+    assert response.json()["warnings"][0]["location"] == str(path)
+
+
+def test_registration_warning_is_rechecked_at_run_time(client, tmp_path):
+    import h5py
+
+    path = tmp_path / "arriving.h5"
+    response = client.put(
+        "/v1/sessions/diagnostics/sources", json={"sources": [{"ref": "sample", "type": "hdf", "location": str(path)}]}
+    )
+    assert len(response.json()["warnings"]) == 1
+    with h5py.File(path, "w"):
+        pass
+    assert client.post("/v1/sessions/diagnostics/process", json={"mode": "full"}).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "kind,io_type",
+    [
+        ("source", "buffer"),
+        ("source", "tiled"),
+        ("source", "custom"),
+        ("sink", "buffer"),
+        ("sink", "tiled"),
+        ("sink", "custom"),
+    ],
+)
+def test_non_file_registration_has_no_location_warning(client, kind, io_type):
+    response = client.put(
+        f"/v1/sessions/diagnostics/{kind}s",
+        json={f"{kind}s": [{"ref": "data", "type": io_type, "location": "not-a-file"}]},
+    )
+    assert response.status_code == 200
+    assert response.json()["warnings"] == []
