@@ -1812,7 +1812,22 @@ Python 3.12–3.14); if it does not, document that and keep the skip.
 **Acceptance criteria.** In at least one CI job, the xraylib tests run rather
 than skip; this is visible in the job log.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.** 2026-10-31: added `attenuation` to the default
+`[testenv]` extras, retaining the development `pytest.importorskip("xraylib")`
+guards. Verified with `tox -e py312 -- -rs`:
+
+- Before: **1238 passed, 4 skipped**, 2 subtests passed. Skips:
+  `tests/integration/test_chunked_memory.py:40` (opt-in RSS check),
+  `tests/io/tiled/test_tiled_sink.py:119` (Tiled not installed),
+  `tests/io/tiled/test_tiled_source_integration.py:12` (Tiled not installed),
+  `tests/modules/technique_modules/scattering/test_material_attenuation_corrections.py:233`
+  (xraylib not installed).
+- After: **1239 passed, 3 skipped**, 2 subtests passed. Remaining skips are
+  exactly the RSS opt-in check and the two Tiled tests above. The xraylib
+  formula acceptance/typo rejection test now executes.
+- The sandbox's initial dependency download could not resolve PyPI; rerunning
+  with network access installed xraylib successfully. Verification here is on
+  macOS/CPython 3.12; Linux wheels were not independently tested.
 
 **Review log.** _(reviewer)_
 
