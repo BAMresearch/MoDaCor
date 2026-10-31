@@ -1517,6 +1517,26 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
   - `Plot1DVisualization`: Parses independent plot data/error paths across bundles.
   - `Plot2DVisualization`: Parses the configured two-dimensional plot data path.
 
+- **Geometry follow-up (2026-10-31):** replaced the eagerly evaluated rank
+  fallback in `XSGeometryFromPixelCoordinates` with `int(coord_x.rank_of_data)`.
+  Removed its incidental `signal` read from the declaration and focused test.
+  Exactly its two snapshot entries lost `sample.signal` and
+  `background.signal` reads; every other snapshot field is unchanged.
+  Full suite with tracing and no opt-outs: 1219 passed, 1 skipped.
+- **R07d (2026-10-31):** removed `output_processing_key` from the shared schema
+  and default contract. Its existing step-specific declarations now control
+  validation: `ConcatenateDatabundles` rejects `None` and defaults to
+  `concatenated`; `IndexedAverager` retains its string/None behavior. An ordinary
+  step rejects the setting with the existing unknown-key hint. Removed the
+  ignored setting from a deprecated geometry test and documented the YAML
+  migration. The only snapshot change is the default concatenation write:
+  `None.*` -> `concatenated.*`.
+  Read-only search of all examples YAMLs found 11 uses in two DLS/I22 pipelines:
+  six `ConcatenateDatabundles` and five `IndexedAverager`; no unsupported uses
+  and no edits to the examples repository.
+  Full suite with tracing and no opt-outs: 1221 passed, 1 skipped;
+  `tox -e lint` passed. There are still 20 overrides. No stop conditions.
+
 **Review log.**
 
 - **R07a (2026-10-31): approved.** Commits `f2d9b37` (step fixes) and

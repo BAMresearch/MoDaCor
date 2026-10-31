@@ -248,3 +248,12 @@ def test_concatenate_ignores_axis_alias_outside_data_keys():
     step.execute(data)
 
     assert data["concatenated"]["signal"].axes == [data["concatenated"]["Q"]]
+
+
+def test_concatenate_rejects_none_output_processing_key():
+    with pytest.raises(TypeError, match="output_processing_key"):
+        ConcatenateDatabundles(configuration={"output_processing_key": None})
+    step = ConcatenateDatabundles()
+    assert step.configuration["output_processing_key"] == "concatenated"
+    with pytest.raises(TypeError, match="output_processing_key"):
+        step.modify_config_by_kwargs(output_processing_key=None)

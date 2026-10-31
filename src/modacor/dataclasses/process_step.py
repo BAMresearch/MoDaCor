@@ -220,12 +220,6 @@ class ProcessStep:
             "allow_none": True,
             "default": None,
         },
-        "output_processing_key": {
-            "type": str,
-            "allow_iterable": False,
-            "allow_none": True,
-            "default": None,
-        },
     }
 
     # three input items for the process step. For backward compatibility, the first is io_sources
@@ -303,8 +297,7 @@ class ProcessStep:
         Subclasses with source/sink side effects or unusual key relationships can still
         override this method with a custom contract. Without dependency hints,
         the default covers ordinary in-place processing steps that use
-        ``with_processing_keys`` and the optional ``output_processing_key``
-        convention.
+        ``with_processing_keys``.
         """
 
         cfg = self.configuration or {}
@@ -344,12 +337,7 @@ class ProcessStep:
 
         if not has_dependency_hints:
             read_patterns = set(processing_key_patterns(cfg.get("with_processing_keys")))
-
-            output_key = cfg.get("output_processing_key")
-            if isinstance(output_key, str) and output_key.strip():
-                write_patterns = set(processing_key_patterns(output_key))
-            else:
-                write_patterns = set(read_patterns)
+            write_patterns = set(read_patterns)
 
         if has_declared_keys and not read_patterns and not write_patterns:
             # Hinted BaseData keys are only exact when paired with processing keys.

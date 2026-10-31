@@ -31,3 +31,10 @@ def test_unknown_config_key_suggestion_at_construction():
         PolarizationCorrection(io_sources=IoSources(), configuration={"polarisation_factor": 0.9})
 
     assert exc_info.value.args[0].endswith(POLARISATION_HINT)
+
+
+def test_ordinary_step_rejects_output_processing_key_with_hint():
+    from modacor.modules import Multiply
+
+    with pytest.raises(KeyError, match="output_processing_key.*Did you mean"):
+        Multiply(configuration={"output_processing_key": "ignored"})

@@ -386,7 +386,7 @@
       "sample.signal"
     ],
     "processing_writes": [
-      "None.*"
+      "concatenated.*"
     ],
     "source_refs": []
   },

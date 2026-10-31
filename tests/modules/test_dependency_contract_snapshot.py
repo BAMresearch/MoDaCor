@@ -20,8 +20,6 @@ SNAPSHOT = Path(__file__).parent / "data" / "dependency_contract_snapshot.json"
 BASE_CONFIGS = {
     "AppendProcessingData": {"processing_key": "sample", "signal_location": "data::/signal"},
     "CopyDataBundleKeys": {"data_keys": ["signal", "Q"]},
-    # None currently produces None.*; preserve that accepted configuration too.
-    "ConcatenateDatabundles": {"output_processing_key": None},
 }
 CUSTOM_CONFIGS = {
     "AppendProcessingData": {

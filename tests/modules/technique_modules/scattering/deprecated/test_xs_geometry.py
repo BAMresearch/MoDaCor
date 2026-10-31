@@ -596,7 +596,6 @@ def test_xsgeometry_prepare_and_calculate_integration():
     # Minimal configuration
     step.configuration = {
         "with_processing_keys": ["signal"],
-        "output_processing_key": None,
     }
 
     # Attach processing_data and bypass I/O in _load_geometry

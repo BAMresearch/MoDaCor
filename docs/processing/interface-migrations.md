@@ -15,6 +15,23 @@ The synthetic [Quickstart](../getting-started/quickstart.md) is unaffected.
 Ordinary explicit `steps` documents also remain valid; the `step_blocks` and
 `for_each` schema is additive.
 
+## R07: `output_processing_key` only on ConcatenateDatabundles and IndexedAverager
+
+Remove `output_processing_key` from every other step's YAML configuration.
+Those steps previously accepted and ignored the setting; they now raise the
+existing unknown-key `KeyError`, including a suggested key when available.
+Their output continues to be written in place or to the step's documented
+output setting, such as `Integrate1D.output_processing_keys`.
+
+`ConcatenateDatabundles` requires a string output key, defaulting to
+`concatenated`. It no longer accepts `None` (`null` in YAML), which previously
+created a bundle literally named `"None"`. Remove a null setting to use the
+default, or replace it with the intended output bundle name.
+
+`IndexedAverager` continues to accept a string or `None`: omit the setting or
+use `null` for in-place averaging; a distinct output bundle requires exactly
+one input bundle.
+
 ## R01b: Use one input per setting and explicit mask keys
 
 Removed configuration keys raise `KeyError`; update existing YAML as follows:

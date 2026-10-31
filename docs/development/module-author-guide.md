@@ -89,8 +89,6 @@ starting point for new work.
 
 - `with_processing_keys`: select which `ProcessingData` bundles the step should
   operate on.
-- `output_processing_key`: optional output target for steps that write to a
-  different `ProcessingData` bundle than they read.
 
 Step-specific configuration belongs in `documentation.arguments`. Those entries
 seed the instance `configuration` automatically through

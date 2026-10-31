@@ -44,6 +44,7 @@ class ConcatenateDatabundles(ProcessStep):
             },
             "output_processing_key": {
                 "type": str,
+                "allow_none": False,
                 "required": True,
                 "default": "concatenated",
                 "doc": "ProcessingData key receiving the pooled DataBundle.",
