@@ -25,6 +25,24 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 - **capillary_beam_profile_retained_fraction**: signal
 - **capillary_attenuation_evaluated**: signal
 
+## Data dependencies
+| Fixed key | Access |
+|---|---|
+| `signal` | read_write |
+
+| Role argument | Access | Default |
+|---|---|---|
+| `attenuation_key` | write | `"capillary_sample_attenuation"` |
+| `calculated_transmission_key` | write | `"capillary_calculated_transmission"` |
+| `coord_x_key` | read | `"coord_x"` |
+| `coord_y_key` | read | `"coord_y"` |
+| `coord_z_key` | read | `"coord_z"` |
+| `correction_key` | write | `"capillary_self_absorption"` |
+| `effective_sample_mu_key` | write | `"capillary_effective_sample_mu"` |
+| `evaluated_mask_key` | write | `"capillary_attenuation_evaluated"` |
+| `mask_key` | read | `null` |
+| `profile_retained_fraction_key` | write | `"capillary_beam_profile_retained_fraction"` |
+
 ## Required arguments
 - with_processing_keys
 - beam_profile

@@ -16,6 +16,14 @@ Reduce an integer mask over configured axes while preserving uint32 reason bits.
 ## Modifies
 - **mask**: signal, units, axes
 
+## Data dependencies
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `source_mask_key` | read | `"mask"` |
+| `target_mask_key` | write | `"mask"` |
+
 ## Required arguments
 - with_processing_keys
 

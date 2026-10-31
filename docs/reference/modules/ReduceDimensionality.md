@@ -16,6 +16,15 @@ Compute a weighted or unweighted mean/sum over the given axes, propagate existin
 ## Modifies
 - **signal**: signal, uncertainties, units, weights
 
+## Data dependencies
+| Fixed key | Access |
+|---|---|
+| `signal` | read_write |
+
+| Role argument | Access | Default |
+|---|---|---|
+| `mask_key` | read | `null` |
+
 ## Required arguments
 - _None_
 

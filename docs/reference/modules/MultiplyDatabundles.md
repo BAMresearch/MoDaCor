@@ -16,6 +16,13 @@ Multiply a DataBundle element using another DataBundle
 ## Modifies
 - **signal**: signal, uncertainties, units
 
+## Data dependencies
+This step defines a custom dependency contract.
+
+_No fixed data keys declared._
+
+_No data-key roles declared._
+
 ## Required arguments
 - _None_
 

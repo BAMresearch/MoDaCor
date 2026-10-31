@@ -18,6 +18,16 @@ Correct angle-dependent self-absorption for a transmission-normalized flat sampl
 - **signal**: signal, uncertainties
 - **flat_plate_self_absorption**: signal, uncertainties, units
 
+## Data dependencies
+| Fixed key | Access |
+|---|---|
+| `signal` | read_write |
+
+| Role argument | Access | Default |
+|---|---|---|
+| `correction_key` | write | `"flat_plate_self_absorption"` |
+| `cos_alpha_key` | read | `"CosAlpha"` |
+
 ## Required arguments
 - with_processing_keys
 - transmission_source

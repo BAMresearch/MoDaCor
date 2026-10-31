@@ -60,6 +60,11 @@ python -m sphinx -E -W --keep-going -b html docs dist/docs
   ultimately describe geometry.
 - Keep CLI and runtime-service paths aligned when they share request or IO
   behavior.
+- Declare configurable data keys with `dependency_role` and hard-coded keys
+  with `fixed_data_keys`; extend `super().dependency_contract()` for extras,
+  reserving full overrides for multi-bundle and I/O steps. Check default
+  metadata, focused dependency assertions, and the full access-traced suite;
+  reserve `no_contract_trace` for deliberately inconsistent test steps.
 - Preserve docstrings and type hints when simplifying code.
 - Avoid leaving unfinished pages or stale backlog state after structural
   refactors.

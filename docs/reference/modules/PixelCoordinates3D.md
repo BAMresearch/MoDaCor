@@ -18,6 +18,18 @@ Computes 3D detector element center coordinates in lab-frame axes.
 - **coord_y**: signal, uncertainties
 - **coord_z**: signal, uncertainties
 
+## Data dependencies
+This step extends the declared dependencies with additional runtime dependencies.
+
+| Fixed key | Access |
+|---|---|
+| `coord_x` | write |
+| `coord_y` | write |
+| `coord_z` | write |
+| `signal` | read |
+
+_No data-key roles declared._
+
 ## Required arguments
 - det_coord_z_source
 - det_coord_x_source

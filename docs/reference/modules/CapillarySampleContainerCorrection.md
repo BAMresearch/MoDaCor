@@ -31,6 +31,19 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
 - **capillary_wall_filled_attenuation_evaluated**: signal
 - **capillary_wall_empty_attenuation_evaluated**: signal
 
+## Data dependencies
+This step defines a custom dependency contract.
+
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `coord_x_key` | read | `"coord_x"` |
+| `coord_y_key` | read | `"coord_y"` |
+| `coord_z_key` | read | `"coord_z"` |
+| `effective_sample_mu_key` | write | `"capillary_effective_sample_mu"` |
+| `mask_key` | read | `null` |
+
 ## Required arguments
 - beam_profile
 - filled_processing_key

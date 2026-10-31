@@ -16,6 +16,14 @@ Create a uint32 mask by evaluating bounds on a selected BaseData signal array.
 ## Modifies
 - **threshold_mask**: signal, units
 
+## Data dependencies
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `source_basedata_key` | read | `"signal"` |
+| `target_mask_key` | write | `"threshold_mask"` |
+
 ## Required arguments
 - with_processing_keys
 

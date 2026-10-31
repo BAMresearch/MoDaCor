@@ -25,7 +25,7 @@ class FindCenterOfMass1D(ProcessStep):
         calling_id="FindCenterOfMass1D",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=["signal"],
+        required_data_keys=["signal", "yaw"],
         modifies={
             "beam_center": ["signal", "uncertainties", "units"],
             "centroid_count": ["signal"],

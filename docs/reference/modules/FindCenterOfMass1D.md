@@ -12,6 +12,7 @@ Find a masked, windowed intensity centroid without assuming a peak shape.
 
 ## Required data keys
 - signal
+- yaw
 
 ## Modifies
 - **beam_center**: signal, uncertainties, units
@@ -19,6 +20,18 @@ Find a masked, windowed intensity centroid without assuming a peak shape.
 - **centroid_converged**: signal
 - **centroid_window_min**: signal, units
 - **centroid_window_max**: signal, units
+
+## Data dependencies
+This step extends the declared dependencies with additional runtime dependencies.
+
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `axis_key` | read | `"yaw"` |
+| `mask_key` | read | `null` |
+| `output_key` | write | `"beam_center"` |
+| `signal_key` | read | `"signal"` |
 
 ## Required arguments
 - with_processing_keys

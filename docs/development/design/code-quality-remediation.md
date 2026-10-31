@@ -1261,7 +1261,7 @@ maintainer's decisions:
 
 ## R07 — Declarative data-key dependencies, verified against behaviour
 
-**Status:** approved (A′); R07a–c complete; R07d–e pending. The recommendation was revised on
+**Status:** implemented (A′); R07a–c approved; geometry follow-up and R07d–e pending review. The recommendation was revised on
 2026-10-31 after checking the modules that derive data keys from configuration.
 
 **Problem.** 35 of the 41 exported steps override `dependency_contract()`; only
@@ -1536,6 +1536,37 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
   and no edits to the examples repository.
   Full suite with tracing and no opt-outs: 1221 passed, 1 skipped;
   `tox -e lint` passed. There are still 20 overrides. No stop conditions.
+
+- **R07e (2026-10-31):** added default metadata equality checks for all
+  25 declaration-based steps (including the four extensions); full overrides
+  retain their existing hand-written expectations. The only exception is:
+
+  | Step | Extra required keys | Extra modifies keys | Reason |
+  | --- | --- | --- | --- |
+  | `FindCenterOfMass1D` | none | `centroid_count`, `centroid_converged`, `centroid_window_min`, `centroid_window_max` | Its extension writes diagnostics derived from `diagnostic_prefix`. |
+
+  Fixed three stale metadata descriptions, without changing their contracts:
+  `IndexByCoordinate.required_data_keys` now includes default coordinate `Q`;
+  `FindCenterOfMass1D.required_data_keys` now includes default axis `yaw`;
+  `Negate` now requires and modifies default key `signal`, replacing its
+  `configured data key` placeholder. No contract-versus-behavior discrepancy
+  or snapshot stop condition was found.
+- The reference generator now renders fixed-key access, role-argument access
+  and defaults, custom-contract notices and extension notices. Regenerated all
+  41 pages. Rewrote the author guide around roles, fixed keys, extensions and
+  full overrides; documented empty-declaration and wildcard semantics and the
+  access trace. Updated the correction template, AGENTS and the contributor
+  checklist. Fixed the implicit concatenation in the fixed-key error message.
+- Confirmed the snapshot was unchanged by R07e before removing the temporary
+  snapshot test and JSON; the empty data directory was removed too. The access
+  trace and focused tests remain, with no opt-outs. The final override count is
+  still 20: four extensions and 16 explicit contracts, listed above.
+- Final development suite with tracing: 1241 passed, 1 skipped (plus 2 subtests);
+  `tox -e py312`: 1238 passed, 4 skipped (plus 2 subtests).
+  `tox -e lint`, `tox -e docs` and `tox -e manifest` passed. The first manifest
+  attempt could not resolve PyPI in the sandbox while fetching isolated build
+  dependencies; retrying with network access passed. The examples audit is
+  recorded in R07d above; that repository was not edited.
 
 **Review log.**
 

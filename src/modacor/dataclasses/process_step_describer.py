@@ -105,7 +105,7 @@ def _normalize_fixed_data_keys(value: Any) -> dict[str, str]:
             raise ValueError("fixed_data_keys keys must be non-empty strings.")
         if not isinstance(role, str) or role not in {"read", "write", "read_write"}:
             raise ValueError(
-                f"fixed_data_keys[{key!r}] contains unknown role {role!r}. " "Known roles: read, write, read_write."
+                f"fixed_data_keys[{key!r}] contains unknown role {role!r}. Known roles: read, write, read_write."
             )
         normalized[key] = role
     return normalized

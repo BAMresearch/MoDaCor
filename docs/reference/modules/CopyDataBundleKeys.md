@@ -16,6 +16,13 @@ Copy selected BaseData entries between DataBundles.
 ## Modifies
 - _None_
 
+## Data dependencies
+This step defines a custom dependency contract.
+
+_No fixed data keys declared._
+
+_No data-key roles declared._
+
 ## Required arguments
 - with_processing_keys
 

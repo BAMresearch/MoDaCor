@@ -16,6 +16,16 @@ Convert an angle relative to its direct-beam or diffraction centre into signed Q
 ## Modifies
 - **Q**: signal, uncertainties, units, axes
 
+## Data dependencies
+This step extends the declared dependencies with additional runtime dependencies.
+
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `angle_key` | read | `"angle"` |
+| `output_key` | write | `"Q"` |
+
 ## Required arguments
 - with_processing_keys
 - photon_source

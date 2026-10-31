@@ -19,6 +19,17 @@ Divide signal by the linear-polarization intensity factor.
 - **signal**: signal, uncertainties
 - **polarization_factor_map**: signal, units
 
+## Data dependencies
+| Fixed key | Access |
+|---|---|
+| `signal` | read_write |
+
+| Role argument | Access | Default |
+|---|---|---|
+| `correction_key` | write | `"polarization_factor_map"` |
+| `psi_key` | read | `"Psi"` |
+| `two_theta_key` | read | `"TwoTheta"` |
+
 ## Required arguments
 - with_processing_keys
 

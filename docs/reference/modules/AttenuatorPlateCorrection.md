@@ -18,6 +18,16 @@ Apply angle-dependent attenuator plate transmission.
 - **signal**: signal, uncertainties
 - **attenuator_transmission**: signal, units
 
+## Data dependencies
+| Fixed key | Access |
+|---|---|
+| `signal` | read_write |
+
+| Role argument | Access | Default |
+|---|---|---|
+| `correction_key` | write | `"attenuator_transmission"` |
+| `cos_alpha_key` | read | `"CosAlpha"` |
+
 ## Required arguments
 - with_processing_keys
 

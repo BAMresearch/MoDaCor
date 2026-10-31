@@ -18,6 +18,16 @@ Divide signal by angle-dependent detector absorption efficiency.
 - **signal**: signal, uncertainties
 - **detector_efficiency**: signal, units
 
+## Data dependencies
+| Fixed key | Access |
+|---|---|
+| `signal` | read_write |
+
+| Role argument | Access | Default |
+|---|---|---|
+| `correction_key` | write | `"detector_efficiency"` |
+| `cos_alpha_key` | read | `"CosAlpha"` |
+
 ## Required arguments
 - with_processing_keys
 

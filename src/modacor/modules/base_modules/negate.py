@@ -20,8 +20,8 @@ class Negate(ProcessStep):
         calling_id="Negate",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=[],
-        modifies={"configured data key": ["signal"]},
+        required_data_keys=["signal"],
+        modifies={"signal": ["signal"]},
         arguments={
             "with_processing_keys": {
                 "type": (str, list, type(None)),

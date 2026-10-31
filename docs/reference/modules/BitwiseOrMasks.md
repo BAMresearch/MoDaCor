@@ -16,6 +16,14 @@ Combine multiple mask arrays stored as different BaseData keys in the same DataB
 ## Modifies
 - **mask**: signal
 
+## Data dependencies
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `source_mask_keys` | read | `[]` |
+| `target_mask_key` | read_write | `"mask"` |
+
 ## Required arguments
 - with_processing_keys
 - source_mask_keys

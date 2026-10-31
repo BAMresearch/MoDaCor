@@ -17,6 +17,14 @@ Divide the pixels in a signal by their solid angle coverage
 ## Modifies
 - **signal**: signal, uncertainties, units
 
+## Data dependencies
+| Fixed key | Access |
+|---|---|
+| `Omega` | read |
+| `signal` | read_write |
+
+_No data-key roles declared._
+
 ## Required arguments
 - with_processing_keys
 

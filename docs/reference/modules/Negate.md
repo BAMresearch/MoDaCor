@@ -11,10 +11,17 @@ Negate a BaseData entry using its uncertainty-preserving unary operation.
 - **Keywords:** negate, sign, BaseData
 
 ## Required data keys
-- _None_
+- signal
 
 ## Modifies
-- **configured data key**: signal
+- **signal**: signal
+
+## Data dependencies
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `data_key` | read_write | `"signal"` |
 
 ## Required arguments
 - with_processing_keys

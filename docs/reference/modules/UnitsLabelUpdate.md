@@ -16,6 +16,13 @@ Update unit labels of one or more BaseData elements (no conversion).
 ## Modifies
 - _None_
 
+## Data dependencies
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `update_pairs` | read_write | `{}` |
+
 ## Required arguments
 - update_pairs
 
