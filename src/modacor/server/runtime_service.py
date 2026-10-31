@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import logging
 import traceback
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -32,6 +33,8 @@ from .session_manager import PipelineSession, SessionManager
 from .source_profiles import get_source_profile, list_source_profiles
 
 __all__ = ["RuntimeService"]
+
+logger = logging.getLogger(__name__)
 
 TRACE_REPORT_LINES = 500
 
@@ -465,6 +468,26 @@ class RuntimeService:
         if not self.manager.delete_session(session_id):
             raise ApiError(status_code=404, detail="Session not found.")
 
+    def _log_io_registration(
+        self, session_id: str, kind: str, registration: dict[str, Any], *, action: str = "registered"
+    ) -> None:
+        logger.info(
+            "%s %s session_id=%s ref=%s type=%s location=%s",
+            kind.capitalize(),
+            action,
+            session_id,
+            registration["ref"],
+            registration["type"],
+            registration["location"],
+            extra={
+                "session_id": session_id,
+                "ref": registration["ref"],
+                "kind": kind,
+                "io_type": registration["type"],
+                "location": registration["location"],
+            },
+        )
+
     def upsert_sources(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         sources = payload.get("sources", [])
         if not isinstance(sources, list):
@@ -480,6 +503,8 @@ class RuntimeService:
             raise ApiError(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
             raise ApiError(status_code=422, detail=str(exc)) from exc
+        for source in sources:
+            self._log_io_registration(session_id, "source", session.sources[str(source["ref"]).strip()])
         return {"session_id": session.session_id, "sources": list(session.sources.values())}
 
     def upsert_sinks(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -497,6 +522,8 @@ class RuntimeService:
             raise ApiError(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
             raise ApiError(status_code=422, detail=str(exc)) from exc
+        for sink in sinks:
+            self._log_io_registration(session_id, "sink", session.sinks[str(sink["ref"]).strip()])
         return {"session_id": session.session_id, "sinks": list(session.sinks.values())}
 
     def patch_source(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -530,6 +557,7 @@ class RuntimeService:
         except ValueError as exc:
             raise ApiError(status_code=422, detail=str(exc)) from exc
 
+        self._log_io_registration(session_id, "source", session.sources[ref], action="updated")
         return {
             "session_id": session.session_id,
             "source": session.sources.get(ref),
@@ -567,6 +595,7 @@ class RuntimeService:
         except ValueError as exc:
             raise ApiError(status_code=422, detail=str(exc)) from exc
 
+        self._log_io_registration(session_id, "sink", session.sinks[ref], action="updated")
         return {
             "session_id": session.session_id,
             "sink": session.sinks.get(ref),
@@ -601,6 +630,7 @@ class RuntimeService:
         except ValueError as exc:
             raise ApiError(status_code=422, detail=str(exc)) from exc
 
+        self._log_io_registration(session_id, "source", session.sources["sample"], action="updated")
         return {
             "session_id": session.session_id,
             "source": session.sources.get("sample"),
@@ -608,20 +638,28 @@ class RuntimeService:
         }
 
     def delete_source(self, session_id: str, ref: str) -> None:
+        session = self.manager.get_session(session_id)
+        registration = None if session is None else session.sources.get(ref)
         try:
             existed = self.manager.delete_source(session_id, ref)
         except KeyError as exc:
             raise ApiError(status_code=404, detail=str(exc)) from exc
         if not existed:
             raise ApiError(status_code=404, detail=f"Source '{ref}' not found.")
+        if registration is not None:
+            self._log_io_registration(session_id, "source", registration, action="deleted")
 
     def delete_sink(self, session_id: str, ref: str) -> None:
+        session = self.manager.get_session(session_id)
+        registration = None if session is None else session.sinks.get(ref)
         try:
             existed = self.manager.delete_sink(session_id, ref)
         except KeyError as exc:
             raise ApiError(status_code=404, detail=str(exc)) from exc
         if not existed:
             raise ApiError(status_code=404, detail=f"Sink '{ref}' not found.")
+        if registration is not None:
+            self._log_io_registration(session_id, "sink", registration, action="deleted")
 
     def put_buffer_source_array(
         self,
@@ -1296,6 +1334,21 @@ class RuntimeService:
                 }
             )
 
+        logger.error(
+            "Run failed session_id=%s run_id=%s code=%s failed_step_id=%s message=%s",
+            session_id,
+            run_id,
+            error_code,
+            error_details.get("failed_step_id"),
+            str(exc),
+            extra={
+                "session_id": session_id,
+                "run_id": run_id,
+                "error_code": error_code,
+                "failed_step_id": error_details.get("failed_step_id"),
+            },
+            exc_info=exc,
+        )
         self.manager.mark_run_failed(
             session_id,
             run_id,

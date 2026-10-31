@@ -1927,7 +1927,16 @@ said what went wrong.
   `SOURCE_UNAVAILABLE` or `SINK_UNAVAILABLE`. This supports live acquisition,
   where files appear only after registration.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.** 2026-10-31, diagnostics implementation:
+
+- Standard module loggers now record API 4xx at WARNING (method, path,
+  session and unchanged detail), API 5xx with traceback at ERROR, and run
+  failures at ERROR (session, run, code, failed step when known, traceback).
+- Successful source/sink registration, patch/sample update and deletion log
+  identity at INFO. Existing ApiError response bodies remain unchanged.
+- Unexpected handler failures return HTTP 500 with structured `INTERNAL_ERROR`,
+  `message` (`ExceptionType: message`) and request context in `details` inside
+  the usual HTTP `detail` envelope, with an ERROR traceback.
 
 **Review log.** _(reviewer)_
 
