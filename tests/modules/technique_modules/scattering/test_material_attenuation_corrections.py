@@ -230,7 +230,7 @@ def test_formula_value_and_source_are_mutually_exclusive():
 
 
 def test_xraylib_accepts_element_formula_and_rejects_typo():
-    import xraylib
+    xraylib = pytest.importorskip("xraylib")
 
     cfg = {"chemical_formula": "Si", "density": 2.33, "beam_energy": 12.0}
     attenuation = material_attenuation_from_config(IoSources(), cfg)

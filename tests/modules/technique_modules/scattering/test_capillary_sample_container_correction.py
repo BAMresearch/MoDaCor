@@ -463,7 +463,10 @@ def test_direct_mu_uncertainty_matches_derived_route(from_source):
     for key in ("capillary_effective_sample_mu", "capillary_sample_attenuation", "signal"):
         actual = direct["sample"][key]
         expected = derived["sample"][key]
-        np.testing.assert_allclose(actual.signal, nominal["sample"][key].signal, rtol=0, atol=0)
+        # with uncertainty sources the kernel evaluates the nominal μ batched with
+        # the perturbed coefficient sets (`np.stack`), which can change floating-point
+        # summation order by one ulp
+        np.testing.assert_allclose(actual.signal, nominal["sample"][key].signal, rtol=1e-14, atol=0)
         np.testing.assert_allclose(actual.signal, expected.signal, rtol=1e-13)
         np.testing.assert_allclose(
             actual.uncertainties["mu_SEM"], expected.uncertainties["mu_SEM"], rtol=1e-13, atol=1e-15
