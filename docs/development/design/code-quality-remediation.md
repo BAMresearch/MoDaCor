@@ -98,6 +98,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | in progress |
 | R14 | The `required` argument flag is never enforced | contract | S | medium | open |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
+| R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -1935,7 +1936,41 @@ instead of treating a refactor as permission to choose a new estimator or
 correlation model. All implementation fixes are deferred to the next brief.
 
 
-**Review log.** _(reviewer)_
+**Review log.**
+
+- **Classification (2026-10-31): approved, with scope decisions.** Commit
+  `04c6172`. 147 sites: 98 (a), 16 (b), 33 (c).
+  - **Maintainer decision: R08 covers refactors only.** That means the
+    shared scalar helper, the six (b) rows that give identical results, and
+    moving the 33 (c) kernels into `models`. The ten (b) rows that would add
+    missing uncertainty terms change published uncertainties, so they move
+    to R16 and are decided one by one.
+  - The six identical-result rows:
+    - `find_scale_factor1d.py:44-46`
+    - `subtract_interpolated_1d.py:210-211, 216-218`
+    - `material_attenuation.py:145-146`
+    - `capillary_self_absorption_correction.py:746, 754-762`
+  - **Performance check** (`.venv-dev`, Apple silicon; the maintainer asked
+    for this because of the capillary ray tracing):
+    - The capillary residual as BaseData division is 2.5 times slower than
+      the hand-written numpy (4.2 → 10.6 ms per 1 Mpx; 10.6 → 26.4 ms for
+      1679×1475 px), with identical values and uncertainties.
+    - The full `CapillarySelfAbsorptionCorrection` takes about 55 µs per pixel
+      in `exact` mode (0.6 s at 100×100 px, 5.0 s at 300×300 px), so the
+      residual change adds about 0.01 %. The ray tracing stays in numpy and is
+      classified (a).
+    - `SubtractInterpolated1D` interpolation via `BaseData.indexed` and
+      arithmetic gives identical results but adds a fixed ~0.25 ms per call
+      (8–20 µs → 260–290 µs for 500–2000 points). That is under 0.1 % of a
+      ~300 ms operando frame. **Maintainer accepted this cost.**
+    - The (c) extractions move numpy code unchanged, so their speed should
+      not change. The implementation brief asks for before/after timings.
+  - BaseData combines same-named components in quadrature. For the
+    interpolation this reproduces the current formula. For the capillary
+    residual it must be checked against `combine_uncertainty_component` with
+    shared component names before changing anything.
+  - The proposed `modules/helpers/quantities.scalar_in_units` (moved and
+    generalized, no parallel helper) is approved.
 
 ---
 
@@ -2084,7 +2119,12 @@ guards. Verified with `tox -e py312 -- -rs`:
   with network access installed xraylib successfully. Verification here is on
   macOS/CPython 3.12; Linux wheels were not independently tested.
 
-**Review log.** _(reviewer)_
+**Review log.**
+
+- **(2026-10-31): approved.** Commit `6dd5eef`. `tox -e py312` now skips 3
+  tests (the chunk-memory opt-in and two Tiled tests, which have their own
+  env), down from 4: the xraylib test runs. Still to confirm: the CI log after
+  the push.
 
 ---
 
@@ -2233,6 +2273,61 @@ said what went wrong.
   including module-reference freshness and warning-as-error Sphinx build.
   No existing server test expectations or ApiError responses needed changes;
   no stop condition was hit.
+
+**Review log.**
+
+- **(2026-10-31): changes requested.** Commits `07aa04d`, `94b0a56` and
+  `97c07a0`. The full suite (1274 passed), `tox -e py312` (1272 passed) and
+  lint pass, and no existing `tests/server` expectation changed. Logging,
+  `INTERNAL_ERROR`, `SOURCE_UNAVAILABLE`/`SINK_UNAVAILABLE` and the log
+  locations work as decided. Two defects:
+  1. **The client crashes on dry-run warnings.** `RuntimeClient.request`
+     treats any `warnings` key as registration warnings (`warning['kind']`).
+     The dry-run plan returns plain strings ("No previous ProcessingData
+     snapshot available; …"), so `SessionClient.dry_run()` raises
+     `TypeError: string indices must be integers`. Reproduced with a fake
+     transport.
+  2. **Sinks into new directories are rejected.** This comes from my brief,
+     which said a sink's parent directory "must exist".
+     `check_file_location` raises when the parent directory is missing, both
+     at registration and at run time. But the HDF and CSV sinks create
+     missing parents themselves (`mkdir(parents=True)`). A run writing to a
+     new subdirectory such as `modacor_output/run_42/out.h5` now fails with
+     `SINK_UNAVAILABLE`, although it worked before. The correct rule: the
+     nearest existing ancestor must be a writable directory.
+
+---
+
+## R16 — Uncertainty propagation gaps found by the R08 audit
+
+**Status:** decision needed (maintainer), row by row. Split out of R08 on
+2026-10-31.
+
+**Problem.** The R08 audit found ten places where an output carries no
+uncertainty contribution from an uncertain input. Each fix changes published
+uncertainties and needs a scientific choice, so none is a plain refactor.
+Line numbers refer to the R08 audit snapshot.
+
+| Site | Missing contribution | Scientific question |
+| --- | --- | --- |
+| `attenuator_plate_correction.py:245-249` | incidence-angle (CosAlpha) sensitivity of the plate transmission | clipping at grazing angles; covariance with the normal-incidence normalization |
+| `detector_efficiency_correction.py:231-235` | angle sensitivity of the efficiency | same as above |
+| `flat_plate_self_absorption_correction.py:128-133` | CosAlpha sensitivity (transmission terms are already propagated) | clipping; covariance between transmission and incidence |
+| `polarization_correction.py:162-166` | TwoTheta and Psi sensitivities | angle covariance through shared geometry; angle wrap; clipping thresholds |
+| `xs_geometry_from_pixel_coordinates.py:352-353` | Psi from `arctan2(dy, dx)` gets no x/y uncertainty | origin singularity, branch cut, shared x/y calibration covariance |
+| `xs_geometry_from_pixel_coordinates.py:361` | CosAlpha clipping does not update uncertainties | derivative and mask policy at the clip |
+| `integrate_1d.py:237-241` | measured axis uncertainty absent from the integral | independent coordinates or a shared axis calibration; duplicate coordinates |
+| `find_scale_factor1d.py:303-317` | axis uncertainties are ignored by the fit | fixed abscissae or errors-in-variables |
+| `subtract_interpolated_1d.py:225-231` | coordinate sensitivity of the interpolated background | interpolation slope; uncertain bracket membership; correlated axes |
+| `helpers/scattering/detector_data.py:129-134` | metadata mean keeps only jitter (SEM), not the measurement components | independence of metadata samples; does jitter replace or supplement measurement errors? |
+
+**Approach.** Decide each row: propagate (which model), document as out of
+scope (like the capillary wall-μ in `capillary-self-absorption.md`), or
+defer. Implement the accepted rows with model sensitivities in `models` and
+attach named components at the BaseData boundary, each with an analytic or
+finite-difference test.
+
+**Implementation notes.** _(implementer)_
 
 **Review log.** _(reviewer)_
 
