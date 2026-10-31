@@ -90,7 +90,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
 | R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | done |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | done |
-| R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | in progress |
+| R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | done |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | open |
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | open |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | open |
@@ -1261,8 +1261,9 @@ maintainer's decisions:
 
 ## R07 — Declarative data-key dependencies, verified against behaviour
 
-**Status:** implemented (A′); R07a–c approved; geometry follow-up and R07d–e pending review. The recommendation was revised on
-2026-10-31 after checking the modules that derive data keys from configuration.
+**Status:** done (A′), on branch `quality-remediation-r07`. The recommendation
+was revised on 2026-10-31 after checking the modules that derive data keys
+from configuration.
 
 **Problem.** 35 of the 41 exported steps override `dependency_contract()`; only
 6 use `dependency_role`. Each override restates by hand which data keys
@@ -1610,6 +1611,29 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
       everything after it. It is fixed in the R07d/e brief.
   - Nit: an implicit string concatenation is left over in the
     `fixed_data_keys` error message in `process_step_describer.py`.
+- **R07d and R07e (2026-10-31): approved; R07 done.** Commits `02e1606`
+  (geometry signal read), `ba2f04d` (`output_processing_key`) and `a130290`
+  (docs, metadata check, snapshot removal).
+  - Re-run independently: full suite with the trace active, 1241 passed and
+    1 skipped; `tox -e py312`, 1238 passed and 4 skipped; `tox -e lint`,
+    `tox -e docs` and `tox -e manifest` clean. The MoDaCor-examples tests
+    (23) pass against this branch.
+  - `XSGeometryFromPixelCoordinates` now reads only `coord_x`, `coord_y` and
+    `coord_z`, so a change to `sample.signal` no longer reruns the geometry.
+  - `output_processing_key` exists only on `ConcatenateDatabundles` (string,
+    `None` rejected) and `IndexedAverager` (string or `None`). Every other
+    step rejects it with the "Did you mean" hint. The migration note is in
+    `interface-migrations.md`.
+  - The metadata consistency test fixed three stale `required_data_keys` /
+    `modifies` entries (`FindCenterOfMass1D`, `IndexByCoordinate`,
+    `Negate`). It has one reasoned exception: the prefix-derived diagnostics
+    of `FindCenterOfMass1D`.
+  - Final state:
+    - 21 of 41 exported steps have no override;
+    - 4 have extension overrides;
+    - 16 have explicit overrides, each listed with a reason in the
+      Implementation notes.
+    - Every override is checked by the access trace.
 
 ---
 
