@@ -1953,6 +1953,60 @@ correlation model. All implementation fixes are deferred to the next brief.
   tests compare against the pre-change Pint formulas at `rtol=1e-12` and check
   that BaseData input signals and uncertainties are not mutated.
 
+- **STOP before Commit B: arithmetic equivalence failed.** The required
+  interpolation expression `background.indexed(left) * lw +
+  background.indexed(right) * rw`, with dimensionless uncertainty-free
+  BaseData weights, was compared against the frozen old signal/sigma formula
+  at `rtol=1e-12`. A normal `shared` component passes, including one-hot and
+  identical left/right indices. A sole `propagate_to_all` component does not:
+  for background values `[2, 4]`, sigma `[0.1, 0.2]`, left `[0, 0, 1]`, right
+  `[0, 1, 1]`, and weights `[1, .5, 1]` / `[0, .5, 0]`, nominal values remain
+  `[2, 3, 4]`. The old component is `[0.1, 0.1118033988749895, 0.2]`; the
+  candidate uncertainty dictionary is empty. BaseData's binary arithmetic
+  excludes the sole global component when the other operand has no uncertainty
+  keys. Thus the proposed substitution changes published named uncertainties.
+  The proof was run outside the source tree; no candidate arithmetic change
+  was applied or committed. No access-trace opt-out was used.
+- Per the brief's explicit stop rule, the six (b) rows and all 33 (c) kernel
+  extractions remain unimplemented. R16 remains untouched. Resolving or
+  adapting the global-component behavior needs review before resuming; this
+  run does not alter BaseData's arithmetic contract to bypass the guard.
+
+**Timings for completed helper refactor only.** The stop above prevented
+Commit B and the kernel moves, so these are not timings for that unimplemented
+work. An uncommitted benchmark used `.venv-dev`, Apple silicon, fresh input
+containers outside the timed section, three warmups and the median of seven
+`calculate()` calls. Scalar/general reductions and indexed averaging use
+1000×1000 inputs; integration uses 2000 points with repeated coordinates; both
+100×100 capillary steps use exact mode. Sample-only attenuation includes shared
+sample-mu/transmission component names and an inactive pixel. The source before
+R08 was frozen locally for the baseline.
+
+| Step / size | Before (ms) | After helper (ms) | Change |
+| --- | ---: | ---: | ---: |
+| `reduction_scalar` | 2.454 | 2.269 | -7.54% |
+| `reduction_weighted` | 3.660 | 3.699 | +1.06% |
+| `indexed_1000x1000` | 73.837 | 77.767 | +5.32% |
+| `integration_2000` | 0.128 | 0.126 | -1.79% |
+| `capillary_self_100x100_exact` | 601.083 | 592.741 | -1.39% |
+| `capillary_composite_100x100_exact` | 1712.910 | 1700.852 | -0.70% |
+
+All measured changes are below the 10% slowdown limit. Across these cases,
+**60 stored nominal/uncertainty arrays** were compared against the frozen
+baseline with `rtol=1e-12`, `atol=0`, including NaNs, and matched. Source-code
+changes after the helper commit were limited to these tracker notes.
+
+**Validation of the safe committed changes:** full development suite with
+access tracing **1286 passed, 1 skipped**, 2 subtests passed. Tox `py312`:
+**1284 passed, 3 skipped**, 2 subtests passed; `lint` and `docs` passed,
+including module-reference freshness and warning-as-error Sphinx. The skips
+remain the RSS opt-in check and, in tox only, the two optional Tiled integration
+tests. No public step metadata changed, so no reference-page regeneration was
+needed. R15's follow-up server/client suite passed **109 tests**. The isolated
+candidate-equivalence proof intentionally stopped with a failure; it is not a
+failure in the committed implementation. The arithmetic/uncertainty stop is
+the only triggered stop condition; the performance guard did not trigger.
+
 **Review log.**
 
 - **Classification (2026-10-31): approved, with scope decisions.** Commit
