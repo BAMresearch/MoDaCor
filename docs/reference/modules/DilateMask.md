@@ -41,8 +41,8 @@ Dilate a 2D integer mask over selected axes while preserving uint32 reason bits.
 | `backend` | str | No | auto | - | Use 'auto', 'skimage', or 'scipy'. 'auto' prefers scikit-image when installed. |
 | `footprint_shape` | str | No | square | - | 2D dilation footprint: 'square', 'disk', or 'cross'. |
 | `radius` | int | No | 1 | - | Dilation radius in pixels. |
-| `source_mask_key` | str | No | mask | - | BaseData key for the mask to dilate. |
-| `target_mask_key` | str | No | mask | - | BaseData key for the dilated mask output. |
+| `source_mask_key` | str | No | mask | processing_read_basedata_key | BaseData key for the mask to dilate. |
+| `target_mask_key` | str | No | mask | processing_write_basedata_key | BaseData key for the dilated mask output. |
 | `with_processing_keys` | list | Yes | ["sample"] | - | Single processing key identifying the DataBundle to update. |
 
 ## Notes

@@ -26,7 +26,7 @@ except ImportError:  # pragma: no cover - exercised only when optional extra is 
 
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -48,11 +48,13 @@ class DilateMask(ProcessStep):
                 "doc": "Single processing key identifying the DataBundle to update.",
             },
             "source_mask_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": str,
                 "default": "mask",
                 "doc": "BaseData key for the mask to dilate.",
             },
             "target_mask_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "mask",
                 "doc": "BaseData key for the dilated mask output.",
@@ -169,17 +171,6 @@ class DilateMask(ProcessStep):
         for index, plane in enumerate(planes_in):
             planes_out[index] = cls._dilate_plane(plane, footprint, backend)
         return np.moveaxis(result, (-2, -1), axes)
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        cfg = self.configuration or {}
-        keys = cfg.get("with_processing_keys")
-        source_key = cfg["source_mask_key"]
-        target_key = cfg["target_mask_key"]
-        return ProcessStepDependencies(
-            source_refs=(),
-            processing_reads=processing_key_patterns(keys, basedata_key=source_key),
-            processing_writes=processing_key_patterns(keys, basedata_key=target_key),
-        )
 
     def calculate(self) -> dict[str, DataBundle]:
         keys = self._normalised_processing_keys()

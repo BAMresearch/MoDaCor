@@ -15,7 +15,7 @@ import numpy as np
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.models.scattering import linear_polarization_factor
 
@@ -29,6 +29,9 @@ class PolarizationCorrection(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal", "TwoTheta", "Psi"],
+        fixed_data_keys={
+            "signal": "read_write",
+        },
         modifies={
             "signal": ["signal", "uncertainties"],
             "polarization_factor_map": ["signal", "units"],
@@ -46,16 +49,19 @@ class PolarizationCorrection(ProcessStep):
                 "doc": "Polarization model. Currently supports 'linear_fraction'; 'stokes' is reserved.",
             },
             "two_theta_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": str,
                 "default": "TwoTheta",
                 "doc": "BaseData key containing the scattering angle 2theta.",
             },
             "psi_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": str,
                 "default": "Psi",
                 "doc": "BaseData key containing the detector azimuth.",
             },
             "correction_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "polarization_factor_map",
                 "doc": "BaseData key used to store the applied polarization factor.",
@@ -120,25 +126,6 @@ class PolarizationCorrection(ProcessStep):
         value = cfg.get("polarization_angular_offset")
         units = cfg["polarization_angular_offset_units"]
         return float((float(value) * ureg.Unit(str(units))).to(ureg.radian).magnitude)
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        cfg = self.configuration or {}
-        keys = cfg.get("with_processing_keys")
-        two_theta_key = cfg["two_theta_key"]
-        psi_key = cfg["psi_key"]
-        correction_key = cfg["correction_key"]
-        return ProcessStepDependencies(
-            source_refs=(),
-            processing_reads=(
-                processing_key_patterns(keys, basedata_key="signal")
-                | processing_key_patterns(keys, basedata_key=two_theta_key)
-                | processing_key_patterns(keys, basedata_key=psi_key)
-            ),
-            processing_writes=(
-                processing_key_patterns(keys, basedata_key="signal")
-                | processing_key_patterns(keys, basedata_key=correction_key)
-            ),
-        )
 
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration

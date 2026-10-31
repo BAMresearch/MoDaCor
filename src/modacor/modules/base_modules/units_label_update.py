@@ -17,7 +17,7 @@ from pathlib import Path
 
 from modacor import ureg
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -36,6 +36,7 @@ class UnitsLabelUpdate(ProcessStep):
         modifies={},
         arguments={
             "update_pairs": {
+                "dependency_role": "processing_read_write_basedata_key",
                 "type": dict,
                 "required": True,
                 "default": {},
@@ -46,14 +47,6 @@ class UnitsLabelUpdate(ProcessStep):
         step_doc="Update unit labels of one or more BaseData elements (no conversion).",
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
     )
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
-        basedata_keys = {str(key).strip() for key in self.configuration["update_pairs"] if str(key).strip()}
-        paths = {
-            f"{processing_key}.{basedata_key}" for processing_key in processing_keys for basedata_key in basedata_keys
-        }
-        return ProcessStepDependencies(processing_reads=paths, processing_writes=paths)
 
     def calculate(self) -> dict[str, DataBundle]:
         pairs = self.configuration["update_pairs"]

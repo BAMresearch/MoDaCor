@@ -14,12 +14,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.helpers import basedata_from_sources
-from modacor.dataclasses.process_step import (
-    ProcessStep,
-    ProcessStepDependencies,
-    processing_key_patterns,
-    source_refs_from_references,
-)
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.geometry import ConcentricCylinderGeometry
 from modacor.models.attenuation import (
@@ -78,6 +73,9 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal", "coord_x", "coord_y", "coord_z"],
+        fixed_data_keys={
+            "signal": "read_write",
+        },
         modifies={
             "signal": ["signal", "uncertainties"],
             "capillary_sample_attenuation": ["signal", "uncertainties"],
@@ -94,10 +92,26 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 "default": ["sample"],
                 "doc": "ProcessingData keys whose detector signal should be corrected.",
             },
-            "coord_x_key": {"type": str, "default": "coord_x", "doc": "Detector lab x-coordinate key."},
-            "coord_y_key": {"type": str, "default": "coord_y", "doc": "Detector lab y-coordinate key."},
-            "coord_z_key": {"type": str, "default": "coord_z", "doc": "Detector lab z-coordinate key."},
+            "coord_x_key": {
+                "dependency_role": "processing_read_basedata_key",
+                "type": str,
+                "default": "coord_x",
+                "doc": "Detector lab x-coordinate key.",
+            },
+            "coord_y_key": {
+                "dependency_role": "processing_read_basedata_key",
+                "type": str,
+                "default": "coord_y",
+                "doc": "Detector lab y-coordinate key.",
+            },
+            "coord_z_key": {
+                "dependency_role": "processing_read_basedata_key",
+                "type": str,
+                "default": "coord_z",
+                "doc": "Detector lab z-coordinate key.",
+            },
             "mask_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": (str, type(None)),
                 "default": None,
                 "doc": (
@@ -312,31 +326,37 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 "doc": "Minimum allowed active-pixel attenuation divisor.",
             },
             "attenuation_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "capillary_sample_attenuation",
                 "doc": "Absolute A_s,sc map key.",
             },
             "correction_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "capillary_self_absorption",
                 "doc": "Applied residual-divisor map key.",
             },
             "calculated_transmission_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "capillary_calculated_transmission",
                 "doc": "Calculated whole-beam transmission diagnostic key.",
             },
             "effective_sample_mu_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "capillary_effective_sample_mu",
                 "doc": "Resolved or derived effective sample attenuation-coefficient key.",
             },
             "profile_retained_fraction_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "capillary_beam_profile_retained_fraction",
                 "doc": "Retained incident-weight fraction after beam-profile truncation or thresholding.",
             },
             "evaluated_mask_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "capillary_attenuation_evaluated",
                 "doc": "Boolean map identifying exactly evaluated detector pixels.",
@@ -355,37 +375,6 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             "propagated; see the capillary design note."
         ),
     )
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        cfg = self.configuration or {}
-        keys = cfg.get("with_processing_keys")
-        read_keys = [
-            "signal",
-            cfg["coord_x_key"],
-            cfg["coord_y_key"],
-            cfg["coord_z_key"],
-        ]
-        mask_key = cfg.get("mask_key")
-        if mask_key is not None:
-            read_keys.append(mask_key)
-        write_keys = [
-            "signal",
-            cfg["attenuation_key"],
-            cfg["correction_key"],
-            cfg["calculated_transmission_key"],
-            cfg["effective_sample_mu_key"],
-            cfg["profile_retained_fraction_key"],
-            cfg["evaluated_mask_key"],
-        ]
-        return ProcessStepDependencies(
-            source_refs=source_refs_from_references(cfg),
-            processing_reads=frozenset().union(
-                *(processing_key_patterns(keys, basedata_key=name) for name in read_keys)
-            ),
-            processing_writes=frozenset().union(
-                *(processing_key_patterns(keys, basedata_key=name) for name in write_keys)
-            ),
-        )
 
     def _scalar(self, name: str, units: str, *, required: bool) -> float:
         data = scalar_quantity_from_config_or_source(

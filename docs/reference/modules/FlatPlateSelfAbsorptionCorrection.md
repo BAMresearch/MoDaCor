@@ -41,8 +41,8 @@ Correct angle-dependent self-absorption for a transmission-normalized flat sampl
 ## Argument specification
 | Argument | Type | Required | Default | Dependency role | Description |
 |---|---|---|---|---|---|
-| `correction_key` | str | No | flat_plate_self_absorption | - | BaseData key used to store the relative attenuation factor. |
-| `cos_alpha_key` | str | No | CosAlpha | - | BaseData key containing cos(2theta) for the sample exit angle. |
+| `correction_key` | str | No | flat_plate_self_absorption | processing_write_basedata_key | BaseData key used to store the relative attenuation factor. |
+| `cos_alpha_key` | str | No | CosAlpha | processing_read_basedata_key | BaseData key containing cos(2theta) for the sample exit angle. |
 | `minimum_attenuation_factor` | int or float | No | 1e-12 | - | Lower allowed relative attenuation factor before division. |
 | `minimum_cos_alpha` | int or float | No | 1e-12 | - | Lower numerical clip for positive exit-angle cosines. |
 | `transmission_source` | str | Yes | - | - | IoSources key for the sample transmission factor. |

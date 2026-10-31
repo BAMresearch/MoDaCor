@@ -21,7 +21,7 @@ import numpy as np
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.modules.helpers import leading_non_data_axes
 
@@ -44,11 +44,13 @@ class ReduceMask(ProcessStep):
                 "doc": "Single processing key identifying the DataBundle to update.",
             },
             "source_mask_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": str,
                 "default": "mask",
                 "doc": "BaseData key for the mask to reduce.",
             },
             "target_mask_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "mask",
                 "doc": "BaseData key for the reduced mask output.",
@@ -121,17 +123,6 @@ class ReduceMask(ProcessStep):
         for axis in sorted(axes, reverse=True):
             reduced = reducer(reduced, axis=axis)
         return np.asarray(reduced, dtype=np.uint32)
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        cfg = self.configuration or {}
-        keys = cfg.get("with_processing_keys")
-        source_key = cfg["source_mask_key"]
-        target_key = cfg["target_mask_key"]
-        return ProcessStepDependencies(
-            source_refs=(),
-            processing_reads=processing_key_patterns(keys, basedata_key=source_key),
-            processing_writes=processing_key_patterns(keys, basedata_key=target_key),
-        )
 
     def calculate(self) -> dict[str, DataBundle]:
         keys = self._normalised_processing_keys()

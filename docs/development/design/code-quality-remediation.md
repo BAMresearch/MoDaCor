@@ -1260,7 +1260,7 @@ maintainer's decisions:
 
 ## R07 — Declarative data-key dependencies, verified against behaviour
 
-**Status:** approved (A′); R07a complete; R07b–e pending. The recommendation was revised on
+**Status:** approved (A′); R07a–c complete; R07d–e pending. The recommendation was revised on
 2026-10-31 after checking the modules that derive data keys from configuration.
 
 **Problem.** 35 of the 41 exported steps override `dependency_contract()`; only
@@ -1463,6 +1463,58 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
   steps without hints. The snapshot is identical before module migration.
   With tracing: 1219 passed, 1 skipped; `tox -e py312` 1216 passed, 4 skipped;
   `tox -e lint` passed.
+
+- **R07c (2026-10-31):** migrated groups (a), (b) and (b′) to declarations
+  and reduced the regular group (c) contracts to extensions. Exactly 20
+  overrides remain: four extensions and 16 explicit contracts. The 16 explicit
+  override files are unchanged, as are the six pre-existing role-only steps.
+  The regular-step focused contract tests passed unchanged (479 focused tests
+  passed overall). One geometry test expected the old wildcard and was
+  tightened to assert the exact new read/write sets, retaining its source-ref
+  assertion; no tests were weakened.
+- Only four snapshot entries changed: `PixelCoordinates3D` and
+  `XSGeometryFromPixelCoordinates`, each in `default_keys` and `configured`.
+  For each selected bundle `b` (`sample` and `background`):
+
+  | Step | Before reads / writes | After reads | After writes |
+  | --- | --- | --- | --- |
+  | `PixelCoordinates3D` | `b.*` / `b.*` | `b.signal` | `b.coord_x`, `b.coord_y`, `b.coord_z` |
+  | `XSGeometryFromPixelCoordinates` | `b.*` / `b.*` | `b.signal`, `b.coord_x`, `b.coord_y`, `b.coord_z` | `b.Q0`, `b.Q1`, `b.Q2`, `b.Q`, `b.Psi`, `b.TwoTheta`, `b.CosAlpha`, `b.Omega` |
+
+  Every source-ref set is unchanged. The trace covers these exact keys across
+  the full suite. `XSGeometryFromPixelCoordinates.prepare_execution()` accesses
+  `signal` in its rank fallback, beyond the documented required coordinate
+  keys, so that read is explicitly included. The earlier empty-mapping stop
+  was resolved by the separate R07b refinement; no additional snapshot stop
+  conditions occurred.
+- With tracing active and no opt-outs: development suite 1219 passed,
+  1 skipped; `tox -e py312` 1216 passed, 4 skipped; `tox -e lint` passed.
+  Regenerated the reference pages; their check and the strict Sphinx build
+  passed. The existing generator renders the new argument roles, including
+  metadata inherited by `CapillarySampleContainerCorrection`; its explicit
+  contract remains unchanged. Fixed-key rendering stays with R07e.
+- Remaining overrides (one-line reasons):
+
+  - `AngleToQ`: Adds the conditional center_key read when angle_zero is unset.
+  - `FindCenterOfMass1D`: Adds diagnostic-prefix writes using _output_keys().
+  - `PixelCoordinates3D`: Adds the NeXus detector_frame source reference.
+  - `XSGeometryFromPixelCoordinates`: Adds NeXus detector_frame and sample_z_override source references.
+  - `DivideDatabundles`: Separates dividend/divisor bundle reads and the dividend write.
+  - `MultiplyDatabundles`: Separates multiplicand/multiplier bundle reads and the multiplicand write.
+  - `SubtractDatabundles`: Separates minuend/subtrahend bundle reads and the minuend write.
+  - `FindScaleFactor1D`: Separates work/reference bundles and conditional fit/diagnostic outputs.
+  - `SubtractInterpolated1D`: Separates work/background bundles and remapped/subtracted outputs.
+  - `CopyDataBundleKeys`: Maps source keys to target keys across distinct bundles.
+  - `CapillarySampleContainerCorrection`: Separates filled/empty bundle reads and filled-bundle outputs.
+  - `ConcatenateDatabundles`: Reads multiple input bundles and writes a separate output bundle.
+  - `IndexedAverager`: Supports in-place and distinct-output bundles plus diagnostics.
+  - `Integrate1D`: Pairs input bundles with configured output bundles.
+  - `AppendProcessingData`: Loads source references into a configured bundle and BaseData key.
+  - `AppendSource`: Declares source registration side effects.
+  - `AppendSink`: Declares sink registration side effects.
+  - `SinkProcessingData`: Parses configured processing paths for sink output.
+  - `Plot1DVisualization`: Parses independent plot data/error paths across bundles.
+  - `Plot2DVisualization`: Parses the configured two-dimensional plot data path.
 
 **Review log.**
 

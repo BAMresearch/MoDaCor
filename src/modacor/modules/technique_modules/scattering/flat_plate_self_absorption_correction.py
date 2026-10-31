@@ -12,12 +12,7 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.helpers import basedata_from_sources
-from modacor.dataclasses.process_step import (
-    ProcessStep,
-    ProcessStepDependencies,
-    processing_key_patterns,
-    source_refs_from_references,
-)
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.models.attenuation import (
     flat_plate_relative_attenuation,
@@ -35,6 +30,9 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal", "CosAlpha"],
+        fixed_data_keys={
+            "signal": "read_write",
+        },
         modifies={
             "signal": ["signal", "uncertainties"],
             "flat_plate_self_absorption": ["signal", "uncertainties", "units"],
@@ -47,11 +45,13 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
                 "doc": "ProcessingData keys whose signal should be corrected.",
             },
             "cos_alpha_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": str,
                 "default": "CosAlpha",
                 "doc": "BaseData key containing cos(2theta) for the sample exit angle.",
             },
             "correction_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "flat_plate_self_absorption",
                 "doc": "BaseData key used to store the relative attenuation factor.",
@@ -91,28 +91,6 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
             "the same as transmission through a separate downstream attenuator."
         ),
     )
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        cfg = self.configuration or {}
-        keys = cfg.get("with_processing_keys")
-        cos_alpha_key = cfg["cos_alpha_key"]
-        correction_key = cfg["correction_key"]
-        sources = [
-            cfg.get("transmission_source"),
-            cfg.get("transmission_units_source"),
-            cfg["transmission_uncertainties_sources"],
-        ]
-        return ProcessStepDependencies(
-            source_refs=source_refs_from_references(sources),
-            processing_reads=(
-                processing_key_patterns(keys, basedata_key="signal")
-                | processing_key_patterns(keys, basedata_key=cos_alpha_key)
-            ),
-            processing_writes=(
-                processing_key_patterns(keys, basedata_key="signal")
-                | processing_key_patterns(keys, basedata_key=correction_key)
-            ),
-        )
 
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration

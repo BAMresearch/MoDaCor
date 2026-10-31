@@ -791,12 +791,16 @@
   },
   "PixelCoordinates3D[configured]": {
     "processing_reads": [
-      "background.*",
-      "sample.*"
+      "background.signal",
+      "sample.signal"
     ],
     "processing_writes": [
-      "background.*",
-      "sample.*"
+      "background.coord_x",
+      "background.coord_y",
+      "background.coord_z",
+      "sample.coord_x",
+      "sample.coord_y",
+      "sample.coord_z"
     ],
     "source_refs": [
       "det_coord_x_source",
@@ -819,12 +823,16 @@
   },
   "PixelCoordinates3D[default_keys]": {
     "processing_reads": [
-      "background.*",
-      "sample.*"
+      "background.signal",
+      "sample.signal"
     ],
     "processing_writes": [
-      "background.*",
-      "sample.*"
+      "background.coord_x",
+      "background.coord_y",
+      "background.coord_z",
+      "sample.coord_x",
+      "sample.coord_y",
+      "sample.coord_z"
     ],
     "source_refs": []
   },
@@ -1119,12 +1127,32 @@
   },
   "XSGeometryFromPixelCoordinates[configured]": {
     "processing_reads": [
-      "background.*",
-      "sample.*"
+      "background.coord_x",
+      "background.coord_y",
+      "background.coord_z",
+      "background.signal",
+      "sample.coord_x",
+      "sample.coord_y",
+      "sample.coord_z",
+      "sample.signal"
     ],
     "processing_writes": [
-      "background.*",
-      "sample.*"
+      "background.CosAlpha",
+      "background.Omega",
+      "background.Psi",
+      "background.Q",
+      "background.Q0",
+      "background.Q1",
+      "background.Q2",
+      "background.TwoTheta",
+      "sample.CosAlpha",
+      "sample.Omega",
+      "sample.Psi",
+      "sample.Q",
+      "sample.Q0",
+      "sample.Q1",
+      "sample.Q2",
+      "sample.TwoTheta"
     ],
     "source_refs": [
       "geometry",
@@ -1145,12 +1173,32 @@
   },
   "XSGeometryFromPixelCoordinates[default_keys]": {
     "processing_reads": [
-      "background.*",
-      "sample.*"
+      "background.coord_x",
+      "background.coord_y",
+      "background.coord_z",
+      "background.signal",
+      "sample.coord_x",
+      "sample.coord_y",
+      "sample.coord_z",
+      "sample.signal"
     ],
     "processing_writes": [
-      "background.*",
-      "sample.*"
+      "background.CosAlpha",
+      "background.Omega",
+      "background.Psi",
+      "background.Q",
+      "background.Q0",
+      "background.Q1",
+      "background.Q2",
+      "background.TwoTheta",
+      "sample.CosAlpha",
+      "sample.Omega",
+      "sample.Psi",
+      "sample.Q",
+      "sample.Q0",
+      "sample.Q1",
+      "sample.Q2",
+      "sample.TwoTheta"
     ],
     "source_refs": []
   }

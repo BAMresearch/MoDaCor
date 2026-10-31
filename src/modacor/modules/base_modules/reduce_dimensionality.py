@@ -24,7 +24,7 @@ from attrs import validators as v
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
-from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.modules.helpers import finalize_weighted_scatter, leading_non_data_axes
 
@@ -87,6 +87,9 @@ class ReduceDimensionality(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
+        fixed_data_keys={
+            "signal": "read_write",
+        },
         modifies={"signal": ["signal", "uncertainties", "units", "weights"]},
         arguments={
             "axes": {
@@ -113,6 +116,7 @@ class ReduceDimensionality(ProcessStep):
                 "doc": "Reduction method: 'mean' or 'sum'.",
             },
             "mask_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": (str, type(None)),
                 "default": None,
                 "doc": (
@@ -681,19 +685,6 @@ class ReduceDimensionality(ProcessStep):
         return result
 
     # ---------------------------- main API ---------------------------------
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        keys = self.configuration.get("with_processing_keys")
-        reads = set(processing_key_patterns(keys, basedata_key="signal"))
-        writes = set(reads)
-        mask_key = self.configuration.get("mask_key")
-        if isinstance(mask_key, str) and mask_key.strip():
-            reads.update(processing_key_patterns(keys, basedata_key=mask_key))
-        return ProcessStepDependencies(
-            source_refs=(),
-            processing_reads=reads,
-            processing_writes=writes,
-        )
 
     def prepare_execution(self) -> None:
         """Validate estimator configuration before processing data."""

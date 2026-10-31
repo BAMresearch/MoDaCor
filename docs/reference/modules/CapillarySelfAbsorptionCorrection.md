@@ -113,27 +113,27 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 | Argument | Type | Required | Default | Dependency role | Description |
 |---|---|---|---|---|---|
 | `absolute_tolerance` | int or float | No | 1e-12 | - | Adaptive absolute tolerance. |
-| `attenuation_key` | str | No | capillary_sample_attenuation | - | Absolute A_s,sc map key. |
+| `attenuation_key` | str | No | capillary_sample_attenuation | processing_write_basedata_key | Absolute A_s,sc map key. |
 | `beam_profile` | dict | Yes | - | - | Measured-image, gaussian_2d, or trapezoid_2d beam-profile configuration. |
-| `calculated_transmission_key` | str | No | capillary_calculated_transmission | - | Calculated whole-beam transmission diagnostic key. |
+| `calculated_transmission_key` | str | No | capillary_calculated_transmission | processing_write_basedata_key | Calculated whole-beam transmission diagnostic key. |
 | `capillary_axis` | tuple | No | [1.0, 0.0, 0.0] | - | Capillary centreline direction in the lab frame; horizontal by default. |
 | `capillary_centre` | tuple | No | [0.0, 0.0, 0.0] | - | Point on the capillary centreline in capillary_centre_units. |
 | `capillary_centre_units` | str | No | m | - | Capillary-centre length units. |
 | `chord_order` | int | No | 12 | - | Gauss--Legendre nodes per occupied chord. |
-| `coord_x_key` | str | No | coord_x | - | Detector lab x-coordinate key. |
-| `coord_y_key` | str | No | coord_y | - | Detector lab y-coordinate key. |
-| `coord_z_key` | str | No | coord_z | - | Detector lab z-coordinate key. |
-| `correction_key` | str | No | capillary_self_absorption | - | Applied residual-divisor map key. |
+| `coord_x_key` | str | No | coord_x | processing_read_basedata_key | Detector lab x-coordinate key. |
+| `coord_y_key` | str | No | coord_y | processing_read_basedata_key | Detector lab y-coordinate key. |
+| `coord_z_key` | str | No | coord_z | processing_read_basedata_key | Detector lab z-coordinate key. |
+| `correction_key` | str | No | capillary_self_absorption | processing_write_basedata_key | Applied residual-divisor map key. |
 | `detector_chunk_size` | int | No | 256 | - | Expert detector chunk-size override. |
-| `effective_sample_mu_key` | str | No | capillary_effective_sample_mu | - | Resolved or derived effective sample attenuation-coefficient key. |
-| `evaluated_mask_key` | str | No | capillary_attenuation_evaluated | - | Boolean map identifying exactly evaluated detector pixels. |
+| `effective_sample_mu_key` | str | No | capillary_effective_sample_mu | processing_write_basedata_key | Resolved or derived effective sample attenuation-coefficient key. |
+| `evaluated_mask_key` | str | No | capillary_attenuation_evaluated | processing_write_basedata_key | Boolean map identifying exactly evaluated detector pixels. |
 | `evaluation_mode` | str | No | adaptive | - | Adaptive detector-grid interpolation or exact active-pixel point rays. |
 | `incident_direction` | tuple | No | [0.0, 0.0, 1.0] | - | Incident beam propagation direction in the lab frame. |
 | `input_state` | str | No | transmission_normalized | - | One of raw, flux_normalized, or transmission_normalized. |
-| `mask_key` | str or NoneType | No | - | - | Boolean mask key; None means no mask. A configured key must exist; True pixels retain identity factors. |
+| `mask_key` | str or NoneType | No | - | processing_read_basedata_key | Boolean mask key; None means no mask. A configured key must exist; True pixels retain identity factors. |
 | `max_depth` | int | No | 10 | - | Maximum adaptive subdivision depth. |
 | `minimum_attenuation_factor` | int or float | No | 1e-12 | - | Minimum allowed active-pixel attenuation divisor. |
-| `profile_retained_fraction_key` | str | No | capillary_beam_profile_retained_fraction | - | Retained incident-weight fraction after beam-profile truncation or thresholding. |
+| `profile_retained_fraction_key` | str | No | capillary_beam_profile_retained_fraction | processing_write_basedata_key | Retained incident-weight fraction after beam-profile truncation or thresholding. |
 | `relative_tolerance` | int or float | No | 0.001 | - | Adaptive relative tolerance. |
 | `sample_mu` | int or float or NoneType | No | - | - | Sample linear attenuation coefficient; alternatively use its source or phase-factor inputs. |
 | `sample_mu_sensitivity_relative_step` | int or float | No | 0.01 | - | Relative finite-difference step for derived-sample-mu uncertainty propagation. |

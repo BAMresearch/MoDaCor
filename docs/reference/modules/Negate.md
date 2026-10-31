@@ -30,5 +30,5 @@ Negate a BaseData entry using its uncertainty-preserving unary operation.
 ## Argument specification
 | Argument | Type | Required | Default | Dependency role | Description |
 |---|---|---|---|---|---|
-| `data_key` | str | No | signal | - | BaseData key whose nominal values are negated. |
+| `data_key` | str | No | signal | processing_read_write_basedata_key | BaseData key whose nominal values are negated. |
 | `with_processing_keys` | str or list or NoneType | Yes | - | - | DataBundle key or keys to update. |

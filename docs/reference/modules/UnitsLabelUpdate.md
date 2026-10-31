@@ -29,7 +29,7 @@ Update unit labels of one or more BaseData elements (no conversion).
 ## Argument specification
 | Argument | Type | Required | Default | Dependency role | Description |
 |---|---|---|---|---|---|
-| `update_pairs` | dict | Yes | {} | - | Mapping of BaseData key to unit string or {'units': str}. |
+| `update_pairs` | dict | Yes | {} | processing_read_write_basedata_key | Mapping of BaseData key to unit string or {'units': str}. |
 
 ## References
 DOI 10.1088/0953-8984/25/38/383201

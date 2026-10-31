@@ -14,12 +14,7 @@ import numpy as np
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import (
-    ProcessStep,
-    ProcessStepDependencies,
-    processing_key_patterns,
-    source_refs_from_references,
-)
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.models.attenuation import planar_absorption_efficiency
 from modacor.modules.helpers.scattering.material_attenuation import (
@@ -38,6 +33,9 @@ class DetectorEfficiencyCorrection(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal", "CosAlpha"],
+        fixed_data_keys={
+            "signal": "read_write",
+        },
         modifies={
             "signal": ["signal", "uncertainties"],
             "detector_efficiency": ["signal", "units"],
@@ -50,11 +48,13 @@ class DetectorEfficiencyCorrection(ProcessStep):
                 "doc": "ProcessingData keys whose signal should be corrected.",
             },
             "cos_alpha_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": str,
                 "default": "CosAlpha",
                 "doc": "BaseData key containing the incidence cosine n dot rhat.",
             },
             "correction_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "detector_efficiency",
                 "doc": "BaseData key used to store the applied relative or absolute efficiency map.",
@@ -193,18 +193,6 @@ class DetectorEfficiencyCorrection(ProcessStep):
             "xraylib is used for material lookup unless linear_attenuation_coefficient is configured directly."
         ),
     )
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        cfg = self.configuration or {}
-        keys = cfg.get("with_processing_keys")
-        cos_alpha_key = cfg["cos_alpha_key"]
-        signal_paths = processing_key_patterns(keys, basedata_key="signal")
-        correction_paths = processing_key_patterns(keys, basedata_key=cfg["correction_key"])
-        return ProcessStepDependencies(
-            source_refs=source_refs_from_references(cfg),
-            processing_reads=signal_paths | processing_key_patterns(keys, basedata_key=cos_alpha_key),
-            processing_writes=signal_paths | correction_paths,
-        )
 
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration
