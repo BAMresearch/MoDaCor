@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v1.12.0 (2026-10-31)
+
+### Documentation
+
+* docs: minor-version policy for interface changes until v2.0 ([`b1c7d5b`](https://github.com/BAMresearch/MoDaCor/commit/b1c7d5b3ac7f78e2465e3bf5d95f4674df3eacb0))
+
+### Features
+
+* feat: configuration-interface cleanup (quality remediation R01–R05) (#148) ([`b1c7d5b`](https://github.com/BAMresearch/MoDaCor/commit/b1c7d5b3ac7f78e2465e3bf5d95f4674df3eacb0))
+
+### Testing
+
+* test: tolerate last-ulp differences in direct-mu equivalence; skip xraylib test without xraylib ([`b1c7d5b`](https://github.com/BAMresearch/MoDaCor/commit/b1c7d5b3ac7f78e2465e3bf5d95f4674df3eacb0))
+
 ## v1.11.0 (2026-10-07)
 
 ### Bug fixes
