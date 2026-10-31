@@ -97,7 +97,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | in progress |
 | R14 | The `required` argument flag is never enforced | contract | S | medium | open |
-| R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | decision needed |
+| R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -1850,7 +1850,8 @@ been checked.
 
 ## R15 — Server: explain source/sink and run failures, and keep logs
 
-**Status:** decision needed (maintainer). Raised 2026-10-31: registering
+**Status:** approved; in progress on branch `quality-remediation-r08-r13-r15`.
+Raised 2026-10-31: registering
 sources and sinks in a server session returned only a failure code, and no log
 said what went wrong.
 
@@ -1899,6 +1900,17 @@ said what went wrong.
   - `modacor serve` gains `--log-file` (and `--log-level`).
   - `LocalServer` writes to a default log file instead of `/dev/null`, and
     includes the path in its startup and failure messages.
+
+**Decision.** 2026-10-31, maintainer:
+- **Log location:** next to the work. `LocalServer` writes to
+  `./modacor_output/modacor_server.log` in the working directory by default.
+  `modacor serve` logs to the console and gains `--log-file`. The path is
+  printed at startup and included in error messages.
+- **Unusable file at registration:** warn, then fail at run time.
+  Registration succeeds, returns a `warnings` list and logs a WARNING. If the
+  file is still unusable when a run starts, the run fails with
+  `SOURCE_UNAVAILABLE` or `SINK_UNAVAILABLE`. This supports live acquisition,
+  where files appear only after registration.
 
 **Implementation notes.** _(implementer)_
 
