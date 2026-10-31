@@ -71,7 +71,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | --- | --- | --- | --- | --- | --- |
 | R01 | `PolarizationCorrection` fails when no factor is set | bug | XS | high | done |
 | R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | done |
-| R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | open (optional) |
+| R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | ready |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
@@ -488,7 +488,7 @@ Sphinx 0 warnings/0 errors. Unrelated checkout edits were preserved.
 
 ## R01c — "Did you mean …?" hint for unknown configuration keys
 
-**Status:** open (optional; after R01b)
+**Status:** ready
 
 **Problem.** With aliases removed, a misspelled key (for example
 `polarisation_factor`) fails at construction with `KeyError` listing every
@@ -499,6 +499,16 @@ known key. That is correct but noisy for steps with many arguments.
 for example `Unknown key 'polarisation_factor'. Did you mean
 'polarization_factor'?`. Keep the existing message and exception type, so that
 `KeyError` and its match patterns in tests keep working.
+
+**Location (reviewer, 2026-10-31).** The unknown-key `KeyError` is raised in
+exactly two places, `ProcessStep.normalize_config_value` and
+`ProcessStep.validate_config_value` (`process_step.py`, about lines 487 and
+496), with identical messages. No other route (runner, pipeline schema,
+server, client, CLI) validates step keys itself, so pipeline YAML and server
+requests all reach these two lines. Move the message into one private helper
+used by both, so the hint cannot drift between them. Keep the exact existing
+prefix `Key <key> not found in configuration. Known keys: ...` and add the
+hint as a separate sentence, so existing `match=` patterns keep working.
 
 **Acceptance criteria.** A focused test in `tests/dataclasses/` shows the hint
 for a near miss and no hint for an unrelated key; existing tests pass
