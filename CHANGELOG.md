@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v1.13.0 (2026-10-31)
+
+### Features
+
+* feat: declarative dependency contracts with access-trace verification (quality remediation R06–R07) (#150) ([`f6747ba`](https://github.com/BAMresearch/MoDaCor/commit/f6747ba6864e391ee6fb3efc4864aa745c089d01))
+
 ## v1.12.0 (2026-10-31)
 
 ### Documentation
