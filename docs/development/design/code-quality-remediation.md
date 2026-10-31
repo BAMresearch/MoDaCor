@@ -2445,31 +2445,38 @@ value meets an operand without uncertainties, its uncertainty vanishes and
 published uncertainties are underestimated. The `MOUSE_solids_operando`
 pipeline uses it for `detector_readout_time`.
 
-**Decision.** 2026-10-31, maintainer: fix the loss and keep the folding.
-- A global-only operand still folds into every key of the other operand (rule
-  2). This means that if those keys are later combined in quadrature (for
-  example by `CombineUncertainties`), the global term counts once per key, √k
-  times in total. This is accepted and must be documented in the BaseData
-  docstrings.
-- An alternative was rejected: treating `propagate_to_all` as an ordinary
-  independent key, which would also have removed the overcount.
+**Decision.** 2026-10-31, maintainer: `propagate_to_all` stays a special
+case and is applied as documented. No supplied uncertainty component is ever
+silently discarded. The contract:
 
-**Rules after the fix.**
+| Operands' uncertainty keys | Result |
+| --- | --- |
+| Both global-only | Keep `propagate_to_all` |
+| Global-only + no uncertainties | Keep and propagate `propagate_to_all` |
+| Global-only + another non-empty mapping | Fold the global contribution into each key of the other mapping |
+| Neither global-only | Union; a `propagate_to_all` mixed in with other keys is an ordinary component |
 
-1. Both operands global-only: the result has `{"propagate_to_all"}`
-   (unchanged).
-2. One operand global-only, the other with at least one key: the result keys
-   are the other operand's keys, and the global term folds into each
-   (unchanged). A `propagate_to_all` key in a mixed set counts as one of
-   these keys.
-3. **New:** one operand global-only, the other with no uncertainties: the
-   result has `{"propagate_to_all"}`, propagated from the global operand.
-4. **Corrected:** neither operand global-only: the union of all keys,
-   including `propagate_to_all` as a normal key where an operand carries it
-   alongside other keys. This is what the docstring already says.
+- **Caveat, to be documented prominently.** Folding does not represent
+  covariance. Combining the resulting keys in quadrature (for example with
+  `CombineUncertainties`) counts the shared global contribution once per key,
+  up to √k times its proper contribution across k keys. When
+  `propagate_to_all` is used, keep the propagated uncertainty components
+  separate rather than combining them afterwards.
+- **Documentation.** Correct the user docs: rule 5 in
+  `docs/data-model/uncertainty-propagation.md` currently says a mixed-in
+  `propagate_to_all` "is not emitted". Then align both BaseData docstrings
+  with the table above.
+- **Implementation.** One key-selection implementation for ordinary and
+  in-place arithmetic. Tests cover mixed keys, uncertainty-free operands,
+  both operand orders, and the equivalence of an exact float and an exact
+  BaseData operand.
+- **Release notes.** Explain the restored uncertainties. R17 stays a
+  separate scientific bug fix: R08's refactors must still preserve results,
+  and their equivalence guards are re-run after R17.
 
-This changes results: uncertainties that were silently lost reappear, so it
-is a `fix:`, not an interface change.
+**Rules after the fix** are the table above. They change results:
+uncertainties that were silently lost reappear. This is a `fix:`, not an
+interface change.
 
 **Implementation notes.** _(implementer)_
 
