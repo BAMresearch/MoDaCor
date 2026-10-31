@@ -71,7 +71,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | --- | --- | --- | --- | --- | --- |
 | R01 | `PolarizationCorrection` fails when no factor is set | bug | XS | high | done |
 | R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | done |
-| R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | in review |
+| R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | done |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
@@ -488,7 +488,7 @@ Sphinx 0 warnings/0 errors. Unrelated checkout edits were preserved.
 
 ## R01c — "Did you mean …?" hint for unknown configuration keys
 
-**Status:** in review
+**Status:** done
 
 **Problem.** With aliases removed, a misspelled key (for example
 `polarisation_factor`) fails at construction with `KeyError` listing every
@@ -528,7 +528,19 @@ unchanged.
   2 subtests passed, 3 warnings; flake8 0 violations; touched-file isort
   0 violations. Before implementation, regression tests: 3 failed, 2 passed.
 
-**Review log.** _(reviewer)_
+**Review log.**
+
+- 2026-10-31, `744cc73`: **done.** One helper,
+  `_unknown_config_key_error`, is used by both raise sites; the original
+  prefix is unchanged and the hint is appended. Tried through real step
+  construction: `polarisation_factor` suggests `polarization_factor` first;
+  `raduis` suggests `radius`; `with_processing_key` suggests
+  `with_processing_keys`; an unrelated key gets no hint. Full suite 1155
+  passed, 1 skipped; flake8 clean. Cosmetic, optional: three suggestions read
+  as "'a' or 'b' or 'c'"; "'a', 'b' or 'c'" would read better, and for steps
+  with many arguments the hint sits after a long known-keys list. Neither
+  needs action.
+
 
 ---
 
