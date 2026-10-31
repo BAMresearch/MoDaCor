@@ -15,6 +15,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.models.interpolation import remap_coefficients_1d
+from modacor.modules.helpers import scalar_in_units
 
 
 class SubtractInterpolated1D(ProcessStep):
@@ -194,7 +195,7 @@ class SubtractInterpolated1D(ProcessStep):
         if max_gap is not None:
             max_gap_units = self.configuration.get("max_gap_units")
             gap_units = sample_axis.units if max_gap_units is None else ureg.Unit(max_gap_units)
-            max_gap = (float(max_gap) * gap_units).to(sample_axis.units).magnitude
+            max_gap = scalar_in_units(max_gap, sample_axis.units, name="max_gap", units=gap_units)
 
         left, right, left_weight, right_weight, remap_valid = remap_coefficients_1d(
             background_coordinates,

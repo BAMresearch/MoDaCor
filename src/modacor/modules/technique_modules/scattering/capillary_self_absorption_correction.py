@@ -30,10 +30,8 @@ from modacor.models.uncertainty import (
     combine_uncertainty_component,
     nominal_and_finite_difference,
 )
-from modacor.modules.helpers.scattering.material_attenuation import (
-    scalar_in_units,
-    scalar_quantity_from_config_or_source,
-)
+from modacor.modules.helpers import scalar_in_units
+from modacor.modules.helpers.scattering.material_attenuation import scalar_quantity_from_config_or_source
 
 
 def _length_array(value, units: str, *, name: str, shape=None) -> np.ndarray:
@@ -53,7 +51,7 @@ def _rotation_radians(profile_config: dict[str, Any]) -> float:
     value = float(profile_config.get("rotation", 0.0))
     units = str(profile_config.get("rotation_units", "degree"))
     try:
-        return float(ureg.Quantity(value, ureg.Unit(units)).to("radian").magnitude)
+        return scalar_in_units(value, "radian", name="beam_profile rotation", units=units)
     except Exception as error:
         raise ValueError("beam_profile rotation must use angular units.") from error
 

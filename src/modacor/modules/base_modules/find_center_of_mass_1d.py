@@ -15,6 +15,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.models.centroid import CentroidResult, intensity_centroid_1d
+from modacor.modules.helpers import scalar_in_units
 
 
 class FindCenterOfMass1D(ProcessStep):
@@ -193,14 +194,16 @@ class FindCenterOfMass1D(ProcessStep):
             half_width_cfg = cfg.get("half_width")
             half_width = None
             if half_width_cfg is not None:
-                half_width = (float(half_width_cfg) * width_units).to(axis.units).magnitude
+                half_width = scalar_in_units(half_width_cfg, axis.units, name="half_width", units=width_units)
                 if not np.isfinite(half_width) or half_width <= 0.0:
                     raise ValueError("FindCenterOfMass1D half_width must be positive and finite.")
-            tolerance = (float(cfg["convergence_tolerance"]) * width_units).to(axis.units).magnitude
+            tolerance = scalar_in_units(
+                cfg["convergence_tolerance"], axis.units, name="convergence_tolerance", units=width_units
+            )
             if tolerance < 0.0 or not np.isfinite(tolerance):
                 raise ValueError("FindCenterOfMass1D convergence_tolerance must be finite and non-negative.")
             baseline_units = ureg.Unit(cfg.get("baseline_units") or signal.units)
-            baseline = (float(cfg["baseline"]) * baseline_units).to(signal.units).magnitude
+            baseline = scalar_in_units(cfg["baseline"], signal.units, name="baseline", units=baseline_units)
 
             valid_indices = np.flatnonzero(valid)
             anchor = int(valid_indices[np.argmax(np.asarray(signal.signal)[valid])])

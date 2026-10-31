@@ -1936,6 +1936,23 @@ instead of treating a refactor as permission to choose a new estimator or
 correlation model. All implementation fixes are deferred to the next brief.
 
 
+**Refactor implementation progress (2026-10-31).**
+
+- Shared scalar helper: moved and generalized to
+  `modules/helpers/quantities.py:scalar_in_units`, re-exported by
+  `modacor.modules.helpers`. Numeric configuration defaults to target units;
+  BaseData inputs reject separate units and preserve scalar/exactly-constant
+  extraction on a converted copy. Contextual errors include the parameter name.
+  All listed scalar configuration sites now use it, including scalar bin bounds;
+  vector bin-edge, profile-length and plot conversions retain Pint directly.
+  Material text/scalar decoding is shared from quantities rather than duplicated.
+  IoSource loading and statistical scalar reduction remain separate.
+- Helper verification: **10 passed**; focused conversion/centroid/remapping/binning
+  and scattering module checks: **171 passed** with access tracing active.
+  Existing nominal and uncertainty assertions remain unchanged; direct converter
+  tests compare against the pre-change Pint formulas at `rtol=1e-12` and check
+  that BaseData input signals and uncertainties are not mutated.
+
 **Review log.**
 
 - **Classification (2026-10-31): approved, with scope decisions.** Commit
