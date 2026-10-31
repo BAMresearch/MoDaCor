@@ -99,6 +99,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R14 | The `required` argument flag is never enforced | contract | S | medium | open |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
+| R17 | BaseData silently drops `propagate_to_all` uncertainties | bug | S | high | in progress |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -1641,8 +1642,10 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
 
 ## R08 — Audit remaining unit stripping in modules
 
-**Status:** in progress on branch `quality-remediation-r08-r13-r15`. First
-step: classification only.
+**Status:** in progress on branch `quality-remediation-r08-r13-r15`. The
+classification and Commit A (the scalar helper) are done. Commit B stopped at
+the equivalence guard: BaseData dropped a sole `propagate_to_all` component.
+That is a BaseData bug, now R17, which is fixed first.
 
 **Inventory (2026-10-31, after R07).** A pattern search (`.magnitude`,
 `.m_as(`, `np.asarray(… .signal)`, `float(… .signal)`, `.to(…).magnitude`)
@@ -2405,6 +2408,68 @@ scope (like the capillary wall-μ in `capillary-self-absorption.md`), or
 defer. Implement the accepted rows with model sensitivities in `models` and
 attach named components at the BaseData boundary, each with an analytic or
 finite-difference test.
+
+**Implementation notes.** _(implementer)_
+
+**Review log.** _(reviewer)_
+
+---
+
+## R17 — BaseData silently drops `propagate_to_all` uncertainties
+
+**Status:** approved (maintainer, 2026-10-31); in progress on branch
+`quality-remediation-r08-r13-r15`. Found when R08's equivalence guard stopped
+the `SubtractInterpolated1D` refactor.
+
+**Problem.** `propagate_to_all` is a special uncertainty key: when it is an
+operand's only key, it acts as a global fallback. The rules live in
+`_binary_basedata_op` and, for in-place operators, `_uncertainty_key_plan`.
+They lose uncertainty in two cases (reproduced on 2026-10-31):
+
+1. **The other operand has no uncertainties at all.** For a global-only
+   operand `g` and an exact BaseData `e`, the results `g * e`, `g / e`,
+   `g + e`, `g - e` and `e * g` all have `uncertainties == {}`. With a plain
+   float (`g * 2.0`) the uncertainty is kept, which is inconsistent.
+2. **Mixed operands.** If an operand carries `propagate_to_all` together with
+   other keys, its `propagate_to_all` component is dropped, for example
+   `mixed * exact` → only `Poisson`. The docstring says that in this case the
+   key is "treated like a normal key name" (union), so the code contradicts
+   its own documentation.
+
+Unary operations (`**`, `sqrt`) and `indexed` keep the key.
+
+**Impact.** The SAXSess example pipeline gives many of its inputs uncertainty
+through `propagate_to_all`: exposure time, dark current, transmitted flux,
+detector and sample positions, photon energy and thickness. Wherever such a
+value meets an operand without uncertainties, its uncertainty vanishes and
+published uncertainties are underestimated. The `MOUSE_solids_operando`
+pipeline uses it for `detector_readout_time`.
+
+**Decision.** 2026-10-31, maintainer: fix the loss and keep the folding.
+- A global-only operand still folds into every key of the other operand (rule
+  2). This means that if those keys are later combined in quadrature (for
+  example by `CombineUncertainties`), the global term counts once per key, √k
+  times in total. This is accepted and must be documented in the BaseData
+  docstrings.
+- An alternative was rejected: treating `propagate_to_all` as an ordinary
+  independent key, which would also have removed the overcount.
+
+**Rules after the fix.**
+
+1. Both operands global-only: the result has `{"propagate_to_all"}`
+   (unchanged).
+2. One operand global-only, the other with at least one key: the result keys
+   are the other operand's keys, and the global term folds into each
+   (unchanged). A `propagate_to_all` key in a mixed set counts as one of
+   these keys.
+3. **New:** one operand global-only, the other with no uncertainties: the
+   result has `{"propagate_to_all"}`, propagated from the global operand.
+4. **Corrected:** neither operand global-only: the union of all keys,
+   including `propagate_to_all` as a normal key where an operand carries it
+   alongside other keys. This is what the docstring already says.
+
+This changes results: uncertainties that were silently lost reappear, so it
+is a `fix:`, not an interface change.
 
 **Implementation notes.** _(implementer)_
 
