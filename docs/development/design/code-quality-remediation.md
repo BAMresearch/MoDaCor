@@ -1454,6 +1454,16 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
   With the access trace active: development suite 1202 passed, 1 skipped;
   `tox -e py312` 1199 passed, 4 skipped; `tox -e lint` passed. No surprises.
 
+- **R07b refinement (2026-10-31):** the R07c snapshot guard stopped on
+  `UnitsLabelUpdate[default_keys]`: its empty `update_pairs` mapping widened
+  the empty processing contract to `*`. Per maintainer decision, the default
+  now distinguishes empty declarations from keys lacking a bundle selection.
+  Empty declarations stay exact and empty; non-empty declarations without
+  processing keys remain conservative. The generic fallback applies only to
+  steps without hints. The snapshot is identical before module migration.
+  With tracing: 1219 passed, 1 skipped; `tox -e py312` 1216 passed, 4 skipped;
+  `tox -e lint` passed.
+
 **Review log.**
 
 - **R07a (2026-10-31): approved.** Commits `f2d9b37` (step fixes) and

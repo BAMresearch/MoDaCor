@@ -314,6 +314,7 @@ class ProcessStep:
         write_patterns: set[str] = set()
         fixed_data_keys = self.documentation.fixed_data_keys
         has_dependency_hints = bool(fixed_data_keys)
+        has_declared_keys = bool(fixed_data_keys)
         for key, role in fixed_data_keys.items():
             patterns = processing_key_patterns(cfg.get("with_processing_keys"), basedata_key=key)
             if role in {"read", "read_write"}:
@@ -327,6 +328,7 @@ class ProcessStep:
                 continue
             has_dependency_hints = True
             basedata_keys = _basedata_keys_from_dependency_value(cfg.get(config_key, config_spec.get("default")))
+            has_declared_keys = has_declared_keys or bool(basedata_keys)
             for role in dependency_roles:
                 try:
                     reads, writes = _DEPENDENCY_ROLE_BEHAVIOR[role]
@@ -349,13 +351,13 @@ class ProcessStep:
             else:
                 write_patterns = set(read_patterns)
 
-        if has_dependency_hints and not read_patterns and not write_patterns:
+        if has_declared_keys and not read_patterns and not write_patterns:
             # Hinted BaseData keys are only exact when paired with processing keys.
             # Without them, keep partial-rerun invalidation conservative.
             read_patterns = {"*"}
             write_patterns = {"*"}
 
-        if not source_refs and not read_patterns and not write_patterns:
+        if not has_dependency_hints and not source_refs and not read_patterns and not write_patterns:
             # Generic/custom steps without a contract are treated conservatively.
             read_patterns = frozenset({"*"})
             write_patterns = {"*"}

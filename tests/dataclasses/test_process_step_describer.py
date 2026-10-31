@@ -171,3 +171,39 @@ def test_fixed_data_keys_without_processing_keys_are_conservative():
 
     contract = FixedStep().dependency_contract()
     assert contract.processing_reads == contract.processing_writes == {"*"}
+
+
+@pytest.mark.parametrize("value", [{}, [], None, "  "])
+@pytest.mark.parametrize("bundles", [["sample"], None])
+@pytest.mark.parametrize("source", [None, "calibration::/value"])
+def test_empty_dependency_roles_have_exact_empty_processing_contract(value, bundles, source):
+    from modacor.dataclasses.process_step import ProcessStep
+
+    class EmptyStep(ProcessStep):
+        documentation = _build_describer(
+            arguments={
+                "keys": {"default": value, "dependency_role": "processing_read_write_basedata_key"},
+                "source": {"default": source},
+            }
+        )
+
+        def calculate(self):
+            return None
+
+    contract = EmptyStep(configuration={"with_processing_keys": bundles}).dependency_contract()
+    assert contract.processing_reads == contract.processing_writes == set()
+    assert contract.source_refs == ({"calibration"} if source else set())
+
+
+def test_step_without_dependency_hints_or_processing_keys_is_conservative():
+    from modacor.dataclasses.process_step import ProcessStep
+
+    class GenericStep(ProcessStep):
+        documentation = _build_describer()
+
+        def calculate(self):
+            return None
+
+    contract = GenericStep().dependency_contract()
+    assert contract.processing_reads == contract.processing_writes == {"*"}
+    assert contract.source_refs == set()
