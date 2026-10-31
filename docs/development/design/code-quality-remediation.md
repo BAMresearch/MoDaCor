@@ -96,6 +96,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | open |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | open |
+| R14 | The `required` argument flag is never enforced | contract | S | medium | open |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -1538,6 +1539,26 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
   - Follow-up for R07d, noted by Codex: `ConcatenateDatabundles` accepts
     `output_processing_key=None`, and `_output_key()` then writes to a bundle
     literally named `"None"`.
+- **R07b and R07c (2026-10-31): approved.** Commits `5585613` (mechanism),
+  `d316651` (empty declarations stay empty) and `c66f43c` (migration).
+  - Re-run independently: full suite with the trace active, 1219 passed and
+    1 skipped; `tox -e py312`, 1216 passed and 4 skipped; `tox -e lint` clean.
+    20 overrides remain, as planned.
+  - The default contract only places `*` when keys are declared but there
+    are no bundles to expand them over. The generic fallback applies only to
+    steps without declarations.
+  - Geometry check: removing the declared `signal` read from both geometry
+    steps fails 11 tests through the trace, so both really read it.
+    - `PixelCoordinates3D` needs it: the detector shape comes from
+      `signal`.
+    - `XSGeometryFromPixelCoordinates` reads it only by accident.
+      `getattr(coord_x, "rank_of_data", ref["signal"]...)` evaluates its
+      fallback eagerly, although `rank_of_data` is always a field of
+      `BaseData`. Because geometry steps run early in a pipeline, this false
+      read makes every change to `sample.signal` rerun the geometry and
+      everything after it. It is fixed in the R07d/e brief.
+  - Nit: an implicit string concatenation is left over in the
+    `fixed_data_keys` error message in `process_step_describer.py`.
 
 ---
 
@@ -1703,6 +1724,36 @@ Python 3.12–3.14); if it does not, document that and keep the skip.
 
 **Acceptance criteria.** In at least one CI job, the xraylib tests run rather
 than skip; this is visible in the job log.
+
+**Implementation notes.** _(implementer)_
+
+**Review log.** _(reviewer)_
+
+---
+
+## R14 — The `required` argument flag is never enforced
+
+**Status:** open. Found during the R07c review.
+
+**Problem.** Argument specs can say `"required": True`, but nothing at
+runtime checks it. Only `scripts/generate_module_doc.py` reads it, to fill the
+"Required" column of the reference pages. Since R03, every argument is seeded
+from its schema default, so a "required" argument that has a default can
+simply be left out. For example, `UnitsLabelUpdate.update_pairs` is required
+but defaults to `{}`: a pipeline that omits it gets a step that silently does
+nothing.
+
+**Options.**
+
+- **(a)** Enforce the flag: a step whose required argument was not supplied by
+  the pipeline, or is still empty, fails at configuration time with a clear
+  error. The `required: True` and `default` combinations would need auditing.
+- **(b)** Drop the flag and rely on defaults plus per-step validation, removing
+  the "Required" column from the reference pages.
+
+**Acceptance criteria.** One meaning for "required", enforced or removed,
+with tests. Every existing combination of `required: True` and `default` has
+been checked.
 
 **Implementation notes.** _(implementer)_
 
