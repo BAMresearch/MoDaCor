@@ -91,12 +91,13 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | done |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | done |
 | R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | done |
-| R08 | Audit remaining unit stripping in modules | contract | M | medium | open |
+| R08 | Audit remaining unit stripping in modules | contract | M | medium | in progress |
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | open |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | open |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
-| R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | open |
+| R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | in progress |
 | R14 | The `required` argument flag is never enforced | contract | S | medium | open |
+| R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | decision needed |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -1639,7 +1640,15 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
 
 ## R08 — Audit remaining unit stripping in modules
 
-**Status:** open. Do this after R03 and R04.
+**Status:** in progress on branch `quality-remediation-r08-r13-r15`, which
+is stacked on `quality-remediation-r07`. First step: classification only.
+
+**Inventory (2026-10-31, after R07).** A pattern search (`.magnitude`,
+`.m_as(`, `np.asarray(… .signal)`, `float(… .signal)`, `.to(…).magnitude`)
+finds about 48 occurrences in 15 files, excluding `deprecated/`. The largest
+counts are in `find_center_of_mass_1d.py` (11), `subtract_interpolated_1d.py`
+(8), `integrate_1d.py` (5) and `concatenate_databundles.py` (5). The line
+numbers in the Problem section below predate R04 and R07.
 
 **Problem.** Several modules convert to raw magnitudes with
 `.to(...).magnitude`, `.value`, or `np.asarray(...)`:
@@ -1782,7 +1791,10 @@ This item should get its own branch and pull request.
 
 ## R13 — CI never exercises the xraylib (attenuation) path
 
-**Status:** open
+**Status:** in progress on branch `quality-remediation-r08-r13-r15`.
+xraylib 4.3.0 publishes manylinux wheels for CPython 3.10–3.15 (x86_64 and
+aarch64), so CI can install it directly. Plan: add the `attenuation` extra to
+the default `[testenv]`.
 
 **Problem.** `xraylib` is the optional `attenuation` extra and is not
 installed by any tox environment. Tests that need it are now skipped with
@@ -1829,6 +1841,64 @@ nothing.
 **Acceptance criteria.** One meaning for "required", enforced or removed,
 with tests. Every existing combination of `required: True` and `default` has
 been checked.
+
+**Implementation notes.** _(implementer)_
+
+**Review log.** _(reviewer)_
+
+---
+
+## R15 — Server: explain source/sink and run failures, and keep logs
+
+**Status:** decision needed (maintainer). Raised 2026-10-31: registering
+sources and sinks in a server session returned only a failure code, and no log
+said what went wrong.
+
+**Findings.**
+
+1. **Nothing in `modacor.server` logs anything.** No server module uses
+   `logging`. When a run fails, `_handle_process_failure` stores the message
+   and traceback in the session's in-memory run record (readable through
+   `GET …/errors/latest`). It then raises HTTP 500 with the code and message
+   in the response body. The server log shows only the uvicorn access line.
+   In `20260524_Pauls_modacor/modacor_output/modacor_server.log` there are 68
+   lines `"POST /v1/sessions/mouse-server-batch/process" 500 Internal Server
+   Error` and not a single error message or traceback.
+2. **Error records disappear with the session.** The client deleted the
+   session right after the failure, which discarded the in-memory error record.
+3. **Registration does not check the file.** `upsert_sources`,
+   `upsert_sinks`, `patch_*` and `set_sample_source` only check the shape of
+   the request and the path-root policy. A missing or unreadable file (for
+   example a local permission problem) surfaces only when the next run fails,
+   as a generic `RUN_FAILED`, not as a problem with that source.
+4. **No log at all by default.** `LocalServer` sends server output to
+   `subprocess.DEVNULL` unless `log_path` is given, and `modacor serve` has
+   no option to write a log file.
+5. **Policy rejections are clear but easy to miss.** These return HTTP 422
+   with a message such as `Runtime policy rejected source.location=…: path is
+   outside allowed read roots`. A client that shows only the status code hides
+   this message.
+
+**Proposal.**
+
+- A `modacor.server` logger:
+  - Every API error is logged: 4xx at WARNING with its detail, 5xx at ERROR
+    with the traceback. Each entry includes `session_id`, and `run_id` where
+    there is one.
+  - Source and sink registration, update and deletion are logged at INFO with
+    ref, type and location.
+  - Building the sources and sinks for a run is logged. A failure is logged at
+    ERROR, naming the ref, type, location and exception.
+- Specific error codes for run-time I/O failures: `SOURCE_UNAVAILABLE` and
+  `SINK_UNAVAILABLE`, with ref, type and location in the details, instead of a
+  generic `RUN_FAILED`.
+- At registration, check that file-based sources are readable and that the
+  parent directory of file-based sinks is writable. *Open question:* fail with
+  422, or return a non-fatal `warnings` list and log a WARNING?
+- Logs in a known place. *Open question:* see the options below.
+  - `modacor serve` gains `--log-file` (and `--log-level`).
+  - `LocalServer` writes to a default log file instead of `/dev/null`, and
+    includes the path in its startup and failure messages.
 
 **Implementation notes.** _(implementer)_
 
