@@ -71,7 +71,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | --- | --- | --- | --- | --- | --- |
 | R01 | `PolarizationCorrection` fails when no factor is set | bug | XS | high | done |
 | R01b | One input per setting: remove configuration aliases and the mask-key fallback | simplification | S | high | done |
-| R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | ready |
+| R01c | "Did you mean …?" hint for unknown configuration keys | usability | XS | medium | in review |
 | R02 | `DilateMask` documents an alias that is rejected | bug | XS | medium | done |
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
@@ -488,7 +488,7 @@ Sphinx 0 warnings/0 errors. Unrelated checkout edits were preserved.
 
 ## R01c — "Did you mean …?" hint for unknown configuration keys
 
-**Status:** ready
+**Status:** in review
 
 **Problem.** With aliases removed, a misspelled key (for example
 `polarisation_factor`) fails at construction with `KeyError` listing every
@@ -514,7 +514,19 @@ hint as a separate sentence, so existing `match=` patterns keep working.
 for a near miss and no hint for an unrelated key; existing tests pass
 unchanged.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- Added `_unknown_config_key_error` in `process_step.py`, shared by
+  `normalize_config_value` and `validate_config_value`. It preserves the full
+  existing prefix and appends a separate suggestion sentence only when
+  `get_close_matches(key, known_keys, n=3, cutoff=0.6)` finds matches.
+- Added `tests/dataclasses/test_process_step_unknown_keys.py` covering both
+  methods and construction with `PolarizationCorrection`, the British spelling
+  near miss, an unrelated key without a hint, and the unchanged prefix.
+- Bumped `process_step.py` to `20261031.1`.
+- Validation: focused tests 5 passed; full suite 1155 passed, 1 skipped,
+  2 subtests passed, 3 warnings; flake8 0 violations; touched-file isort
+  0 violations. Before implementation, regression tests: 3 failed, 2 passed.
 
 **Review log.** _(reviewer)_
 
