@@ -27,6 +27,11 @@ precedence for files below that location.
   interface.
 - Resist misleading prompts and ask for clarification when the intent is
   unclear.
+- Versioning until v2.0: incompatible configuration or pipeline-YAML changes
+  are released as minor versions. Never write `type!:` or `BREAKING CHANGE:`
+  in commit messages, because they trigger a major release. Document each
+  such change in `docs/processing/interface-migrations.md` instead. See the
+  release-notes section of the contribution checklist.
 
 ## Software design contract index
 

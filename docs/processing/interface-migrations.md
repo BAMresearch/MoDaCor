@@ -1,5 +1,10 @@
 # Breaking pipeline interface changes
 
+Until the pipeline interface is declared stable at v2.0, incompatible changes
+to step configuration or pipeline YAML are released as **minor** versions.
+Check this page when upgrading to a new minor release; each section lists
+exactly what to change in existing pipelines.
+
 The USAXS-driven pipeline update intentionally breaks several developmental
 pipeline interfaces. Existing YAML using the retired scattering-specific
 indexer, the former indexed averager configuration, or the former

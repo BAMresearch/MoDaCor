@@ -64,6 +64,14 @@ Status values: `open`, `ready`, `in progress`, `in review`,
   `flake8 src tests`. Report counts only; do not paste long output.
 - Bump the touched module's `__version__` (format `YYYYMMDD.N`) when its
   behavior or public metadata changes.
+- **Versioning policy (maintainer decision, 2026-10-31):** until v2.0,
+  incompatible interface changes are released as minor versions (see the
+  contribution checklist). Do not write `type!:` or `BREAKING CHANGE:` in
+  commit messages; document the change in
+  `docs/processing/interface-migrations.md` instead. The `BREAKING CHANGE:`
+  footers requested for R01b predate this decision. They sit in branch
+  commits that are squashed away, so they must not appear in the squash
+  message.
 
 ## Overview
 
