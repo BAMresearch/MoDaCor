@@ -89,7 +89,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R03 | One source of truth for configuration defaults, with a guard test | consistency | S | high | done |
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
 | R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | done |
-| R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | open |
+| R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | done |
 | R07 | Declarative fixed-key dependencies; retire most `dependency_contract()` overrides | design | M–L | high | decision needed |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | open |
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | open |
@@ -1213,7 +1213,7 @@ tiled source are lower priority and are not part of this item.
 
 ## R06 — Repository hygiene
 
-**Status:** open. The maintainer owns this item; the implementer only proposes.
+**Status:** done
 
 **Problem.** The checkout contains untracked artefacts that are easy to commit
 by accident:
@@ -1235,7 +1235,24 @@ tracked or ignored, and whether `docs/design/` duplicates the tracked
 **Acceptance criteria.** `git status` on a fresh build-and-test checkout shows
 only intended changes.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.** Done by the reviewer on 2026-10-31 with the
+maintainer's decisions:
+
+- `.gitignore`: `*.code-workspace`, `*.bkp`, `.$*`, `uv.lock`.
+- Removed from git: `docs/Classes.drawio` and `docs/FlowGeneral.drawio`
+  (unreferenced).
+- Tracked: `docs/development/design/future-package-architecture.drawio`, a WIP
+  schema for splitting MoDaCor into sub-packages with tighter
+  responsibilities (formerly the untracked `docs/design/`).
+- Moved out of the repository to
+  `~/Documents/BAM/Projects/2026/MoDaCor-auxiliary/`: `logo/` (Keynote
+  draft), `testdata/` (25 MB MOUSE `.nxs` used by no test), and
+  `docs-images/` (old diagram exports). Items approved for deletion
+  (draw.io backups, `Classes.drawio.pdf`, `gendocs_test.sh`, `build/`,
+  `dist/`, and source/test folders holding only `__pycache__`) were moved to
+  `MoDaCor-auxiliary/to-delete/` for the maintainer to empty.
+- Verified: `git status` shows no untracked files; `tox -e manifest` OK;
+  `tox -e py312` 1152 passed, 4 skipped; Sphinx `-W` clean.
 
 **Review log.** _(reviewer)_
 
