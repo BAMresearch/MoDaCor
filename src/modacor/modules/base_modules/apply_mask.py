@@ -134,9 +134,9 @@ class ApplyMask(ProcessStep):
         if len(keys) != 1:
             raise ValueError("ApplyMask requires a single databundle processing key.")
         processing_key = keys[0]
-        mask_key = cfg.get("mask_key", "mask")
-        source_keys = cfg.get("basedata_to_mask", ["signal"])
-        masked_value = self._masked_value(cfg.get("masked_value", "nan"))
+        mask_key = cfg["mask_key"]
+        source_keys = cfg["basedata_to_mask"]
+        masked_value = self._masked_value(cfg["masked_value"])
 
         if not isinstance(source_keys, list):
             raise TypeError("ApplyMask basedata_to_mask must be a list.")

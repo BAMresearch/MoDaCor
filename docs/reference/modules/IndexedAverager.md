@@ -7,7 +7,7 @@ Compute weighted group means from a precomputed integer index map.
 - **Import path:** `modacor.modules.base_modules.indexed_averager.IndexedAverager`
 - **Source:** [`src/modacor/modules/base_modules/indexed_averager.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/indexed_averager.py)
 - **Module ID:** IndexedAverager
-- **Module version:** 20261001.1
+- **Module version:** 20261030.1
 - **Keywords:** indexed, grouped, weighted average, reduction
 
 ## Required data keys
@@ -31,7 +31,7 @@ Compute weighted group means from a precomputed integer index map.
   "axis_key": "Q",
   "bin_id_key": "bin_id",
   "index_key": "bin_index",
-  "mask_key": "Mask",
+  "mask_key": null,
   "output_processing_key": null,
   "stats_keys": null,
   "uncertainty_weight_key": null,
@@ -48,7 +48,7 @@ Compute weighted group means from a precomputed integer index map.
 | `axis_key` | str or NoneType | No | Q | - | Optional BaseData to average over the same points and attach as the output axis. |
 | `bin_id_key` | str | No | bin_id | - | Output BaseData key recording the original populated bin IDs. |
 | `index_key` | str | No | bin_index | - | BaseData containing precomputed integer group indices. |
-| `mask_key` | str or NoneType | No | Mask | - | Optional mask BaseData; true values are excluded when the key is present. |
+| `mask_key` | str or NoneType | No | - | - | Mask BaseData key; None means no mask. A configured key must exist; true values are excluded. |
 | `output_processing_key` | str or NoneType | No | - | - | Optional distinct output bundle; requires exactly one input bundle. |
 | `stats_keys` | list or str or NoneType | No | - | - | Value and/or axis keys receiving scatter-derived SEM and STD; None selects both. |
 | `uncertainty_weight_key` | str or NoneType | No | - | - | Value uncertainty component used for inverse-variance weighting. |

@@ -10,11 +10,12 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
-__version__ = "20251121.1"
+__version__ = "20261031.1"
 
 from abc import abstractmethod
 from collections.abc import Iterable
 from copy import deepcopy
+from difflib import get_close_matches
 from numbers import Integral
 from pathlib import Path
 from typing import Any, Type
@@ -29,7 +30,16 @@ from .messagehandler import MessageHandler
 from .process_step_describer import DEPENDENCY_ROLES, ProcessStepDescriber
 from .processing_data import ProcessingData
 
-# from .validators import is_list_of_ints
+
+def _unknown_config_key_error(key: str, known_keys: Iterable[str]) -> KeyError:
+    """Build the shared unknown-key error with optional spelling suggestions."""
+    known_keys = sorted(known_keys)
+    message = f"Key {key} not found in configuration. Known keys: {', '.join(known_keys)}"
+    matches = get_close_matches(key, known_keys, n=3, cutoff=0.6)
+    if matches:
+        suggestions = " or ".join(f"'{match}'" for match in matches)
+        message += f". Did you mean {suggestions}?"
+    return KeyError(message)
 
 
 def _as_frozen_str_set(value: Any) -> frozenset[str]:
@@ -485,8 +495,7 @@ class ProcessStep:
         """Normalize one configuration value against the unified schema."""
         schema = cls.effective_config_schema()
         if key not in schema:
-            known_keys = ", ".join(sorted(schema.keys()))
-            raise KeyError(f"Key {key} not found in configuration. Known keys: {known_keys}")  # noqa
+            raise _unknown_config_key_error(key, schema)
         return _normalize_config_value_for_spec(value, schema[key])
 
     @classmethod
@@ -494,8 +503,7 @@ class ProcessStep:
         """Validate one configuration value against the unified schema."""
         schema = cls.effective_config_schema()
         if key not in schema:
-            known_keys = ", ".join(sorted(schema.keys()))
-            raise KeyError(f"Key {key} not found in configuration. Known keys: {known_keys}")  # noqa
+            raise _unknown_config_key_error(key, schema)
 
         config_spec = schema[key]
         value = _normalize_config_value_for_spec(value, config_spec)

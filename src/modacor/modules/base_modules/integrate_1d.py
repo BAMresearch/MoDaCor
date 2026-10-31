@@ -104,8 +104,8 @@ class Integrate1D(ProcessStep):
         if not processing_keys:
             return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
 
-        signal_key = str(cfg.get("signal_key", "signal"))
-        axis_key = str(cfg.get("axis_key", "q"))
+        signal_key = str(cfg["signal_key"])
+        axis_key = str(cfg["axis_key"])
         mask_key = cfg.get("mask_key")
         read_keys = {signal_key, axis_key}
         if mask_key is not None:
@@ -114,7 +114,7 @@ class Integrate1D(ProcessStep):
 
         output_processing_keys = cfg.get("output_processing_keys")
         if output_processing_keys is None:
-            output_key = str(cfg.get("output_key", "integral"))
+            output_key = str(cfg["output_key"])
             writes = {f"{processing_key}.{output_key}" for processing_key in processing_keys}
         else:
             output_processing_keys = [str(key) for key in output_processing_keys]
@@ -281,11 +281,11 @@ class Integrate1D(ProcessStep):
         processing_keys = self._normalised_processing_keys()
         if not processing_keys:
             raise ValueError("Integrate1D requires at least one processing key.")
-        signal_key = str(cfg.get("signal_key", "signal"))
-        axis_key = str(cfg.get("axis_key", "q"))
-        method = str(cfg.get("method", "trapezoid")).strip().lower()
+        signal_key = str(cfg["signal_key"])
+        axis_key = str(cfg["axis_key"])
+        method = str(cfg["method"]).strip().lower()
         mask_key = cfg.get("mask_key")
-        duplicate_axis = str(cfg.get("duplicate_axis", "error")).strip().lower()
+        duplicate_axis = str(cfg["duplicate_axis"]).strip().lower()
 
         signals, reference_axis, axis, common = self._collect_common_domain(
             processing_keys,
@@ -297,7 +297,7 @@ class Integrate1D(ProcessStep):
             axis,
             common,
             method=method,
-            sort_axis=bool(cfg.get("sort_axis", False)),
+            sort_axis=bool(cfg["sort_axis"]),
             duplicate_axis=duplicate_axis,
         )
         output_processing_keys = self._normalise_output_processing_keys(
@@ -306,7 +306,7 @@ class Integrate1D(ProcessStep):
         )
 
         output: dict[str, DataBundle] = {}
-        output_key = str(cfg.get("output_key", "integral"))
+        output_key = str(cfg["output_key"])
         for index, (processing_key, signal) in enumerate(zip(processing_keys, signals, strict=True)):
             integral = self._integrate_signal(signal, reference_axis, domain)
             result_key, bundle = self._store_integral(

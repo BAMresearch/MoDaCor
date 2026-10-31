@@ -77,8 +77,8 @@ class Multiply(ProcessStep):
         multiplier = basedata_from_sources(
             io_sources=self.io_sources,
             signal_source=self.configuration.get("multiplier_source"),
-            units_source=self.configuration.get("multiplier_units_source", None),
-            uncertainty_sources=self.configuration.get("multiplier_uncertainties_sources", {}),
+            units_source=self.configuration["multiplier_units_source"],
+            uncertainty_sources=self.configuration["multiplier_uncertainties_sources"],
         )
 
         output: dict[str, DataBundle] = {}

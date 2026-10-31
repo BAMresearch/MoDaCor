@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySampleContainerCorrection"]
-__version__ = "20260906.3"
+__version__ = "20261030.4"
 
 from copy import deepcopy
 from pathlib import Path
@@ -29,7 +29,6 @@ from modacor.models.uncertainty import (
     nominal_and_finite_difference,
     uncertainties_from_derivative,
 )
-from modacor.modules.helpers import get_first_present
 from modacor.modules.technique_modules.scattering.capillary_self_absorption_correction import (
     CapillarySelfAbsorptionCorrection,
 )
@@ -65,7 +64,9 @@ _ARGUMENTS.update(
         "empty_mask_key": {
             "type": (str, type(None)),
             "default": None,
-            "doc": "Empty-capillary mask key; defaults to mask_key.",
+            "doc": (
+                "Empty-capillary mask key; None uses mask_key (no mask if both are None). A configured key must exist."
+            ),
         },
         "empty_centre_mu": {
             "type": (int, float, type(None)),
@@ -180,45 +181,45 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         step_note=(
             "The filled and empty signals must already have comparable exposure and incident-flux normalization. "
             "Do not include a separate normalization by measured sample or empty-capillary transmission in the "
-            "same correction pipeline. The operation is [F - (A_c,sc/A_c,c) E] / A_s,sc."
+            "same correction pipeline. The operation is [F - (A_c,sc/A_c,c) E] / A_s,sc. "
+            "Uncertainties of directly configured wall mu, empty-centre mu, capillary radius and wall "
+            "thickness are not yet propagated; see the capillary design note."
         ),
     )
 
     def dependency_contract(self) -> ProcessStepDependencies:
         cfg = self.configuration or {}
-        filled_key = cfg.get("filled_processing_key", "sample")
-        empty_key = cfg.get("empty_processing_key", "background")
+        filled_key = cfg["filled_processing_key"]
+        empty_key = cfg["empty_processing_key"]
         coordinate_names = (
-            cfg.get("coord_x_key", "coord_x"),
-            cfg.get("coord_y_key", "coord_y"),
-            cfg.get("coord_z_key", "coord_z"),
+            cfg["coord_x_key"],
+            cfg["coord_y_key"],
+            cfg["coord_z_key"],
         )
-        mask_key = cfg.get("mask_key", "mask")
-        empty_mask_key = cfg.get("empty_mask_key") or mask_key
+        mask_key = cfg.get("mask_key")
+        empty_mask_key = cfg.get("empty_mask_key")
+        if empty_mask_key is None:
+            empty_mask_key = mask_key
         filled_reads = {"signal", *coordinate_names}
-        if mask_key:
+        if mask_key is not None:
             filled_reads.add(mask_key)
-            if mask_key in {"mask", "Mask"}:
-                filled_reads.add("Mask" if mask_key == "mask" else "mask")
         empty_reads = {"signal"}
-        if empty_mask_key:
+        if empty_mask_key is not None:
             empty_reads.add(empty_mask_key)
-            if empty_mask_key in {"mask", "Mask"}:
-                empty_reads.add("Mask" if empty_mask_key == "mask" else "mask")
         output_names = {
             "signal",
             mask_key,
-            cfg.get("sample_attenuation_key", "capillary_sample_attenuation"),
-            cfg.get("wall_filled_attenuation_key", "capillary_wall_attenuation_filled"),
-            cfg.get("wall_empty_attenuation_key", "capillary_wall_attenuation_empty"),
-            cfg.get("wall_subtraction_scale_key", "capillary_wall_subtraction_scale"),
-            cfg.get("filled_calculated_transmission_key", "capillary_filled_calculated_transmission"),
-            cfg.get("empty_calculated_transmission_key", "capillary_empty_calculated_transmission"),
-            cfg.get("effective_sample_mu_key", "capillary_effective_sample_mu"),
-            cfg.get("profile_retained_fraction_key", "capillary_beam_profile_retained_fraction"),
-            cfg.get("sample_evaluated_mask_key", "capillary_sample_attenuation_evaluated"),
-            cfg.get("wall_filled_evaluated_mask_key", "capillary_wall_filled_attenuation_evaluated"),
-            cfg.get("wall_empty_evaluated_mask_key", "capillary_wall_empty_attenuation_evaluated"),
+            cfg["sample_attenuation_key"],
+            cfg["wall_filled_attenuation_key"],
+            cfg["wall_empty_attenuation_key"],
+            cfg["wall_subtraction_scale_key"],
+            cfg["filled_calculated_transmission_key"],
+            cfg["empty_calculated_transmission_key"],
+            cfg["effective_sample_mu_key"],
+            cfg["profile_retained_fraction_key"],
+            cfg["sample_evaluated_mask_key"],
+            cfg["wall_filled_evaluated_mask_key"],
+            cfg["wall_empty_evaluated_mask_key"],
         }
         return ProcessStepDependencies(
             source_refs=source_refs_from_references(cfg),
@@ -232,15 +233,14 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         )
 
     @staticmethod
-    def _mask_array(databundle: DataBundle, mask_key: str | None, target_shape) -> np.ndarray:
-        if not mask_key:
+    def _mask_array(databundle: DataBundle, mask_key: str | None, target_shape, *, bundle_key: str) -> np.ndarray:
+        if mask_key is None:
             return np.zeros(target_shape, dtype=bool)
-        aliases = (str(mask_key),)
-        if mask_key in {"mask", "Mask"}:
-            aliases += ("Mask" if mask_key == "mask" else "mask",)
-        mask_data = get_first_present(databundle, *aliases)
-        if mask_data is None:
-            return np.zeros(target_shape, dtype=bool)
+        if mask_key not in databundle:
+            raise KeyError(
+                f"CapillarySampleContainerCorrection: mask key {mask_key!r} missing from bundle {bundle_key!r}."
+            )
+        mask_data = databundle[mask_key]
         try:
             return np.broadcast_to(np.asarray(mask_data.signal, dtype=bool), target_shape).copy()
         except ValueError as error:
@@ -259,7 +259,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         active,
         incident_direction,
     ) -> tuple[np.ndarray, np.ndarray]:
-        evaluation_mode = str(self.configuration.get("evaluation_mode", "adaptive")).strip().lower()
+        evaluation_mode = str(self.configuration["evaluation_mode"]).strip().lower()
         if evaluation_mode == "adaptive":
             result = adaptive_attenuation_factors_on_grid(
                 geometry=geometry,
@@ -269,10 +269,10 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
                 detector_position_grid=detector_grid,
                 active_mask=active,
                 incident_direction=incident_direction,
-                relative_tolerance=self.configuration.get("relative_tolerance", 1e-3),
-                absolute_tolerance=self.configuration.get("absolute_tolerance", 1e-12),
-                max_depth=self.configuration.get("max_depth", 10),
-                detector_chunk_size=self.configuration.get("detector_chunk_size", 256),
+                relative_tolerance=self.configuration["relative_tolerance"],
+                absolute_tolerance=self.configuration["absolute_tolerance"],
+                max_depth=self.configuration["max_depth"],
+                detector_chunk_size=self.configuration["detector_chunk_size"],
             )
             return result.factors, result.evaluated_mask
         if evaluation_mode != "exact":
@@ -286,7 +286,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             volume_weights=volume_weights,
             detector_positions=detector_grid[active],
             incident_direction=incident_direction,
-            detector_chunk_size=self.configuration.get("detector_chunk_size", 256),
+            detector_chunk_size=self.configuration["detector_chunk_size"],
         )
         if coefficients_array.ndim == 1:
             factors = np.ones(detector_grid.shape[:2], dtype=float)
@@ -332,8 +332,8 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             )
 
     def calculate(self) -> dict[str, DataBundle]:
-        filled_key = self.configuration.get("filled_processing_key", "sample")
-        empty_key = self.configuration.get("empty_processing_key", "background")
+        filled_key = self.configuration["filled_processing_key"]
+        empty_key = self.configuration["empty_processing_key"]
         if filled_key == empty_key:
             raise ValueError("filled_processing_key and empty_processing_key must be different.")
         if filled_key not in self.processing_data or empty_key not in self.processing_data:
@@ -357,9 +357,9 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         if empty_mu < 0.0:
             raise ValueError("empty_centre_mu must be non-negative.")
         empty_coefficients = np.asarray([empty_mu, filled_coefficients[1]])
-        incident_direction = self.configuration.get("incident_direction", (0.0, 0.0, 1.0))
+        incident_direction = self.configuration["incident_direction"]
         profile = self._beam_profile(geometry.centre, incident_direction)
-        chord_order = self.configuration.get("chord_order", 12)
+        chord_order = self.configuration["chord_order"]
         wall_chord_order = self.configuration.get("wall_chord_order")
         if wall_chord_order is None:
             wall_chord_order = chord_order
@@ -381,9 +381,9 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         )
 
         coordinate_keys = (
-            self.configuration.get("coord_x_key", "coord_x"),
-            self.configuration.get("coord_y_key", "coord_y"),
-            self.configuration.get("coord_z_key", "coord_z"),
+            self.configuration["coord_x_key"],
+            self.configuration["coord_y_key"],
+            self.configuration["coord_z_key"],
         )
         detector_grid = self._coordinate_grid(filled, coordinate_keys)
         if filled_signal.signal.shape[-2:] != detector_grid.shape[:2]:
@@ -391,10 +391,12 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
                 "The last two filled-signal axes must match the detector-coordinate grid; "
                 f"got {filled_signal.signal.shape} and {detector_grid.shape[:2]}."
             )
-        mask_key = self.configuration.get("mask_key", "mask")
-        empty_mask_key = self.configuration.get("empty_mask_key") or mask_key
-        filled_mask = self._mask_array(filled, mask_key, filled_signal.shape)
-        empty_mask = self._mask_array(empty, empty_mask_key, empty_signal.shape)
+        mask_key = self.configuration.get("mask_key")
+        empty_mask_key = self.configuration.get("empty_mask_key")
+        if empty_mask_key is None:
+            empty_mask_key = mask_key
+        filled_mask = self._mask_array(filled, mask_key, filled_signal.shape, bundle_key=filled_key)
+        empty_mask = self._mask_array(empty, empty_mask_key, empty_signal.shape, bundle_key=empty_key)
         combined_mask = filled_mask | empty_mask
         active = (
             ~np.all(combined_mask, axis=tuple(range(combined_mask.ndim - 2)))
@@ -443,7 +445,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             )
         wall_filled_evaluated = wall_evaluated
         wall_empty_evaluated = wall_evaluated
-        minimum_factor = float(self.configuration.get("minimum_attenuation_factor", 1e-12))
+        minimum_factor = float(self.configuration["minimum_attenuation_factor"])
         if not np.isfinite(minimum_factor) or minimum_factor <= 0.0:
             raise ValueError("minimum_attenuation_factor must be finite and positive.")
         for name, factor in (
@@ -519,39 +521,33 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         )
 
         filled["signal"] = corrected
-        if mask_key:
+        if mask_key is not None:
             filled[mask_key] = BaseData(
                 signal=combined_mask,
                 units=ureg.dimensionless,
                 rank_of_data=filled_signal.rank_of_data,
             )
         output_values = {
-            self.configuration.get("sample_attenuation_key", "capillary_sample_attenuation"): sample_factor_data,
-            self.configuration.get(
-                "wall_filled_attenuation_key", "capillary_wall_attenuation_filled"
-            ): wall_filled_data,
-            self.configuration.get("wall_empty_attenuation_key", "capillary_wall_attenuation_empty"): wall_empty_data,
-            self.configuration.get("wall_subtraction_scale_key", "capillary_wall_subtraction_scale"): wall_scale_data,
-            self.configuration.get("sample_evaluated_mask_key", "capillary_sample_attenuation_evaluated"): BaseData(
+            self.configuration["sample_attenuation_key"]: sample_factor_data,
+            self.configuration["wall_filled_attenuation_key"]: wall_filled_data,
+            self.configuration["wall_empty_attenuation_key"]: wall_empty_data,
+            self.configuration["wall_subtraction_scale_key"]: wall_scale_data,
+            self.configuration["sample_evaluated_mask_key"]: BaseData(
                 signal=sample_evaluated, units=ureg.dimensionless, rank_of_data=rank
             ),
-            self.configuration.get(
-                "wall_filled_evaluated_mask_key", "capillary_wall_filled_attenuation_evaluated"
-            ): BaseData(signal=wall_filled_evaluated, units=ureg.dimensionless, rank_of_data=rank),
-            self.configuration.get(
-                "wall_empty_evaluated_mask_key", "capillary_wall_empty_attenuation_evaluated"
-            ): BaseData(signal=wall_empty_evaluated, units=ureg.dimensionless, rank_of_data=rank),
-            self.configuration.get(
-                "filled_calculated_transmission_key", "capillary_filled_calculated_transmission"
-            ): BaseData(
+            self.configuration["wall_filled_evaluated_mask_key"]: BaseData(
+                signal=wall_filled_evaluated, units=ureg.dimensionless, rank_of_data=rank
+            ),
+            self.configuration["wall_empty_evaluated_mask_key"]: BaseData(
+                signal=wall_empty_evaluated, units=ureg.dimensionless, rank_of_data=rank
+            ),
+            self.configuration["filled_calculated_transmission_key"]: BaseData(
                 signal=np.asarray(filled_transmission),
                 units=ureg.dimensionless,
                 uncertainties=filled_transmission_uncertainties,
                 rank_of_data=0,
             ),
-            self.configuration.get(
-                "empty_calculated_transmission_key", "capillary_empty_calculated_transmission"
-            ): BaseData(
+            self.configuration["empty_calculated_transmission_key"]: BaseData(
                 signal=np.asarray(
                     direct_beam_transmission(
                         geometry=geometry,
@@ -564,7 +560,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
                 units=ureg.dimensionless,
                 rank_of_data=0,
             ),
-            self.configuration.get("effective_sample_mu_key", "capillary_effective_sample_mu"): BaseData(
+            self.configuration["effective_sample_mu_key"]: BaseData(
                 signal=np.asarray(resolved_sample_mu.value),
                 units=ureg.Unit("1/m"),
                 uncertainties={
@@ -572,9 +568,7 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
                 },
                 rank_of_data=0,
             ),
-            self.configuration.get(
-                "profile_retained_fraction_key", "capillary_beam_profile_retained_fraction"
-            ): BaseData(
+            self.configuration["profile_retained_fraction_key"]: BaseData(
                 signal=np.asarray(profile.retained_weight_fraction),
                 units=ureg.dimensionless,
                 rank_of_data=0,

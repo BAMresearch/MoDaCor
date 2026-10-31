@@ -45,7 +45,7 @@ class TestThresholdMaskProcessingStep(unittest.TestCase):
 
     def _make_step(self, **configuration) -> ThresholdMask:
         step = ThresholdMask(io_sources=TEST_IO_SOURCES)
-        base_configuration = {"with_processing_keys": ["sample"], "threshold": 1e9}
+        base_configuration = {"with_processing_keys": ["sample"], "upper_bound": 1e9}
         base_configuration.update(configuration)
         step.modify_config_by_dict(base_configuration)
         step.processing_data = self.test_processing_data
@@ -56,7 +56,7 @@ class TestThresholdMaskProcessingStep(unittest.TestCase):
     # ------------------------------------------------------------------ #
 
     def test_threshold_mask_expected_mask(self):
-        "Test legacy threshold behavior masks values above the threshold."
+        "Test upper_bound masks values above the bound."
 
         self.setUp()
 
@@ -75,7 +75,6 @@ class TestThresholdMaskProcessingStep(unittest.TestCase):
             target_mask_key="flatfield_mask",
             lower_bound=0.8,
             upper_bound=1.2,
-            threshold=None,
             mask_mode="outside",
         )
 
@@ -90,7 +89,6 @@ class TestThresholdMaskProcessingStep(unittest.TestCase):
             source_basedata_key="flatfield",
             lower_bound=0.9,
             upper_bound=1.1,
-            threshold=None,
             mask_mode="inside",
         )
 
@@ -156,7 +154,6 @@ class TestThresholdMaskProcessingStep(unittest.TestCase):
             source_basedata_key="flatfield",
             lower_bound=0.8,
             upper_bound=1.2,
-            threshold=None,
         )
         step.calculate()
 
@@ -171,7 +168,6 @@ class TestThresholdMaskProcessingStep(unittest.TestCase):
             target_mask_key="flatfield_mask",
             lower_bound=0.8,
             upper_bound=1.2,
-            threshold=None,
         )
 
         contract = step.dependency_contract()
@@ -182,12 +178,19 @@ class TestThresholdMaskProcessingStep(unittest.TestCase):
         self.assertEqual(contract.processing_writes, frozenset({"sample.flatfield_mask"}))
 
     def test_threshold_mask_rejects_invalid_range_or_mode(self):
-        step = self._make_step(lower_bound=1.2, upper_bound=0.8, threshold=None)
+        step = self._make_step(lower_bound=1.2, upper_bound=0.8)
 
         with self.assertRaises(ValueError):
             step.calculate()
 
-        step = self._make_step(lower_bound=0.8, upper_bound=1.2, threshold=None, mask_mode="middle")
+        step = self._make_step(lower_bound=0.8, upper_bound=1.2, mask_mode="middle")
 
         with self.assertRaises(ValueError):
             step.calculate()
+
+
+def test_removed_threshold_key_is_rejected():
+    import pytest
+
+    with pytest.raises(KeyError, match="threshold"):
+        ThresholdMask(io_sources=IoSources(), configuration={"threshold": 10.0})

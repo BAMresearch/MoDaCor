@@ -77,8 +77,8 @@ class Subtract(ProcessStep):
         subtrahend = basedata_from_sources(
             io_sources=self.io_sources,
             signal_source=self.configuration.get("subtrahend_source"),
-            units_source=self.configuration.get("subtrahend_units_source", None),
-            uncertainty_sources=self.configuration.get("subtrahend_uncertainties_sources", {}),
+            units_source=self.configuration["subtrahend_units_source"],
+            uncertainty_sources=self.configuration["subtrahend_uncertainties_sources"],
         )
         # Get the data
         data = self.processing_data

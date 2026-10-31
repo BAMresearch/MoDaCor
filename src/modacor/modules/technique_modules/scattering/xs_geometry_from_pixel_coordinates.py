@@ -191,8 +191,8 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         return basedata_from_sources(
             io_sources=self.io_sources,
             signal_source=self.configuration.get(f"{key}_source"),
-            units_source=self.configuration.get(f"{key}_units_source", None),
-            uncertainty_sources=self.configuration.get(f"{key}_uncertainties_sources", {}),
+            units_source=self.configuration[f"{key}_units_source"],
+            uncertainty_sources=self.configuration[f"{key}_uncertainties_sources"],
         )
 
     def dependency_contract(self) -> ProcessStepDependencies:
@@ -370,7 +370,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
     def prepare_execution(self):
         super().prepare_execution()
 
-        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
+        with_keys = normalize_str_list(self.configuration["with_processing_keys"]) or []
         if not with_keys:
             raise ValueError("XSGeometryFromPixelCoordinates: configuration.with_processing_keys is empty.")
 
@@ -411,7 +411,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
                 uncertainty_key="pixel_pitch_jitter",
             )
             detector_normal = unit_vector3(
-                self.configuration.get("detector_normal", (0.0, 0.0, 1.0)),
+                self.configuration["detector_normal"],
                 name="detector_normal",
             )
         else:
@@ -445,7 +445,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         self._prepared_data = {k: out[k] for k in self.output_keys}
 
     def calculate(self) -> dict[str, DataBundle]:
-        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
+        with_keys = normalize_str_list(self.configuration["with_processing_keys"]) or []
         if not with_keys:
             logger.warning("XSGeometryFromPixelCoordinates: no with_processing_keys specified; nothing to do.")
             return {}

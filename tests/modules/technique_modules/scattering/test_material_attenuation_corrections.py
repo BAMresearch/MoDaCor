@@ -16,6 +16,9 @@ from modacor.io.io_sources import IoSources
 from modacor.modules.helpers.scattering.material_attenuation import (
     _decode_scalar,
     energy_kev_from_config_or_wavelength,
+    material_attenuation_from_config,
+    scalar_quantity_from_config_or_source,
+    text_from_config_or_source,
 )
 from modacor.modules.technique_modules.scattering.attenuator_plate_correction import AttenuatorPlateCorrection
 from modacor.modules.technique_modules.scattering.detector_efficiency_correction import DetectorEfficiencyCorrection
@@ -153,7 +156,7 @@ def test_detector_efficiency_dependency_contract_tracks_sources_and_cos_alpha():
         {
             "with_processing_keys": ["sample"],
             "cos_alpha_key": "CosAlpha",
-            "material_source": "calibration::/entry/detector/sensor_material",
+            "chemical_formula_source": "calibration::/entry/detector/sensor_material",
             "density_source": "calibration::/entry/detector/sensor_density",
             "density_units_source": "calibration::/entry/detector/sensor_density@units",
             "thickness_source": "calibration::/entry/detector/sensor_thickness",
@@ -196,3 +199,78 @@ def test_attenuator_dependency_contract_tracks_exact_paths() -> None:
             "background.filter_transmission",
         },
     )
+
+
+@pytest.mark.parametrize("step_type", [AttenuatorPlateCorrection, DetectorEfficiencyCorrection])
+@pytest.mark.parametrize(
+    "key", ["material", "material_source", "chemical_composition", "chemical_composition_source", "composition"]
+)
+def test_removed_material_keys_are_rejected(step_type, key):
+    with pytest.raises(KeyError, match=key):
+        step_type(io_sources=IoSources(), configuration={key: "Si"})
+
+
+def test_scalar_value_and_source_are_mutually_exclusive():
+    with pytest.raises(ValueError, match="density.*density_source"):
+        scalar_quantity_from_config_or_source(
+            IoSources(),
+            {"density": 2.33, "density_source": "measurement::/density"},
+            "density",
+            default_units="g/cm^3",
+        )
+
+
+def test_formula_value_and_source_are_mutually_exclusive():
+    with pytest.raises(ValueError, match="chemical_formula.*chemical_formula_source"):
+        text_from_config_or_source(
+            IoSources(),
+            {"chemical_formula": "Si", "chemical_formula_source": "measurement::/formula"},
+            "chemical_formula",
+        )
+
+
+def test_xraylib_accepts_element_formula_and_rejects_typo():
+    xraylib = pytest.importorskip("xraylib")
+
+    cfg = {"chemical_formula": "Si", "density": 2.33, "beam_energy": 12.0}
+    attenuation = material_attenuation_from_config(IoSources(), cfg)
+    assert attenuation.chemical_formula == "Si"
+    assert attenuation.linear_attenuation_coefficient_m_inv == pytest.approx(
+        xraylib.CS_Total_CP("Si", 12.0) * 2.33 * 100.0
+    )
+    with pytest.raises(ValueError, match="chemical_formula.*Sii") as error:
+        material_attenuation_from_config(IoSources(), {**cfg, "chemical_formula": "Sii"})
+    assert isinstance(error.value.__cause__, ValueError)
+
+
+def test_formula_source_reads_nexus_string_dataset_and_attribute(tmp_path):
+    import h5py
+
+    from modacor.io.hdf.hdf_source import HDFSource
+
+    path = tmp_path / "sensor.h5"
+    with h5py.File(path, "w") as handle:
+        sensor = handle.create_dataset("sensor_material", data=np.bytes_("Si"))
+        sensor.attrs["formula"] = "SiO2"
+    sources = IoSources()
+    sources.register_source(HDFSource(source_reference="sample", resource_location=path))
+    for reference, expected in [("sample::/sensor_material", "Si"), ("sample::/sensor_material@formula", "SiO2")]:
+        assert (
+            text_from_config_or_source(sources, {"chemical_formula_source": reference}, "chemical_formula") == expected
+        )
+
+
+def test_formula_source_falls_back_only_for_unsupported_static_metadata():
+    from unittest.mock import Mock
+
+    sources = Mock(spec=IoSources)
+    sources.get_static_metadata.side_effect = NotImplementedError("static metadata unsupported")
+    sources.get_data.return_value = np.array([b"Si"])
+    cfg = {"chemical_formula_source": "sample::/formula"}
+    assert text_from_config_or_source(sources, cfg, "chemical_formula") == "Si"
+    sources.get_data.assert_called_once_with("sample::/formula")
+    sources.get_data.reset_mock()
+    sources.get_static_metadata.side_effect = OSError("broken file")
+    with pytest.raises(OSError, match="broken file"):
+        text_from_config_or_source(sources, cfg, "chemical_formula")
+    sources.get_data.assert_not_called()

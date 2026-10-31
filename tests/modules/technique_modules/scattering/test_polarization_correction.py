@@ -49,6 +49,38 @@ def _run_step(pd: ProcessingData, **configuration) -> None:
     step.calculate()
 
 
+def test_no_factor_defaults_to_unpolarized_correction():
+    step = PolarizationCorrection(io_sources=IoSources())
+    assert step._fraction_from_config(step.configuration) == 0.5
+
+    pd = _processing_data()
+    step.processing_data = pd
+    step.calculate()
+
+    np.testing.assert_allclose(pd["sample"]["polarization_factor_map"].signal, [0.75, 0.75])
+    np.testing.assert_allclose(pd["sample"]["signal"].signal, np.array([10.0, 10.0]) / 0.75)
+    np.testing.assert_allclose(pd["sample"]["signal"].uncertainties["Poisson"], np.array([1.0, 1.0]) / 0.75)
+
+
+@pytest.mark.parametrize("value, expected", [(None, 0.5), (0.0, 0.0), (1.0, 1.0), (0.9, 0.9)])
+def test_fraction_resolves_optional_value(value, expected):
+    step = PolarizationCorrection(io_sources=IoSources(), configuration={"polarization_factor": value})
+    assert step._fraction_from_config(step.configuration) == expected
+
+
+@pytest.mark.parametrize(
+    "key, value",
+    [
+        ("polarisation_factor", 0.9),
+        ("polarisation_angular_offset", 90.0),
+        ("polarisation_angular_offset_units", "degree"),
+    ],
+)
+def test_removed_british_keys_are_rejected(key, value):
+    with pytest.raises(KeyError, match=key):
+        PolarizationCorrection(io_sources=IoSources(), configuration={key: value})
+
+
 def test_linear_fraction_polarization_correction_matches_formula():
     pd = _processing_data()
 
@@ -73,15 +105,14 @@ def test_linear_fraction_unpolarized_case_reduces_to_standard_factor():
     np.testing.assert_allclose(pd["sample"]["polarization_factor_map"].signal, expected)
 
 
-def test_polarisation_aliases_and_degree_units_are_supported():
+def test_angular_offset_and_degree_units_are_supported():
     pd = _processing_data(psi_units=ureg.degree)
 
     _run_step(
         pd,
-        polarization_factor=None,
-        polarisation_factor=0.9,
-        polarisation_angular_offset=90.0,
-        polarisation_angular_offset_units="degree",
+        polarization_factor=0.9,
+        polarization_angular_offset=90.0,
+        polarization_angular_offset_units="degree",
     )
 
     two_theta = np.array([np.pi / 4.0, np.pi / 4.0])

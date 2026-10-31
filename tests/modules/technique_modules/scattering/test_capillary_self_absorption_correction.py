@@ -11,6 +11,9 @@ from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_source import IoSource
 from modacor.io.io_sources import IoSources
+from modacor.modules.technique_modules.scattering.capillary_sample_container_correction import (
+    CapillarySampleContainerCorrection,
+)
 from modacor.modules.technique_modules.scattering.capillary_self_absorption_correction import (
     CapillarySelfAbsorptionCorrection,
 )
@@ -19,8 +22,11 @@ from modacor.modules.technique_modules.scattering.capillary_self_absorption_corr
 class CapillarySource(IoSource):
     def get_data(self, data_key, load_slice=...):
         values = {
+            "/sample_mu": np.asarray(500.0),
+            "/sample_mu_sem": np.asarray(5.0),
             "/transmission": np.asarray(0.5),
             "/transmission_sem": np.asarray(0.01),
+            "/phase_percent": np.asarray(50.0),
             "/beam": np.asarray([[1.0, 2.0], [2.0, 1.0]]),
             "/sample_phase_absorption": np.asarray(1.0 - np.exp(-0.5)),
             "/sample_phase_transmission": np.asarray(np.exp(-0.5)),
@@ -31,6 +37,10 @@ class CapillarySource(IoSource):
         return values[data_key]
 
     def get_static_metadata(self, data_key):
+        if "sample_mu" in data_key:
+            return "1/m"
+        if "phase_percent" in data_key:
+            return "percent"
         return "m" if "thickness" in data_key else "dimensionless"
 
 
@@ -61,7 +71,7 @@ def _processing_data(*, masked=True, nan_at_mask=False):
         coord_x=BaseData(signal=coord_x, units=ureg.m, rank_of_data=2),
         coord_y=BaseData(signal=coord_y, units=ureg.m, rank_of_data=2),
         coord_z=BaseData(signal=coord_z, units=ureg.m, rank_of_data=2),
-        Mask=BaseData(signal=mask, units=ureg.dimensionless, rank_of_data=2),
+        mask=BaseData(signal=mask, units=ureg.dimensionless, rank_of_data=2),
     )
     processing = ProcessingData()
     processing["sample"] = bundle
@@ -71,6 +81,7 @@ def _processing_data(*, masked=True, nan_at_mask=False):
 def _configuration(**overrides):
     config = {
         "with_processing_keys": ["sample"],
+        "mask_key": "mask",
         "sample_radius": 1.0,
         "sample_radius_units": "mm",
         "wall_thickness": 0.1,
@@ -102,6 +113,59 @@ def _run(processing, **overrides):
     return step
 
 
+@pytest.mark.parametrize("phase_input", ["absorption", "transmission"])
+@pytest.mark.parametrize("shared_name", [False, True])
+def test_sample_mu_matches_analytic_uncertainties_and_basedata(phase_input, shared_name):
+    factor_name = "shared" if shared_name else "factor"
+    thickness_name = "shared" if shared_name else "thickness"
+    transmission = np.exp(-0.5)
+    factor = 1.0 - transmission if phase_input == "absorption" else transmission
+    thickness = BaseData(
+        signal=np.asarray(1.0),
+        units=ureg.mm,
+        uncertainties={thickness_name: np.asarray(0.01)},
+    )
+    phase = BaseData(
+        signal=np.asarray(factor),
+        units=ureg.dimensionless,
+        uncertainties={factor_name: np.asarray(0.002)},
+    )
+    basedata_transmission = 1 - phase if phase_input == "absorption" else phase
+    basedata_mu = -basedata_transmission.log() / thickness
+    basedata_mu.to_units(ureg.Unit("1/m"))
+    expected = {factor_name: 0.002 / (0.001 * transmission)}
+    thickness_component = 500.0 * 0.00001 / 0.001
+    if shared_name:
+        expected[factor_name] = np.hypot(expected[factor_name], thickness_component)
+    else:
+        expected[thickness_name] = thickness_component
+
+    step = CapillarySelfAbsorptionCorrection(io_sources=_sources())
+    step.modify_config_by_dict(
+        _configuration(
+            sample_mu=None,
+            **{
+                f"sample_phase_{phase_input}_source": f"measurement::/sample_phase_{phase_input}",
+                f"sample_phase_{phase_input}_uncertainties_sources": {
+                    factor_name: "measurement::/sample_phase_factor_sem",
+                },
+                "sample_phase_thickness_source": "measurement::/sample_phase_thickness",
+                "sample_phase_thickness_units_source": "measurement::/sample_phase_thickness@units",
+                "sample_phase_thickness_uncertainties_sources": {
+                    thickness_name: "measurement::/sample_phase_thickness_sem",
+                },
+            },
+        )
+    )
+    resolved = step._sample_mu()
+    assert resolved.value == pytest.approx(500.0, rel=1e-14)
+    assert float(basedata_mu.signal) == pytest.approx(500.0, rel=1e-14)
+    assert set(resolved.uncertainties) == set(basedata_mu.uncertainties) == set(expected)
+    for name, uncertainty in expected.items():
+        assert resolved.uncertainties[name] == pytest.approx(uncertainty, rel=1e-14)
+        assert float(basedata_mu.uncertainties[name]) == pytest.approx(uncertainty, rel=1e-14)
+
+
 def test_raw_signal_is_corrected_by_absolute_sample_origin_factor():
     processing = _processing_data(masked=True, nan_at_mask=True)
 
@@ -110,7 +174,7 @@ def test_raw_signal_is_corrected_by_absolute_sample_origin_factor():
     bundle = processing["sample"]
     attenuation = bundle["capillary_sample_attenuation"].signal
     correction = bundle["capillary_self_absorption"].signal
-    active = ~bundle["Mask"].signal
+    active = ~bundle["mask"].signal
     assert np.all((attenuation[active] > 0.0) & (attenuation[active] < 1.0))
     np.testing.assert_array_equal(attenuation[~active], 1.0)
     np.testing.assert_array_equal(correction, attenuation)
@@ -157,18 +221,18 @@ def test_adaptive_mode_matches_exact_and_respects_mask_boundary():
     exact = exact_processing["sample"]["capillary_sample_attenuation"].signal
     adaptive_bundle = adaptive_processing["sample"]
     adaptive = adaptive_bundle["capillary_sample_attenuation"].signal
-    active = ~adaptive_bundle["Mask"].signal
+    active = ~adaptive_bundle["mask"].signal
     np.testing.assert_allclose(adaptive[active], exact[active], rtol=6e-4, atol=1e-12)
     assert not np.any(adaptive_bundle["capillary_attenuation_evaluated"].signal[~active])
 
 
 def test_scan_shaped_mask_evaluates_pixels_active_in_any_frame():
     processing = _processing_data(masked=False)
-    static_mask = processing["sample"]["Mask"].signal
+    static_mask = processing["sample"]["mask"].signal
     scan_mask = np.zeros((2, *static_mask.shape), dtype=bool)
     scan_mask[:, 0, 0] = True
     scan_mask[0, 1, 1] = True
-    processing["sample"]["Mask"] = BaseData(
+    processing["sample"]["mask"] = BaseData(
         signal=scan_mask,
         units=ureg.dimensionless,
         rank_of_data=2,
@@ -313,7 +377,7 @@ def test_adaptive_derived_mu_uncertainty_matches_exact_evaluation():
 
     exact_bundle = exact["sample"]
     adaptive_bundle = adaptive["sample"]
-    active = ~exact_bundle["Mask"].signal
+    active = ~exact_bundle["mask"].signal
     for key in ("capillary_sample_attenuation", "signal"):
         np.testing.assert_allclose(
             adaptive_bundle[key].uncertainties["sample_transmission_SEM"][active],
@@ -350,13 +414,13 @@ def test_dependency_contract_tracks_geometry_mask_and_nested_profile_source():
 
     assert isinstance(contract, ProcessStepDependencies)
     assert contract.source_refs == frozenset({"measurement"})
+    assert "sample.Mask" not in contract.processing_reads
     assert {
         "sample.signal",
         "sample.coord_x",
         "sample.coord_y",
         "sample.coord_z",
         "sample.mask",
-        "sample.Mask",
     } <= contract.processing_reads
     assert {
         "sample.signal",
@@ -396,3 +460,138 @@ def test_invalid_configuration_is_rejected(overrides, message):
     processing = _processing_data(masked=False)
     with pytest.raises((ValueError, TypeError), match=message):
         _run(processing, **overrides)
+
+
+def test_configured_mask_does_not_fall_back_to_capitalized_key():
+    processing = _processing_data(masked=True)
+    bundle = processing["sample"]
+    bundle["Mask"] = bundle.pop("mask")
+    step = CapillarySelfAbsorptionCorrection(io_sources=_sources())
+    step.modify_config_by_dict(_configuration(mask_key="mask"))
+    with pytest.raises(KeyError, match="mask.*sample"):
+        step._active_mask(bundle, bundle["Mask"].shape, bundle_key="sample")
+    bundle["mask"] = BaseData(np.zeros(bundle["Mask"].shape, dtype=bool), ureg.dimensionless, rank_of_data=2)
+    assert np.all(step._active_mask(bundle, bundle["Mask"].shape, bundle_key="sample"))
+
+
+@pytest.mark.parametrize("present_mask", [False, True])
+def test_no_mask_by_default_ignores_present_mask(present_mask):
+    processing = _processing_data(masked=True)
+    if not present_mask:
+        processing["sample"].pop("mask")
+    cfg = _configuration()
+    cfg.pop("mask_key")
+    step = CapillarySelfAbsorptionCorrection(io_sources=_sources(), configuration=cfg)
+    assert step.configuration["mask_key"] is None
+    step.processing_data = processing
+    step.calculate()
+    assert processing["sample"]["capillary_sample_attenuation"].signal[3, 4] < 1.0
+
+
+def test_configured_mask_is_applied():
+    processing = _processing_data(masked=True)
+    _run(processing, mask_key="mask")
+    assert processing["sample"]["capillary_sample_attenuation"].signal[3, 4] == 1.0
+
+
+def test_missing_configured_mask_names_key_and_bundle():
+    with pytest.raises(KeyError, match="excluded.*sample"):
+        _run(_processing_data(), mask_key="excluded")
+
+
+@pytest.mark.parametrize("mask_key", [None, "excluded"])
+def test_optional_mask_dependency_contract(mask_key):
+    step = CapillarySelfAbsorptionCorrection(io_sources=_sources(), configuration=_configuration(mask_key=mask_key))
+    contract = step.dependency_contract()
+    assert contract.source_refs == frozenset()
+    assert contract.processing_reads == {
+        "sample.signal",
+        "sample.coord_x",
+        "sample.coord_y",
+        "sample.coord_z",
+    } | ({f"sample.{mask_key}"} if mask_key is not None else set())
+    assert contract.processing_writes == {
+        "sample.signal",
+        "sample.capillary_sample_attenuation",
+        "sample.capillary_self_absorption",
+        "sample.capillary_calculated_transmission",
+        "sample.capillary_effective_sample_mu",
+        "sample.capillary_beam_profile_retained_fraction",
+        "sample.capillary_attenuation_evaluated",
+    }
+
+
+@pytest.mark.parametrize("step_type", [CapillarySelfAbsorptionCorrection, CapillarySampleContainerCorrection])
+@pytest.mark.parametrize("factor", ["absorption", "transmission"])
+@pytest.mark.parametrize("from_source", [False, True])
+def test_phase_factor_percent_units_convert_to_dimensionless(step_type, factor, from_source):
+    name = f"sample_phase_{factor}"
+    config = {"sample_phase_thickness": 1.0e-3}
+    if from_source:
+        config.update(
+            {
+                f"{name}_source": "measurement::/phase_percent",
+                f"{name}_units_source": "measurement::/phase_percent@units",
+            }
+        )
+    else:
+        config.update({name: 50.0, f"{name}_units": "percent"})
+    step = step_type(io_sources=_sources(), configuration=config)
+
+    resolved = step._sample_mu()
+
+    assert resolved.value == pytest.approx(-np.log(0.5) / 1.0e-3)
+    assert resolved.uncertainties == {}
+    contract = step.dependency_contract()
+    expected_sources = {"measurement"} if from_source else set()
+    assert contract.source_refs == frozenset(expected_sources)
+
+
+@pytest.mark.parametrize("from_source", [False, True])
+def test_direct_mu_uncertainty_matches_derived_route(from_source):
+    direct = _processing_data(masked=False)
+    derived = _processing_data(masked=False)
+    nominal = _processing_data(masked=False)
+    config = {"sample_mu_uncertainties_sources": {"mu_SEM": "measurement::/sample_mu_sem"}}
+    if from_source:
+        config.update(
+            sample_mu=None,
+            sample_mu_source="measurement::/sample_mu",
+            sample_mu_units_source="measurement::/sample_mu@units",
+        )
+    _run(direct, **config)
+    _run(
+        derived,
+        sample_mu=None,
+        sample_phase_transmission=float(np.exp(-0.5)),
+        sample_phase_thickness_source="measurement::/sample_phase_thickness",
+        sample_phase_thickness_units_source="measurement::/sample_phase_thickness@units",
+        sample_phase_thickness_uncertainties_sources={"mu_SEM": "measurement::/sample_phase_thickness_sem"},
+    )
+    _run(nominal)
+    for key in ("capillary_effective_sample_mu", "capillary_sample_attenuation", "signal"):
+        actual = direct["sample"][key]
+        expected = derived["sample"][key]
+        # with uncertainty sources the kernel evaluates the nominal μ batched with
+        # the perturbed coefficient sets (`np.stack`), which can change floating-point
+        # summation order by one ulp
+        np.testing.assert_allclose(actual.signal, nominal["sample"][key].signal, rtol=1e-14, atol=0)
+        np.testing.assert_allclose(actual.signal, expected.signal, rtol=1e-13)
+        np.testing.assert_allclose(
+            actual.uncertainties["mu_SEM"], expected.uncertainties["mu_SEM"], rtol=1e-13, atol=1e-15
+        )
+        assert "mu_SEM" not in nominal["sample"][key].uncertainties
+    assert np.any(direct["sample"]["signal"].uncertainties["mu_SEM"] > 0)
+
+
+def test_dependency_contract_includes_direct_mu_uncertainty_sources():
+    step = CapillarySelfAbsorptionCorrection(
+        configuration={"sample_mu_uncertainties_sources": {"mu_SEM": "calibration::/mu_sem"}},
+    )
+    baseline = CapillarySelfAbsorptionCorrection().dependency_contract()
+    contract = step.dependency_contract()
+    assert contract == ProcessStepDependencies(
+        source_refs=frozenset({"calibration"}),
+        processing_reads=baseline.processing_reads,
+        processing_writes=baseline.processing_writes,
+    )

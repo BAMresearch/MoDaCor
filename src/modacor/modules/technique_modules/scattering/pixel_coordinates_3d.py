@@ -231,8 +231,8 @@ class PixelCoordinates3D(ProcessStep):
         return basedata_from_sources(
             io_sources=self.io_sources,
             signal_source=self.configuration.get(f"{key}_source"),
-            units_source=self.configuration.get(f"{key}_units_source", None),
-            uncertainty_sources=self.configuration.get(f"{key}_uncertainties_sources", {}),
+            units_source=self.configuration[f"{key}_units_source"],
+            uncertainty_sources=self.configuration[f"{key}_uncertainties_sources"],
         )
 
     def dependency_contract(self) -> ProcessStepDependencies:
@@ -302,9 +302,9 @@ class PixelCoordinates3D(ProcessStep):
             uncertainty_key="pixel_pitch_jitter",
         )  # scalar length
 
-        e_fast = unit_vector3(self.configuration.get("basis_fast", (1.0, 0.0, 0.0)), name="basis_fast")
-        e_slow = unit_vector3(self.configuration.get("basis_slow", (0.0, 1.0, 0.0)), name="basis_slow")
-        e_norm = unit_vector3(self.configuration.get("basis_normal", (0.0, 0.0, 1.0)), name="basis_normal")
+        e_fast = unit_vector3(self.configuration["basis_fast"], name="basis_fast")
+        e_slow = unit_vector3(self.configuration["basis_slow"], name="basis_slow")
+        e_norm = unit_vector3(self.configuration["basis_normal"], name="basis_normal")
 
         return CanonicalDetectorFrame(
             det_coord_z=det_coord_z,
@@ -417,7 +417,7 @@ class PixelCoordinates3D(ProcessStep):
     def prepare_execution(self):
         super().prepare_execution()
 
-        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
+        with_keys = normalize_str_list(self.configuration["with_processing_keys"]) or []
         if not with_keys:
             raise ValueError("PixelCoordinates3D: configuration.with_processing_keys is empty.")
 
@@ -439,7 +439,7 @@ class PixelCoordinates3D(ProcessStep):
         self._prepared_data = {k: outputs[k] for k in ("coord_x", "coord_y", "coord_z")}
 
     def calculate(self) -> dict[str, DataBundle]:
-        with_keys = normalize_str_list(self.configuration.get("with_processing_keys", None)) or []
+        with_keys = normalize_str_list(self.configuration["with_processing_keys"]) or []
         if not with_keys:
             logger.warning("PixelCoordinates3D: no with_processing_keys specified; nothing to do.")
             return {}

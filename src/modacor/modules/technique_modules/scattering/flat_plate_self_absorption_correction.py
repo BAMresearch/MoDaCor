@@ -95,12 +95,12 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
     def dependency_contract(self) -> ProcessStepDependencies:
         cfg = self.configuration or {}
         keys = cfg.get("with_processing_keys")
-        cos_alpha_key = cfg.get("cos_alpha_key", "CosAlpha")
-        correction_key = cfg.get("correction_key", "flat_plate_self_absorption")
+        cos_alpha_key = cfg["cos_alpha_key"]
+        correction_key = cfg["correction_key"]
         sources = [
             cfg.get("transmission_source"),
             cfg.get("transmission_units_source"),
-            cfg.get("transmission_uncertainties_sources", {}),
+            cfg["transmission_uncertainties_sources"],
         ]
         return ProcessStepDependencies(
             source_refs=source_refs_from_references(sources),
@@ -120,18 +120,18 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
             io_sources=self.io_sources,
             signal_source=cfg.get("transmission_source"),
             units_source=cfg.get("transmission_units_source"),
-            uncertainty_sources=cfg.get("transmission_uncertainties_sources", {}),
+            uncertainty_sources=cfg["transmission_uncertainties_sources"],
         )
         transmission = scalar_in_units(transmission_data, "dimensionless", name="transmission")
         if not np.isfinite(transmission) or transmission <= 0.0 or transmission > 1.0:
             raise ValueError("transmission must be finite and in the interval (0, 1].")
 
-        minimum_cos_alpha = float(cfg.get("minimum_cos_alpha", 1e-12))
-        minimum_factor = float(cfg.get("minimum_attenuation_factor", 1e-12))
+        minimum_cos_alpha = float(cfg["minimum_cos_alpha"])
+        minimum_factor = float(cfg["minimum_attenuation_factor"])
         if minimum_factor <= 0.0:
             raise ValueError("minimum_attenuation_factor must be positive.")
-        cos_alpha_key = cfg.get("cos_alpha_key", "CosAlpha")
-        correction_key = cfg.get("correction_key", "flat_plate_self_absorption")
+        cos_alpha_key = cfg["cos_alpha_key"]
+        correction_key = cfg["correction_key"]
 
         output: dict[str, DataBundle] = {}
         for key in self._normalised_processing_keys():

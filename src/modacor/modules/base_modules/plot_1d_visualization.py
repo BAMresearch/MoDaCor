@@ -113,13 +113,13 @@ def _plot_layout(
     axis_types = {
         "xaxis": _resolved_axis_type(
             configuration.get("x_axis_type"),
-            auto_log=bool(configuration.get("auto_log_x", True)),
+            auto_log=bool(configuration["auto_log_x"]),
             valid_values=x_valid,
             label="x_axis_type",
         ),
         "yaxis": _resolved_axis_type(
             configuration.get("y_axis_type"),
-            auto_log=bool(configuration.get("auto_log_y", True)),
+            auto_log=bool(configuration["auto_log_y"]),
             valid_values=y_valid,
             label="y_axis_type",
         ),

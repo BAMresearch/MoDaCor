@@ -90,14 +90,14 @@ class CombineUncertainties(ProcessStep):
     # ------------------------------------------------------------------
 
     def calculate(self) -> dict[str, DataBundle]:
-        combinations_raw = self.configuration.get("combinations", {})
+        combinations_raw = self.configuration["combinations"]
         combinations = normalize_uncertainty_combinations(combinations_raw)
         if not combinations:
             raise ValueError("CombineUncertainties requires a non-empty 'combinations' mapping in its configuration.")
 
-        target_basedata_key = str(self.configuration.get("target_basedata_key", "signal"))
-        drop_sources = bool(self.configuration.get("drop_source_keys", False))
-        ignore_missing = bool(self.configuration.get("ignore_missing", False))
+        target_basedata_key = str(self.configuration["target_basedata_key"])
+        drop_sources = bool(self.configuration["drop_source_keys"])
+        ignore_missing = bool(self.configuration["ignore_missing"])
 
         output: dict[str, DataBundle] = {}
 

@@ -71,9 +71,20 @@ python -m sphinx -E -W --keep-going -b html docs dist/docs
 - Use semantic commit prefixes that match the project configuration:
   `fix:`/`perf:` for patch releases, `enh:`/`feat:` for minor releases, and
   `docs:` for documentation entries.
-- Mark an incompatible public interface with a conventional breaking-change
-  marker (`type!:` and/or a `BREAKING CHANGE:` footer), and link its migration
-  guidance from the PR. A plain `feat:` commit does not communicate the
-  required major-version impact.
+- **Versioning policy until v2.0:** MoDaCor's pipeline interface is still
+  settling, so incompatible changes to step configuration or pipeline YAML
+  are released as **minor** versions, not major ones. Each such change must
+  add a section to
+  [`docs/processing/interface-migrations.md`](../processing/interface-migrations.md)
+  telling users exactly what to change, and the PR must link to it. Use
+  `feat:` (or `enh:`) as the prefix. Do **not** use `type!:` or a
+  `BREAKING CHANGE:` footer: python-semantic-release turns either into a
+  major release. v2.0 is reserved for a deliberate milestone at which the
+  pipeline interface is declared stable; strict semantic versioning applies
+  from then on.
+- Squash-merge PRs with a conventional title (it decides the release bump).
+  Before confirming the squash, replace GitHub's default body, which
+  concatenates every commit message, with a short summary. This keeps stray
+  breaking-change footers from branch commits out of `main`.
 - Review and merge the generated release PR before expecting a new version tag
   or PyPI publication.

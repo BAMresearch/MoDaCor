@@ -63,7 +63,7 @@ class SinkProcessingData(ProcessStep):
     )
 
     def dependency_contract(self) -> ProcessStepDependencies:
-        data_paths = self.configuration.get("data_paths", [])
+        data_paths = self.configuration["data_paths"]
         if isinstance(data_paths, str):
             data_paths = [data_paths]
 

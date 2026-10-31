@@ -7,7 +7,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 - **Import path:** `modacor.modules.technique_modules.scattering.capillary_self_absorption_correction.CapillarySelfAbsorptionCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/capillary_self_absorption_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/capillary_self_absorption_correction.py)
 - **Module ID:** CapillarySelfAbsorptionCorrection
-- **Module version:** 20260906.3
+- **Module version:** 20261030.4
 - **Keywords:** sample, self absorption, capillary, cylinder, transmission
 
 ## Required data keys
@@ -62,7 +62,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
     1.0
   ],
   "input_state": "transmission_normalized",
-  "mask_key": "mask",
+  "mask_key": null,
   "max_depth": 10,
   "minimum_attenuation_factor": 1e-12,
   "profile_retained_fraction_key": "capillary_beam_profile_retained_fraction",
@@ -70,11 +70,14 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
   "sample_mu": null,
   "sample_mu_sensitivity_relative_step": 0.01,
   "sample_mu_source": null,
+  "sample_mu_uncertainties_sources": {},
   "sample_mu_units": "1/m",
   "sample_mu_units_source": null,
   "sample_phase_absorption": null,
   "sample_phase_absorption_source": null,
   "sample_phase_absorption_uncertainties_sources": {},
+  "sample_phase_absorption_units": "dimensionless",
+  "sample_phase_absorption_units_source": null,
   "sample_phase_thickness": null,
   "sample_phase_thickness_source": null,
   "sample_phase_thickness_uncertainties_sources": {},
@@ -83,6 +86,8 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
   "sample_phase_transmission": null,
   "sample_phase_transmission_source": null,
   "sample_phase_transmission_uncertainties_sources": {},
+  "sample_phase_transmission_units": "dimensionless",
+  "sample_phase_transmission_units_source": null,
   "sample_radius": null,
   "sample_radius_source": null,
   "sample_radius_units": "m",
@@ -125,7 +130,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 | `evaluation_mode` | str | No | adaptive | - | Adaptive detector-grid interpolation or exact active-pixel point rays. |
 | `incident_direction` | tuple | No | [0.0, 0.0, 1.0] | - | Incident beam propagation direction in the lab frame. |
 | `input_state` | str | No | transmission_normalized | - | One of raw, flux_normalized, or transmission_normalized. |
-| `mask_key` | str or NoneType | No | mask | - | Optional boolean mask key; True pixels are inactive and retain identity factors. |
+| `mask_key` | str or NoneType | No | - | - | Boolean mask key; None means no mask. A configured key must exist; True pixels retain identity factors. |
 | `max_depth` | int | No | 10 | - | Maximum adaptive subdivision depth. |
 | `minimum_attenuation_factor` | int or float | No | 1e-12 | - | Minimum allowed active-pixel attenuation divisor. |
 | `profile_retained_fraction_key` | str | No | capillary_beam_profile_retained_fraction | - | Retained incident-weight fraction after beam-profile truncation or thresholding. |
@@ -133,11 +138,14 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 | `sample_mu` | int or float or NoneType | No | - | - | Sample linear attenuation coefficient; alternatively use its source or phase-factor inputs. |
 | `sample_mu_sensitivity_relative_step` | int or float | No | 0.01 | - | Relative finite-difference step for derived-sample-mu uncertainty propagation. |
 | `sample_mu_source` | str or NoneType | No | - | - | Optional IoSources reference for sample linear attenuation coefficient. |
+| `sample_mu_uncertainties_sources` | dict | No | {} | - | Mapping of uncertainty name to IoSources reference for sample_mu. |
 | `sample_mu_units` | str | No | 1/m | - | Sample-mu reciprocal-length units. |
 | `sample_mu_units_source` | str or NoneType | No | - | - | Optional IoSources reference for sample-mu units. |
 | `sample_phase_absorption` | int or float or NoneType | No | - | - | Sample-only absorbed fraction A=1-T; use with sample_phase_thickness instead of sample_mu. |
 | `sample_phase_absorption_source` | str or NoneType | No | - | - | Optional IoSources reference for the dimensionless sample-only absorbed fraction. |
 | `sample_phase_absorption_uncertainties_sources` | dict | No | {} | - | Uncertainty-name to IoSources-reference mapping for sample-only absorption. |
+| `sample_phase_absorption_units` | str | No | dimensionless | - | Sample-only absorption units, for example dimensionless or percent. |
+| `sample_phase_absorption_units_source` | str or NoneType | No | - | - | Optional IoSources reference for sample-only absorption units. |
 | `sample_phase_thickness` | int or float or NoneType | No | - | - | Transmission path thickness used to derive effective sample mu. |
 | `sample_phase_thickness_source` | str or NoneType | No | - | - | Optional IoSources reference for the sample-phase transmission path thickness. |
 | `sample_phase_thickness_uncertainties_sources` | dict | No | {} | - | Uncertainty-name to IoSources-reference mapping for sample-phase thickness. |
@@ -146,6 +154,8 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 | `sample_phase_transmission` | int or float or NoneType | No | - | - | Sample-only transmission T; use with sample_phase_thickness instead of sample_mu. |
 | `sample_phase_transmission_source` | str or NoneType | No | - | - | Optional IoSources reference for the dimensionless sample-only transmission. |
 | `sample_phase_transmission_uncertainties_sources` | dict | No | {} | - | Uncertainty-name to IoSources-reference mapping for sample-only transmission. |
+| `sample_phase_transmission_units` | str | No | dimensionless | - | Sample-only transmission units, for example dimensionless or percent. |
+| `sample_phase_transmission_units_source` | str or NoneType | No | - | - | Optional IoSources reference for sample-only transmission units. |
 | `sample_radius` | int or float or NoneType | No | - | - | Inner/sample radius; alternatively use sample_radius_source. |
 | `sample_radius_source` | str or NoneType | No | - | - | Optional IoSources reference for sample radius. |
 | `sample_radius_units` | str | No | m | - | Sample-radius units. |
@@ -167,4 +177,4 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 https://doi.org/10.1021/acs.cgd.5c00551
 
 ## Notes
-The default capillary axis is horizontal; tilted straight capillaries are supported. Measured transmission is an effective whole-beam value, not a centreline estimate of mu. This step is only for sample-origin scattering after consistent container removal or when wall scattering is negligible; filled/empty attenuation-aware container subtraction requires the separate composite correction.
+The default capillary axis is horizontal; tilted straight capillaries are supported. Measured transmission is an effective whole-beam value, not a centreline estimate of mu. This step is only for sample-origin scattering after consistent container removal or when wall scattering is negligible; filled/empty attenuation-aware container subtraction requires the separate composite correction. Uncertainties of directly configured wall mu, capillary radius and wall thickness are not yet propagated; see the capillary design note.

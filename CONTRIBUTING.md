@@ -89,6 +89,13 @@ merge that release PR like any other change.
 The release workflow only tags and publishes a version after the generated
 release PR has been merged into `main`.
 
+Until the pipeline interface is declared stable at v2.0, incompatible
+configuration or pipeline-YAML changes are released as minor versions. Each
+one is documented in `docs/processing/interface-migrations.md`. Do not use
+`type!:` or `BREAKING CHANGE:` footers, which would trigger a major release.
+See the release-notes section of `docs/development/contribution-checklist.md`
+for details.
+
 ### Tips
 
 To run a subset of tests:

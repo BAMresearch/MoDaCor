@@ -80,8 +80,8 @@ class Divide(ProcessStep):
         divisor = basedata_from_sources(
             io_sources=self.io_sources,
             signal_source=self.configuration.get("divisor_source"),
-            units_source=self.configuration.get("divisor_units_source", None),
-            uncertainty_sources=self.configuration.get("divisor_uncertainties_sources", {}),
+            units_source=self.configuration["divisor_units_source"],
+            uncertainty_sources=self.configuration["divisor_uncertainties_sources"],
         )
 
         output: dict[str, DataBundle] = {}

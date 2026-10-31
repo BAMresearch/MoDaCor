@@ -102,7 +102,7 @@ class AppendSink(ProcessStep):
                     sink_name=iosink_module,
                     sink_location=sink_location,
                     sink_identifier=sink_id,
-                    iosink_method_kwargs=self.configuration.get("iosink_method_kwargs", {}),
+                    iosink_method_kwargs=self.configuration["iosink_method_kwargs"],
                 )
 
         return output

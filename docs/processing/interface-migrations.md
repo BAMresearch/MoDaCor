@@ -1,5 +1,10 @@
 # Breaking pipeline interface changes
 
+Until the pipeline interface is declared stable at v2.0, incompatible changes
+to step configuration or pipeline YAML are released as **minor** versions.
+Check this page when upgrading to a new minor release; each section lists
+exactly what to change in existing pipelines.
+
 The USAXS-driven pipeline update intentionally breaks several developmental
 pipeline interfaces. Existing YAML using the retired scattering-specific
 indexer, the former indexed averager configuration, or the former
@@ -9,6 +14,51 @@ does not retain compatibility aliases for these interfaces.
 The synthetic [Quickstart](../getting-started/quickstart.md) is unaffected.
 Ordinary explicit `steps` documents also remain valid; the `step_blocks` and
 `for_each` schema is additive.
+
+## R01b: Use one input per setting and explicit mask keys
+
+Removed configuration keys raise `KeyError`; update existing YAML as follows:
+
+| Step | Removed key | Replacement |
+|---|---|---|
+| `PolarizationCorrection` | `polarisation_factor` | `polarization_factor` |
+| `PolarizationCorrection` | `polarisation_angular_offset` | `polarization_angular_offset` |
+| `PolarizationCorrection` | `polarisation_angular_offset_units` | `polarization_angular_offset_units` |
+| `AttenuatorPlateCorrection`, `DetectorEfficiencyCorrection` | `material`, `chemical_composition`, `composition` | `chemical_formula` |
+| `AttenuatorPlateCorrection`, `DetectorEfficiencyCorrection` | `material_source`, `chemical_composition_source` | `chemical_formula_source` |
+| `ThresholdMask` | `threshold` | `upper_bound` |
+
+`chemical_formula` is a chemical formula in xraylib syntax, e.g. `SiO2`.
+Exact xraylib NIST compound names (e.g. `Kapton Polyimide Film`) are also
+accepted. Bare element symbols such as `Si` are valid; informal names such
+as `Silicon` or `Kapton` are not supported. Invalid formulas raise `ValueError`
+naming the formula and preserve xraylib's original error as the cause.
+The helper result field `MaterialAttenuation.material` is also renamed to
+`MaterialAttenuation.chemical_formula`.
+
+For attenuation and capillary parameters, configure either a literal value or
+its corresponding `_source`, never both with non-`None` values. Supplying both
+now raises `ValueError` naming the conflicting keys.
+
+Both capillary corrections read exactly the configured mask key. They no
+longer search for `Mask` when configured for `mask`, or vice versa. Lowercase
+`mask` is the canonical convention; keys remain case-sensitive.
+
+`CapillarySelfAbsorptionCorrection.mask_key` and
+`CapillarySampleContainerCorrection.mask_key` now default to `None`, meaning
+no masking even if a mask is present. Set `mask_key: mask` to enable masking.
+Any configured mask key that is absent raises `KeyError` naming the key and
+its input bundle. `CapillarySampleContainerCorrection.empty_mask_key` still
+defaults to `None`, meaning use `mask_key` for the empty bundle as well.
+With both keys `None`, neither bundle is masked. To mask only the empty
+bundle, set `mask_key: null` and `empty_mask_key` to its mask's key.
+
+`IndexedAverager.mask_key` now defaults to `None`, meaning no masking even if
+a mask is present. Set `mask_key: mask` to use the canonical mask, or explicitly
+name another key. A configured but absent mask raises `KeyError` naming both
+the key and its input bundle. Omit `mask_key` or use `mask_key: null` to disable
+masking. `PolarizationCorrection.polarization_factor` remains optional:
+unset or `None` means 0.5 (unpolarized).
 
 ## Replace `IndexPixels` with `IndexByCoordinate`
 

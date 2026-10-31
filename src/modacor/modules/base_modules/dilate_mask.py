@@ -11,7 +11,7 @@ __date__ = "02/09/2026"
 __status__ = "Development"
 
 __all__ = ["DilateMask"]
-__version__ = "20260927.2"
+__version__ = "20261030.1"
 
 from pathlib import Path
 from typing import Any
@@ -60,7 +60,7 @@ class DilateMask(ProcessStep):
             "radius": {
                 "type": int,
                 "default": 1,
-                "doc": "Dilation radius in pixels. Aliases: number_of_pixels, number_of_pixels_to_dilate.",
+                "doc": "Dilation radius in pixels.",
             },
             "footprint_shape": {
                 "type": str,
@@ -114,7 +114,7 @@ class DilateMask(ProcessStep):
 
     @staticmethod
     def _radius_from_config(cfg: dict[str, Any]) -> int:
-        value = cfg.get("radius", cfg.get("number_of_pixels", cfg.get("number_of_pixels_to_dilate", 1)))
+        value = cfg["radius"]
         radius = int(value)
         if radius < 0:
             raise ValueError("DilateMask radius must be >= 0.")
@@ -173,8 +173,8 @@ class DilateMask(ProcessStep):
     def dependency_contract(self) -> ProcessStepDependencies:
         cfg = self.configuration or {}
         keys = cfg.get("with_processing_keys")
-        source_key = cfg.get("source_mask_key", "mask")
-        target_key = cfg.get("target_mask_key", "mask")
+        source_key = cfg["source_mask_key"]
+        target_key = cfg["target_mask_key"]
         return ProcessStepDependencies(
             source_refs=(),
             processing_reads=processing_key_patterns(keys, basedata_key=source_key),
@@ -187,11 +187,11 @@ class DilateMask(ProcessStep):
             raise ValueError("DilateMask requires a single databundle processing key.")
 
         processing_key = keys[0]
-        source_key = self.configuration.get("source_mask_key", "mask")
-        target_key = self.configuration.get("target_mask_key", "mask")
+        source_key = self.configuration["source_mask_key"]
+        target_key = self.configuration["target_mask_key"]
         radius = self._radius_from_config(self.configuration)
-        footprint = self._footprint(radius, self.configuration.get("footprint_shape", "square"))
-        backend = self.configuration.get("backend", "auto")
+        footprint = self._footprint(radius, self.configuration["footprint_shape"])
+        backend = self.configuration["backend"]
 
         bundle = self.processing_data[processing_key]
         source_mask: BaseData = bundle[source_key]

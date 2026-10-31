@@ -125,8 +125,8 @@ class ReduceMask(ProcessStep):
     def dependency_contract(self) -> ProcessStepDependencies:
         cfg = self.configuration or {}
         keys = cfg.get("with_processing_keys")
-        source_key = cfg.get("source_mask_key", "mask")
-        target_key = cfg.get("target_mask_key", "mask")
+        source_key = cfg["source_mask_key"]
+        target_key = cfg["target_mask_key"]
         return ProcessStepDependencies(
             source_refs=(),
             processing_reads=processing_key_patterns(keys, basedata_key=source_key),
@@ -139,9 +139,9 @@ class ReduceMask(ProcessStep):
             raise ValueError("ReduceMask requires a single databundle processing key.")
 
         processing_key = keys[0]
-        source_key = self.configuration.get("source_mask_key", "mask")
-        target_key = self.configuration.get("target_mask_key", "mask")
-        reduction = str(self.configuration.get("reduction", "any")).strip().lower()
+        source_key = self.configuration["source_mask_key"]
+        target_key = self.configuration["target_mask_key"]
+        reduction = str(self.configuration["reduction"]).strip().lower()
 
         bundle = self.processing_data[processing_key]
         source_mask: BaseData = bundle[source_key]

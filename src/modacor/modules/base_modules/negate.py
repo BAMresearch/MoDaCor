@@ -43,12 +43,12 @@ class Negate(ProcessStep):
         processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
         if not processing_keys:
             return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
-        data_key = str(self.configuration.get("data_key", "signal"))
+        data_key = str(self.configuration["data_key"])
         paths = {f"{processing_key}.{data_key}" for processing_key in processing_keys}
         return ProcessStepDependencies(processing_reads=paths, processing_writes=paths)
 
     def calculate(self) -> dict[str, DataBundle]:
-        data_key = str(self.configuration.get("data_key", "signal"))
+        data_key = str(self.configuration["data_key"])
         output: dict[str, DataBundle] = {}
         for processing_key in self._normalised_processing_keys():
             bundle = self.processing_data[processing_key]
