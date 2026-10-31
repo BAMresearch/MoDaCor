@@ -57,17 +57,13 @@ pattern.
   [`src/modacor/dataclasses/process_step_describer.py`](src/modacor/dataclasses/process_step_describer.py).
   Declare module-specific configuration in `ProcessStepDescriber.arguments` and
   keep `required_data_keys`, `modifies`, defaults, types, and docs accurate.
-- **Dependency contracts and partial reruns:** use `dependency_role` metadata to
-  derive exact `bundle.basedata` reads/writes where possible; override
-  `dependency_contract()` only for relationships the schema cannot express.
-  Account for every external `source_ref` and every `ProcessingData` read and
-  write (including additions and overwrites), and add a focused assertion of
-  `source_refs`, `processing_reads`, and `processing_writes`. See the dependency
-  section of the module author guide, `ProcessStepDependencies` and its helpers
-  in `process_step.py`, and representative tests in
-  [`tests/modules/base_modules/test_apply_mask.py`](tests/modules/base_modules/test_apply_mask.py)
-  and
-  [`tests/server/test_execution.py`](tests/server/test_execution.py).
+- **Dependency contracts and partial reruns:** use `dependency_role` for
+  configurable keys and `fixed_data_keys` for hard-coded keys; extend
+  `super().dependency_contract()` for conditional or derived extras, reserving
+  full overrides for multi-bundle and I/O steps. Account for all source refs
+  and processing reads/writes, keep focused contract assertions, and run the
+  access-trace test (see the module author guide and `tests/_contract_trace.py`);
+  `no_contract_trace` is only for deliberately inconsistent test steps.
 - **Module outputs and mutation boundary:** `calculate()` must make authoritative
   changes directly in `self.processing_data`. Its optional `dict` return is only
   stored as `produced_outputs` for bookkeeping and is never merged into the

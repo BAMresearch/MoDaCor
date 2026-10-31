@@ -17,6 +17,14 @@ Apply a uint32 bitfield mask to one or more BaseData signal arrays in the same D
 ## Modifies
 - **signal**: signal
 
+## Data dependencies
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `basedata_to_mask` | read_write | `["signal"]` |
+| `mask_key` | read | `"mask"` |
+
 ## Required arguments
 - with_processing_keys
 - basedata_to_mask

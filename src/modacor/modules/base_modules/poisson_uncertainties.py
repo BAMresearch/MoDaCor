@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 # from typing import Any
@@ -36,6 +36,9 @@ class PoissonUncertainties(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
+        fixed_data_keys={
+            "signal": "read_write",
+        },
         modifies={"signal": ["uncertainties"]},
         arguments={
             "with_processing_keys": {
@@ -50,13 +53,6 @@ class PoissonUncertainties(ProcessStep):
         step_reference="DOI 10.1088/0953-8984/25/38/383201",
         step_note="This is a simple Poisson uncertainty calculation based on the signal intensity",
     )
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        signal_paths = processing_key_patterns(
-            self.configuration.get("with_processing_keys"),
-            basedata_key="signal",
-        )
-        return ProcessStepDependencies(processing_reads=signal_paths, processing_writes=signal_paths)
 
     def calculate(self) -> dict[str, DataBundle]:
         """

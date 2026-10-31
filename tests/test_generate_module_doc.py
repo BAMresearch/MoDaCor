@@ -79,6 +79,7 @@ def test_build_markdown_contains_core_sections(divide_docs):
         "## Metadata",
         "## Required data keys",
         "## Modifies",
+        "## Data dependencies",
         "## Required arguments",
         "## Default configuration",
         "## Argument specification",
@@ -208,3 +209,28 @@ def test_exports_and_doc_generation_cover_all_process_steps():
 
     assert exported_targets == expected_targets
     assert set(generate_module_doc._discover_targets()) == expected_targets
+
+
+@pytest.mark.parametrize(
+    "name, expected, custom",
+    [
+        ("SolidAngleCorrection", ["| `signal` | read_write |", "| `Omega` | read |"], False),
+        (
+            "ApplyMask",
+            ['| `mask_key` | read | `"mask"` |', '| `basedata_to_mask` | read_write | `["signal"]` |'],
+            False,
+        ),
+        ("UnitsLabelUpdate", ["| `update_pairs` | read_write | `{}` |"], False),
+        ("AngleToQ", ['| `angle_key` | read | `"angle"` |', "extends the declared dependencies"], False),
+        ("ConcatenateDatabundles", ["This step defines a custom dependency contract."], True),
+    ],
+)
+def test_data_dependencies_render_access_defaults_and_custom_contracts(name, expected, custom):
+    import modacor.modules
+
+    step_class = getattr(modacor.modules, name)
+    markdown = build_markdown(step_class, step_class.documentation)
+    section = markdown.split("## Data dependencies\n", 1)[1].split("\n## ", 1)[0]
+    for fragment in expected:
+        assert fragment in section
+    assert ("This step defines a custom dependency contract." in section) is custom

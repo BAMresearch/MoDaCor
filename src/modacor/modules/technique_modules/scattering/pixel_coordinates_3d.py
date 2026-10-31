@@ -112,6 +112,12 @@ class PixelCoordinates3D(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
+        fixed_data_keys={
+            "signal": "read",
+            "coord_x": "write",
+            "coord_y": "write",
+            "coord_z": "write",
+        },
         arguments={
             "det_coord_z_source": {
                 "type": (str, type(None)),

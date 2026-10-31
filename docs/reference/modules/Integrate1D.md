@@ -17,6 +17,13 @@ Integrate sampled 1D BaseData while propagating coordinate units and independent
 ## Modifies
 - **integral**: signal, uncertainties, units
 
+## Data dependencies
+This step defines a custom dependency contract.
+
+_No fixed data keys declared._
+
+_No data-key roles declared._
+
 ## Required arguments
 - with_processing_keys
 

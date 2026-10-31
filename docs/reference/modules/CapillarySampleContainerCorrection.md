@@ -31,6 +31,19 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
 - **capillary_wall_filled_attenuation_evaluated**: signal
 - **capillary_wall_empty_attenuation_evaluated**: signal
 
+## Data dependencies
+This step defines a custom dependency contract.
+
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `coord_x_key` | read | `"coord_x"` |
+| `coord_y_key` | read | `"coord_y"` |
+| `coord_z_key` | read | `"coord_z"` |
+| `effective_sample_mu_key` | write | `"capillary_effective_sample_mu"` |
+| `mask_key` | read | `null` |
+
 ## Required arguments
 - beam_profile
 - filled_processing_key
@@ -131,11 +144,11 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
 | `capillary_centre` | tuple | No | [0.0, 0.0, 0.0] | - | Point on the capillary centreline in capillary_centre_units. |
 | `capillary_centre_units` | str | No | m | - | Capillary-centre length units. |
 | `chord_order` | int | No | 12 | - | Gauss--Legendre nodes per occupied chord. |
-| `coord_x_key` | str | No | coord_x | - | Detector lab x-coordinate key. |
-| `coord_y_key` | str | No | coord_y | - | Detector lab y-coordinate key. |
-| `coord_z_key` | str | No | coord_z | - | Detector lab z-coordinate key. |
+| `coord_x_key` | str | No | coord_x | processing_read_basedata_key | Detector lab x-coordinate key. |
+| `coord_y_key` | str | No | coord_y | processing_read_basedata_key | Detector lab y-coordinate key. |
+| `coord_z_key` | str | No | coord_z | processing_read_basedata_key | Detector lab z-coordinate key. |
 | `detector_chunk_size` | int | No | 256 | - | Expert detector chunk-size override. |
-| `effective_sample_mu_key` | str | No | capillary_effective_sample_mu | - | Resolved or derived effective sample attenuation-coefficient key. |
+| `effective_sample_mu_key` | str | No | capillary_effective_sample_mu | processing_write_basedata_key | Resolved or derived effective sample attenuation-coefficient key. |
 | `empty_calculated_transmission_key` | str | No | capillary_empty_calculated_transmission | - | Output key for calculated empty-capillary transmission. |
 | `empty_centre_mu` | int or float or NoneType | No | 0.0 | - | Linear attenuation coefficient inside the nominally empty capillary. |
 | `empty_centre_mu_source` | str or NoneType | No | - | - | Optional IoSources reference for empty-centre attenuation. |
@@ -147,7 +160,7 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
 | `filled_calculated_transmission_key` | str | No | capillary_filled_calculated_transmission | - | Output key for calculated filled-capillary transmission. |
 | `filled_processing_key` | str | Yes | sample | - | DataBundle containing the filled-capillary measurement and output signal. |
 | `incident_direction` | tuple | No | [0.0, 0.0, 1.0] | - | Incident beam propagation direction in the lab frame. |
-| `mask_key` | str or NoneType | No | - | - | Boolean mask key; None means no mask. A configured key must exist; True pixels retain identity factors. |
+| `mask_key` | str or NoneType | No | - | processing_read_basedata_key | Boolean mask key; None means no mask. A configured key must exist; True pixels retain identity factors. |
 | `max_depth` | int | No | 10 | - | Maximum adaptive subdivision depth. |
 | `minimum_attenuation_factor` | int or float | No | 1e-12 | - | Minimum allowed active-pixel attenuation divisor. |
 | `profile_retained_fraction_key` | str | No | capillary_beam_profile_retained_fraction | - | Output key for retained beam-profile incident weight. |

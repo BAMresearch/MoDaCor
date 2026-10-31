@@ -16,6 +16,13 @@ Divide a DataBundle element by a divisor loaded from a data source
 ## Modifies
 - **signal**: signal, uncertainties, units
 
+## Data dependencies
+| Fixed key | Access |
+|---|---|
+| `signal` | read_write |
+
+_No data-key roles declared._
+
 ## Required arguments
 - _None_
 

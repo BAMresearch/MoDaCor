@@ -89,8 +89,6 @@ starting point for new work.
 
 - `with_processing_keys`: select which `ProcessingData` bundles the step should
   operate on.
-- `output_processing_key`: optional output target for steps that write to a
-  different `ProcessingData` bundle than they read.
 
 Step-specific configuration belongs in `documentation.arguments`. Those entries
 seed the instance `configuration` automatically through
@@ -136,54 +134,80 @@ step-local validation in `calculate()` or helper methods for semantic rules such
 as non-empty strings, mutually exclusive options, source-reference shape, or
 nested dictionary contents.
 
-Argument specs can also declare how configuration values contribute to the
-runtime dependency contract used by partial reruns. Use `dependency_role` when a
-configuration value names a `BaseData` entry in each selected
-`with_processing_keys` bundle:
+## Dependency contracts and partial reruns
+
+Declare the `BaseData` keys a step accesses in this order:
+
+1. Use `dependency_role` for configurable keys in `documentation.arguments`.
+   A string supplies one key, a list supplies its members, and a mapping
+   supplies its keys. `None` and empty values contribute no keys. Supported
+   roles are `processing_read_basedata_key`, `processing_write_basedata_key`,
+   and `processing_read_write_basedata_key`, plus their `_list` variants.
+2. Use `fixed_data_keys` for keys hard-coded by the implementation. Each
+   access is `read`, `write`, or `read_write`; keys must be non-empty strings.
+   The describer strips whitespace and rejects invalid keys or access values
+   when the class-level metadata is constructed.
+3. For conditional or derived extras, keep an extension override: start with
+   `contract = super().dependency_contract()`, add the extra source references
+   or processing paths, and return a new `ProcessStepDependencies` preserving
+   the base sets. `AngleToQ` adds a conditional centre read;
+   `FindCenterOfMass1D` adds prefix-derived diagnostic writes.
+4. Keep a full override for multi-bundle and I/O steps, where input/output
+   selection, path parsing, or registration side effects cannot be expressed
+   by declarations. Account for every source reference and processing read
+   and write, including additions and overwrites.
+
+For example, this step updates a hard-coded signal, reads a configurable mask,
+and writes a configurable correction map:
 
 ```python
 documentation = ProcessStepDescriber(
     ...,
+    fixed_data_keys={"signal": "read_write"},
     arguments={
-        "source_basedata_key": {
-            "type": str,
-            "default": "signal",
-            "doc": "BaseData key to read.",
+        "mask_key": {
+            "type": (str, type(None)),
+            "default": None,
+            "doc": "Optional mask BaseData key.",
             "dependency_role": "processing_read_basedata_key",
         },
-        "target_basedata_key": {
+        "correction_key": {
             "type": str,
-            "default": "corrected",
-            "doc": "BaseData key to write.",
+            "default": "correction",
+            "doc": "Output correction map key.",
             "dependency_role": "processing_write_basedata_key",
-        },
-        "basedata_to_update": {
-            "type": list,
-            "default": ["signal"],
-            "doc": "BaseData keys to read and update.",
-            "dependency_role": "processing_read_write_basedata_key_list",
         },
     },
 )
 ```
 
-Supported roles are:
+The default contract expands fixed keys and role values over
+`with_processing_keys`, yielding exact paths such as `sample.signal`.
+Non-empty declared keys without `with_processing_keys` give `*` reads and
+writes because the bundle selection is unknown. An empty declaration, such
+as a mapping-valued role with `{}`, gives an empty processing contract even
+when bundle selection is unset. External `ref::path` references in configuration
+are collected independently in `source_refs`.
 
-- `processing_read_basedata_key`
-- `processing_write_basedata_key`
-- `processing_read_write_basedata_key`
-- `processing_read_basedata_key_list`
-- `processing_write_basedata_key_list`
-- `processing_read_write_basedata_key_list`
+Steps without dependency hints retain conservative whole-bundle reads and
+writes, or `*` when neither sources nor bundle selection describe their work.
+Prefer declarations for new steps so unrelated key changes do not trigger
+unnecessary partial reruns.
 
-When at least one argument declares a dependency role,
-`ProcessStep.dependency_contract()` derives exact `sample.signal`-style reads
-and writes from the current configuration. Modules with no dependency roles keep
-the older conservative behavior based on whole `with_processing_keys` bundles.
-Override `dependency_contract()` only for unusual cases, such as IO side
-effects, source/sink registration steps, parsing dependency paths from strings,
-or steps where different positions in `with_processing_keys` have different
-meanings.
+Keep `required_data_keys` equal to the default declared reads and `modifies`
+keys equal to the default declared writes. The public-module metadata test
+checks both sets; conditional or derived extras need an explicitly reasoned
+exception in its table. Full overrides retain hand-written expectations.
+
+The session-installed access trace in `tests/_contract_trace.py` checks each
+step's execution against its declared contract throughout the test suite. It
+records `DataBundle` reads and writes, including `update()` keys and newly
+inserted bundles, and fails the executing test if a touched key is uncovered.
+Re-storing the same bundle object is ignored. Keep focused tests asserting
+`source_refs`, `processing_reads`, and `processing_writes` as well: the trace
+only checks configurations exercised by tests. `no_contract_trace` is reserved
+for test steps with deliberately inconsistent contracts; it must not hide a
+real module's missing dependency.
 
 Pipeline YAML uses YAML sequences for list-like values. If a module declares a
 configuration key with `"type": tuple`, a YAML sequence such as `[1.0, 0.0,

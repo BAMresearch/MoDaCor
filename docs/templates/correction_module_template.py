@@ -58,6 +58,7 @@ class YourCorrectionStep(ProcessStep):
                 "doc": "Scalar factor applied to the signal.",
             },
             "signal_key": {
+                "dependency_role": "processing_read_write_basedata_key",
                 "type": str,
                 "default": "signal",
                 "doc": "BaseData key to read/write within each DataBundle.",
@@ -94,7 +95,7 @@ class YourCorrectionStep(ProcessStep):
         output: dict[str, DataBundle] = {}
 
         keys = self._normalised_processing_keys()
-        signal_key = self.configuration.get("signal_key", "signal")
+        signal_key = self.configuration["signal_key"]
         factor = float(self.configuration.get("correction_factor", 1.0))
         lookup = self._prepared_data.get("lookup", None)
 

@@ -16,6 +16,16 @@ Convert an angle relative to its direct-beam or diffraction centre into signed Q
 ## Modifies
 - **Q**: signal, uncertainties, units, axes
 
+## Data dependencies
+This step extends the declared dependencies with additional runtime dependencies.
+
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `angle_key` | read | `"angle"` |
+| `output_key` | write | `"Q"` |
+
 ## Required arguments
 - with_processing_keys
 - photon_source
@@ -42,11 +52,11 @@ Convert an angle relative to its direct-beam or diffraction centre into signed Q
 | Argument | Type | Required | Default | Dependency role | Description |
 |---|---|---|---|---|---|
 | `angle_convention` | str | No | scattering_angle | - | Angle convention: scattering_angle/two_theta uses sin(angle/2); bragg_angle/theta uses sin(angle). |
-| `angle_key` | str | No | angle | - | Angular-coordinate BaseData key. |
+| `angle_key` | str | No | angle | processing_read_basedata_key | Angular-coordinate BaseData key. |
 | `angle_zero` | float or int or NoneType | No | - | - | Optional configured angle zero, overriding center_key. |
 | `angle_zero_units` | str or NoneType | No | - | - | Units for angle_zero; defaults to the input angle units. |
 | `center_key` | str or NoneType | No | beam_center | - | Angle-zero BaseData key used when angle_zero is None; None means zero angle. |
-| `output_key` | str | No | Q | - | Output BaseData key. |
+| `output_key` | str | No | Q | processing_write_basedata_key | Output BaseData key. |
 | `output_units` | str | No | 1/nm | - | Momentum-transfer output units. |
 | `photon_source` | str or NoneType | Yes | - | - | IoSources key for scalar or angle-shaped photon energy or wavelength metadata. |
 | `photon_uncertainties_sources` | dict | No | {} | - | Uncertainty sources for photon energy or wavelength metadata. |

@@ -14,6 +14,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 import argparse
+import ast
 import importlib
 import inspect
 import json
@@ -21,6 +22,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from textwrap import dedent
 from typing import Any, Iterable
 
 # Allow running this script directly from a source checkout without requiring
@@ -120,6 +122,7 @@ if sys.version_info < (3, 11):
 try:
     import attr
 
+    from modacor.dataclasses.process_step import ProcessStep
     from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 except ModuleNotFoundError:
     _maybe_reexec_with_local_venv()
@@ -237,6 +240,57 @@ def _format_arguments(documentation: ProcessStepDescriber) -> str:
     return "\n".join([header, *rows])
 
 
+def _dependency_contract_kind(step_cls) -> str:
+    method = step_cls.dependency_contract
+    if method is ProcessStep.dependency_contract:
+        return "declarative"
+    tree = ast.parse(dedent(inspect.getsource(method)))
+    extends_declarations = any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "dependency_contract"
+        and isinstance(node.func.value, ast.Call)
+        and isinstance(node.func.value.func, ast.Name)
+        and node.func.value.func.id == "super"
+        for node in ast.walk(tree)
+    )
+    return "extension" if extends_declarations else "custom"
+
+
+def _format_data_dependencies(step_cls, documentation: ProcessStepDescriber) -> str:
+    lines = []
+    kind = _dependency_contract_kind(step_cls)
+    if kind == "custom":
+        lines.extend(["This step defines a custom dependency contract.", ""])
+    elif kind == "extension":
+        lines.extend(["This step extends the declared dependencies with additional runtime dependencies.", ""])
+
+    if documentation.fixed_data_keys:
+        lines.extend(["| Fixed key | Access |", "|---|---|"])
+        lines.extend(f"| `{key}` | {access} |" for key, access in sorted(documentation.fixed_data_keys.items()))
+    else:
+        lines.append("_No fixed data keys declared._")
+
+    rows = []
+    defaults = documentation.initial_configuration()
+    for name, spec in sorted(documentation.arguments.items()):
+        roles = spec.get("dependency_role", ())
+        if not roles:
+            continue
+        if isinstance(roles, str):
+            roles = (roles,)
+        default = json.dumps(defaults[name], ensure_ascii=False).replace("|", "&#124;")
+        for role in sorted(roles):
+            access = role.removeprefix("processing_").removesuffix("_list").removesuffix("_basedata_key")
+            rows.append(f"| `{name}` | {access} | `{default}` |")
+    lines.append("")
+    if rows:
+        lines.extend(["| Role argument | Access | Default |", "|---|---|---|", *rows])
+    else:
+        lines.append("_No data-key roles declared._")
+    return "\n".join(lines)
+
+
 def _format_default_config(documentation: ProcessStepDescriber) -> str:
     defaults = {}
     if hasattr(documentation, "initial_configuration"):
@@ -307,6 +361,9 @@ def build_markdown(step_cls, documentation: ProcessStepDescriber) -> str:
         "",
         "## Modifies",
         _format_modifies(documentation.modifies or {}),
+        "",
+        "## Data dependencies",
+        _format_data_dependencies(step_cls, documentation),
         "",
         "## Required arguments",
         _format_required_arguments(documentation),

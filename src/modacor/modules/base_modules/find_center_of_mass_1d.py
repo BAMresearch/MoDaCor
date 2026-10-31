@@ -12,7 +12,7 @@ import numpy as np
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
+from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.models.centroid import CentroidResult, intensity_centroid_1d
 
@@ -25,7 +25,7 @@ class FindCenterOfMass1D(ProcessStep):
         calling_id="FindCenterOfMass1D",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=["signal"],
+        required_data_keys=["signal", "yaw"],
         modifies={
             "beam_center": ["signal", "uncertainties", "units"],
             "centroid_count": ["signal"],
@@ -41,16 +41,19 @@ class FindCenterOfMass1D(ProcessStep):
                 "doc": "DataBundle key or keys containing peaks to centre.",
             },
             "signal_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": str,
                 "default": "signal",
                 "doc": "Intensity BaseData key.",
             },
             "axis_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": str,
                 "default": "yaw",
                 "doc": "One-dimensional coordinate BaseData key.",
             },
             "mask_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": (str, type(None)),
                 "default": None,
                 "doc": "Optional mask key; nonzero values are excluded.",
@@ -86,6 +89,7 @@ class FindCenterOfMass1D(ProcessStep):
                 "doc": "Absolute centre-change tolerance in width_units.",
             },
             "output_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "beam_center",
                 "doc": "Scalar centroid output key.",
@@ -113,19 +117,15 @@ class FindCenterOfMass1D(ProcessStep):
         return output_key, f"{prefix}_count", f"{prefix}_converged", f"{prefix}_window_min", f"{prefix}_window_max"
 
     def dependency_contract(self) -> ProcessStepDependencies:
-        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
-        if not processing_keys:
-            return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
-        signal_key = str(self.configuration["signal_key"])
-        axis_key = str(self.configuration["axis_key"])
-        mask_key = self.configuration.get("mask_key")
-        read_keys = {signal_key, axis_key}
-        if mask_key is not None and str(mask_key).strip():
-            read_keys.add(str(mask_key).strip())
-        output_keys = self._output_keys()
+        contract = super().dependency_contract()
+        writes = set(contract.processing_writes)
+        if self.configuration.get("with_processing_keys"):
+            for key in self._output_keys()[1:]:
+                writes.update(processing_key_patterns(self.configuration.get("with_processing_keys"), basedata_key=key))
         return ProcessStepDependencies(
-            processing_reads={f"{processing_key}.{key}" for processing_key in processing_keys for key in read_keys},
-            processing_writes={f"{processing_key}.{key}" for processing_key in processing_keys for key in output_keys},
+            source_refs=contract.source_refs,
+            processing_reads=contract.processing_reads,
+            processing_writes=writes,
         )
 
     @staticmethod

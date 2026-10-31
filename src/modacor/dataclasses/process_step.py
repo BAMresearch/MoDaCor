@@ -167,8 +167,6 @@ def _basedata_keys_from_dependency_value(value: Any) -> list[str]:
     if isinstance(value, str):
         stripped = value.strip()
         return [stripped] if stripped else []
-    if isinstance(value, dict):
-        return []
     try:
         return [str(item).strip() for item in value if str(item).strip()]
     except TypeError:
@@ -219,12 +217,6 @@ class ProcessStep:
         "with_processing_keys": {
             "type": str,
             "allow_iterable": True,
-            "allow_none": True,
-            "default": None,
-        },
-        "output_processing_key": {
-            "type": str,
-            "allow_iterable": False,
             "allow_none": True,
             "default": None,
         },
@@ -300,13 +292,12 @@ class ProcessStep:
         """
         Return the runtime dependencies used for partial-rerun invalidation.
 
-        Argument specs may declare ``dependency_role`` to derive exact
-        BaseData-level reads and writes from configuration values. Subclasses
-        with source/sink side effects or unusual key relationships can still
-        override this method with a custom contract. Without dependency roles,
+        Fixed data keys and argument specs declaring ``dependency_role`` derive
+        exact BaseData-level reads and writes from declarations and configuration.
+        Subclasses with source/sink side effects or unusual key relationships can still
+        override this method with a custom contract. Without dependency hints,
         the default covers ordinary in-place processing steps that use
-        ``with_processing_keys`` and the optional ``output_processing_key``
-        convention.
+        ``with_processing_keys``.
         """
 
         cfg = self.configuration or {}
@@ -314,7 +305,15 @@ class ProcessStep:
         schema = self.effective_config_schema()
         read_patterns: set[str] = set()
         write_patterns: set[str] = set()
-        has_dependency_hints = False
+        fixed_data_keys = self.documentation.fixed_data_keys
+        has_dependency_hints = bool(fixed_data_keys)
+        has_declared_keys = bool(fixed_data_keys)
+        for key, role in fixed_data_keys.items():
+            patterns = processing_key_patterns(cfg.get("with_processing_keys"), basedata_key=key)
+            if role in {"read", "read_write"}:
+                read_patterns.update(patterns)
+            if role in {"write", "read_write"}:
+                write_patterns.update(patterns)
 
         for config_key, config_spec in schema.items():
             dependency_roles = _dependency_roles_from_spec(config_spec)
@@ -322,6 +321,7 @@ class ProcessStep:
                 continue
             has_dependency_hints = True
             basedata_keys = _basedata_keys_from_dependency_value(cfg.get(config_key, config_spec.get("default")))
+            has_declared_keys = has_declared_keys or bool(basedata_keys)
             for role in dependency_roles:
                 try:
                     reads, writes = _DEPENDENCY_ROLE_BEHAVIOR[role]
@@ -337,28 +337,15 @@ class ProcessStep:
 
         if not has_dependency_hints:
             read_patterns = set(processing_key_patterns(cfg.get("with_processing_keys")))
+            write_patterns = set(read_patterns)
 
-            output_key = cfg.get("output_processing_key")
-            if isinstance(output_key, str) and output_key.strip():
-                write_patterns = set(processing_key_patterns(output_key))
-            else:
-                write_patterns = set(read_patterns)
-
-            processing_key = cfg.get("processing_key")
-            if isinstance(processing_key, str) and processing_key.strip():
-                databundle_output_key = cfg.get("databundle_output_key")
-                if isinstance(databundle_output_key, str) and databundle_output_key.strip():
-                    write_patterns.update(processing_key_patterns(processing_key, basedata_key=databundle_output_key))
-                else:
-                    write_patterns.update(processing_key_patterns(processing_key))
-
-        if has_dependency_hints and not read_patterns and not write_patterns:
+        if has_declared_keys and not read_patterns and not write_patterns:
             # Hinted BaseData keys are only exact when paired with processing keys.
             # Without them, keep partial-rerun invalidation conservative.
             read_patterns = {"*"}
             write_patterns = {"*"}
 
-        if not source_refs and not read_patterns and not write_patterns:
+        if not has_dependency_hints and not source_refs and not read_patterns and not write_patterns:
             # Generic/custom steps without a contract are treated conservatively.
             read_patterns = frozenset({"*"})
             write_patterns = {"*"}

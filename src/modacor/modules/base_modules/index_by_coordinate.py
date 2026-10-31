@@ -31,7 +31,7 @@ class IndexByCoordinate(ProcessStep):
         calling_id="IndexByCoordinate",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=[],
+        required_data_keys=["Q"],
         arguments={
             "with_processing_keys": {
                 "type": (str, list, type(None)),

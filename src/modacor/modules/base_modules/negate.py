@@ -8,7 +8,7 @@ __version__ = "20260929.1"
 from pathlib import Path
 
 from modacor.dataclasses.databundle import DataBundle
-from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -20,8 +20,8 @@ class Negate(ProcessStep):
         calling_id="Negate",
         calling_module_path=Path(__file__),
         calling_version=__version__,
-        required_data_keys=[],
-        modifies={"configured data key": ["signal"]},
+        required_data_keys=["signal"],
+        modifies={"signal": ["signal"]},
         arguments={
             "with_processing_keys": {
                 "type": (str, list, type(None)),
@@ -30,6 +30,7 @@ class Negate(ProcessStep):
                 "doc": "DataBundle key or keys to update.",
             },
             "data_key": {
+                "dependency_role": "processing_read_write_basedata_key",
                 "type": str,
                 "default": "signal",
                 "doc": "BaseData key whose nominal values are negated.",
@@ -38,14 +39,6 @@ class Negate(ProcessStep):
         step_keywords=["negate", "sign", "BaseData"],
         step_doc="Negate a BaseData entry using its uncertainty-preserving unary operation.",
     )
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
-        if not processing_keys:
-            return ProcessStepDependencies(processing_reads={"*"}, processing_writes={"*"})
-        data_key = str(self.configuration["data_key"])
-        paths = {f"{processing_key}.{data_key}" for processing_key in processing_keys}
-        return ProcessStepDependencies(processing_reads=paths, processing_writes=paths)
 
     def calculate(self) -> dict[str, DataBundle]:
         data_key = str(self.configuration["data_key"])

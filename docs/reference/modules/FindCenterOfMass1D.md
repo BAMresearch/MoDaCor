@@ -12,6 +12,7 @@ Find a masked, windowed intensity centroid without assuming a peak shape.
 
 ## Required data keys
 - signal
+- yaw
 
 ## Modifies
 - **beam_center**: signal, uncertainties, units
@@ -19,6 +20,18 @@ Find a masked, windowed intensity centroid without assuming a peak shape.
 - **centroid_converged**: signal
 - **centroid_window_min**: signal, units
 - **centroid_window_max**: signal, units
+
+## Data dependencies
+This step extends the declared dependencies with additional runtime dependencies.
+
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `axis_key` | read | `"yaw"` |
+| `mask_key` | read | `null` |
+| `output_key` | write | `"beam_center"` |
+| `signal_key` | read | `"signal"` |
 
 ## Required arguments
 - with_processing_keys
@@ -44,16 +57,16 @@ Find a masked, windowed intensity centroid without assuming a peak shape.
 ## Argument specification
 | Argument | Type | Required | Default | Dependency role | Description |
 |---|---|---|---|---|---|
-| `axis_key` | str | No | yaw | - | One-dimensional coordinate BaseData key. |
+| `axis_key` | str | No | yaw | processing_read_basedata_key | One-dimensional coordinate BaseData key. |
 | `baseline` | float or int | No | 0.0 | - | Scalar baseline in baseline_units, subtracted before clipping negative weights. |
 | `baseline_units` | str or NoneType | No | - | - | Units for baseline; defaults to signal units. |
 | `convergence_tolerance` | float or int | No | 0.0 | - | Absolute centre-change tolerance in width_units. |
 | `diagnostic_prefix` | str | No | centroid | - | Prefix for count, convergence, and window-bound diagnostic keys. |
 | `half_width` | float or int or NoneType | No | - | - | Optional physical half-width around the iterated centre. |
-| `mask_key` | str or NoneType | No | - | - | Optional mask key; nonzero values are excluded. |
+| `mask_key` | str or NoneType | No | - | processing_read_basedata_key | Optional mask key; nonzero values are excluded. |
 | `maximum_iterations` | int | No | 5 | - | Maximum number of window-recentring iterations. |
-| `output_key` | str | No | beam_center | - | Scalar centroid output key. |
-| `signal_key` | str | No | signal | - | Intensity BaseData key. |
+| `output_key` | str | No | beam_center | processing_write_basedata_key | Scalar centroid output key. |
+| `signal_key` | str | No | signal | processing_read_basedata_key | Intensity BaseData key. |
 | `width_units` | str or NoneType | No | - | - | Units for half_width and convergence_tolerance; defaults to axis units. |
 | `with_processing_keys` | str or list or NoneType | Yes | - | - | DataBundle key or keys containing peaks to centre. |
 

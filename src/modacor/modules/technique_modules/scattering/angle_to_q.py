@@ -16,7 +16,7 @@ from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.process_step import (
     ProcessStep,
     ProcessStepDependencies,
-    normalize_processing_key_values,
+    processing_key_patterns,
 )
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.geometry.scattering_angle import q_angle_factor
@@ -41,6 +41,7 @@ class AngleToQ(ProcessStep):
                 "doc": "DataBundle key or keys whose angular coordinates are converted.",
             },
             "angle_key": {
+                "dependency_role": "processing_read_basedata_key",
                 "type": str,
                 "default": "angle",
                 "doc": "Angular-coordinate BaseData key.",
@@ -86,6 +87,7 @@ class AngleToQ(ProcessStep):
                 ),
             },
             "output_key": {
+                "dependency_role": "processing_write_basedata_key",
                 "type": str,
                 "default": "Q",
                 "doc": "Output BaseData key.",
@@ -121,25 +123,18 @@ class AngleToQ(ProcessStep):
         return key or None
 
     def dependency_contract(self) -> ProcessStepDependencies:
-        base_contract = super().dependency_contract()
-        processing_keys = normalize_processing_key_values(self.configuration.get("with_processing_keys"))
-        if not processing_keys:
-            return ProcessStepDependencies(
-                source_refs=base_contract.source_refs,
-                processing_reads={"*"},
-                processing_writes={"*"},
-            )
-        angle_key = str(self.configuration["angle_key"])
-        read_keys = {angle_key}
+        contract = super().dependency_contract()
+        reads = set(contract.processing_reads)
         if self.configuration.get("angle_zero") is None:
             center_key = self._optional_key(self.configuration["center_key"])
             if center_key is not None:
-                read_keys.add(center_key)
-        output_key = str(self.configuration["output_key"])
+                reads.update(
+                    processing_key_patterns(self.configuration.get("with_processing_keys"), basedata_key=center_key)
+                )
         return ProcessStepDependencies(
-            source_refs=base_contract.source_refs,
-            processing_reads={f"{processing_key}.{key}" for processing_key in processing_keys for key in read_keys},
-            processing_writes={f"{processing_key}.{output_key}" for processing_key in processing_keys},
+            source_refs=contract.source_refs,
+            processing_reads=reads,
+            processing_writes=contract.processing_writes,
         )
 
     def _angle_zero(self, bundle: DataBundle, angle: BaseData) -> BaseData:

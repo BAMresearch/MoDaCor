@@ -22,6 +22,13 @@ Compute weighted group means from a precomputed integer index map.
 - **sum_weights**: signal
 - **effective_sample_size**: signal
 
+## Data dependencies
+This step defines a custom dependency contract.
+
+_No fixed data keys declared._
+
+_No data-key roles declared._
+
 ## Required arguments
 - _None_
 

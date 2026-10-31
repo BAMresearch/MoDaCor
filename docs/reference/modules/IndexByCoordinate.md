@@ -11,11 +11,20 @@ Assign one coordinate value per input point to a one-dimensional bin index.
 - **Keywords:** indexing, binning, coordinate, reduction
 
 ## Required data keys
-- _None_
+- Q
 
 ## Modifies
 - **bin_index**: signal, units, axes
 - **bin_edges**: signal, units
+
+## Data dependencies
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `coordinate_key` | read | `"Q"` |
+| `edges_key` | write | `"bin_edges"` |
+| `index_key` | write | `"bin_index"` |
 
 ## Required arguments
 - _None_

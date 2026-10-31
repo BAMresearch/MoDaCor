@@ -18,6 +18,16 @@ Apply angle-dependent attenuator plate transmission.
 - **signal**: signal, uncertainties
 - **attenuator_transmission**: signal, units
 
+## Data dependencies
+| Fixed key | Access |
+|---|---|
+| `signal` | read_write |
+
+| Role argument | Access | Default |
+|---|---|---|
+| `correction_key` | write | `"attenuator_transmission"` |
+| `cos_alpha_key` | read | `"CosAlpha"` |
+
 ## Required arguments
 - with_processing_keys
 
@@ -67,8 +77,8 @@ Apply angle-dependent attenuator plate transmission.
 | `beam_energy_units_source` | str or NoneType | No | - | - | Optional IoSources key for beam energy units. |
 | `chemical_formula` | str or NoneType | No | - | - | Chemical formula in xraylib syntax, e.g. SiO2. Exact xraylib NIST compound names (e.g. Kapton Polyimide Film) are also accepted. |
 | `chemical_formula_source` | str or NoneType | No | - | - | Optional IoSources key for a chemical formula in xraylib syntax, e.g. SiO2. Exact xraylib NIST compound names (e.g. Kapton Polyimide Film) are also accepted. |
-| `correction_key` | str | No | attenuator_transmission | - | BaseData key used to store the applied transmission map. |
-| `cos_alpha_key` | str | No | CosAlpha | - | BaseData key containing the incidence cosine n dot rhat. |
+| `correction_key` | str | No | attenuator_transmission | processing_write_basedata_key | BaseData key used to store the applied transmission map. |
+| `cos_alpha_key` | str | No | CosAlpha | processing_read_basedata_key | BaseData key containing the incidence cosine n dot rhat. |
 | `density` | int or float or NoneType | No | - | - | Attenuator material density. |
 | `density_source` | str or NoneType | No | - | - | Optional IoSources key for attenuator density. |
 | `density_units` | str | No | g/cm^3 | - | Units for density. |

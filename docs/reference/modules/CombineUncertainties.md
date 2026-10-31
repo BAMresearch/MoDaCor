@@ -16,6 +16,13 @@ Combine selected uncertainties in quadrature and expose the result under new key
 ## Modifies
 - **signal**: uncertainties
 
+## Data dependencies
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `target_basedata_key` | read_write | `"signal"` |
+
 ## Required arguments
 - combinations
 

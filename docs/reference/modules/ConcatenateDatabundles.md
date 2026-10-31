@@ -17,6 +17,13 @@ Concatenate matching 1D BaseData entries, optionally sorting every entry togethe
 - **configured data keys**: signal, uncertainties, weights, units, axes
 - **source_index**: signal
 
+## Data dependencies
+This step defines a custom dependency contract.
+
+_No fixed data keys declared._
+
+_No data-key roles declared._
+
 ## Required arguments
 - with_processing_keys
 - data_keys

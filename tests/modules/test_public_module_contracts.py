@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ast
+import inspect
+from textwrap import dedent
 from typing import get_args, get_origin, get_type_hints
 
 import pytest
@@ -12,32 +14,46 @@ from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 PUBLIC_STEP_NAMES = tuple(modacor.modules.__all__)
 
-DEFAULT_METADATA_CONTRACTS = {
-    "AngleToQ": ({"angle"}, {"Q"}),
+# Multi-bundle and I/O contracts remain explicit; retain their existing
+# hand-written default metadata expectations.
+CUSTOM_DEFAULT_METADATA_CONTRACTS = {
     "ConcatenateDatabundles": (set(), {"configured data keys", "source_index"}),
-    "DilateMask": ({"mask"}, {"mask"}),
     "DivideDatabundles": ({"signal"}, {"signal"}),
     "FindScaleFactor1D": ({"signal", "Q"}, {"scale_factor", "scale_background"}),
-    "FindCenterOfMass1D": (
-        {"signal"},
-        {"beam_center", "centroid_count", "centroid_converged", "centroid_window_min", "centroid_window_max"},
-    ),
-    "FlatPlateSelfAbsorptionCorrection": (
-        {"signal", "CosAlpha"},
-        {"signal", "flat_plate_self_absorption"},
-    ),
-    "IndexByCoordinate": (set(), {"bin_index", "bin_edges"}),
     "Integrate1D": ({"signal", "q"}, {"integral"}),
-    "Negate": (set(), {"configured data key"}),
-    "PoissonUncertainties": ({"signal"}, {"signal"}),
-    "PolarizationCorrection": (
-        {"signal", "TwoTheta", "Psi"},
-        {"signal", "polarization_factor_map"},
-    ),
-    "ReduceMask": ({"mask"}, {"mask"}),
     "SubtractInterpolated1D": ({"signal", "Q"}, {"signal", "remap_mask"}),
-    "ThresholdMask": ({"signal"}, {"threshold_mask"}),
 }
+
+# Extra metadata beyond declarations, with an explicit reason for each entry.
+# These writes belong to the extension override, not the regular declarations.
+DECLARATIVE_METADATA_EXCEPTIONS = {
+    "FindCenterOfMass1D": {
+        "required": set(),
+        "modifies": {"centroid_count", "centroid_converged", "centroid_window_min", "centroid_window_max"},
+        "reason": "The extension writes diagnostics derived from diagnostic_prefix.",
+    },
+}
+
+
+def _uses_dependency_declarations(step_class) -> bool:
+    method = step_class.dependency_contract
+    if method is ProcessStep.dependency_contract:
+        return True
+    tree = ast.parse(dedent(inspect.getsource(method)))
+    return any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "dependency_contract"
+        and isinstance(node.func.value, ast.Call)
+        and isinstance(node.func.value.func, ast.Name)
+        and node.func.value.func.id == "super"
+        for node in ast.walk(tree)
+    )
+
+
+DECLARATIVE_STEP_NAMES = tuple(
+    name for name in PUBLIC_STEP_NAMES if _uses_dependency_declarations(getattr(modacor.modules, name))
+)
 
 
 @pytest.mark.parametrize("step_name", PUBLIC_STEP_NAMES)
@@ -62,9 +78,9 @@ def test_public_process_step_metadata_contract(step_name: str) -> None:
     assert get_args(return_annotation) == (str, DataBundle)
 
 
-@pytest.mark.parametrize("step_name", DEFAULT_METADATA_CONTRACTS)
+@pytest.mark.parametrize("step_name", CUSTOM_DEFAULT_METADATA_CONTRACTS)
 def test_public_process_step_default_data_metadata(step_name: str) -> None:
-    required_data_keys, modified_data_keys = DEFAULT_METADATA_CONTRACTS[step_name]
+    required_data_keys, modified_data_keys = CUSTOM_DEFAULT_METADATA_CONTRACTS[step_name]
     documentation = getattr(modacor.modules, step_name).documentation
 
     assert set(documentation.required_data_keys) == required_data_keys
@@ -81,3 +97,36 @@ def test_public_process_step_modules_do_not_use_assert_for_runtime_validation() 
         assertions.extend(f"{module_path}:{node.lineno}" for node in ast.walk(tree) if isinstance(node, ast.Assert))
 
     assert not assertions, "Runtime assertions found: " + ", ".join(sorted(assertions))
+
+
+@pytest.mark.parametrize("step_name", DECLARATIVE_STEP_NAMES)
+def test_declarative_step_default_data_metadata(step_name: str) -> None:
+    documentation = getattr(modacor.modules, step_name).documentation
+    required = {key for key, access in documentation.fixed_data_keys.items() if access in {"read", "read_write"}}
+    modified = {key for key, access in documentation.fixed_data_keys.items() if access in {"write", "read_write"}}
+    defaults = documentation.initial_configuration()
+    for name, spec in documentation.arguments.items():
+        roles = spec.get("dependency_role", ())
+        if not roles:
+            continue
+        if isinstance(roles, str):
+            roles = (roles,)
+        value = defaults[name]
+        keys = {value} if isinstance(value, str) else set(value or ())
+        for role in roles:
+            if "read" in role:
+                required.update(keys)
+            if "write" in role:
+                modified.update(keys)
+    exception = DECLARATIVE_METADATA_EXCEPTIONS.get(step_name)
+    if exception is not None:
+        assert exception["reason"]
+        required.update(exception["required"])
+        modified.update(exception["modifies"])
+    assert set(documentation.required_data_keys) == required
+    assert set(documentation.modifies) == modified
+
+
+def test_metadata_exception_table_covers_only_declarative_steps():
+    assert DECLARATIVE_METADATA_EXCEPTIONS.keys() <= set(DECLARATIVE_STEP_NAMES)
+    assert not CUSTOM_DEFAULT_METADATA_CONTRACTS.keys() & set(DECLARATIVE_STEP_NAMES)

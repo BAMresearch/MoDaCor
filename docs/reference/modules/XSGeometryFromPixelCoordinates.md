@@ -25,6 +25,25 @@ Compute Q-vector components and angles from lab-frame pixel coordinates.
 - **CosAlpha**: signal, uncertainties
 - **Omega**: signal, uncertainties
 
+## Data dependencies
+This step extends the declared dependencies with additional runtime dependencies.
+
+| Fixed key | Access |
+|---|---|
+| `CosAlpha` | write |
+| `Omega` | write |
+| `Psi` | write |
+| `Q` | write |
+| `Q0` | write |
+| `Q1` | write |
+| `Q2` | write |
+| `TwoTheta` | write |
+| `coord_x` | read |
+| `coord_y` | read |
+| `coord_z` | read |
+
+_No data-key roles declared._
+
 ## Required arguments
 - sample_z_source
 - photon_source

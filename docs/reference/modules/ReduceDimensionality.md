@@ -16,6 +16,15 @@ Compute a weighted or unweighted mean/sum over the given axes, propagate existin
 ## Modifies
 - **signal**: signal, uncertainties, units, weights
 
+## Data dependencies
+| Fixed key | Access |
+|---|---|
+| `signal` | read_write |
+
+| Role argument | Access | Default |
+|---|---|---|
+| `mask_key` | read | `null` |
+
 ## Required arguments
 - _None_
 
@@ -37,7 +46,7 @@ Compute a weighted or unweighted mean/sum over the given axes, propagate existin
 |---|---|---|---|---|---|
 | `axes` | int or list or tuple or str or NoneType | No | - | - | Axis or axes to reduce (int, list/tuple, or None for all). Use 'non_data' to reduce every leading axis before the final rank_of_data axes. |
 | `mask_bits` | int or list or tuple or NoneType | No | - | - | Optional uint32 bit value or iterable of bit values to exclude. None excludes any nonzero mask. |
-| `mask_key` | str or NoneType | No | - | - | Optional BaseData mask key in each selected DataBundle. Nonzero mask values are excluded without modifying the input signal. |
+| `mask_key` | str or NoneType | No | - | processing_read_basedata_key | Optional BaseData mask key in each selected DataBundle. Nonzero mask values are excluded without modifying the input signal. |
 | `nan_policy` | str | No | omit | - | NaN handling policy: 'omit' or 'propagate'. |
 | `reduction` | str | No | mean | - | Reduction method: 'mean' or 'sum'. |
 | `uncertainty_estimation` | dict or NoneType | No | - | - | Optional mapping containing estimator definitions and a collision policy for scatter-derived uncertainty components. |

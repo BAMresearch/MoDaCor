@@ -16,6 +16,13 @@ Add Poisson uncertainties to the data
 ## Modifies
 - **signal**: uncertainties
 
+## Data dependencies
+| Fixed key | Access |
+|---|---|
+| `signal` | read_write |
+
+_No data-key roles declared._
+
 ## Required arguments
 - with_processing_keys
 

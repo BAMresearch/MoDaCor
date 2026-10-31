@@ -57,6 +57,19 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["coord_x", "coord_y", "coord_z"],
+        fixed_data_keys={
+            "coord_x": "read",
+            "coord_y": "read",
+            "coord_z": "read",
+            "Q0": "write",
+            "Q1": "write",
+            "Q2": "write",
+            "Q": "write",
+            "Psi": "write",
+            "TwoTheta": "write",
+            "CosAlpha": "write",
+            "Omega": "write",
+        },
         arguments={
             "sample_z_source": {
                 "type": (str, type(None)),
@@ -380,13 +393,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         coord_y: BaseData = ref["coord_y"]
         coord_z: BaseData = ref["coord_z"]
 
-        RoD = int(
-            getattr(
-                coord_x,
-                "rank_of_data",
-                ref["signal"].rank_of_data if "signal" in ref else np.ndim(coord_x.signal),
-            )
-        )
+        RoD = int(coord_x.rank_of_data)
 
         sample_z = prepare_static_scalar(
             self._load_sample_z(),

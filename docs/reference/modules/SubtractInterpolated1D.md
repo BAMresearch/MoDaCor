@@ -18,6 +18,13 @@ Remap a 1D background by nearest neighbour or linear interpolation, then subtrac
 - **signal**: signal, uncertainties, weights, units
 - **remap_mask**: signal
 
+## Data dependencies
+This step defines a custom dependency contract.
+
+_No fixed data keys declared._
+
+_No data-key roles declared._
+
 ## Required arguments
 - with_processing_keys
 

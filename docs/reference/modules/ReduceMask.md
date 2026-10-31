@@ -16,6 +16,14 @@ Reduce an integer mask over configured axes while preserving uint32 reason bits.
 ## Modifies
 - **mask**: signal, units, axes
 
+## Data dependencies
+_No fixed data keys declared._
+
+| Role argument | Access | Default |
+|---|---|---|
+| `source_mask_key` | read | `"mask"` |
+| `target_mask_key` | write | `"mask"` |
+
 ## Required arguments
 - with_processing_keys
 
@@ -37,8 +45,8 @@ Reduce an integer mask over configured axes while preserving uint32 reason bits.
 |---|---|---|---|---|---|
 | `axes` | int or list or tuple or str or NoneType | No | - | - | Axis or axes to reduce. Use None to reduce all axes, or 'non_data' to reduce every leading axis before the final rank_of_data axes. |
 | `reduction` | str | No | any | - | Use 'any' to OR mask bits across axes, or 'all' to AND bits across axes. |
-| `source_mask_key` | str | No | mask | - | BaseData key for the mask to reduce. |
-| `target_mask_key` | str | No | mask | - | BaseData key for the reduced mask output. |
+| `source_mask_key` | str | No | mask | processing_read_basedata_key | BaseData key for the mask to reduce. |
+| `target_mask_key` | str | No | mask | processing_write_basedata_key | BaseData key for the reduced mask output. |
 | `with_processing_keys` | list | Yes | ["sample"] | - | Single processing key identifying the DataBundle to update. |
 
 ## Notes

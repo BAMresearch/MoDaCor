@@ -18,12 +18,7 @@ from pathlib import Path
 
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.helpers import basedata_from_sources
-from modacor.dataclasses.process_step import (
-    ProcessStep,
-    ProcessStepDependencies,
-    processing_key_patterns,
-    source_refs_from_references,
-)
+from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 
@@ -38,6 +33,9 @@ class Subtract(ProcessStep):
         calling_module_path=Path(__file__),
         calling_version=__version__,
         required_data_keys=["signal"],
+        fixed_data_keys={
+            "signal": "read_write",
+        },
         modifies={"signal": ["signal", "uncertainties", "units"]},
         arguments={
             "subtrahend_source": {
@@ -62,15 +60,6 @@ class Subtract(ProcessStep):
         step_note="""This loads a scalar (value, units and uncertainty)
             from an IOSource and applies it to the data signal""",
     )
-
-    def dependency_contract(self) -> ProcessStepDependencies:
-        cfg = self.configuration
-        signal_paths = processing_key_patterns(cfg.get("with_processing_keys"), basedata_key="signal")
-        return ProcessStepDependencies(
-            source_refs=source_refs_from_references(cfg),
-            processing_reads=signal_paths,
-            processing_writes=signal_paths,
-        )
 
     def calculate(self) -> dict[str, DataBundle]:
         # build up the subtrahend BaseData object from the IoSources
