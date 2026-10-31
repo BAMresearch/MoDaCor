@@ -1956,6 +1956,29 @@ said what went wrong.
   real chmod checks as a non-root POSIX user, late-arriving files, all registration
   routes, excluded backends, and single Python warning emission.
 
+- LocalRuntimeServer now resolves the default log path at startup to
+  `Path.cwd() / "modacor_output" / "modacor_server.log"`, creates its parent,
+  prints it and exposes `log_path`. Its managed client includes the path in
+  RuntimeAPIError text without changing server response fields; startup exit
+  and timeout messages also point there. Reused external servers do not claim
+  a local log. The subprocess output is captured once, without `--log-file`.
+- `modacor serve` uses stderr and optional `--log-file PATH`, controlled by
+  `--log-level` (default info), with MessageHandler's timestamp/name/level/message
+  format. Serve owns the root handlers (including modacor and uvicorn records);
+  existing MessageHandler console handlers are removed and later ones delegate
+  to that configuration. Tests check one console and file record, including
+  repeated setup and early/late handlers. Ordinary MessageHandler use retains
+  its existing standalone behavior. Operations docs explain logs and error
+  record lifetime; deleting a session discards its in-memory error records.
+- Full development suite with access tracing: **1274 passed, 1 skipped**,
+  2 subtests passed; the sole skip is the opt-in RSS subprocess test.
+
+- Final tox checks: `py312` **1272 passed, 3 skipped**, 2 subtests passed
+  (same three skips as R13 after installation); `lint` passed; `docs` passed
+  including module-reference freshness and warning-as-error Sphinx build.
+  No existing server test expectations or ApiError responses needed changes;
+  no stop condition was hit.
+
 **Review log.** _(reviewer)_
 
 ---

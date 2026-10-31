@@ -215,3 +215,24 @@ def test_non_file_registration_has_no_location_warning(client, kind, io_type):
     )
     assert response.status_code == 200
     assert response.json()["warnings"] == []
+
+
+@pytest.mark.parametrize("kind", ["source", "sink"])
+def test_backend_constructor_failure_keeps_cause_and_registration(client, monkeypatch, kind):
+    def fail(*args, **kwargs):
+        raise ConnectionError("backend unavailable")
+
+    monkeypatch.setattr(f"modacor.server.io_utils.build_{kind}_from_spec", fail)
+    response = client.put(
+        f"/v1/sessions/diagnostics/{kind}s",
+        json={f"{kind}s": [{"ref": "data", "type": "custom", "location": "backend://offline"}]},
+    )
+    assert response.status_code == 200
+    assert response.json()["warnings"] == []
+    response = client.post("/v1/sessions/diagnostics/process", json={"mode": "full"})
+    detail = response.json()["detail"]
+    assert detail["code"] == f"{kind.upper()}_UNAVAILABLE"
+    assert detail["details"]["exception_type"] == "ConnectionError"
+    assert "data" in detail["message"]
+    assert "backend://offline" in detail["message"]
+    assert "ConnectionError: backend unavailable" in detail["message"]

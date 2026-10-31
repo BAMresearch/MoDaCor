@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 __all__ = ["RuntimeAPIError"]
@@ -20,6 +21,7 @@ class RuntimeAPIError(RuntimeError):
         details: Any = None,
         endpoint: str,
         method: str,
+        log_path: Path | None = None,
     ) -> None:
         self.status = status
         self.status_code = status
@@ -28,9 +30,11 @@ class RuntimeAPIError(RuntimeError):
         self.details = details
         self.endpoint = endpoint
         self.method = method.upper()
+        self.log_path = log_path
         status_text = "transport error" if status is None else f"HTTP {status}"
         code_text = f" [{code}]" if code else ""
-        super().__init__(f"{self.method} {endpoint}: {status_text}{code_text}: {self.message}")
+        log_note = f" See runtime log: {log_path}." if log_path is not None else ""
+        super().__init__(f"{self.method} {endpoint}: {status_text}{code_text}: {self.message}{log_note}")
 
 
 def error_fields(payload: Any, fallback: str) -> tuple[str | None, str, Any]:

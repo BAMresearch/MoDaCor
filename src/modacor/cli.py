@@ -149,6 +149,13 @@ def _add_serve_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     serve_parser = subparsers.add_parser("serve", help="Start the MoDaCor runtime API service.")
     serve_parser.add_argument("--host", default="127.0.0.1", help="Bind host for the HTTP server.")
     serve_parser.add_argument("--port", default=8000, type=int, help="Bind port for the HTTP server.")
+    serve_parser.add_argument("--log-file", type=Path, help="Also write runtime logs to this file.")
+    serve_parser.add_argument(
+        "--log-level",
+        choices=("debug", "info", "warning", "error", "critical"),
+        default="info",
+        help="Runtime console and file logging level.",
+    )
     serve_parser.add_argument(
         "--runtime-policy",
         choices=("trusted", "restricted"),
@@ -384,8 +391,10 @@ def _serve_command(args: argparse.Namespace) -> int:
         raise RuntimeError("uvicorn is not installed. Install server extras: pip install modacor[server].") from exc
 
     from modacor.server.api import create_app
+    from modacor.server.logging_setup import configure_server_logging
     from modacor.server.runtime_policy import RuntimePolicy
 
+    configure_server_logging(log_file=args.log_file, log_level=args.log_level)
     policy_kwargs = {
         "source_read_roots": tuple(args.read_root),
         "pipeline_yaml_read_roots": tuple(args.read_root),
@@ -401,7 +410,7 @@ def _serve_command(args: argparse.Namespace) -> int:
         policy = RuntimePolicy.trusted(**policy_kwargs)
 
     app = create_app(runtime_policy=policy)
-    uvicorn.run(app, host=args.host, port=args.port)
+    uvicorn.run(app, host=args.host, port=args.port, log_config=None, log_level=args.log_level)
     return 0
 
 

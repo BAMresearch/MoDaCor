@@ -46,6 +46,7 @@ class RuntimeClient:
         if self.timeout <= 0:
             raise ValueError("timeout must be positive.")
         self._transport = transport or UrllibRuntimeTransport()
+        self.server_log_path: Path | None = None
         self.chunked_outputs = ChunkedOutputsClient(self)
 
     def url(self, path: str) -> str:
@@ -83,6 +84,7 @@ class RuntimeClient:
                 details=exc.details,
                 endpoint=endpoint,
                 method=method,
+                log_path=self.server_log_path,
             ) from exc
         decoded = self._decode_body(raw)
         if status not in expected:
@@ -95,6 +97,7 @@ class RuntimeClient:
                 details=details,
                 endpoint=endpoint,
                 method=method,
+                log_path=self.server_log_path,
             )
         if raw and "application/x-npy" in self._content_type(response_headers):
             return decode_npy(raw)
