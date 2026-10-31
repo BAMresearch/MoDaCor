@@ -93,6 +93,24 @@ def _normalize_arguments(value: Any, field_name: str) -> dict[str, ArgumentSpec]
     return normalized
 
 
+def _normalize_fixed_data_keys(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise TypeError("fixed_data_keys must be a mapping.")
+    normalized = {}
+    for key, role in value.items():
+        if not isinstance(key, str):
+            raise TypeError("fixed_data_keys keys must be strings.")
+        key = key.strip()
+        if not key:
+            raise ValueError("fixed_data_keys keys must be non-empty strings.")
+        if not isinstance(role, str) or role not in {"read", "write", "read_write"}:
+            raise ValueError(
+                f"fixed_data_keys[{key!r}] contains unknown role {role!r}. " "Known roles: read, write, read_write."
+            )
+        normalized[key] = role
+    return normalized
+
+
 def _deepcopy_default(value: Any) -> Any:
     return deepcopy(value)
 
@@ -115,6 +133,7 @@ class ProcessStepDescriber:
         converter=lambda value: _normalize_arguments(value, "arguments"),
         validator=v.deep_mapping(key_validator=v.instance_of(str), value_validator=v.instance_of(dict)),
     )  # schema describing configurable arguments
+    fixed_data_keys: dict[str, str] = field(factory=dict, converter=_normalize_fixed_data_keys)
     modifies: dict[str, list] = field(
         factory=dict, validator=v.instance_of(dict)
     )  # which aspects of BaseData are modified by this

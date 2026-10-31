@@ -63,8 +63,8 @@ def test_find_dirty_step_ids_with_changed_keys_matches_processing_patterns():
     load = DummyStep(step_id="load")
     corr = DummyStep(step_id="corr")
 
-    load.configuration["processing_key"] = "sample"
-    load.configuration["databundle_output_key"] = "signal"
+    load.configuration["with_processing_keys"] = ["sample"]
+    assert load.dependency_contract().processing_writes == {"sample.*"}
     corr.configuration["with_processing_keys"] = ["sample"]
 
     pipeline = Pipeline.from_dict({load: set(), corr: {load}}, name="dirty-test-keys")

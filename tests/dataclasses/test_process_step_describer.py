@@ -85,3 +85,89 @@ def test_required_argument_names():
     )
 
     assert describer.required_argument_names() == ("needed",)
+
+
+@pytest.mark.parametrize(
+    "value, error, message",
+    [
+        ([], TypeError, "mapping"),
+        ({1: "read"}, TypeError, "strings"),
+        ({"": "read"}, ValueError, "non-empty"),
+        ({"  ": "read"}, ValueError, "non-empty"),
+        ({"signal": "invalid"}, ValueError, "unknown role"),
+        ({"signal": []}, ValueError, "unknown role"),
+    ],
+)
+def test_fixed_data_keys_validation_at_class_definition(value, error, message):
+    with pytest.raises(error, match=message):
+
+        class InvalidStep:
+            documentation = _build_describer(fixed_data_keys=value)
+
+
+def test_fixed_data_keys_normalize_and_survive_copy():
+    describer = _build_describer(fixed_data_keys={" signal ": "read_write"})
+    assert describer.fixed_data_keys == {"signal": "read_write"}
+    assert describer.copy().fixed_data_keys == describer.fixed_data_keys
+    assert _build_describer().fixed_data_keys == {}
+
+
+@pytest.mark.parametrize("bundles", [["sample"], ["sample", "background"]])
+def test_fixed_data_keys_expand_reads_and_writes(bundles):
+    from modacor.dataclasses.process_step import ProcessStep
+
+    class FixedStep(ProcessStep):
+        documentation = _build_describer(fixed_data_keys={"input": "read", "output": "write", "signal": "read_write"})
+
+        def calculate(self):
+            return None
+
+    step = FixedStep(configuration={"with_processing_keys": bundles})
+    contract = step.dependency_contract()
+    assert contract.source_refs == set()
+    assert contract.processing_reads == {f"{bundle}.{key}" for bundle in bundles for key in ("input", "signal")}
+    assert contract.processing_writes == {f"{bundle}.{key}" for bundle in bundles for key in ("output", "signal")}
+
+
+def test_fixed_data_keys_combine_roles_mapping_keys_and_source_refs():
+    from modacor.dataclasses.process_step import ProcessStep
+
+    class MixedStep(ProcessStep):
+        documentation = _build_describer(
+            fixed_data_keys={"signal": "read_write"},
+            arguments={
+                "updates": {
+                    "type": dict,
+                    "default": {"Q": "1/nm", "angle": "rad"},
+                    "dependency_role": "processing_read_write_basedata_key",
+                },
+                "mask_key": {"type": str, "default": "mask", "dependency_role": "processing_read_basedata_key"},
+                "source": {"type": str, "default": "calibration::/value"},
+            },
+        )
+
+        def calculate(self):
+            return None
+
+    step = MixedStep(configuration={"with_processing_keys": ["sample"]})
+    contract = step.dependency_contract()
+    assert contract.source_refs == {"calibration"}
+    assert contract.processing_reads == {"sample.signal", "sample.Q", "sample.angle", "sample.mask"}
+    assert contract.processing_writes == {"sample.signal", "sample.Q", "sample.angle"}
+    step.modify_config_by_kwargs(with_processing_keys=None)
+    contract = step.dependency_contract()
+    assert contract.source_refs == {"calibration"}
+    assert contract.processing_reads == contract.processing_writes == {"*"}
+
+
+def test_fixed_data_keys_without_processing_keys_are_conservative():
+    from modacor.dataclasses.process_step import ProcessStep
+
+    class FixedStep(ProcessStep):
+        documentation = _build_describer(fixed_data_keys={"signal": "read_write"})
+
+        def calculate(self):
+            return None
+
+    contract = FixedStep().dependency_contract()
+    assert contract.processing_reads == contract.processing_writes == {"*"}

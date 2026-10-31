@@ -1447,6 +1447,13 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
   snapshot preserves; conftest must defer MoDaCor imports until fixture setup
   to avoid installed-wheel/source-doctest collection conflicts in tox.
 
+- **R07b (2026-10-31):** added validated `fixed_data_keys`, mapping-key roles,
+  and fixed-key expansion in the default contract; removed its dead
+  `AppendProcessingData` branch. No exported steps changed; the 82-case
+  snapshot is identical. All 35 module overrides remain pending migration.
+  With the access trace active: development suite 1202 passed, 1 skipped;
+  `tox -e py312` 1199 passed, 4 skipped; `tox -e lint` passed. No surprises.
+
 **Review log.**
 
 - **R07a (2026-10-31): approved.** Commits `f2d9b37` (step fixes) and
