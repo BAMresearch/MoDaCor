@@ -58,7 +58,6 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         calling_version=__version__,
         required_data_keys=["coord_x", "coord_y", "coord_z"],
         fixed_data_keys={
-            "signal": "read",
             "coord_x": "read",
             "coord_y": "read",
             "coord_z": "read",
@@ -394,13 +393,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         coord_y: BaseData = ref["coord_y"]
         coord_z: BaseData = ref["coord_z"]
 
-        RoD = int(
-            getattr(
-                coord_x,
-                "rank_of_data",
-                ref["signal"].rank_of_data if "signal" in ref else np.ndim(coord_x.signal),
-            )
-        )
+        RoD = int(coord_x.rank_of_data)
 
         sample_z = prepare_static_scalar(
             self._load_sample_z(),

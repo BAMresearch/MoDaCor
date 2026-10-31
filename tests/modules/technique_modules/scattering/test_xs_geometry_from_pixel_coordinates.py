@@ -400,7 +400,7 @@ def test_geometry_dependency_contract_tracks_nested_nexus_sources():
 
     assert step.dependency_contract() == ProcessStepDependencies(
         source_refs={"measurement", "calibration", "sample_position"},
-        processing_reads={"sample.signal", "sample.coord_x", "sample.coord_y", "sample.coord_z"},
+        processing_reads={"sample.coord_x", "sample.coord_y", "sample.coord_z"},
         processing_writes={
             "sample.Q0",
             "sample.Q1",

@@ -1130,11 +1130,9 @@
       "background.coord_x",
       "background.coord_y",
       "background.coord_z",
-      "background.signal",
       "sample.coord_x",
       "sample.coord_y",
-      "sample.coord_z",
-      "sample.signal"
+      "sample.coord_z"
     ],
     "processing_writes": [
       "background.CosAlpha",
@@ -1176,11 +1174,9 @@
       "background.coord_x",
       "background.coord_y",
       "background.coord_z",
-      "background.signal",
       "sample.coord_x",
       "sample.coord_y",
-      "sample.coord_z",
-      "sample.signal"
+      "sample.coord_z"
     ],
     "processing_writes": [
       "background.CosAlpha",
