@@ -1215,7 +1215,7 @@ tiled source are lower priority and are not part of this item.
 
 ## R06 — Repository hygiene
 
-**Status:** done
+**Status:** done. Merged in PR #150 and released in v1.13.0.
 
 **Problem.** The checkout contains untracked artefacts that are easy to commit
 by accident:
@@ -1262,7 +1262,7 @@ maintainer's decisions:
 
 ## R07 — Declarative data-key dependencies, verified against behaviour
 
-**Status:** done (A′), on branch `quality-remediation-r07`. The recommendation
+**Status:** done (A′). Merged in PR #150 and released in v1.13.0. The recommendation
 was revised on 2026-10-31 after checking the modules that derive data keys
 from configuration.
 
@@ -1640,8 +1640,8 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
 
 ## R08 — Audit remaining unit stripping in modules
 
-**Status:** in progress on branch `quality-remediation-r08-r13-r15`, which
-is stacked on `quality-remediation-r07`. First step: classification only.
+**Status:** in progress on branch `quality-remediation-r08-r13-r15`. First
+step: classification only.
 
 **Inventory (2026-10-31, after R07).** A pattern search (`.magnitude`,
 `.m_as(`, `np.asarray(… .signal)`, `float(… .signal)`, `.to(…).magnitude`)
