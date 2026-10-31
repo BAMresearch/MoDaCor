@@ -26,17 +26,31 @@ uncertainty at that position.
 
 ## Named-component rules
 
-Propagation happens independently for each name:
+Matching components combine using the operation's formula; absent components
+contribute zero. The key-selection rules are:
 
-1. Matching names on both operands are combined with the operation's formula.
-2. Non-matching names form a union; each contribution propagates from the
-   operand that contains it, with zero contribution from the other operand.
-3. An absent uncertainty mapping contributes no components.
-4. `propagate_to_all` is a global fallback only when it is the sole key on an
-   operand. It contributes to every explicit name on the other operand.
-5. If both operands contain only `propagate_to_all`, the result retains that
-   key. When it appears alongside other keys it is not a fallback and is not
-   emitted as a result key.
+| Operands' uncertainty keys | Result |
+| --- | --- |
+| Both global-only | Keep `propagate_to_all` |
+| Global-only + no uncertainties | Keep and propagate `propagate_to_all` |
+| Global-only + another non-empty mapping | Fold the global contribution into each key of the other mapping |
+| Neither global-only | Union; a `propagate_to_all` mixed in with other keys is an ordinary component |
+
+Here **global-only** means that `propagate_to_all` is the operand's sole key.
+The other mapping in the folding rule may itself include `propagate_to_all`
+alongside named components; that key receives the fallback like any other.
+
+```{warning}
+Folding does not represent covariance. Combining the resulting keys in
+quadrature (for example with `CombineUncertainties`) counts the shared global
+contribution once per key, up to √k times across k keys. When
+`propagate_to_all` is used, keep the propagated components separate rather than
+combining them afterwards.
+```
+
+**Changed:** uncertainty-free and mixed-key operations now propagate
+`propagate_to_all` components that were previously silently lost. Nominal
+values are unchanged; resulting uncertainties now include those components.
 
 This scheme preserves provenance, but a shared name is not proof of statistical
 independence. Choose names and combinations to match the physical uncertainty

@@ -48,4 +48,4 @@ _No fixed data keys declared._
 DOI 10.1088/0953-8984/25/38/383201
 
 ## Notes
-Designed for SAXS/SANS pipelines where uncertainties such as Poisson, readout noise, and flat-field corrections are stored separately (see the MOUSE notebook examples).
+Designed for SAXS/SANS pipelines where uncertainties such as Poisson, readout noise, and flat-field corrections are stored separately (see the MOUSE notebook examples). Folding propagate_to_all does not represent covariance: combining the resulting keys counts the shared global contribution once per key (up to sqrt(k) times across k keys), so keep those propagated components separate rather than combining them afterwards.

@@ -2478,7 +2478,32 @@ silently discarded. The contract:
 uncertainties that were silently lost reappear. This is a `fix:`, not an
 interface change.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.** 2026-10-31: implemented the maintainer table with
+one `_uncertainty_key_plan` shared by ordinary and in-place operators. Removed
+the duplicate ordinary key plan and its unconditional global-key deletion.
+Exact BaseData and float operands now agree. In-place folding preserves an
+unmodified fallback array when the output also writes the global key, avoiding
+order-dependent aliasing between components. Propagation formulas, unary
+operations, indexing and conversions are unchanged.
+
+- Both arithmetic docstrings and the user uncertainty guide now state the
+  four rules and prominently warn about covariance and the √k folding effect.
+  The guide has a Changed note; CombineUncertainties carries the requested
+  caution and its reference page was regenerated.
+- Analytic contract tests cover all rows, mixed/exact/named/global cases,
+  both orders, ordinary and in-place +/−/×/÷, exact-float equivalence and the
+  k=2 quadrature overcount. Focused arithmetic suite: **188 passed**.
+- **Changed existing test expectations: none.** All previous assertions pass
+  unchanged. Full suite with access tracing: **1447 passed, 1 skipped**,
+  2 subtests passed (RSS opt-in skip).
+- MoDaCor-examples `tests` and `DLS/I22/tests`: **23 passed before and
+  23 passed after**, with no result changes or files edited by this work.
+  That checkout has no `.venv-dev`, so both runs used MoDaCor's
+  `.venv-dev/bin/python`; bytecode and pytest cache writes were disabled.
+  Existing unrelated modifications in that checkout were left alone.
+- R17 is a separate uncertainty-restoration fix. Subsequent R08 comparisons
+  use the corrected R17 baseline rather than blessing any module-level change
+  in published uncertainty.
 
 **Review log.** _(reviewer)_
 
