@@ -2010,6 +2010,34 @@ candidate-equivalence proof intentionally stopped with a failure; it is not a
 failure in the committed implementation. The arithmetic/uncertainty stop is
 the only triggered stop condition; the performance guard did not trigger.
 
+**Resume after R17 (2026-10-31): second equivalence stop before Commit B.**
+R17 commit `3ea4ec2` restores BaseData uncertainty components. The original
+interpolation proof now passes for both `shared` and global-only
+`propagate_to_all` backgrounds, including exact/nearest one-hot and identical
+left/right selections.
+
+The capillary residual has a further difference beyond the accepted folding
+exception. A real `CapillarySelfAbsorptionCorrection` run with measured
+transmission **50 percent**, uncertainty **1 percent**, explicit unit metadata,
+separate named `mu` and `transmission` components, and an inactive pixel was
+compared with attenuation BaseData divided by a copy of the measured
+transmission converted to dimensionless units. Nominal residuals, masks,
+component names and sample-mu uncertainties match at `rtol=1e-12`. The first
+active transmission component is **1.1908702976776804** in the current
+implementation and **0.011908702976776804** in the candidate: a factor of 100.
+The current manual formula converts the nominal transmission through
+`scalar_in_units` but uses the source uncertainty array without converting it
+from percent. The candidate converts both nominal and sigma consistently.
+This case has no global-only operand, so it cannot be explained by folding.
+
+Per Part 2's explicit **any other difference means STOP** instruction, no
+Commit B arithmetic changes, capillary reclassification/comment or kernel
+moves were applied. R16 was not changed. The percent-unit finding is recorded
+here for a separate scientific decision; this refactor does not correct it.
+No R08 performance before/after comparison was run on this resumed attempt,
+since no R08 implementation was applied; the earlier timing table remains
+explicitly limited to the completed helper refactor.
+
 **Review log.**
 
 - **Classification (2026-10-31): approved, with scope decisions.** Commit
@@ -2504,6 +2532,14 @@ operations, indexing and conversions are unchanged.
 - R17 is a separate uncertainty-restoration fix. Subsequent R08 comparisons
   use the corrected R17 baseline rather than blessing any module-level change
   in published uncertainty.
+
+Final R17 validation: tox `py312` **1445 passed, 3 skipped**, 2 subtests
+passed; `lint` and `docs` passed, including regenerated reference freshness and
+warning-as-error Sphinx. Skips remain RSS opt-in and the two optional Tiled
+integration tests. The resumed R08 guard found a separate percent-transmission
+uncertainty conversion difference, documented in R08 above; implementation
+stopped before Commit B and kernel moves. No additional source changes were
+made after the R17 commit.
 
 **Review log.** _(reviewer)_
 
