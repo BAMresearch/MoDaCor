@@ -217,3 +217,34 @@ def test_concatenate_dependency_contract_is_exact():
         },
         processing_writes={"pooled.*"},
     )
+
+
+def test_concatenate_rejects_axis_not_in_data_keys():
+    bundle = _bundle([10, 20], [1, 2], ureg.Unit("1/nm"), [1, 1])
+    step = ConcatenateDatabundles(io_sources=IoSources())
+    step.modify_config_by_kwargs(with_processing_keys=["sample"], data_keys=["signal"])
+
+    with pytest.raises(ValueError, match="cannot preserve 'signal' axes because .*not included in data_keys"):
+        step.execute(ProcessingData(sample=bundle))
+
+
+def test_concatenate_rejects_axis_with_multiple_configured_names():
+    bundle = _bundle([10, 20], [1, 2], ureg.Unit("1/nm"), [1, 1])
+    bundle["Q_alias"] = bundle["Q"]
+    step = ConcatenateDatabundles(io_sources=IoSources())
+    step.modify_config_by_kwargs(with_processing_keys=["sample"], data_keys=["signal", "Q", "Q_alias"])
+
+    with pytest.raises(ValueError, match="uniquely named"):
+        step.execute(ProcessingData(sample=bundle))
+
+
+def test_concatenate_ignores_axis_alias_outside_data_keys():
+    bundle = _bundle([10, 20], [1, 2], ureg.Unit("1/nm"), [1, 1])
+    bundle["Q_alias"] = bundle["Q"]
+    step = ConcatenateDatabundles(io_sources=IoSources())
+    step.modify_config_by_kwargs(with_processing_keys=["sample"], data_keys=["signal", "Q"])
+    data = ProcessingData(sample=bundle)
+
+    step.execute(data)
+
+    assert data["concatenated"]["signal"].axes == [data["concatenated"]["Q"]]

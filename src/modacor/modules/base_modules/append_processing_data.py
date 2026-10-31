@@ -362,7 +362,7 @@ class AppendProcessingData(ProcessStep):
         output: dict[str, DataBundle] = {processing_key: databundle}
 
         logger.info(
-            f"AppendProcessingData: DataBundle '{processing_key}' now contains datasets {list(databundle.keys())}.",
+            f"AppendProcessingData: stored '{databundle_output_key}' in DataBundle '{processing_key}'.",
         )
 
         return output

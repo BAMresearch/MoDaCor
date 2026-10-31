@@ -130,10 +130,15 @@ class ConcatenateDatabundles(ProcessStep):
         )
 
     @staticmethod
-    def _axis_key(bundle: DataBundle, axis: BaseData | None) -> str | None:
+    def _axis_key(bundle: DataBundle, axis: BaseData | None, data_keys: list[str], data_key: str) -> str | None:
         if axis is None:
             return None
-        matches = [key for key, value in bundle.items() if value is axis]
+        matches = [key for key in data_keys if bundle[key] is axis]
+        if not matches:
+            raise ValueError(
+                f"ConcatenateDatabundles cannot preserve {data_key!r} axes because "
+                "an axis is not included in data_keys."
+            )
         if len(matches) != 1:
             raise ValueError(
                 "ConcatenateDatabundles can preserve axes only when each axis is a uniquely named "
@@ -222,7 +227,7 @@ class ConcatenateDatabundles(ProcessStep):
             signals: list[np.ndarray] = []
             weights: list[np.ndarray] = []
             uncertainties: dict[str, list[np.ndarray]] = {name: [] for name in output_uncertainties}
-            axis_key_map[data_key] = [self._axis_key(bundles[0], axis) for axis in reference.axes]
+            axis_key_map[data_key] = [self._axis_key(bundles[0], axis, data_keys, data_key) for axis in reference.axes]
 
             for processing_key, bundle, length in zip(processing_keys, bundles, lengths, strict=True):
                 current = bundle[data_key].copy(with_axes=False)
@@ -237,7 +242,9 @@ class ConcatenateDatabundles(ProcessStep):
                         f"{data_key!r}; {processing_key!r} has {sorted(current.uncertainties)!r}, "
                         f"expected {sorted(reference_uncertainties)!r}."
                     )
-                current_axis_keys = [self._axis_key(bundle, axis) for axis in bundle[data_key].axes]
+                current_axis_keys = [
+                    self._axis_key(bundle, axis, data_keys, data_key) for axis in bundle[data_key].axes
+                ]
                 if current_axis_keys != axis_key_map[data_key]:
                     raise ValueError(f"ConcatenateDatabundles axis references differ for data key {data_key!r}.")
                 signals.append(np.asarray(current.signal))
@@ -282,12 +289,6 @@ class ConcatenateDatabundles(ProcessStep):
                 output[data_key] = basedata.indexed(order, rank_of_data=1)
 
         for data_key, axis_keys in axis_key_map.items():
-            missing_axis_keys = [key for key in axis_keys if key is not None and key not in output]
-            if missing_axis_keys:
-                raise ValueError(
-                    f"ConcatenateDatabundles cannot preserve {data_key!r} axes because "
-                    f"{missing_axis_keys!r} are not included in data_keys."
-                )
             output[data_key].axes = [output[key] if key is not None else None for key in axis_keys]
 
         output.default_plot = bundles[0].default_plot if bundles[0].default_plot in output else None
