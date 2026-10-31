@@ -90,7 +90,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R04 | Derive capillary sample μ through `BaseData` | contract | S | medium | done |
 | R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | done |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | done |
-| R07 | Declarative fixed-key dependencies; retire most `dependency_contract()` overrides | design | M–L | high | decision needed |
+| R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | in progress |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | open |
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | open |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | open |
@@ -1258,62 +1258,169 @@ maintainer's decisions:
 
 ---
 
-## R07 — Declarative fixed-key dependencies
+## R07 — Declarative data-key dependencies, verified against behaviour
 
-**Status:** decision needed (maintainer)
+**Status:** approved (A′); R07a in progress. The recommendation was revised on
+2026-10-31 after checking the modules that derive data keys from configuration.
 
-**Problem.** 35 of the 40 exported steps override `dependency_contract()`; only
-6 use `dependency_role`. The reason is structural, not neglect. A
-`dependency_role` attaches to a configuration value, but most steps read and
-write fixed `BaseData` keys: `"signal"` (hard-coded in 27 steps), `"Omega"`,
-mask keys, and so on. The schema has no way to declare those, so each step
-writes a near-identical override. `Multiply` and `SolidAngleCorrection` are
-typical examples. Every override is a hand-maintained duplicate that can drift
-from `calculate()`.
+**Problem.** 35 of the 41 exported steps override `dependency_contract()`; only
+6 use `dependency_role`. Each override restates by hand which data keys
+`calculate()` touches, and nothing checks that the two agree.
 
-**Options.**
+**What the contract is used for.** Only `server/execution.find_dirty_step_ids`
+reads it. A step is a seed for a partial rerun when a changed source matches
+its `source_refs`, or a changed key matches `processing_reads |
+processing_writes`. Every step downstream of a seed in the pipeline graph is
+rerun regardless of its contract. Two consequences:
 
-- **A. Recommended:** declare fixed keys in the schema. Add explicit
-  `ProcessStepDescriber` fields, for example
-  `fixed_processing_reads: list[str]` and `fixed_processing_writes: list[str]`.
-  The default `dependency_contract()` expands them against
-  `with_processing_keys`, combined with any `dependency_role` keys and the
-  existing source-ref extraction. Keep these fields separate from `modifies`
-  and `required_data_keys`, which `AGENTS.md` says must not be confused with
-  the runtime contract. Steps with genuinely irregular relationships (sinks,
-  cross-bundle steps, `output_processing_key` remapping) keep their overrides.
-- **B.** Make `signal_key` configurable in every step and use roles. This is
-  more flexible, but it changes the public configuration surface of 27 steps,
-  for little demonstrated user need.
-- **C.** Keep the overrides, and add a test that each contract matches what
-  `calculate()` actually touches. This is the cheapest option but leaves the
-  boilerplate.
+- Reads and writes are combined at runtime. The distinction between them is
+  documentation for now.
+- Declaring too much costs an unnecessary rerun. Declaring too little gives
+  stale results. A contract that covers everything the step touches matters
+  more than one that is exactly tight.
 
-**Approach (option A, once approved).**
+### Findings (2026-10-31)
 
-1. **Safety net first.** Add a snapshot test that records the current
-   `dependency_contract()` of every exported step for one or two representative
-   configurations each. This defines the behavior to preserve.
-2. Add the describer fields, the default-contract expansion, documentation in
-   the module author guide (dependency section), and unit tests in
-   `tests/dataclasses/`.
-3. Migrate steps in small batches: base arithmetic, then masks, then scattering
-   corrections. Delete each override whose contract the schema now reproduces
-   exactly. The snapshot must stay identical; any intentional difference is
-   listed and justified.
-4. Update the `module-author-guide.md` and correction-module-template guidance.
+1. **The current overrides are accurate.** A prototype recorded every
+   `DataBundle` access made during each step execution across the full test
+   suite (1155 tests). It then compared each access with that step's contract.
+   No step touched a key outside its contract. The only flags were `update()`
+   writes of declared keys and re-storing the same bundle object. This covers
+   only the configurations the tests exercise. R07 is about maintainability and
+   keeping the contracts correct, not about a live bug.
+2. **No data key depends on data content.** Every key that is not written
+   literally in the code is a fixed function of the configuration:
+   - **Diagnostic names built from a prefix:** `FindCenterOfMass1D` and
+     `FindScaleFactor1D` (`{diagnostic_prefix}_…`).
+   - **Fixed diagnostic sets:** `IndexedAverager` (`bin_count`,
+     `sum_weights`, …).
+   - **Keys taken from a mapping:** `CopyDataBundleKeys.key_map` and
+     `UnitsLabelUpdate.update_pairs`.
+   - **Output written to another bundle:** `Integrate1D.output_processing_keys`,
+     `IndexedAverager` and `ConcatenateDatabundles`.
+   - **Conditional keys:** `AngleToQ` reads `center_key` only when `angle_zero`
+     is unset; `FindScaleFactor1D` writes `background_output_key` only when
+     `fit_background` is set.
 
-**Acceptance criteria.**
+   A contract can therefore always be computed from configuration before the
+   step runs. However, a purely declarative scheme cannot cover all of these
+   cases without becoming a small configuration language of its own.
+3. **The 35 overrides fall into six groups.**
 
-- The snapshot test passes unchanged, apart from listed and justified
-  differences.
-- The number of remaining overrides is recorded, each with a one-line reason
-  (target: at most 12).
-- Docs and template updated; reference pages regenerated.
+   | Group | Steps | Declarative? |
+   | --- | --- | --- |
+   | (a) only configurable keys | `DilateMask`, `ReduceMask`, `Negate` | yes, with existing roles |
+   | (b) fixed `signal` / `Omega` plus configurable keys | `Multiply`, `Divide`, `Subtract`, `PoissonUncertainties`, `SolidAngleCorrection`, `ReduceDimensionality`, `AttenuatorPlateCorrection`, `DetectorEfficiencyCorrection`, `FlatPlateSelfAbsorptionCorrection`, `PolarizationCorrection`, `CapillarySelfAbsorptionCorrection` | yes, with a fixed-key declaration |
+   | (b′) keys given as a mapping | `UnitsLabelUpdate` | yes, if roles accept mapping keys |
+   | (c) regular keys plus derived extras | `AngleToQ`, `FindCenterOfMass1D`, `PixelCoordinates3D`, `XSGeometryFromPixelCoordinates` | partly: roles for the regular keys, a short extension override for the rest |
+   | (d) several bundles with different roles | `DivideDatabundles`, `MultiplyDatabundles`, `SubtractDatabundles`, `FindScaleFactor1D`, `SubtractInterpolated1D`, `CopyDataBundleKeys`, `CapillarySampleContainerCorrection`, `ConcatenateDatabundles`, `IndexedAverager`, `Integrate1D` | no; would need a per-role bundle selector |
+   | (e) I/O and path-addressed | `AppendProcessingData`, `AppendSource`, `AppendSink`, `SinkProcessingData`, `Plot1DVisualization`, `Plot2DVisualization` | no |
 
-This item should get its own branch and pull request.
+4. **The fixed keys are already listed twice.** The describer's
+   `required_data_keys` and `modifies` already name `signal`, `Omega` and the
+   defaults of configurable keys. Only `scripts/generate_module_doc.py` reads
+   them. A new fixed-key field would be a third list unless the docs are
+   checked against it.
+5. **`output_processing_key` is accepted by every step but honoured by two.**
+   It is a base-schema key in `ProcessStep.CONFIG_KEYS`. Only
+   `ConcatenateDatabundles` and `IndexedAverager` use it; `Integrate1D` has its
+   own `output_processing_keys`. The other 39 steps accept it and silently
+   ignore it. The base default contract also has a branch for
+   `processing_key` / `databundle_output_key`, which belong to
+   `AppendProcessingData`; no exported step reaches that branch. The
+   MoDaCor-examples pipelines and the local experiment pipelines pass
+   `output_processing_key` only to the two steps that honour it.
 
-**Decision.** _(maintainer)_
+### Options
+
+- **A′ (recommended).** Declare the regular part, extend explicitly for the
+  rest, and verify every contract against behaviour.
+  1. Add one describer field, `fixed_data_keys: dict[str, str]`, for example
+     `{"signal": "read_write", "Omega": "read"}`. Values are `read`, `write` or
+     `read_write` and are validated. The default contract expands these keys
+     over `with_processing_keys`, together with the existing
+     `dependency_role` keys and source-ref extraction.
+  2. A `dependency_role` argument whose value is a mapping contributes the
+     mapping's keys (needed for `UnitsLabelUpdate`).
+  3. Group (c) steps declare their regular keys and override only to add the
+     extras: `super().dependency_contract()` plus additions. `AngleToQ` and
+     `PixelCoordinates3D` already follow this pattern.
+  4. Groups (d) and (e) keep explicit overrides. They are genuinely irregular,
+     and plain Python is clearer than a selector syntax.
+  5. A permanent **access-trace test**, a robust version of the prototype
+     above. While the test suite runs, every step execution records the data
+     keys it touches and fails if they are not covered by its contract. This
+     guards hand-written and declarative contracts alike, including the steps
+     with derived keys, and addresses the drift risk that motivated R07.
+  6. A docs consistency test: `required_data_keys` and `modifies` must agree
+     with the declared fixed keys and the role defaults. This keeps the
+     existing documentation lists without a larger describer redesign.
+  7. Move `output_processing_key` into the two steps that honour it, and
+     remove the dead branch from the base contract.
+
+  **Result:** 21 of 41 steps need no override (6 today plus 15 migrated). Four
+  keep a short extension override and 16 keep an explicit one. The trace test
+  checks all of them. The earlier target of at most 12 overrides was too
+  optimistic.
+- **A (original).** Fixed-key lists only. It migrates the same 15 steps, but
+  leaves the 20 remaining overrides unchecked and adds a third, unchecked list
+  of keys.
+- **B.** Add a configurable `signal_key` to every step and use roles only.
+  This gives the most uniform mechanism, but adds about 11 public arguments
+  that nobody has asked for, and invites applying corrections to keys other
+  than the intensity.
+- **C.** Keep all overrides and add only the trace test. This is the cheapest
+  option and removes the drift risk, but keeps the boilerplate.
+- **Not recommended:** a bundle-selector syntax inside roles, such as
+  `with_processing_keys[0]`, to absorb group (d). It would remove about ten
+  overrides, but every module author would have to learn a small language.
+
+### Approach (A′, once approved)
+
+One branch and one pull request, with one commit per sub-step.
+
+1. **R07a: safety nets.**
+   - A temporary contract snapshot covering every exported step with one or
+     two representative configurations. It proves that the migration
+     preserves contracts exactly.
+   - The access-trace test, as a session-level fixture or a plugin module
+     under `tests/`. It counts `update()` keys as writes, treats a newly
+     inserted bundle as writes of its keys, and ignores re-storing the same
+     bundle. A violation fails the test in which it happens. It must pass on
+     the current code with no allow-list.
+2. **R07b: mechanism.** Add the `fixed_data_keys` field with validation,
+   mapping-valued roles, and the default-contract expansion. Remove the dead
+   `AppendProcessingData` branch. Add unit tests in `tests/dataclasses/`.
+3. **R07c: migrate** groups (a), (b) and (b′) in small batches, and reduce
+   group (c) to extension overrides. The snapshot must stay identical; any
+   difference is listed and justified.
+4. **R07d: `output_processing_key`.** Move it from the base schema into
+   `ConcatenateDatabundles` and `IndexedAverager`. Add an entry to
+   `docs/processing/interface-migrations.md`; this is a minor release under the
+   versioning policy.
+5. **R07e: docs.**
+   - Add the consistency test for `required_data_keys` and `modifies`.
+   - Have the reference-page generator render the declared dependencies.
+   - Update the dependency section of the module author guide and the
+     correction-module template.
+   - Regenerate the reference pages.
+   - Remove the snapshot test, which is no longer needed once the trace test
+     and the focused contract tests remain.
+
+### Acceptance criteria
+
+- The trace test passes on the whole suite with no allow-list.
+- The snapshot is identical before and after migration, apart from listed and
+  justified differences.
+- Every remaining override is listed with a one-line reason (expected: 4
+  extensions and 16 explicit overrides).
+- Steps that do not honour `output_processing_key` reject it, and the
+  migration note says so.
+- The module author guide, the template and the reference pages are updated.
+
+**Decision.** 2026-10-31: option A′ approved, including R07d (moving
+`output_processing_key` into the two steps that honour it). The work goes on
+branch `quality-remediation-r07`, which also carries the R06 commits.
 
 **Implementation notes.** _(implementer)_
 
