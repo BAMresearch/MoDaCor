@@ -40,6 +40,11 @@ Roles: **implementer** (Codex/GPT, relayed by the maintainer) and **reviewer**
    runs the focused tests, and records the verdict in the **Review log**:
    `done`, or `changes requested` with a numbered list.
 5. When all items are `done` or `deferred`, move this note to `completed/`.
+6. Before a branch goes to a pull request, the reviewer runs the CI test
+   environment (`tox -e py312`), not only `.venv-dev`. Added 2026-10-31 after
+   PR #148 failed in CI: `.venv-dev` has optional extras (xraylib) and a
+   different numpy build, which hid an unguarded optional import and an exact
+   float comparison.
 
 Status values: `open`, `ready`, `in progress`, `in review`,
 `changes requested`, `done`, `deferred`, `decision needed`.
@@ -90,6 +95,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | open |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | open |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
+| R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | open |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -1434,6 +1440,32 @@ Move one service per commit, with no logic edits in the same commit.
 - No public method signature changes on `RuntimeService`.
 
 This item should get its own branch and pull request.
+
+**Implementation notes.** _(implementer)_
+
+**Review log.** _(reviewer)_
+
+---
+
+## R13 — CI never exercises the xraylib (attenuation) path
+
+**Status:** open
+
+**Problem.** `xraylib` is the optional `attenuation` extra and is not
+installed by any tox environment. Tests that need it are now skipped with
+`pytest.importorskip` (fix `c28341e`, PR #148), so in CI the
+`chemical_formula` resolution through `xraylib.CS_Total_CP` is never
+exercised: `Si` resolves, `Sii` is rejected, and NIST names are accepted
+(R01b). Only developer environments that happen to have xraylib run it.
+
+**Approach.** Add the `attenuation` extra to one CI test environment. Either
+add it to the `py312` env's `extras`, or create a small dedicated tox env
+that runs `tests/modules/technique_modules/scattering/test_material_attenuation_corrections.py`.
+First confirm that xraylib installs from PyPI wheels on the CI runner (Linux,
+Python 3.12–3.14); if it does not, document that and keep the skip.
+
+**Acceptance criteria.** In at least one CI job, the xraylib tests run rather
+than skip; this is visible in the job log.
 
 **Implementation notes.** _(implementer)_
 
