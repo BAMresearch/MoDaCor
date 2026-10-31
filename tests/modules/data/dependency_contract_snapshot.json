@@ -1,0 +1,1157 @@
+{
+  "AngleToQ[configured]": {
+    "processing_reads": [
+      "background.theta",
+      "sample.theta"
+    ],
+    "processing_writes": [
+      "background.q",
+      "sample.q"
+    ],
+    "source_refs": [
+      "photon_source",
+      "photon_uncertainties_sources",
+      "photon_units_source"
+    ]
+  },
+  "AngleToQ[default_keys]": {
+    "processing_reads": [
+      "background.angle",
+      "background.beam_center",
+      "sample.angle",
+      "sample.beam_center"
+    ],
+    "processing_writes": [
+      "background.Q",
+      "sample.Q"
+    ],
+    "source_refs": []
+  },
+  "AppendProcessingData[configured]": {
+    "processing_reads": [],
+    "processing_writes": [
+      "background.counts"
+    ],
+    "source_refs": [
+      "data",
+      "errors",
+      "units",
+      "weights"
+    ]
+  },
+  "AppendProcessingData[default_keys]": {
+    "processing_reads": [],
+    "processing_writes": [
+      "sample.signal"
+    ],
+    "source_refs": [
+      "data"
+    ]
+  },
+  "AppendSink[configured]": {
+    "processing_reads": [],
+    "processing_writes": [],
+    "source_refs": []
+  },
+  "AppendSink[default_keys]": {
+    "processing_reads": [],
+    "processing_writes": [],
+    "source_refs": []
+  },
+  "AppendSource[configured]": {
+    "processing_reads": [],
+    "processing_writes": [],
+    "source_refs": [
+      "calibration"
+    ]
+  },
+  "AppendSource[default_keys]": {
+    "processing_reads": [],
+    "processing_writes": [],
+    "source_refs": []
+  },
+  "ApplyMask[configured]": {
+    "processing_reads": [
+      "background.Q",
+      "background.bad_pixels",
+      "background.signal",
+      "sample.Q",
+      "sample.bad_pixels",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.Q",
+      "background.signal",
+      "sample.Q",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "ApplyMask[default_keys]": {
+    "processing_reads": [
+      "background.mask",
+      "background.signal",
+      "sample.mask",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "AttenuatorPlateCorrection[configured]": {
+    "processing_reads": [
+      "background.CosAlpha",
+      "background.signal",
+      "sample.CosAlpha",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.attenuator_transmission",
+      "background.signal",
+      "sample.attenuator_transmission",
+      "sample.signal"
+    ],
+    "source_refs": [
+      "beam_energy_source",
+      "beam_energy_units_source",
+      "chemical_formula_source",
+      "density_source",
+      "density_units_source",
+      "linear_attenuation_coefficient_source",
+      "linear_attenuation_coefficient_units_source",
+      "thickness_source",
+      "thickness_units_source",
+      "wavelength_source",
+      "wavelength_units_source"
+    ]
+  },
+  "AttenuatorPlateCorrection[default_keys]": {
+    "processing_reads": [
+      "background.CosAlpha",
+      "background.signal",
+      "sample.CosAlpha",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.attenuator_transmission",
+      "background.signal",
+      "sample.attenuator_transmission",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "BitwiseOrMasks[configured]": {
+    "processing_reads": [
+      "background.bad",
+      "background.combined",
+      "background.saturated",
+      "sample.bad",
+      "sample.combined",
+      "sample.saturated"
+    ],
+    "processing_writes": [
+      "background.combined",
+      "sample.combined"
+    ],
+    "source_refs": []
+  },
+  "BitwiseOrMasks[default_keys]": {
+    "processing_reads": [
+      "background.mask",
+      "sample.mask"
+    ],
+    "processing_writes": [
+      "background.mask",
+      "sample.mask"
+    ],
+    "source_refs": []
+  },
+  "CapillarySampleContainerCorrection[configured]": {
+    "processing_reads": [
+      "background.empty_mask",
+      "background.signal",
+      "sample.bad_pixels",
+      "sample.coord_x",
+      "sample.coord_y",
+      "sample.coord_z",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "sample.bad_pixels",
+      "sample.capillary_beam_profile_retained_fraction",
+      "sample.capillary_effective_sample_mu",
+      "sample.capillary_empty_calculated_transmission",
+      "sample.capillary_filled_calculated_transmission",
+      "sample.capillary_sample_attenuation",
+      "sample.capillary_sample_attenuation_evaluated",
+      "sample.capillary_wall_attenuation_empty",
+      "sample.capillary_wall_attenuation_filled",
+      "sample.capillary_wall_empty_attenuation_evaluated",
+      "sample.capillary_wall_filled_attenuation_evaluated",
+      "sample.capillary_wall_subtraction_scale",
+      "sample.signal"
+    ],
+    "source_refs": [
+      "empty_centre_mu_source",
+      "empty_centre_mu_units_source",
+      "sample_mu_source",
+      "sample_mu_uncertainties_sources",
+      "sample_mu_units_source",
+      "sample_phase_absorption_source",
+      "sample_phase_absorption_uncertainties_sources",
+      "sample_phase_absorption_units_source",
+      "sample_phase_thickness_source",
+      "sample_phase_thickness_uncertainties_sources",
+      "sample_phase_thickness_units_source",
+      "sample_phase_transmission_source",
+      "sample_phase_transmission_uncertainties_sources",
+      "sample_phase_transmission_units_source",
+      "sample_radius_source",
+      "sample_radius_units_source",
+      "wall_mu_source",
+      "wall_mu_units_source",
+      "wall_thickness_source",
+      "wall_thickness_units_source"
+    ]
+  },
+  "CapillarySampleContainerCorrection[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.coord_x",
+      "sample.coord_y",
+      "sample.coord_z",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "sample.capillary_beam_profile_retained_fraction",
+      "sample.capillary_effective_sample_mu",
+      "sample.capillary_empty_calculated_transmission",
+      "sample.capillary_filled_calculated_transmission",
+      "sample.capillary_sample_attenuation",
+      "sample.capillary_sample_attenuation_evaluated",
+      "sample.capillary_wall_attenuation_empty",
+      "sample.capillary_wall_attenuation_filled",
+      "sample.capillary_wall_empty_attenuation_evaluated",
+      "sample.capillary_wall_filled_attenuation_evaluated",
+      "sample.capillary_wall_subtraction_scale",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "CapillarySelfAbsorptionCorrection[configured]": {
+    "processing_reads": [
+      "background.bad_pixels",
+      "background.coord_x",
+      "background.coord_y",
+      "background.coord_z",
+      "background.signal",
+      "sample.bad_pixels",
+      "sample.coord_x",
+      "sample.coord_y",
+      "sample.coord_z",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.capillary_attenuation_evaluated",
+      "background.capillary_beam_profile_retained_fraction",
+      "background.capillary_calculated_transmission",
+      "background.capillary_effective_sample_mu",
+      "background.capillary_sample_attenuation",
+      "background.capillary_self_absorption",
+      "background.signal",
+      "sample.capillary_attenuation_evaluated",
+      "sample.capillary_beam_profile_retained_fraction",
+      "sample.capillary_calculated_transmission",
+      "sample.capillary_effective_sample_mu",
+      "sample.capillary_sample_attenuation",
+      "sample.capillary_self_absorption",
+      "sample.signal"
+    ],
+    "source_refs": [
+      "sample_mu_source",
+      "sample_mu_uncertainties_sources",
+      "sample_mu_units_source",
+      "sample_phase_absorption_source",
+      "sample_phase_absorption_uncertainties_sources",
+      "sample_phase_absorption_units_source",
+      "sample_phase_thickness_source",
+      "sample_phase_thickness_uncertainties_sources",
+      "sample_phase_thickness_units_source",
+      "sample_phase_transmission_source",
+      "sample_phase_transmission_uncertainties_sources",
+      "sample_phase_transmission_units_source",
+      "sample_radius_source",
+      "sample_radius_units_source",
+      "transmission_source",
+      "transmission_uncertainties_sources",
+      "transmission_units_source",
+      "wall_mu_source",
+      "wall_mu_units_source",
+      "wall_thickness_source",
+      "wall_thickness_units_source"
+    ]
+  },
+  "CapillarySelfAbsorptionCorrection[default_keys]": {
+    "processing_reads": [
+      "background.coord_x",
+      "background.coord_y",
+      "background.coord_z",
+      "background.signal",
+      "sample.coord_x",
+      "sample.coord_y",
+      "sample.coord_z",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.capillary_attenuation_evaluated",
+      "background.capillary_beam_profile_retained_fraction",
+      "background.capillary_calculated_transmission",
+      "background.capillary_effective_sample_mu",
+      "background.capillary_sample_attenuation",
+      "background.capillary_self_absorption",
+      "background.signal",
+      "sample.capillary_attenuation_evaluated",
+      "sample.capillary_beam_profile_retained_fraction",
+      "sample.capillary_calculated_transmission",
+      "sample.capillary_effective_sample_mu",
+      "sample.capillary_sample_attenuation",
+      "sample.capillary_self_absorption",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "CombineUncertaintiesMax[configured]": {
+    "processing_reads": [
+      "background.counts",
+      "sample.counts"
+    ],
+    "processing_writes": [
+      "background.counts",
+      "sample.counts"
+    ],
+    "source_refs": []
+  },
+  "CombineUncertaintiesMax[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "CombineUncertainties[configured]": {
+    "processing_reads": [
+      "background.counts",
+      "sample.counts"
+    ],
+    "processing_writes": [
+      "background.counts",
+      "sample.counts"
+    ],
+    "source_refs": []
+  },
+  "CombineUncertainties[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "ConcatenateDatabundles[configured]": {
+    "processing_reads": [
+      "background.counts",
+      "background.q",
+      "sample.counts",
+      "sample.q"
+    ],
+    "processing_writes": [
+      "merged.*"
+    ],
+    "source_refs": []
+  },
+  "ConcatenateDatabundles[default_keys]": {
+    "processing_reads": [
+      "background.Q",
+      "background.signal",
+      "sample.Q",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "None.*"
+    ],
+    "source_refs": []
+  },
+  "CopyDataBundleKeys[configured]": {
+    "processing_reads": [
+      "background.Q",
+      "background.signal"
+    ],
+    "processing_writes": [
+      "sample.copied_q",
+      "sample.copied_signal"
+    ],
+    "source_refs": []
+  },
+  "CopyDataBundleKeys[default_keys]": {
+    "processing_reads": [
+      "background.Q",
+      "background.signal"
+    ],
+    "processing_writes": [
+      "sample.Q",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "DetectorEfficiencyCorrection[configured]": {
+    "processing_reads": [
+      "background.CosAlpha",
+      "background.signal",
+      "sample.CosAlpha",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.detector_efficiency",
+      "background.signal",
+      "sample.detector_efficiency",
+      "sample.signal"
+    ],
+    "source_refs": [
+      "beam_energy_source",
+      "beam_energy_units_source",
+      "chemical_formula_source",
+      "density_source",
+      "density_units_source",
+      "linear_attenuation_coefficient_source",
+      "linear_attenuation_coefficient_units_source",
+      "thickness_source",
+      "thickness_units_source",
+      "wavelength_source",
+      "wavelength_units_source"
+    ]
+  },
+  "DetectorEfficiencyCorrection[default_keys]": {
+    "processing_reads": [
+      "background.CosAlpha",
+      "background.signal",
+      "sample.CosAlpha",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.detector_efficiency",
+      "background.signal",
+      "sample.detector_efficiency",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "DilateMask[configured]": {
+    "processing_reads": [
+      "background.bad",
+      "sample.bad"
+    ],
+    "processing_writes": [
+      "background.dilated",
+      "sample.dilated"
+    ],
+    "source_refs": []
+  },
+  "DilateMask[default_keys]": {
+    "processing_reads": [
+      "background.mask",
+      "sample.mask"
+    ],
+    "processing_writes": [
+      "background.mask",
+      "sample.mask"
+    ],
+    "source_refs": []
+  },
+  "DivideDatabundles[configured]": {
+    "processing_reads": [
+      "background.normalizer",
+      "sample.counts"
+    ],
+    "processing_writes": [
+      "sample.counts"
+    ],
+    "source_refs": []
+  },
+  "DivideDatabundles[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "Divide[configured]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": [
+      "divisor_source",
+      "divisor_uncertainties_sources",
+      "divisor_units_source"
+    ]
+  },
+  "Divide[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "FindCenterOfMass1D[configured]": {
+    "processing_reads": [
+      "background.bad_pixels",
+      "background.signal",
+      "background.yaw",
+      "sample.bad_pixels",
+      "sample.signal",
+      "sample.yaw"
+    ],
+    "processing_writes": [
+      "background.beam_center",
+      "background.custom_center_converged",
+      "background.custom_center_count",
+      "background.custom_center_window_max",
+      "background.custom_center_window_min",
+      "sample.beam_center",
+      "sample.custom_center_converged",
+      "sample.custom_center_count",
+      "sample.custom_center_window_max",
+      "sample.custom_center_window_min"
+    ],
+    "source_refs": []
+  },
+  "FindCenterOfMass1D[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "background.yaw",
+      "sample.signal",
+      "sample.yaw"
+    ],
+    "processing_writes": [
+      "background.beam_center",
+      "background.centroid_converged",
+      "background.centroid_count",
+      "background.centroid_window_max",
+      "background.centroid_window_min",
+      "sample.beam_center",
+      "sample.centroid_converged",
+      "sample.centroid_count",
+      "sample.centroid_window_max",
+      "sample.centroid_window_min"
+    ],
+    "source_refs": []
+  },
+  "FindScaleFactor1D[configured]": {
+    "processing_reads": [
+      "background.Q",
+      "background.signal",
+      "sample.Q",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "sample.fit_point_count",
+      "sample.fit_reduced_chi_square",
+      "sample.fit_x_max",
+      "sample.fit_x_min",
+      "sample.scale_background",
+      "sample.scale_factor"
+    ],
+    "source_refs": []
+  },
+  "FindScaleFactor1D[default_keys]": {
+    "processing_reads": [
+      "background.Q",
+      "background.signal",
+      "sample.Q",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "sample.scale_factor"
+    ],
+    "source_refs": []
+  },
+  "FlatPlateSelfAbsorptionCorrection[configured]": {
+    "processing_reads": [
+      "background.CosAlpha",
+      "background.signal",
+      "sample.CosAlpha",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.flat_plate_self_absorption",
+      "background.signal",
+      "sample.flat_plate_self_absorption",
+      "sample.signal"
+    ],
+    "source_refs": [
+      "transmission_source",
+      "transmission_uncertainties_sources",
+      "transmission_units_source"
+    ]
+  },
+  "FlatPlateSelfAbsorptionCorrection[default_keys]": {
+    "processing_reads": [
+      "background.CosAlpha",
+      "background.signal",
+      "sample.CosAlpha",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.flat_plate_self_absorption",
+      "background.signal",
+      "sample.flat_plate_self_absorption",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "IndexByCoordinate[configured]": {
+    "processing_reads": [
+      "background.angle",
+      "sample.angle"
+    ],
+    "processing_writes": [
+      "background.edges",
+      "background.index",
+      "sample.edges",
+      "sample.index"
+    ],
+    "source_refs": []
+  },
+  "IndexByCoordinate[default_keys]": {
+    "processing_reads": [
+      "background.Q",
+      "sample.Q"
+    ],
+    "processing_writes": [
+      "background.bin_edges",
+      "background.bin_index",
+      "sample.bin_edges",
+      "sample.bin_index"
+    ],
+    "source_refs": []
+  },
+  "IndexedAverager[configured]": {
+    "processing_reads": [
+      "sample.bad_pixels",
+      "sample.bin_index",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "averaged.*"
+    ],
+    "source_refs": []
+  },
+  "IndexedAverager[default_keys]": {
+    "processing_reads": [
+      "background.Q",
+      "background.bin_index",
+      "background.signal",
+      "sample.Q",
+      "sample.bin_index",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.Q",
+      "background.bin_count",
+      "background.bin_id",
+      "background.effective_sample_size",
+      "background.positive_weight_count",
+      "background.signal",
+      "background.sum_weights",
+      "sample.Q",
+      "sample.bin_count",
+      "sample.bin_id",
+      "sample.effective_sample_size",
+      "sample.positive_weight_count",
+      "sample.signal",
+      "sample.sum_weights"
+    ],
+    "source_refs": []
+  },
+  "Integrate1D[configured]": {
+    "processing_reads": [
+      "background.bad_pixels",
+      "background.q",
+      "background.signal",
+      "sample.bad_pixels",
+      "sample.q",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background_integral.*",
+      "sample_integral.*"
+    ],
+    "source_refs": []
+  },
+  "Integrate1D[default_keys]": {
+    "processing_reads": [
+      "background.q",
+      "background.signal",
+      "sample.q",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.integral",
+      "sample.integral"
+    ],
+    "source_refs": []
+  },
+  "MultiplyDatabundles[configured]": {
+    "processing_reads": [
+      "background.normalizer",
+      "sample.counts"
+    ],
+    "processing_writes": [
+      "sample.counts"
+    ],
+    "source_refs": []
+  },
+  "MultiplyDatabundles[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "Multiply[configured]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": [
+      "multiplier_source",
+      "multiplier_uncertainties_sources",
+      "multiplier_units_source"
+    ]
+  },
+  "Multiply[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "Negate[configured]": {
+    "processing_reads": [
+      "background.counts",
+      "sample.counts"
+    ],
+    "processing_writes": [
+      "background.counts",
+      "sample.counts"
+    ],
+    "source_refs": []
+  },
+  "Negate[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "PixelCoordinates3D[configured]": {
+    "processing_reads": [
+      "background.*",
+      "sample.*"
+    ],
+    "processing_writes": [
+      "background.*",
+      "sample.*"
+    ],
+    "source_refs": [
+      "det_coord_x_source",
+      "det_coord_x_uncertainties_sources",
+      "det_coord_x_units_source",
+      "det_coord_y_source",
+      "det_coord_y_uncertainties_sources",
+      "det_coord_y_units_source",
+      "det_coord_z_source",
+      "det_coord_z_uncertainties_sources",
+      "det_coord_z_units_source",
+      "geometry",
+      "pixel_pitch_fast_source",
+      "pixel_pitch_fast_uncertainties_sources",
+      "pixel_pitch_fast_units_source",
+      "pixel_pitch_slow_source",
+      "pixel_pitch_slow_uncertainties_sources",
+      "pixel_pitch_slow_units_source"
+    ]
+  },
+  "PixelCoordinates3D[default_keys]": {
+    "processing_reads": [
+      "background.*",
+      "sample.*"
+    ],
+    "processing_writes": [
+      "background.*",
+      "sample.*"
+    ],
+    "source_refs": []
+  },
+  "Plot1DVisualization[configured]": {
+    "processing_reads": [
+      "background.Q",
+      "background.signal",
+      "sample.Q",
+      "sample.signal"
+    ],
+    "processing_writes": [],
+    "source_refs": []
+  },
+  "Plot1DVisualization[default_keys]": {
+    "processing_reads": [
+      "*"
+    ],
+    "processing_writes": [],
+    "source_refs": []
+  },
+  "Plot2DVisualization[configured]": {
+    "processing_reads": [
+      "sample.signal"
+    ],
+    "processing_writes": [],
+    "source_refs": []
+  },
+  "Plot2DVisualization[default_keys]": {
+    "processing_reads": [
+      "*"
+    ],
+    "processing_writes": [],
+    "source_refs": []
+  },
+  "PoissonUncertainties[configured]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "PoissonUncertainties[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "PolarizationCorrection[configured]": {
+    "processing_reads": [
+      "background.Psi",
+      "background.TwoTheta",
+      "background.signal",
+      "sample.Psi",
+      "sample.TwoTheta",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.polarization_factor_map",
+      "background.signal",
+      "sample.polarization_factor_map",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "PolarizationCorrection[default_keys]": {
+    "processing_reads": [
+      "background.Psi",
+      "background.TwoTheta",
+      "background.signal",
+      "sample.Psi",
+      "sample.TwoTheta",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.polarization_factor_map",
+      "background.signal",
+      "sample.polarization_factor_map",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "ReduceDimensionality[configured]": {
+    "processing_reads": [
+      "background.bad_pixels",
+      "background.signal",
+      "sample.bad_pixels",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "ReduceDimensionality[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "ReduceMask[configured]": {
+    "processing_reads": [
+      "background.bad",
+      "sample.bad"
+    ],
+    "processing_writes": [
+      "background.reduced",
+      "sample.reduced"
+    ],
+    "source_refs": []
+  },
+  "ReduceMask[default_keys]": {
+    "processing_reads": [
+      "background.mask",
+      "sample.mask"
+    ],
+    "processing_writes": [
+      "background.mask",
+      "sample.mask"
+    ],
+    "source_refs": []
+  },
+  "SinkProcessingData[configured]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.*"
+    ],
+    "processing_writes": [],
+    "source_refs": []
+  },
+  "SinkProcessingData[default_keys]": {
+    "processing_reads": [],
+    "processing_writes": [],
+    "source_refs": []
+  },
+  "SolidAngleCorrection[configured]": {
+    "processing_reads": [
+      "background.Omega",
+      "background.signal",
+      "sample.Omega",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "SolidAngleCorrection[default_keys]": {
+    "processing_reads": [
+      "background.Omega",
+      "background.signal",
+      "sample.Omega",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "SubtractDatabundles[configured]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "SubtractDatabundles[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "SubtractInterpolated1D[configured]": {
+    "processing_reads": [
+      "background.Q",
+      "background.bad_pixels",
+      "background.signal",
+      "sample.Q",
+      "sample.bad_pixels",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "sample.remap_mask",
+      "sample.remapped",
+      "sample.subtracted"
+    ],
+    "source_refs": []
+  },
+  "SubtractInterpolated1D[default_keys]": {
+    "processing_reads": [
+      "background.Q",
+      "background.signal",
+      "sample.Q",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "sample.remap_mask",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "Subtract[configured]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": [
+      "subtrahend_source",
+      "subtrahend_uncertainties_sources",
+      "subtrahend_units_source"
+    ]
+  },
+  "Subtract[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "ThresholdMask[configured]": {
+    "processing_reads": [
+      "background.counts",
+      "sample.counts"
+    ],
+    "processing_writes": [
+      "background.threshold",
+      "sample.threshold"
+    ],
+    "source_refs": []
+  },
+  "ThresholdMask[default_keys]": {
+    "processing_reads": [
+      "background.signal",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.threshold_mask",
+      "sample.threshold_mask"
+    ],
+    "source_refs": []
+  },
+  "UnitsLabelUpdate[configured]": {
+    "processing_reads": [
+      "background.Q",
+      "background.signal",
+      "sample.Q",
+      "sample.signal"
+    ],
+    "processing_writes": [
+      "background.Q",
+      "background.signal",
+      "sample.Q",
+      "sample.signal"
+    ],
+    "source_refs": []
+  },
+  "UnitsLabelUpdate[default_keys]": {
+    "processing_reads": [],
+    "processing_writes": [],
+    "source_refs": []
+  },
+  "XSGeometryFromPixelCoordinates[configured]": {
+    "processing_reads": [
+      "background.*",
+      "sample.*"
+    ],
+    "processing_writes": [
+      "background.*",
+      "sample.*"
+    ],
+    "source_refs": [
+      "geometry",
+      "photon_source",
+      "photon_uncertainties_sources",
+      "photon_units_source",
+      "pixel_pitch_fast_source",
+      "pixel_pitch_fast_uncertainties_sources",
+      "pixel_pitch_fast_units_source",
+      "pixel_pitch_slow_source",
+      "pixel_pitch_slow_uncertainties_sources",
+      "pixel_pitch_slow_units_source",
+      "sample_position",
+      "sample_z_source",
+      "sample_z_uncertainties_sources",
+      "sample_z_units_source"
+    ]
+  },
+  "XSGeometryFromPixelCoordinates[default_keys]": {
+    "processing_reads": [
+      "background.*",
+      "sample.*"
+    ],
+    "processing_writes": [
+      "background.*",
+      "sample.*"
+    ],
+    "source_refs": []
+  }
+}

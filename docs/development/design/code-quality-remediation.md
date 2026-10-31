@@ -1260,7 +1260,7 @@ maintainer's decisions:
 
 ## R07 — Declarative data-key dependencies, verified against behaviour
 
-**Status:** approved (A′); R07a in progress. The recommendation was revised on
+**Status:** approved (A′); R07a complete; R07b–e pending. The recommendation was revised on
 2026-10-31 after checking the modules that derive data keys from configuration.
 
 **Problem.** 35 of the 41 exported steps override `dependency_contract()`; only
@@ -1422,7 +1422,29 @@ One branch and one pull request, with one commit per sub-step.
 `output_processing_key` into the two steps that honour it). The work goes on
 branch `quality-remediation-r07`, which also carries the R06 commits.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- **R07a (2026-10-31):** added 82 generated snapshot cases covering all 41
+  exported steps, plus a session-installed access trace and 32 self-tests.
+  There are no `no_contract_trace` uses or allow-lists.
+- The trace exposed two whole-bundle reads. With maintainer approval,
+  `AppendProcessingData` now logs the stored key without enumerating its bundle,
+  and `ConcatenateDatabundles` resolves axis identities only among configured
+  `data_keys`, rejecting excluded and ambiguous axes during lookup. Three
+  focused tests cover excluded axes and aliases. Neither contract changed;
+  no further exported-step violations were found.
+- Full development suite with tracing: 1191 passed, 1 skipped in 20.57 s
+  (22.94 s process wall time). For the identical 1159-test suite excluding the
+  trace self-tests, process wall time was 24.20 s without tracing and 19.59 s
+  with tracing (pytest: 20.51 s / 17.55 s). These single-run timings are noisy;
+  they do not establish a speedup. The original pre-change baseline was
+  1155 passed, 1 skipped in 17.50 s.
+- `tox -e py312` passed without optional extras: 1188 passed, 4 skipped in
+  21.48 s (25.00 s tox wall time). `tox -e lint` passed.
+- Two details surfaced during implementation: `ConcatenateDatabundles` accepts
+  `output_processing_key=None` and currently declares `None.*`, which the
+  snapshot preserves; conftest must defer MoDaCor imports until fixture setup
+  to avoid installed-wheel/source-doctest collection conflicts in tox.
 
 **Review log.** _(reviewer)_
 
