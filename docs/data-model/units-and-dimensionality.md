@@ -23,3 +23,32 @@ must be between zero and three and cannot exceed `signal.ndim`.
 Detector element coordinates are indices. MoDaCor therefore treats `pixel`,
 `px`, `dot`, and related aliases as dimensionless detector-coordinate units.
 Detector pitch remains a physical length such as `m`, `mm`, or `um`.
+
+## Conversion and numerical boundaries
+
+`data.to_units("m")` converts in place, rebinding the signal and every named
+uncertainty array. `converted = data.in_units("m")` returns an independent
+converted object. Both promote integer signals to floating point, validate the
+uncertainty mapping before conversion, and preserve axes. Weights are
+**dimensionless relative weights**; unit conversions leave their values alone.
+
+At numerical-kernel boundaries, `signal, uncertainties = data.magnitudes("m")`
+returns both in the requested units without mutating the input. Identity
+conversions may return borrowed arrays; use `in_units` for independent storage.
+`value, components = data.scalar_components("m")` returns Python floats,
+accepting scalars or exactly constant arrays for the signal and every component.
+A global-only mapping retains its `propagate_to_all` key.
+
+## Scalar metadata and configuration
+
+`BaseData.from_scalar` is the common constructor for scalar metadata and
+configuration. It folds pure-number units such as percent, permille and ppm into
+the magnitude, converting absolute uncertainties with the same factor. It also
+cancels matching dimensional factors: `m/mm` becomes dimensionless with a factor
+of 1000. It preserves `count`, angle units defined via radian (including degree),
+`steradian` and `pixel`, including their occurrences in compound units.
+Thus `count/%` becomes count with a factor of 100, while `count/sr` stays intact.
+
+This reduction applies only at scalar ingestion. General constructors and
+arithmetic results retain their Pint units; there is no automatic reduction
+of processing results.

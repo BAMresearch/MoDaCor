@@ -382,7 +382,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             default_units=units,
             required=required,
         )
-        return 0.0 if data is None else scalar_in_units(data, units, name=name)
+        return 0.0 if data is None else data.scalar_components(units, name=name)[0]
 
     def _scalar_basedata(self, name: str, units: str, *, required: bool) -> BaseData:
         """Load a scalar quantity, retaining units and named uncertainties for arithmetic."""
@@ -395,33 +395,16 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             uncertainty_sources=self.configuration[f"{name}_uncertainties_sources"],
         )
         if data is None:
-            return BaseData(signal=np.asarray(0.0), units=ureg.Unit(units))
-        value, uncertainties = self._scalar_components(data, units, name=name)
-        return BaseData(
+            return BaseData.from_scalar(signal=0.0, units=units)
+        value, uncertainties = data.scalar_components(units, name=name)
+        return BaseData.from_scalar(
             signal=np.asarray(value),
             units=ureg.Unit(units),
             uncertainties={key: np.asarray(sigma) for key, sigma in uncertainties.items()},
         )
 
     def _scalar_with_uncertainties(self, name: str, units: str, *, required: bool) -> tuple[float, dict[str, float]]:
-        return self._scalar_components(self._scalar_basedata(name, units, required=required), units, name=name)
-
-    @staticmethod
-    def _scalar_components(data: BaseData, units: str, *, name: str) -> tuple[float, dict[str, float]]:
-        """Validate constant-valued input or reduce a quantity at the numerical boundary."""
-        value = scalar_in_units(data, units, name=name)
-        converted = data.copy(with_axes=False)
-        converted.to_units(ureg.Unit(units))
-        uncertainties = {}
-        for uncertainty_name, uncertainty_values in converted.uncertainties.items():
-            values = np.asarray(uncertainty_values, dtype=float).reshape(-1)
-            if values.size != 1 and not np.allclose(values, values[0], rtol=0.0, atol=0.0, equal_nan=True):
-                raise ValueError(f"{name} uncertainty {uncertainty_name!r} must be scalar or constant-valued.")
-            uncertainty = float(values[0])
-            if not np.isfinite(uncertainty) or uncertainty < 0.0:
-                raise ValueError(f"{name} uncertainty {uncertainty_name!r} must be finite and non-negative.")
-            uncertainties[uncertainty_name] = uncertainty
-        return value, uncertainties
+        return self._scalar_basedata(name, units, required=required).scalar_components(units, name=name)
 
     def _is_configured(self, name: str) -> bool:
         return self.configuration.get(f"{name}_source") is not None or self.configuration.get(name) is not None
@@ -457,7 +440,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             if not np.isfinite(transmission.signal) or not 0.0 < transmission.signal <= 1.0:
                 raise ValueError("sample_phase_transmission must be finite and in (0, 1].")
         sample_mu = -transmission.log() / thickness
-        return _ResolvedSampleMu(*self._scalar_components(sample_mu, "1/m", name="sample_mu"))
+        return _ResolvedSampleMu(*sample_mu.scalar_components("1/m", name="sample_mu"))
 
     def _geometry_and_coefficients(
         self,
@@ -626,7 +609,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             units_source=self.configuration.get("transmission_units_source"),
             uncertainty_sources=self.configuration["transmission_uncertainties_sources"],
         )
-        value = scalar_in_units(transmission, "dimensionless", name="transmission")
+        value = transmission.scalar_components("dimensionless", name="transmission")[0]
         if not np.isfinite(value) or value <= 0.0 or value > 1.0:
             raise ValueError("transmission must be finite and in (0, 1].")
         return transmission
@@ -672,7 +655,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         measured_value = (
             1.0
             if measured_transmission is None
-            else scalar_in_units(measured_transmission, "dimensionless", name="transmission")
+            else measured_transmission.scalar_components("dimensionless", name="transmission")[0]
         )
         evaluation_mode = str(self.configuration["evaluation_mode"]).strip().lower()
         if evaluation_mode not in {"adaptive", "exact"}:

@@ -141,7 +141,7 @@ class AngleToQ(ProcessStep):
         configured = self.configuration.get("angle_zero")
         if configured is not None:
             units = ureg.Unit(self.configuration.get("angle_zero_units") or angle.units)
-            zero = BaseData(np.asarray(float(configured)), units)
+            zero = BaseData.from_scalar(float(configured), units)
             zero.to_units(angle.units)
             return zero
         center_key = self._optional_key(self.configuration["center_key"])

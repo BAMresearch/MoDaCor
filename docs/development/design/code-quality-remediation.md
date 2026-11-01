@@ -2695,7 +2695,29 @@ dimensionless inputs give identical factors and uncertainties for both steps.
 This changes results only for non-dimensionless transmission inputs, so it is
 a `fix:`.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- **R18a:** `magnitudes` is the single conversion implementation, shared by
+  `_unary_inputs`, `to_units` and `in_units`. Conversion validates first and
+  preserves masked arrays; fresh converted arrays are adopted without another
+  copy. `scalar_components` preserves global-only mappings and enforces the
+  scalar-or-exactly-constant policy. `from_scalar` runs constructor validation.
+- Scalar ingestion routes: scalar/size-one `basedata_from_sources`, configured
+  `scalar_quantity_from_config_or_source`, capillary `_scalar_basedata`,
+  `prepare_static_scalar` (passthrough and weighted summary), AngleToQ configured
+  zero, and NeXus detector-frame `_basedata_scalar`. Numeric decoding now belongs
+  to BaseData; text metadata has a separate text-only decoder.
+- Release comparison: v1.15.0 (`d4226f6`) module/dataclass tests passed (1236);
+  219 successful public-step calls were captured outside the repository and
+  compared per bundle/key, nominal array and every named uncertainty at
+  `rtol=1e-12, atol=0` (equivalent unit changes normalized). R18a: 1261 passed,
+  including the unchanged 424 Stage 0 cases; all baseline arrays agree.
+- Initial median timings (7 repeats, scalar 1000 calls, 1 Mpx 20 calls, two
+  uncertainty keys): release binary scalar 45.39 µs, frame 6.116 ms; R18a
+  46.26 µs, 6.964 ms. Binary implementation is unchanged; repeat paired
+  measurements before the final report to distinguish timing noise. Release
+  copy-then-convert frame 3.457 ms; `in_units` frame 1.563 ms. v1.15.0 has no
+  `in_units`, so its comparison uses the equivalent copy-plus-`to_units` path.
 
 **Review log.** _(reviewer)_
 

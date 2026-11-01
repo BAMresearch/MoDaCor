@@ -15,8 +15,6 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.io.io_sources import IoSources
-from modacor.modules.helpers import scalar_in_units
-from modacor.modules.helpers.quantities import _decode_scalar
 from modacor.modules.helpers.scattering.photon_energy import photon_energy_from_wavelength
 
 
@@ -50,7 +48,7 @@ def scalar_quantity_from_config_or_source(
         )
 
     if name in cfg and cfg[name] is not None:
-        return BaseData(
+        return BaseData.from_scalar(
             signal=np.asarray(cfg[name], dtype=float),
             units=ureg.Unit(str(cfg.get(f"{name}_units", default_units))),
             uncertainties={
@@ -65,13 +63,22 @@ def scalar_quantity_from_config_or_source(
     return None
 
 
+def _text_scalar(value) -> str:
+    # Text metadata is distinct from BaseData's numeric scalar boundary.
+    arr = np.asarray(value).reshape(-1)
+    if not arr.size or not np.all(arr == arr[0]):
+        raise ValueError("Expected scalar or constant-valued text metadata.")
+    value = arr[0]
+    return value.decode("utf-8", "replace") if isinstance(value, bytes) else str(value)
+
+
 def text_from_config_or_source(io_sources: IoSources, cfg: dict[str, Any], name: str) -> str | None:
     value = cfg.get(name)
     source = cfg.get(f"{name}_source")
     if value is not None and source is not None:
         raise ValueError(f"{name} and {name}_source are mutually exclusive.")
     if value is not None:
-        return str(_decode_scalar(value))
+        return _text_scalar(value)
     if source is None:
         return None
     try:
@@ -79,7 +86,7 @@ def text_from_config_or_source(io_sources: IoSources, cfg: dict[str, Any], name:
     except NotImplementedError:
         # IoSource's explicit unsupported-static-metadata capability error.
         value = io_sources.get_data(str(source))
-    return None if value is None else str(_decode_scalar(value))
+    return None if value is None else _text_scalar(value)
 
 
 def energy_kev_from_config_or_wavelength(io_sources: IoSources, cfg: dict[str, Any]) -> float:
@@ -91,7 +98,7 @@ def energy_kev_from_config_or_wavelength(io_sources: IoSources, cfg: dict[str, A
         required=False,
     )
     if energy is not None:
-        return scalar_in_units(energy, "keV", name="beam_energy")
+        return energy.scalar_components("keV", name="beam_energy")[0]
 
     wavelength = scalar_quantity_from_config_or_source(
         io_sources,
@@ -101,7 +108,7 @@ def energy_kev_from_config_or_wavelength(io_sources: IoSources, cfg: dict[str, A
         required=True,
     )
     energy = photon_energy_from_wavelength(wavelength, output_units="keV")
-    return scalar_in_units(energy, "keV", name="beam_energy")
+    return energy.scalar_components("keV", name="beam_energy")[0]
 
 
 def _linear_attenuation_from_xraylib(chemical_formula: str, density_g_cm3: float, energy_kev: float) -> float:
@@ -132,7 +139,9 @@ def material_attenuation_from_config(io_sources: IoSources, cfg: dict[str, Any])
     )
     if linear is not None:
         return MaterialAttenuation(
-            linear_attenuation_coefficient_m_inv=scalar_in_units(linear, "1/m", name="linear_attenuation_coefficient")
+            linear_attenuation_coefficient_m_inv=linear.scalar_components("1/m", name="linear_attenuation_coefficient")[
+                0
+            ]
         )
 
     chemical_formula = text_from_config_or_source(io_sources, cfg, "chemical_formula")
@@ -140,7 +149,7 @@ def material_attenuation_from_config(io_sources: IoSources, cfg: dict[str, Any])
         raise ValueError("Material attenuation requires chemical_formula.")
 
     density = scalar_quantity_from_config_or_source(io_sources, cfg, "density", default_units="g/cm^3", required=True)
-    density_g_cm3 = scalar_in_units(density, "g/cm^3", name="density")
+    density_g_cm3 = density.scalar_components("g/cm^3", name="density")[0]
     if density_g_cm3 <= 0:
         raise ValueError("density must be positive.")
 
@@ -160,7 +169,7 @@ def material_attenuation_from_config(io_sources: IoSources, cfg: dict[str, Any])
 
 def thickness_m_from_config(io_sources: IoSources, cfg: dict[str, Any]) -> float:
     thickness = scalar_quantity_from_config_or_source(io_sources, cfg, "thickness", default_units="m", required=True)
-    thickness_m = scalar_in_units(thickness, "m", name="thickness")
+    thickness_m = thickness.scalar_components("m", name="thickness")[0]
     if thickness_m < 0:
         raise ValueError("thickness must be >= 0.")
     return thickness_m

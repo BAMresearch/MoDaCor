@@ -11,6 +11,8 @@ __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
+import numpy as np
+
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.io.io_sources import IoSources
@@ -48,4 +50,4 @@ def basedata_from_sources(
     kwargs = {"signal": signal, "units": units, "uncertainties": uncertainties}
     if weights_source is not None:
         kwargs["weights"] = io_sources.get_data(weights_source)
-    return BaseData(**kwargs)
+    return BaseData.from_scalar(**kwargs) if np.size(signal) == 1 else BaseData(**kwargs)
