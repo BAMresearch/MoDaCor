@@ -100,7 +100,9 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
             units_source=cfg.get("transmission_units_source"),
             uncertainty_sources=cfg["transmission_uncertainties_sources"],
         )
-        transmission = transmission_data.scalar_components("dimensionless", name="transmission")[0]
+        transmission, transmission_uncertainties = transmission_data.scalar_components(
+            "dimensionless", name="transmission"
+        )
         if not np.isfinite(transmission) or transmission <= 0.0 or transmission > 1.0:
             raise ValueError("transmission must be finite and in the interval (0, 1].")
 
@@ -122,8 +124,7 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
 
             derivative = flat_plate_relative_attenuation_derivative(transmission, cos_alpha)
             correction_uncertainties = {
-                name: np.abs(derivative) * float(np.asarray(values).reshape(-1)[0])
-                for name, values in transmission_data.uncertainties.items()
+                name: np.abs(derivative) * values for name, values in transmission_uncertainties.items()
             }
             correction = BaseData(
                 signal=attenuation,

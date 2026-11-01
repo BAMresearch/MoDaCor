@@ -2719,6 +2719,20 @@ a `fix:`.
   copy-then-convert frame 3.457 ms; `in_units` frame 1.563 ms. v1.15.0 has no
   `in_units`, so its comparison uses the equivalent copy-plus-`to_units` path.
 
+- **R18b:** both transmission adapters now obtain nominal values and sigmas
+  together in dimensionless units, including constant-array sources. Capillary's
+  `with_uncertainty_estimates` fold remains in place. Eight parameterized
+  percent-versus-dimensionless cases cover scalar/constant-array input and
+  named/global-only mappings, comparing every output component at `rtol=1e-12`.
+  Module/dataclass suite: 1269 passed; all 219 release calls / 463 uncertainty
+  arrays agree. Grep of all module Pint and BaseData conversions found no other
+  converted-nominal/unconverted-sigma pair.
+- Additional observation (not changed): capillary with named sample-mu estimates
+  plus a global-only transmission mapping raises the existing Stage 0 mixed-key
+  validation error; the fold supports the opposite direction. This is outside
+  the permitted transmission-unit fix. Regression cases exercise global sample
+  mu with named/global transmission, retaining the existing behavior.
+
 **Review log.** _(reviewer)_
 
 ---

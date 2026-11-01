@@ -609,7 +609,8 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             units_source=self.configuration.get("transmission_units_source"),
             uncertainty_sources=self.configuration["transmission_uncertainties_sources"],
         )
-        value = transmission.scalar_components("dimensionless", name="transmission")[0]
+        transmission = transmission.in_units("dimensionless")
+        value, _ = transmission.scalar_components("dimensionless", name="transmission")
         if not np.isfinite(value) or value <= 0.0 or value > 1.0:
             raise ValueError("transmission must be finite and in (0, 1].")
         return transmission
@@ -652,10 +653,10 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 calculated_transmission_values, mu_delta, central_mu_difference
             )
         measured_transmission = self._measured_transmission()
-        measured_value = (
-            1.0
+        measured_value, measured_uncertainties = (
+            (1.0, {})
             if measured_transmission is None
-            else measured_transmission.scalar_components("dimensionless", name="transmission")[0]
+            else measured_transmission.scalar_components("dimensionless", name="transmission")
         )
         evaluation_mode = str(self.configuration["evaluation_mode"]).strip().lower()
         if evaluation_mode not in {"adaptive", "exact"}:
@@ -738,7 +739,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             }
             if measured_transmission is not None:
                 components = {}
-                for name, values in measured_transmission.uncertainties.items():
+                for name, values in measured_uncertainties.items():
                     component = attenuation * np.asarray(values, dtype=float) / measured_value**2
                     component[~active] = 0.0
                     if name in correction_uncertainties:
