@@ -95,7 +95,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | open |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | open |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
-| R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | in progress |
+| R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | done |
 | R14 | The `required` argument flag is never enforced | contract | S | medium | open |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
@@ -2185,7 +2185,7 @@ This item should get its own branch and pull request.
 
 ## R13 — CI never exercises the xraylib (attenuation) path
 
-**Status:** in progress on branch `quality-remediation-r08-r13-r15`.
+**Status:** done (PR #152).
 xraylib 4.3.0 publishes manylinux wheels for CPython 3.10–3.15 (x86_64 and
 aarch64), so CI can install it directly. Plan: add the `attenuation` extra to
 the default `[testenv]`.
@@ -2227,8 +2227,10 @@ guards. Verified with `tox -e py312 -- -rs`:
 
 - **(2026-10-31): approved.** Commit `6dd5eef`. `tox -e py312` now skips 3
   tests (the chunk-memory opt-in and two Tiled tests, which have their own
-  env), down from 4: the xraylib test runs. Still to confirm: the CI log after
-  the push.
+  env), down from 4: the xraylib test runs. Confirmed in CI (PR #152, py3.12 job): the
+  environment installs `xraylib==4.3.0` and
+  `test_xraylib_accepts_element_formula_and_rejects_typo` PASSED. The only
+  skips are the chunk-memory opt-in and the two Tiled tests.
 
 ---
 
