@@ -2745,6 +2745,16 @@ a `fix:`.
   Module/dataclass suite: 1270 passed; all release nominal arrays and 463 named
   uncertainty arrays from 219 calls match at `rtol=1e-12`.
 
+- **R18d / ConvertUnits:** exported public step, mapping-valued read/write
+  dependency role, exact explicit-bundle paths and conservative wildcard
+  contract. Wildcard selection logs each absent key at INFO; explicit lists
+  fail with bundle/key context. In-place conversion preserves object/axis
+  identity and weights. Eight focused cases cover multiple bundles/keys,
+  partially present keys, conversion errors, uncertainty scaling and contracts.
+  Added the step to the reference generator's module groups and regenerated
+  reference pages. Module/dataclass suite: 1280 passed; release comparison
+  remains 219 calls / 463 named uncertainty arrays at `rtol=1e-12`.
+
 **Review log.** _(reviewer)_
 
 ---

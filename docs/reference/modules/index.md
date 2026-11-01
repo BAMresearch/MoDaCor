@@ -14,6 +14,7 @@ Configuration tables are generated from each step's `ProcessStepDescriber` metad
 
 ## Arithmetic and normalization
 
+- [ConvertUnits](ConvertUnits.md)
 - [Divide](Divide.md)
 - [DivideDatabundles](DivideDatabundles.md)
 - [FindScaleFactor1D](FindScaleFactor1D.md)
@@ -85,6 +86,7 @@ CapillarySelfAbsorptionCorrection
 CombineUncertainties
 CombineUncertaintiesMax
 ConcatenateDatabundles
+ConvertUnits
 CopyDataBundleKeys
 DetectorEfficiencyCorrection
 DilateMask
