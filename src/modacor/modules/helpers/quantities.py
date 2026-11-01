@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import numbers
+
 import pint
 
 from modacor import ureg
@@ -12,25 +14,20 @@ __all__ = ["scalar_in_units"]
 
 
 def scalar_in_units(
-    value: BaseData | float | int,
+    value: float | int,
     target_units: str | pint.Unit,
     *,
     name: str,
     units: str | pint.Unit | None = None,
 ) -> float:
-    """Convert a nominal scalar, accepting exactly constant BaseData arrays.
+    """Convert a configuration number; BaseData must use its central accessors.
 
-    Numeric configuration values without ``units`` already use target units.
-    BaseData carries its own units and is converted on a copy. This function
-    returns only a nominal value; uncertainty-aware arithmetic must retain the
-    BaseData or adapt its uncertainty components at the kernel boundary.
+    Without ``units``, the number already uses the requested target units.
     """
+    if isinstance(value, BaseData) or not isinstance(value, numbers.Real):
+        raise TypeError(f"{name}: expected a configuration number, got {type(value).__name__}.")
     try:
         target = ureg.Unit(target_units)
-        if isinstance(value, BaseData):
-            if units is not None:
-                raise ValueError("units must be None for BaseData inputs")
-            return value.scalar_components(target)[0]
         return float(ureg.Quantity(float(value), target if units is None else units).to(target).magnitude)
     except (pint.PintError, ValueError, TypeError, IndexError) as exc:
         raise ValueError(f"{name}: {exc}") from exc

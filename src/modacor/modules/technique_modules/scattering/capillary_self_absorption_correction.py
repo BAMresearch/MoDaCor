@@ -36,7 +36,7 @@ from modacor.modules.helpers.scattering.material_attenuation import scalar_quant
 
 def _length_array(value, units: str, *, name: str, shape=None) -> np.ndarray:
     try:
-        converted = ureg.Quantity(np.asarray(value, dtype=float), ureg.Unit(str(units))).to("m").magnitude
+        converted = BaseData(np.asarray(value, dtype=float), ureg.Unit(str(units))).magnitudes("m")[0]
     except Exception as error:
         raise ValueError(f"{name} must use units compatible with length.") from error
     result = np.asarray(converted, dtype=float)

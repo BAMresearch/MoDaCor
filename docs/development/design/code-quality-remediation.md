@@ -2733,6 +2733,18 @@ a `fix:`.
   the permitted transmission-unit fix. Regression cases exercise global sample
   mu with named/global transmission, retaining the existing behavior.
 
+- **R18c:** `scalar_in_units` accepts real configuration numbers only and
+  rejects BaseData with TypeError. Material-attenuation and capillary data
+  callers use `scalar_components`; capillary configuration arrays use
+  `magnitudes`, and IndexByCoordinate's configured unit factor uses the scalar
+  helper. The AST guard covers `.to(...).magnitude`, `.m_as`, `.m_from`, and
+  `ureg.Quantity`, excluding deprecated modules. Its two function-scoped
+  exceptions are `plot_1d_visualization._convert_values` (display values and
+  error bars) and `helpers.quantities.scalar_in_units` (configuration numbers,
+  with BaseData explicitly rejected). No other exceptions remain.
+  Module/dataclass suite: 1270 passed; all release nominal arrays and 463 named
+  uncertainty arrays from 219 calls match at `rtol=1e-12`.
+
 **Review log.** _(reviewer)_
 
 ---
