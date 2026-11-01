@@ -99,7 +99,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R14 | The `required` argument flag is never enforced | contract | S | medium | open |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
-| R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | in progress (own branch and PR) |
+| R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | done (v1.15.0, PR #154) |
 | R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | approved |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
@@ -2450,12 +2450,12 @@ finite-difference test.
 ## R17 — BaseData silently drops `propagate_to_all` uncertainties
 
 **Status:** superseded by the uncertainty-propagation specification, Stage 0
-(maintainer, 2026-11-01). It is implemented on its own branch,
-`uncertainty-stage0` from `main`, as its own PR.
+(maintainer, 2026-11-01). Implemented on its own branch, `uncertainty-stage0`
+from `main`; merged as PR #154 and released in v1.15.0.
 - The interim fix `3ea4ec2` (union rule for mixed mappings) is reverted on
   `quality-remediation-r08-r13-r15`. Stage 0 makes a mixed mapping raise
   `ValueError` instead (R0.1).
-- The material is in `auxiliary/modacor_stage0_handoff.zip`: HANDOFF.md, the
+- The material is in `auxiliary/modacor_stage0_handoff.zip`: `HANDOFF.md`, the
   normative specification, `repro.py` and RFC v8. The archive is not
   committed; the specification and the RFC are added to the docs by the
   Stage 0 PR.
@@ -2576,6 +2576,28 @@ made after the R17 commit.
     caution.
   - No existing test expectation changed. The MoDaCor-examples tests (23)
     pass before and after.
+- **(2026-11-01): Stage 0 approved; PR #154 opened as a draft.** Commits
+  `59cd747` … `401e759` (Codex), plus reviewer follow-ups `8f0dea5` and `fd56f6f`.
+  - Re-ran: full suite **1717 passed, 1 skipped**; tox `py312` **1715 passed,
+    3 skipped**; `docs` and `lint` pass. The opt-in RSS chunk-memory test passes.
+  - `main`'s own suite run against the branch fails only the three tests
+    that asserted the old behaviour (array identity, uncertainty-buffer
+    identity), plus one doc-generator path artefact of the out-of-tree run.
+  - F4 stays 15.0 by design: T0-05 keeps the union rule in Stage 0.
+  - Design change: in-place operators now compute the full result and then
+    install it, replacing the September 2026 in-place fast paths. Measured on
+    8 × 1024² with 2 keys: same speed within about 10%; in-place peak memory
+    rises from about 2 to 3 frames (keys + 1, within S0.7); out-of-place and
+    `*=` peak memory falls from about 8 to 3 frames. Exact-mode capillary:
+    0.119 s on both, identical results.
+  - Follow-ups made by the reviewer: the specification copy is now the
+    maintainer's updated version (R0.4 multi-estimate, T0-04b values); T0-04b
+    uses the specification's σ 10 and 20; the guide again links the
+    combination modules, keeps the naming and collision guidance, and warns
+    that a global term counted in every named estimate is over-counted when
+    those estimates are combined.
+  - Open: `CombineUncertainties` itself carries no over-count caution (it was
+    in the reverted interim fix only).
 
 ---
 
