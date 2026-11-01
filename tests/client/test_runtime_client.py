@@ -167,3 +167,45 @@ def test_reopen_detects_provisional_output_and_finalize_resolves_hash():
     assert output.plan_hash == "resolved"
     assert result["status"] == "complete"
     assert json.loads(transport.calls[2]["data"]) == {"plan_hash": "resolved"}
+
+
+@pytest.mark.parametrize(
+    "operation", ["register_sources", "register_sinks", "register_source", "register_sink", "set_sample"]
+)
+def test_registration_warnings_surface_once(operation):
+    warning = {"ref": "sample", "kind": "source", "location": "/data/missing.h5", "problem": "file does not exist"}
+    transport = StubTransport([response(200, {"warnings": [warning]})])
+    runtime = RuntimeClient("http://runtime", transport=transport)
+    session = runtime.session("demo")
+    registration = {"ref": "sample", "type": "hdf", "location": warning["location"]}
+    with pytest.warns(RuntimeWarning, match="sample.*missing.h5.*file does not exist") as caught:
+        if operation == "set_sample":
+            result = session.set_sample(warning["location"])
+        else:
+            result = getattr(session, operation)(registration)
+    assert len(caught) == 1
+    assert result["warnings"] == [warning]
+
+
+def test_dry_run_string_warnings_are_returned_unchanged():
+    import warnings
+
+    plan = {"warnings": ["No previous ProcessingData snapshot available; full run required."]}
+    client = RuntimeClient("http://runtime", transport=StubTransport([response(200, plan)]))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        actual = client.session("demo").dry_run()
+    assert actual == plan
+    assert not caught
+
+
+def test_raw_request_leaves_warning_payload_untouched():
+    import warnings
+
+    payload = {"warnings": [{"kind": "source", "ref": "data", "location": "missing", "problem": "unavailable"}]}
+    client = RuntimeClient("http://runtime", transport=StubTransport([response(200, payload)]))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        actual = client.request("PUT", "/v1/sessions/demo/sources", payload={})
+    assert actual == payload
+    assert not caught

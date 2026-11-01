@@ -406,3 +406,11 @@ def test_cli_session_delete_sink_calls_api(monkeypatch):
     assert captured["method"] == "DELETE"
     assert captured["path"] == "/v1/sessions/s1/sinks/export_csv"
     assert captured["payload"] is None
+
+
+def test_cli_serve_accepts_logging_options(tmp_path):
+    from modacor.cli import build_parser
+
+    args = build_parser().parse_args(["serve", "--log-file", str(tmp_path / "runtime.log"), "--log-level", "debug"])
+    assert args.log_file == tmp_path / "runtime.log"
+    assert args.log_level == "debug"

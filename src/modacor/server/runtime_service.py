@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import logging
 import traceback
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -23,8 +24,9 @@ from modacor.runner.pipeline_runner import PipelineRunError, RunResult
 from modacor.runner.process_step_registry import ProcessStepRegistry
 
 from .chunked_outputs import ChunkedOutputManager
-from .errors import ApiError
+from .errors import ApiError, IOBuildError
 from .execution import find_dirty_step_ids
+from .io_diagnostics import check_file_location
 from .io_utils import bind_chunk_source_slices, build_sinks_from_session, build_sources_from_session, write_hdf_output
 from .planning import build_dry_run_plan, missing_required_source_refs, ordered_step_ids, resolve_effective_mode
 from .runtime_policy import RuntimePolicy
@@ -32,6 +34,8 @@ from .session_manager import PipelineSession, SessionManager
 from .source_profiles import get_source_profile, list_source_profiles
 
 __all__ = ["RuntimeService"]
+
+logger = logging.getLogger(__name__)
 
 TRACE_REPORT_LINES = 500
 
@@ -155,11 +159,16 @@ class RuntimeService:
                     source_shape = tuple(int(size) for size in declared_shape)
                     source_dtype = provisional.driver.get("dtype")
                 else:
-                    sources = build_sources_from_session(
-                        session,
-                        buffer_store=self.manager.buffer_store,
-                        runtime_policy=self.policy,
-                    )
+                    try:
+                        sources = build_sources_from_session(
+                            session,
+                            buffer_store=self.manager.buffer_store,
+                            runtime_policy=self.policy,
+                        )
+                    except IOBuildError as exc:
+                        # Preserve this endpoint's existing provisional-plan
+                        # ApiError mappings; run failures map IOBuildError below.
+                        raise exc.original_exception from exc
                     source = sources.get_source(source_ref)
                     source_shape = tuple(source.get_data_shape(data_key))
                     source_dtype = source.get_data_dtype(data_key)
@@ -465,6 +474,52 @@ class RuntimeService:
         if not self.manager.delete_session(session_id):
             raise ApiError(status_code=404, detail="Session not found.")
 
+    def _log_io_registration(
+        self, session_id: str, kind: str, registration: dict[str, Any], *, action: str = "registered"
+    ) -> None:
+        logger.info(
+            "%s %s session_id=%s ref=%s type=%s location=%s",
+            kind.capitalize(),
+            action,
+            session_id,
+            registration["ref"],
+            registration["type"],
+            registration["location"],
+            extra={
+                "session_id": session_id,
+                "ref": registration["ref"],
+                "kind": kind,
+                "io_type": registration["type"],
+                "location": registration["location"],
+            },
+        )
+
+    def _registration_warnings(
+        self, session_id: str, kind: str, registrations: list[dict[str, Any]]
+    ) -> list[dict[str, str]]:
+        warnings = []
+        for registration in registrations:
+            try:
+                check_file_location(kind=kind, io_type=registration["type"], location=registration["location"])
+            except OSError as exc:
+                warning = {
+                    "ref": registration["ref"],
+                    "kind": kind,
+                    "location": registration["location"],
+                    "problem": str(exc),
+                }
+                warnings.append(warning)
+                logger.warning(
+                    "I/O registration warning session_id=%s ref=%s kind=%s location=%s problem=%s",
+                    session_id,
+                    warning["ref"],
+                    kind,
+                    warning["location"],
+                    warning["problem"],
+                    extra={"session_id": session_id, **warning},
+                )
+        return warnings
+
     def upsert_sources(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         sources = payload.get("sources", [])
         if not isinstance(sources, list):
@@ -480,7 +535,12 @@ class RuntimeService:
             raise ApiError(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
             raise ApiError(status_code=422, detail=str(exc)) from exc
-        return {"session_id": session.session_id, "sources": list(session.sources.values())}
+        for source in sources:
+            self._log_io_registration(session_id, "source", session.sources[str(source["ref"]).strip()])
+        warnings = self._registration_warnings(
+            session_id, "source", [session.sources[str(item["ref"]).strip()] for item in sources]
+        )
+        return {"session_id": session.session_id, "sources": list(session.sources.values()), "warnings": warnings}
 
     def upsert_sinks(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         sinks = payload.get("sinks", [])
@@ -497,7 +557,12 @@ class RuntimeService:
             raise ApiError(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
             raise ApiError(status_code=422, detail=str(exc)) from exc
-        return {"session_id": session.session_id, "sinks": list(session.sinks.values())}
+        for sink in sinks:
+            self._log_io_registration(session_id, "sink", session.sinks[str(sink["ref"]).strip()])
+        warnings = self._registration_warnings(
+            session_id, "sink", [session.sinks[str(item["ref"]).strip()] for item in sinks]
+        )
+        return {"session_id": session.session_id, "sinks": list(session.sinks.values()), "warnings": warnings}
 
     def patch_source(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         ref = str(payload.get("ref", "")).strip()
@@ -530,7 +595,10 @@ class RuntimeService:
         except ValueError as exc:
             raise ApiError(status_code=422, detail=str(exc)) from exc
 
+        self._log_io_registration(session_id, "source", session.sources[ref], action="updated")
+        warnings = self._registration_warnings(session_id, "source", [session.sources[ref]])
         return {
+            "warnings": warnings,
             "session_id": session.session_id,
             "source": session.sources.get(ref),
             "sources": list(session.sources.values()),
@@ -567,7 +635,10 @@ class RuntimeService:
         except ValueError as exc:
             raise ApiError(status_code=422, detail=str(exc)) from exc
 
+        self._log_io_registration(session_id, "sink", session.sinks[ref], action="updated")
+        warnings = self._registration_warnings(session_id, "sink", [session.sinks[ref]])
         return {
+            "warnings": warnings,
             "session_id": session.session_id,
             "sink": session.sinks.get(ref),
             "sinks": list(session.sinks.values()),
@@ -601,27 +672,38 @@ class RuntimeService:
         except ValueError as exc:
             raise ApiError(status_code=422, detail=str(exc)) from exc
 
+        self._log_io_registration(session_id, "source", session.sources["sample"], action="updated")
+        warnings = self._registration_warnings(session_id, "source", [session.sources["sample"]])
         return {
+            "warnings": warnings,
             "session_id": session.session_id,
             "source": session.sources.get("sample"),
             "sources": list(session.sources.values()),
         }
 
     def delete_source(self, session_id: str, ref: str) -> None:
+        session = self.manager.get_session(session_id)
+        registration = None if session is None else session.sources.get(ref)
         try:
             existed = self.manager.delete_source(session_id, ref)
         except KeyError as exc:
             raise ApiError(status_code=404, detail=str(exc)) from exc
         if not existed:
             raise ApiError(status_code=404, detail=f"Source '{ref}' not found.")
+        if registration is not None:
+            self._log_io_registration(session_id, "source", registration, action="deleted")
 
     def delete_sink(self, session_id: str, ref: str) -> None:
+        session = self.manager.get_session(session_id)
+        registration = None if session is None else session.sinks.get(ref)
         try:
             existed = self.manager.delete_sink(session_id, ref)
         except KeyError as exc:
             raise ApiError(status_code=404, detail=str(exc)) from exc
         if not existed:
             raise ApiError(status_code=404, detail=f"Sink '{ref}' not found.")
+        if registration is not None:
+            self._log_io_registration(session_id, "sink", registration, action="deleted")
 
     def put_buffer_source_array(
         self,
@@ -1263,7 +1345,7 @@ class RuntimeService:
             session.processing_data = preparation.snapshot_before_partial
 
         original_exception = (
-            exc.original_exception if isinstance(exc, (PipelineRunError, _ChunkPublicationError)) else exc
+            exc.original_exception if isinstance(exc, (PipelineRunError, _ChunkPublicationError, IOBuildError)) else exc
         )
         error_code = (
             "CHUNK_WRITE_FAILED"
@@ -1274,6 +1356,9 @@ class RuntimeService:
             "exception_type": type(original_exception).__name__,
             "traceback": traceback.format_exc(),
         }
+        if isinstance(exc, IOBuildError):
+            error_code = "SOURCE_UNAVAILABLE" if exc.kind == "source" else "SINK_UNAVAILABLE"
+            error_details.update(exc.details())
         if isinstance(exc, PipelineRunError):
             if exc.failed_step_id is not None:
                 error_details["failed_step_id"] = exc.failed_step_id
@@ -1296,6 +1381,21 @@ class RuntimeService:
                 }
             )
 
+        logger.error(
+            "Run failed session_id=%s run_id=%s code=%s failed_step_id=%s message=%s",
+            session_id,
+            run_id,
+            error_code,
+            error_details.get("failed_step_id"),
+            str(exc),
+            extra={
+                "session_id": session_id,
+                "run_id": run_id,
+                "error_code": error_code,
+                "failed_step_id": error_details.get("failed_step_id"),
+            },
+            exc_info=exc,
+        )
         self.manager.mark_run_failed(
             session_id,
             run_id,
@@ -1324,7 +1424,11 @@ class RuntimeService:
             detail={
                 "code": error_code,
                 "message": str(exc),
-                "details": {"session_id": session_id, "run_id": run_id},
+                "details": {
+                    "session_id": session_id,
+                    "run_id": run_id,
+                    **(exc.details() if isinstance(exc, IOBuildError) else {}),
+                },
             },
         ) from exc
 

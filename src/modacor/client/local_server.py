@@ -46,6 +46,7 @@ class LocalRuntimeServer:
         self.host = str(host)
         self.port = int(port)
         self.log_path = None if log_path is None else Path(log_path)
+        self._requested_log_path = self.log_path
         self.environment = dict(environment or {})
         self.read_roots = tuple(Path(path) for path in read_roots)
         self.write_roots = tuple(Path(path) for path in write_roots)
@@ -76,6 +77,8 @@ class LocalRuntimeServer:
             self.process = None
             self._close_log()
         if self.client.is_ready():
+            if not self.launched:
+                self.client.server_log_path = None
             return self.client
         if self.launched:
             try:
@@ -131,11 +134,13 @@ class LocalRuntimeServer:
                 command.extend([option, str(value)])
         return command
 
-    def _open_log(self) -> int | IO[str]:
-        if self.log_path is None:
-            return subprocess.DEVNULL
+    def _open_log(self) -> IO[str]:
+        requested = self._requested_log_path or Path.cwd() / "modacor_output" / "modacor_server.log"
+        self.log_path = requested.expanduser().resolve()
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self._log_file = self.log_path.open("a", encoding="utf-8", buffering=1)
+        self.client.server_log_path = self.log_path
+        print(f"MoDaCor runtime log: {self.log_path}")
         return self._log_file
 
     def _close_log(self) -> None:
@@ -157,6 +162,7 @@ class LocalRuntimeServer:
             sleep(min(0.25, max(0.0, deadline - monotonic())))
         raise TimeoutError(
             f"MoDaCor runtime did not become ready within {self.startup_timeout:g} seconds at {self.client.base_url}."
+            f" See {self.log_path}."
         )
 
     def stop(self) -> None:

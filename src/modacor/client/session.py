@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -34,17 +35,29 @@ class SessionClient:
     def delete(self) -> None:
         self.runtime.request("DELETE", self._path)
 
+    def _registration_request(self, method: str, path: str, *, payload: Mapping[str, Any]) -> dict[str, Any]:
+        response = self.runtime.request(method, path, payload=payload)
+        for warning in response.get("warnings", []):
+            warnings.warn(
+                f"{warning['kind'].capitalize()} '{warning['ref']}' ({warning['location']}): {warning['problem']}",
+                RuntimeWarning,
+                stacklevel=3,
+            )
+        return response
+
     def register_sources(self, *sources: Mapping[str, Any]) -> dict[str, Any]:
-        return self.runtime.request("PUT", f"{self._path}/sources", payload={"sources": list(sources)})
+        """Register inputs; emits location warnings as RuntimeWarning."""
+        return self._registration_request("PUT", f"{self._path}/sources", payload={"sources": list(sources)})
 
     def register_sinks(self, *sinks: Mapping[str, Any]) -> dict[str, Any]:
-        return self.runtime.request("PUT", f"{self._path}/sinks", payload={"sinks": list(sinks)})
+        """Register outputs; emits location warnings as RuntimeWarning."""
+        return self._registration_request("PUT", f"{self._path}/sinks", payload={"sinks": list(sinks)})
 
     def register_source(self, source: Mapping[str, Any]) -> dict[str, Any]:
-        return self.runtime.request("POST", f"{self._path}/sources/patch", payload=source)
+        return self._registration_request("POST", f"{self._path}/sources/patch", payload=source)
 
     def register_sink(self, sink: Mapping[str, Any]) -> dict[str, Any]:
-        return self.runtime.request("POST", f"{self._path}/sinks/patch", payload=sink)
+        return self._registration_request("POST", f"{self._path}/sinks/patch", payload=sink)
 
     def set_sample(
         self,
@@ -53,7 +66,7 @@ class SessionClient:
         source_type: str = "hdf",
         kwargs: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        return self.runtime.request(
+        return self._registration_request(
             "POST",
             f"{self._path}/sample",
             payload={"location": str(location), "type": source_type, "kwargs": dict(kwargs or {})},

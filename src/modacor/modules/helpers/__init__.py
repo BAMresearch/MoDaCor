@@ -8,6 +8,7 @@ __version__ = "20261030.1"
 
 from typing import Any, Mapping, MutableMapping, Sequence
 
+from modacor.modules.helpers.quantities import scalar_in_units
 from modacor.modules.helpers.statistics import WeightedScatterEstimates, finalize_weighted_scatter
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     "finalize_weighted_scatter",
     "leading_non_data_axes",
     "normalize_str_list",
+    "scalar_in_units",
 ]
 
 

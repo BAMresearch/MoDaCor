@@ -29,6 +29,7 @@ from modacor.models.scaling import (
     fit_scale_factor_1d,
     prepare_scale_fit_data,
 )
+from modacor.modules.helpers import scalar_in_units
 
 # -------------------------------------------------------------------------
 # Helpers
@@ -291,12 +292,12 @@ class FindScaleFactor1D(ProcessStep):
 
         fit_units = cfg.get("fit_val_units") or x_ref_bd.units
         if fit_min is not None:
-            fit_min = ureg.Quantity(fit_min, fit_units).to(x_ref_bd.units).magnitude
+            fit_min = scalar_in_units(fit_min, x_ref_bd.units, name="fit_min_val", units=fit_units)
         else:
             fit_min = np.nanmin(x_ref)
 
         if fit_max is not None:
-            fit_max = ureg.Quantity(fit_max, fit_units).to(x_ref_bd.units).magnitude
+            fit_max = scalar_in_units(fit_max, x_ref_bd.units, name="fit_max_val", units=fit_units)
         else:
             fit_max = np.nanmax(x_ref)
 

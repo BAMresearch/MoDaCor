@@ -18,6 +18,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.models.scattering import linear_polarization_factor
+from modacor.modules.helpers import scalar_in_units
 
 
 class PolarizationCorrection(ProcessStep):
@@ -125,7 +126,7 @@ class PolarizationCorrection(ProcessStep):
     def _offset_from_config(cfg: dict[str, Any]) -> float:
         value = cfg.get("polarization_angular_offset")
         units = cfg["polarization_angular_offset_units"]
-        return float((float(value) * ureg.Unit(str(units))).to(ureg.radian).magnitude)
+        return scalar_in_units(value, ureg.radian, name="polarization_angular_offset", units=str(units))
 
     def calculate(self) -> dict[str, DataBundle]:
         cfg = self.configuration

@@ -15,6 +15,8 @@ from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.io.io_sources import IoSources
+from modacor.modules.helpers import scalar_in_units
+from modacor.modules.helpers.quantities import _decode_scalar
 from modacor.modules.helpers.scattering.photon_energy import photon_energy_from_wavelength
 
 
@@ -24,26 +26,6 @@ class MaterialAttenuation:
     chemical_formula: str | None = None
     density_g_cm3: float | None = None
     energy_kev: float | None = None
-
-
-def _decode_scalar(value: Any) -> Any:
-    arr = np.asarray(value)
-    if arr.shape != ():
-        flattened = arr.reshape(-1)
-        if flattened.size != 1:
-            first = flattened[0]
-            if np.issubdtype(arr.dtype, np.number):
-                is_constant = np.allclose(flattened, first, rtol=0.0, atol=0.0, equal_nan=True)
-            else:
-                is_constant = bool(np.all(flattened == first))
-            if not is_constant:
-                raise ValueError(f"Expected a scalar or constant-valued array, got shape {arr.shape}.")
-        value = flattened[0]
-    else:
-        value = arr.item() if hasattr(arr, "item") else value
-    if isinstance(value, (bytes, np.bytes_)):
-        return value.decode("utf-8", "replace")
-    return value
 
 
 def scalar_quantity_from_config_or_source(
@@ -81,12 +63,6 @@ def scalar_quantity_from_config_or_source(
     if required:
         raise ValueError(f"Missing required material attenuation parameter: {name}.")
     return None
-
-
-def scalar_in_units(value: BaseData, units: str, *, name: str) -> float:
-    converted = value.copy(with_axes=False)
-    converted.to_units(ureg.Unit(units))
-    return float(_decode_scalar(converted.signal))
 
 
 def text_from_config_or_source(io_sources: IoSources, cfg: dict[str, Any], name: str) -> str | None:

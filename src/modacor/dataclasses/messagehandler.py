@@ -43,11 +43,13 @@ class MessageHandler:
         self.name = name
 
         self.logger = logging.getLogger(name)
-        self.logger.setLevel(level)
+        server_logging = any(handler.name == "modacor.runtime.console" for handler in logging.getLogger().handlers)
+        self.logger.setLevel(logging.NOTSET if server_logging else level)
 
         # Avoid adding multiple console handlers if this handler is created multiple times
-        if not any(isinstance(h, logging.StreamHandler) for h in self.logger.handlers):
+        if not server_logging and not any(isinstance(h, logging.StreamHandler) for h in self.logger.handlers):
             console_handler = logging.StreamHandler()
+            console_handler.set_name("modacor.message_handler.console")
             console_handler.setLevel(level)
 
             formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")

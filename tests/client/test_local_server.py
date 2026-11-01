@@ -146,3 +146,38 @@ def test_local_server_stops_owned_process_when_readiness_wait_fails(monkeypatch)
 
     assert events == ["terminate", ("wait", 2.0)]
     assert server.process is None
+
+
+def test_default_log_path_is_resolved_when_opened(monkeypatch, tmp_path, capsys):
+    server = LocalRuntimeServer()
+    monkeypatch.chdir(tmp_path)
+    try:
+        target = server._open_log()
+        expected = (tmp_path / "modacor_output" / "modacor_server.log").resolve()
+        assert server.log_path == expected
+        assert server.client.server_log_path == expected
+        assert target.name == str(expected)
+        assert expected.is_file()
+        assert f"MoDaCor runtime log: {expected}" in capsys.readouterr().out
+        assert "--log-file" not in server._command()
+    finally:
+        server._close_log()
+
+
+def test_owned_client_error_points_to_resolved_log(monkeypatch, tmp_path):
+    from modacor.client import RuntimeAPIError
+
+    class FailingTransport:
+        def request(self, *args, **kwargs):
+            return 500, b'{"detail":{"code":"RUN_FAILED","message":"failed"}}', {}
+
+    server = LocalRuntimeServer(log_path=tmp_path / "runtime.log")
+    server.client._transport = FailingTransport()
+    try:
+        server._open_log()
+        with pytest.raises(RuntimeAPIError, match=str(server.log_path)) as caught:
+            server.client.health()
+        assert caught.value.message == "failed"
+        assert caught.value.log_path == server.log_path
+    finally:
+        server._close_log()

@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import json
+import logging
+from contextvars import ContextVar
 from functools import lru_cache
 from importlib import resources
 from typing import Any
@@ -15,6 +17,8 @@ from .runtime_service import RuntimeService
 from .session_manager import SessionManager
 
 __all__ = ["create_app"]
+
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -144,12 +148,51 @@ def create_app(  # noqa: C901
         description="Scaffold API for long-lived MoDaCor pipeline sessions.",
     )
     app.state.runtime_service = service
+    current_request: ContextVar[Any] = ContextVar("runtime_request")
+
+    @app.middleware("http")
+    async def request_context(request, call_next):
+        token = current_request.set(request)
+        try:
+            return await call_next(request)
+        finally:
+            current_request.reset(token)
 
     def _call(handler, *args, **kwargs):
+        request = current_request.get()
+        context = {
+            "method": request.method,
+            "path": request.url.path,
+            "session_id": request.path_params.get("session_id"),
+        }
         try:
             return handler(*args, **kwargs)
         except ApiError as exc:
+            logger.log(
+                logging.ERROR if exc.status_code >= 500 else logging.WARNING,
+                "%s %s session_id=%s detail=%s",
+                context["method"],
+                context["path"],
+                context["session_id"],
+                exc.detail,
+                extra=context,
+                exc_info=exc if exc.status_code >= 500 else None,
+            )
             raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        except Exception as exc:
+            message = f"{type(exc).__name__}: {exc}"
+            logger.exception(
+                "%s %s session_id=%s %s",
+                context["method"],
+                context["path"],
+                context["session_id"],
+                message,
+                extra=context,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail={"code": "INTERNAL_ERROR", "message": message, "details": context},
+            ) from exc
 
     @app.get("/v1/health")
     def health() -> dict[str, str]:

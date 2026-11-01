@@ -13,6 +13,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.models.binning import assign_bin_indices, generate_bin_edges, validate_bin_edges
+from modacor.modules.helpers import scalar_in_units
 
 __all__ = ["IndexByCoordinate"]
 __version__ = "20261001.1"
@@ -142,8 +143,12 @@ class IndexByCoordinate(ProcessStep):
             spacing = "linear"
         lower = generated_settings["bin_min"]
         upper = generated_settings["bin_max"]
-        lower_value = None if lower is None else float(lower) * conversion
-        upper_value = None if upper is None else float(upper) * conversion
+        lower_value = (
+            None if lower is None else scalar_in_units(lower, coordinate.units, name="bin_min", units=configured_units)
+        )
+        upper_value = (
+            None if upper is None else scalar_in_units(upper, coordinate.units, name="bin_max", units=configured_units)
+        )
         return generate_bin_edges(
             coordinate.signal,
             lower=lower_value,

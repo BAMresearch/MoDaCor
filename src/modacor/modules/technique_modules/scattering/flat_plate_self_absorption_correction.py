@@ -18,7 +18,8 @@ from modacor.models.attenuation import (
     flat_plate_relative_attenuation,
     flat_plate_relative_attenuation_derivative,
 )
-from modacor.modules.helpers.scattering.material_attenuation import positive_cos_alpha, scalar_in_units
+from modacor.modules.helpers import scalar_in_units
+from modacor.modules.helpers.scattering.material_attenuation import positive_cos_alpha
 
 
 class FlatPlateSelfAbsorptionCorrection(ProcessStep):
