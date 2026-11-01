@@ -86,16 +86,8 @@ Stage 0 keeps the representation `BaseData.uncertainties: dict[str, ndarray]` an
 | R0.1 | A mapping containing `propagate_to_all` together with any other key is **mixed**. A mixed mapping MUST raise `ValueError` before any mutation. |
 | R0.2 | Validation MUST run at construction, at every binary, in-place and unary operation, in `indexed`, `copy` and `to_units`, in `combine_uncertainty_keys`, and in every uncertainty-producing module. Constructor-only validation is insufficient, because the mapping is mutable. |
 | R0.3 | `combine_uncertainty_keys` MUST reject `propagate_to_all` as a source key and MUST NOT create a mixed mapping. |
-| R0.4 | **Producer transition (Stage 0 only).** A producer adding a named estimate `X` to a `BaseData` whose only key is `propagate_to_all` MUST fold the global term into `X` in quadrature (`σ_X ← hypot(σ_X,new, σ_global)`) and replace the mapping with `{X: σ_X}` in one step. It MUST log the transition at INFO level as a *legacy fold*. It MUST NOT expose a mixed mapping at any point. |
+| R0.4 | **Producer transition (Stage 0 only).** A producer adding one or more named estimates `X₁…Xₙ` in one call to a `BaseData` whose only key is `propagate_to_all` MUST fold the **same original** global term into **each** new estimate in quadrature: `σ_Xᵢ ← hypot(σ_Xᵢ,new, σ_global)`. This is the same as the binary rule G∘N (§4.3), where the global term contributes to every named key. All folded estimates MUST be computed first and then installed by replacing the mapping with `{X₁: σ_X₁, …, Xₙ: σ_Xₙ}` in one assignment, with `propagate_to_all` removed; no intermediate or mixed mapping is ever visible. One INFO log per call lists the folded keys as a *legacy fold*. A later producer call that adds a key to an already-named mapping performs no fold, because the global term no longer exists separately. That key therefore lacks the global contribution; this is a documented Stage 0 limitation, resolved in Stage 1 (§6.9). |
 | R0.5 | A global-only mapping MAY remain on the working signal until a named estimate is introduced. |
-
-**R0.4 batching clarification (2026-11-01).** If one producer call introduces
-several named estimates, fold the same original global term into every new
-estimate, compute all folded arrays first, and install the complete mapping in
-one assignment with `propagate_to_all` removed. Log one INFO message per call
-listing all folded keys as a *legacy fold*. A later producer call on the now-named
-mapping does no fold: its new estimate lacks the removed global contribution.
-This is a Stage 0 limitation; explicit roles in §6.9 address it in Stage 1.
 
 ### 4.3 Binary key resolution
 
@@ -488,7 +480,7 @@ Numbers are first-order expected values from the reference implementation. Every
 | T0-02 | `a / t`, with `a` having no uncertainty and `t = {propagate_to_all: σ}` | result `{propagate_to_all: …}`, not `{}` (F1) |
 | T0-03 | Mixed mapping, in-place and out-of-place, at construction and in `combine_uncertainty_keys` | `ValueError`; target unchanged (F2, F3) |
 | T0-04 | `PoissonUncertainties` on `{propagate_to_all: 5}`, signal 100, then `/ 2` | `{Poisson: 5.59}`; INFO log; no transient mixed mapping |
-| T0-04b | One producer call adds several named estimates to a global-only mapping; a later call adds another name | Each initial estimate folds the same original global sigma; atomic mapping install and one INFO legacy-fold log listing all keys. The later name receives no fold. |
+| T0-04b | A producer adding two estimates (σ 10 and 20) in one call to `{propagate_to_all: 5}` | `{X₁: hypot(10, 5) = 11.18, X₂: hypot(20, 5) = 20.62}`; installed in one assignment; `propagate_to_all` absent; one INFO log; a subsequent producer adding `X₃` to the result performs no fold |
 | T0-05 | `{Poisson: 10, SEM: 15} − {Poisson: 7}` | Poisson 12.21, SEM 15.0 (union rule; documented Stage 0 limitation) |
 | T0-06 | Two objects built from one array; `p /= 3` | the other object unchanged (F5) |
 | T0-07 | `a /= a` with `[4, 9] ± [2, 3]` | equals `a / a`: `[0.707, 0.471]` (F6) |

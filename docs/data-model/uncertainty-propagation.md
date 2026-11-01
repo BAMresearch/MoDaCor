@@ -95,9 +95,28 @@ A **later producer call** adding another name to the already-named mapping
 performs no fold: the global term is no longer present separately. That new
 estimate lacks the earlier global contribution. This is a Stage 0 limitation.
 
-`CombineUncertainties` combines selected named components in quadrature;
-`CombineUncertaintiesMax` takes an element-wise maximum. Neither may use
-`propagate_to_all` as a source key or create a mixed result mapping.
+## Creating and combining components
+
+- [`PoissonUncertainties`](../reference/modules/PoissonUncertainties.md) creates
+  a `Poisson` estimate from count data, using the producer rule above.
+- [`CombineUncertainties`](../reference/modules/CombineUncertainties.md)
+  combines selected independent components in quadrature under a new name.
+- [`CombineUncertaintiesMax`](../reference/modules/CombineUncertaintiesMax.md)
+  takes the element-wise maximum when a conservative envelope, rather than an
+  independent quadrature model, is intended.
+
+Neither combination module may use `propagate_to_all` as a source key or create
+a mixed result mapping.
+
+A global term reaches **every** named estimate, both through binary arithmetic
+(`G` with `N`) and through the legacy fold. Combining those estimates afterwards
+therefore counts the global term once per estimate. Keep the propagated
+estimates separate when `propagate_to_all` has been used.
+
+Propagating an existing measurement component and estimating a new component
+from scatter are different operations. Name them distinctly and choose an
+explicit collision policy when a reduction estimator would reuse an existing
+name.
 
 ## Ownership, in-place and unary operations
 
@@ -140,5 +159,6 @@ The container does not represent covariance or physical correlations between
 pixels, measurements, parameters or names. First-order propagation may be
 inadequate for strongly nonlinear functions or large uncertainties. In
 particular, broadcasting and repeated use of a correction do not establish
-independence. Choose uncertainty models and explicit combinations to match the
+independence. Systematic contributions must not be combined in quadrature merely
+for convenience. Choose uncertainty models and explicit combinations to match the
 measurement, and retain diagnostic outputs where a stronger model is needed.
