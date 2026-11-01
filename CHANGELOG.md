@@ -1,5 +1,55 @@
 # CHANGELOG
 
+## v1.14.0 (2026-11-01)
+
+### Bug fixes
+
+* fix: accept creatable sink directories and keep dry-run warnings intact ([`19ca5d3`](https://github.com/BAMresearch/MoDaCor/commit/19ca5d3bc0b4040bfd4533c0fbd83a345e1ca322))
+
+### Continuous integration
+
+* ci: install the attenuation extra so the xraylib tests run in CI ([`6dd5eef`](https://github.com/BAMresearch/MoDaCor/commit/6dd5eefc9be0248d98c7f771bdb07ecafd771b3b))
+
+### Documentation
+
+* docs: point R17 to the uncertainty Stage 0 specification in remediation tracker ([`4c08d1e`](https://github.com/BAMresearch/MoDaCor/commit/4c08d1ee9ec2026cd6f349a62654d38a16af83da))
+
+* docs: record the R18 unit-handling decisions in remediation tracker ([`48bf599`](https://github.com/BAMresearch/MoDaCor/commit/48bf5991154afd9ccbe47aa9e60c46bf093abca6))
+
+* docs: widen R18 to central unit handling and mark the R17 mixed-key rule for revision ([`38e8e40`](https://github.com/BAMresearch/MoDaCor/commit/38e8e406a650785fabc99de3e78dc9f9b0e6a098))
+
+* docs: record R17 review and add R18 to remediation tracker ([`c64a6c5`](https://github.com/BAMresearch/MoDaCor/commit/c64a6c5833d7f7e3953d95114e193ecdbeda3ac2))
+
+* docs: record the R08 capillary unit equivalence stop ([`3725e8f`](https://github.com/BAMresearch/MoDaCor/commit/3725e8f54eb7bdc3b36e8c26c88a160cb640ce1a))
+
+* docs: record the propagate_to_all contract for R17 in remediation tracker ([`83be8ad`](https://github.com/BAMresearch/MoDaCor/commit/83be8ad7009c10f0b6f2831bacb287eb1b914364))
+
+* docs: add R17 propagate_to_all uncertainty loss to remediation tracker ([`1ad776f`](https://github.com/BAMresearch/MoDaCor/commit/1ad776fe6eaa6c4d14bf690cf677b8a4f8a4e992))
+
+* docs: record the R08 arithmetic equivalence stop and validation ([`12959a9`](https://github.com/BAMresearch/MoDaCor/commit/12959a9cfbf9b096c201cafee728a92c881ca692))
+
+* docs: record R08/R13/R15 reviews and add R16 to remediation tracker ([`e8fafe7`](https://github.com/BAMresearch/MoDaCor/commit/e8fafe7ee4f89e5af14b2806d5dec06eea94043c))
+
+* docs: classify unit-stripping occurrences for R08 ([`04c6172`](https://github.com/BAMresearch/MoDaCor/commit/04c6172eb96dc060055fb9d6ce0196eaadba3a79))
+
+* docs: note the R06–R07 release in remediation tracker ([`4d3d99d`](https://github.com/BAMresearch/MoDaCor/commit/4d3d99d71b3cc8e253daaf892c6eeee131c0d02e))
+
+* docs: record R15 decisions in remediation tracker ([`146912e`](https://github.com/BAMresearch/MoDaCor/commit/146912ef8d2c89ac43e9ae4d670ad63ee71fef1a))
+
+* docs: plan R08 and R13, add R15 server diagnostics to remediation tracker ([`f256c9b`](https://github.com/BAMresearch/MoDaCor/commit/f256c9b37d46c33c979c1f5a5484949cac5081ad))
+
+### Features
+
+* feat: write runtime server logs next to the work by default ([`97c07a0`](https://github.com/BAMresearch/MoDaCor/commit/97c07a00d4d073859a5fa225b7c98345b7aade5a))
+
+* feat: warn about unusable source and sink locations and report them at run time ([`94b0a56`](https://github.com/BAMresearch/MoDaCor/commit/94b0a566fe6b8bb1e1b24e623a43dc4d5e902d71))
+
+* feat: log server API errors, I/O registration and run failures ([`07aa04d`](https://github.com/BAMresearch/MoDaCor/commit/07aa04df6f2a0834c52477c305db9cc9f39c19de))
+
+### Refactoring
+
+* refactor: share one configuration-scalar unit conversion helper ([`4e72925`](https://github.com/BAMresearch/MoDaCor/commit/4e7292576d369e2c6195a8f59edf9c57d6997c20))
+
 ## v1.13.0 (2026-10-31)
 
 ### Features
