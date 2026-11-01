@@ -12,6 +12,8 @@ source of truth when they differ from runtime code or maintainer documentation.
 
 documentation-architecture
 code-quality-remediation
+uncertainty-propagation-spec
+uncertainty-propagation-rfc-v8
 capillary-self-absorption
 pixel-unit-removal
 tiled-io-upgrade

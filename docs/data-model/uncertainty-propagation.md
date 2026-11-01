@@ -1,17 +1,26 @@
 # Uncertainty propagation
 
-MoDaCor stores uncertainties as absolute one-standard-deviation values in
-`BaseData.uncertainties`. Each key names a contribution, for example `Poisson`,
-`readout`, `transmission`, or `calibration`. Arrays may be scalar or broadcast
-to the signal shape.
+MoDaCor stores absolute, nonnegative one-standard-deviation uncertainties in
+`BaseData.uncertainties`, in the signal's units. Each key names an uncertainty
+estimate; its array must broadcast to the signal shape. NaN values follow the
+operation's existing domain and arithmetic policy.
 
-The current arithmetic model uses first-order propagation and assumes the two
-operands' contributions are uncorrelated. It does not represent covariance.
+**Changed (Stage 0):** mixed `propagate_to_all` mappings now raise `ValueError`;
+global-only uncertainties survive arithmetic with an empty mapping. Producers
+fold a global-only term into newly introduced named estimates. Constructors
+copy array inputs, in-place arithmetic is atomic and alias-safe, unary functions
+preserve their inputs, and scalar arithmetic avoids full-size zero arrays.
+
+An empty mapping means **no quantified contribution supplied (unquantified)**,
+not that a measurement is exact. Stage 0 arithmetic treats absent terms as zero;
+this computational convention does not establish exactness. Python real and
+scalar Pint quantity operands are coerced to exact zero-dimensional operands
+with no uncertainty keys.
 
 ## Binary arithmetic
 
 For values `A` and `B`, absolute standard uncertainties `sigma_A` and
-`sigma_B`, and result `R`:
+`sigma_B`, and result `R`, first-order propagation assumes independent operands:
 
 | Operation | Result uncertainty |
 | --- | --- |
@@ -19,76 +28,117 @@ For values `A` and `B`, absolute standard uncertainties `sigma_A` and
 | `R = A × B` | `sigma_R² = (B sigma_A)² + (A sigma_B)²` |
 | `R = A / B` | `sigma_R² = (sigma_A / B)² + (A sigma_B / B²)²` |
 
-Pint converts addition/subtraction uncertainties to the result unit before the
-quadrature sum. Multiplication and division use the derived result unit.
-Division by a zero-valued divisor produces an undefined (`NaN`) propagated
-uncertainty at that position.
+Pint supplies the unit algebra and conversion factors. Addition and subtraction
+convert both uncertainties to the result's units. Division by a zero-valued
+divisor produces a `NaN` propagated uncertainty at that position. Missing sigma
+terms are skipped rather than materialized as zero arrays.
 
-## Named-component rules
+## Uncertainty key table
 
-Propagation happens independently for each name:
+`E` means empty; `N` means one or more named keys without `propagate_to_all`;
+`G` means exactly `{propagate_to_all}`; `M` means a mixed mapping containing
+`propagate_to_all` and another key.
 
-1. Matching names on both operands are combined with the operation's formula.
-2. Non-matching names form a union; each contribution propagates from the
-   operand that contains it, with zero contribution from the other operand.
-3. An absent uncertainty mapping contributes no components.
-4. `propagate_to_all` is a global fallback only when it is the sole key on an
-   operand. It contributes to every explicit name on the other operand.
-5. If both operands contain only `propagate_to_all`, the result retains that
-   key. When it appears alongside other keys it is not a fallback and is not
-   emitted as a result key.
+The same table applies to `+`, `-`, `*`, `/` and their in-place forms. Both
+operand orders are explicit below; the numerical formula still follows the
+operation and operand order.
 
-This scheme preserves provenance, but a shared name is not proof of statistical
-independence. Choose names and combinations to match the physical uncertainty
-model.
+| Left | Right | Result keys and behaviour |
+| --- | --- | --- |
+| E | E | E |
+| N | E | N, propagated from the left operand |
+| E | N | N, propagated from the right operand |
+| G | E | G, propagated from the left operand |
+| E | G | G, propagated from the right operand |
+| G | N | N; the left global term contributes to every right named key |
+| N | G | N; the right global term contributes to every left named key |
+| G | G | G, combining both operands' terms |
+| N | N, identical key sets | Pairwise propagation by name |
+| N | N, differing key sets | Union; a missing term contributes zero; logged at DEBUG |
+| M | Any | `ValueError` before mutation |
+| Any | M | `ValueError` before mutation |
 
-## Unary functions
+The reserved key must be the sole key or absent. Validation runs at
+construction, every binary, in-place and unary operation, `indexed`, `copy`,
+`to_units`, uncertainty combination, and uncertainty-producing modules. The
+mapping remains mutable, so constructing a valid object does not exempt later
+operations from validation. To repair a mixed input, keep `propagate_to_all`
+alone or rename it to an ordinary key.
 
-Supported unary functions use `sigma_y ≈ abs(f'(x)) sigma_x` independently for
-each named component. This covers powers, square root, logarithm, exponential,
-and trigonometric helpers. Outside a function's valid domain, both the signal
-and propagated uncertainties are set to `NaN`.
+The union rule is a Stage 0 limitation. For example,
+`{Poisson: 10, SEM: 15} - {Poisson: 7}` produces
+`{Poisson: 12.2066, SEM: 15}`. The missing right `SEM` term is treated as zero;
+the right `Poisson` term is not substituted for it. Key names do not establish
+physical correlation, and estimates are not implicitly added across names.
 
-Negation copies absolute uncertainties unchanged. Exact scalar operations carry
-zero additional uncertainty while preserving existing names.
+## Producers and the legacy fold
+
+A producer introducing a named estimate `X` into a global-only mapping computes
+`sigma_X = hypot(sigma_X,new, sigma_global)` and replaces the mapping with
+`{X: sigma_X}` in one assignment. It logs the transition at INFO as a **legacy
+fold**. The global term can remain on the working signal until such a producer
+introduces a name.
+
+When one call introduces several estimates, each receives the **same original
+global term**. All folded arrays are calculated first; the complete named
+mapping is installed atomically, with `propagate_to_all` removed. One INFO
+message lists all folded names. No mixed mapping is exposed.
+
+For example, `PoissonUncertainties` on a signal of 100 counts with
+`{propagate_to_all: 5}` produces `{Poisson: sqrt(10² + 5²)}`, approximately
+`{Poisson: 11.1803}` counts. Dividing by 2 gives `{Poisson: 5.5902}` counts.
+`IndexedAverager` and `ReduceDimensionality` use the same batch rule when they
+introduce scatter estimates alongside propagated global-only uncertainties.
+Existing named-key collision policies still apply.
+
+A **later producer call** adding another name to the already-named mapping
+performs no fold: the global term is no longer present separately. That new
+estimate lacks the earlier global contribution. This is a Stage 0 limitation.
+
+`CombineUncertainties` combines selected named components in quadrature;
+`CombineUncertaintiesMax` takes an element-wise maximum. Neither may use
+`propagate_to_all` as a source key or create a mixed result mapping.
+
+## Ownership, in-place and unary operations
+
+Constructors and `copy()` own independent signal and uncertainty arrays. Unit
+conversion rebinds converted arrays. In-place arithmetic keeps the container's
+identity and computes a complete checked result before installing it, so a
+failed operation leaves the target's signal, units, uncertainties and metadata
+unchanged. Array identities need not be preserved.
+
+Aliases read their original operand values, including for `a /= a` and
+`a *= a`. **Computational alias safety is not physical correlation.** For
+`a - a`, independent-operand propagation still gives `sqrt(2) * sigma`, rather
+than cancelling the uncertainty. Shared corrections and repeated measurements
+require scientific assessment beyond these formulas.
+
+Unary functions use `sigma_y = abs(f'(x)) sigma_x` for each key. A shared helper
+converts the signal and every uncertainty together with an inline factor, so
+logarithms, exponentials, powers and trigonometric functions leave their input
+object and units unchanged. Percent inputs are converted to dimensionless
+values; angular inputs are converted to radians. Invalid domain positions
+produce `NaN` signal and uncertainties. Negation preserves absolute sigmas.
 
 ## Reductions and integration
 
 For an unweighted mean of independent samples,
 `sigma_mean = sqrt(sum(sigma_i²)) / N`. For a weighted mean,
 `sigma_mean² = sum(w_i² sigma_i²) / sum(w_i)²`. A weighted sum omits the
-denominator. `ReduceDimensionality` applies these rules to every existing name
-and can separately add scatter-derived estimators.
+denominator. `ReduceDimensionality` propagates each existing key and can add
+scatter-derived estimates using the producer rule above.
 
-`Integrate1D` derives quadrature coefficients `c_i` from the shared coordinate
-axis and calculates `sigma_I = sqrt(sum((c_i sigma_i)²))` per component. The
-output unit is the signal unit multiplied by the coordinate unit. Invalid,
-masked, or zero-weight samples are omitted from the common integration domain.
+`Integrate1D` uses quadrature coefficients `c_i` and computes
+`sigma_I = sqrt(sum((c_i sigma_i)²))` for each key. The output unit is the signal
+unit multiplied by the coordinate unit. Invalid, masked or zero-weight samples
+are omitted from the common integration domain. A reduction's `nan_policy`
+controls whether invalid samples are omitted or produce a `NaN` result.
 
-The `nan_policy` of a reduction determines whether invalid samples are omitted
-or make the reduced result `NaN`. Optional masks exclude selected samples
-without changing the input arrays.
+## Scientific limitations
 
-## Creating and combining components
-
-- [`PoissonUncertainties`](../reference/modules/PoissonUncertainties.md) creates
-  a `Poisson` estimate from count data.
-- [`CombineUncertainties`](../reference/modules/CombineUncertainties.md)
-  combines selected independent components in quadrature under a new name.
-- [`CombineUncertaintiesMax`](../reference/modules/CombineUncertaintiesMax.md)
-  takes the element-wise maximum when a conservative envelope, rather than an
-  independent quadrature model, is intended.
-
-Propagating an existing measurement component and estimating a new component
-from scatter are different operations. Name them distinctly and choose an
-explicit collision policy when a reduction estimator would reuse an existing
-name.
-
-## Limitations and scientific responsibility
-
-The container does not currently carry covariance matrices or correlations
-between pixels, samples, parameters, or named components. First-order rules can
-be inadequate for strongly nonlinear transformations or large uncertainties.
-Systematic contributions must not be combined in quadrature merely for
-convenience. When correlation or a domain-specific model matters, implement and
-document that model explicitly and retain diagnostic outputs.
+The container does not represent covariance or physical correlations between
+pixels, measurements, parameters or names. First-order propagation may be
+inadequate for strongly nonlinear functions or large uncertainties. In
+particular, broadcasting and repeated use of a correction do not establish
+independence. Choose uncertainty models and explicit combinations to match the
+measurement, and retain diagnostic outputs where a stronger model is needed.

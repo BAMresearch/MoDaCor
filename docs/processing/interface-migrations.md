@@ -15,6 +15,20 @@ The synthetic [Quickstart](../getting-started/quickstart.md) is unaffected.
 Ordinary explicit `steps` documents also remain valid; the `step_blocks` and
 `for_each` schema is additive.
 
+## Stage 0: mixed `propagate_to_all` mappings raise ValueError
+
+An uncertainty mapping containing both `propagate_to_all` and another key now
+raises `ValueError`. Keep `propagate_to_all` as the only key, or rename it to an
+ordinary named key. This applies to configured uncertainty sources as well as
+mappings modified directly in Python. Validation occurs before mutation at
+arithmetic, copying, indexing, unit-conversion and uncertainty-producer entry
+points. Combination modules reject `propagate_to_all` as a source key.
+
+A producer introducing named estimates into a global-only mapping folds the
+global term into each estimate produced in that call and atomically removes the
+reserved key. Do not pre-build a mixed mapping to request this transition.
+See [Uncertainty propagation](../data-model/uncertainty-propagation.md).
+
 ## R07: `output_processing_key` only on ConcatenateDatabundles and IndexedAverager
 
 Remove `output_processing_key` from every other step's YAML configuration.
