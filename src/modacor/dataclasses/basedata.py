@@ -242,24 +242,22 @@ def _binary_basedata_op(
     Apply a binary arithmetic operation to two BaseData objects, propagating
     uncertainties using standard first-order, uncorrelated error propagation.
 
-    Uncertainty-key rules
-    ---------------------
-    ``propagate_to_all`` is global only when it is an operand's sole key:
+    Semantics
+    ---------
+    - Uncertainty dict entries are treated as independent sources keyed by name.
+    - "propagate_to_all" is treated as a *global fallback* only when it is the sole key
+      on an operand. Otherwise it is treated like a normal key name and participates via
+      rule 4 (union, no cross-key combining).
 
-    1) Both operands global-only: keep ``propagate_to_all``.
-    2) Global-only and no uncertainties: keep and propagate ``propagate_to_all``.
-    3) Global-only and another non-empty mapping: use the other mapping's keys,
-       folding the global contribution into each, including a mixed-in
-       ``propagate_to_all`` key.
-    4) Neither global-only: union of all keys; a mixed-in ``propagate_to_all``
-       is an ordinary component. Matching components combine in quadrature.
-
-    .. warning::
-       Folding does not represent covariance. Combining the resulting keys in
-       quadrature (for example with CombineUncertainties) counts the shared
-       global contribution once per key, up to sqrt(k) times across k keys.
-       When using ``propagate_to_all``, keep propagated components separate
-       rather than combining them afterwards.
+    Rules for result uncertainty keys:
+    1) If both operands have only "propagate_to_all":
+         result.uncertainties = {"propagate_to_all": σ}
+    2) If exactly one operand has only "propagate_to_all" and the other has non-global keys:
+         result.uncertainties contains only the other operand's non-global keys.
+         The global term contributes into each of those keys.
+    3) Matching non-global keys propagate and combine by key.
+    4) Non-matching non-global keys: transfer/propagate each key independently into the result
+         (union of keys), without cross-key combining.
 
     Propagation formulas (uncorrelated, first-order)
     -----------------------------------------------
@@ -285,7 +283,27 @@ def _binary_basedata_op(
     left_unc = left.uncertainties
     right_unc = right.uncertainties
 
-    out_keys, left_global, right_global = _uncertainty_key_plan(left_unc, right_unc)
+    # "global-only" if and only if propagate_to_all is the sole key
+    left_global = left_unc.get("propagate_to_all") if set(left_unc.keys()) == {"propagate_to_all"} else None
+    right_global = right_unc.get("propagate_to_all") if set(right_unc.keys()) == {"propagate_to_all"} else None
+
+    left_non_global_keys = set(left_unc.keys()) - {"propagate_to_all"}
+    right_non_global_keys = set(right_unc.keys()) - {"propagate_to_all"}
+
+    # Decide output keys per rules
+    if left_global is not None and right_global is not None:
+        out_keys = {"propagate_to_all"}
+        drop_global_key = False  # we *do* want it
+    elif left_global is not None and right_non_global_keys:
+        out_keys = set(right_non_global_keys)
+        drop_global_key = True
+    elif right_global is not None and left_non_global_keys:
+        out_keys = set(left_non_global_keys)
+        drop_global_key = True
+    else:
+        # General case: union of non-global keys
+        out_keys = left_non_global_keys | right_non_global_keys
+        drop_global_key = True  # we never emit propagate_to_all unless both-global-only
 
     def _as_broadcast_float(err: Any) -> np.ndarray:
         arr = np.asarray(err, dtype=float)
@@ -342,6 +360,10 @@ def _binary_basedata_op(
     else:
         raise NotImplementedError(f"Operation {op} not supported in _binary_basedata_op")  # noqa: E713
 
+    # Only emit propagate_to_all in the both-global-only case
+    if drop_global_key:
+        result_unc.pop("propagate_to_all", None)
+
     result = BaseData(signal=base_signal, units=result_units, uncertainties=result_unc)
     return _inherit_binary_metadata(left, right, result)
 
@@ -373,19 +395,17 @@ def _uncertainty_key_plan(
     left_global = left_unc.get("propagate_to_all") if set(left_unc.keys()) == {"propagate_to_all"} else None
     right_global = right_unc.get("propagate_to_all") if set(right_unc.keys()) == {"propagate_to_all"} else None
 
+    left_non_global_keys = set(left_unc.keys()) - {"propagate_to_all"}
+    right_non_global_keys = set(right_unc.keys()) - {"propagate_to_all"}
+
     if left_global is not None and right_global is not None:
         out_keys = {"propagate_to_all"}
-    elif left_global is not None:
-        out_keys = set(right_unc) or {"propagate_to_all"}
-    elif right_global is not None:
-        out_keys = set(left_unc) or {"propagate_to_all"}
+    elif left_global is not None and right_non_global_keys:
+        out_keys = set(right_non_global_keys)
+    elif right_global is not None and left_non_global_keys:
+        out_keys = set(left_non_global_keys)
     else:
-        out_keys = set(left_unc) | set(right_unc)
-
-    if left_global is not None and "propagate_to_all" in out_keys and len(out_keys) > 1:
-        # In-place paths may overwrite the original global array under its
-        # own key. Other keys must fold in the original, unmodified fallback.
-        left_global = np.array(left_global, copy=True)
+        out_keys = left_non_global_keys | right_non_global_keys
     return out_keys, left_global, right_global
 
 
@@ -746,22 +766,24 @@ class BaseData(UncertaintyOpsMixin):
 
         Special key: ``"propagate_to_all"``
         ---------------------------------
-        The key is global only when it is an operand's sole uncertainty key.
+        ``"propagate_to_all"`` is treated as a *global* uncertainty **only when it is the sole
+        key present** on an operand.
 
-        1. Both operands global-only: keep ``propagate_to_all``.
-        2. Global-only and no uncertainties: keep and propagate ``propagate_to_all``.
-        3. Global-only and another non-empty mapping: fold the global contribution
-           into each key of the other mapping, including a mixed-in
-           ``propagate_to_all`` key.
-        4. Neither global-only: union of all keys; a mixed-in ``propagate_to_all``
-           is an ordinary component. Matching keys combine in quadrature.
+        The propagation rules for an operation ``result = op(a, b)`` are:
 
-        .. warning::
-           Folding does not represent covariance. Combining the resulting keys in
-           quadrature (for example with CombineUncertainties) counts the shared
-           global contribution once per key, up to sqrt(k) times across k keys.
-           When using ``propagate_to_all``, keep propagated components separate
-           rather than combining them afterwards.
+        1. If both operands only contain ``"propagate_to_all"``, the result contains only
+           ``"propagate_to_all"`` (propagated normally).
+
+        2. If one operand only contains ``"propagate_to_all"`` and the other contains one or
+           more non-``"propagate_to_all"`` keys, the result contains only those non-global keys.
+           The global uncertainty contributes as a fallback term to each of those keys.
+
+        3. If both operands contain matching non-global keys, those keys are propagated and
+           combined by key.
+
+        4. If both operands contain non-global keys but with no matches, the result contains
+           the union of keys, and each key is propagated from its originating operand only
+           (no cross-key combining).
     weights : np.ndarray, optional
         Weights for `signal` (default is a scaling 1.0) for use in averaging operations.
         Must broadcast to `signal.shape`.

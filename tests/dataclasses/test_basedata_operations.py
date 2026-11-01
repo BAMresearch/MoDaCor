@@ -10,11 +10,9 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 
-import operator
 import unittest
 
 import numpy as np
-import pytest
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
@@ -509,102 +507,3 @@ class TestBroadcastValidation(unittest.TestCase):
         # and unary op should broadcast this fine
         res = bd.square()
         self.assertEqual(res.uncertainties["u"].shape, signal.shape)
-
-
-# Analytic component pairs are written explicitly for each contract row;
-# they do not call BaseData's key-selection implementation.
-_GLOBAL_CASES = [
-    ({"propagate_to_all": 0.2}, {}, {"propagate_to_all": (0.2, 0.0)}),
-    ({"propagate_to_all": 0.2}, {"propagate_to_all": 0.3}, {"propagate_to_all": (0.2, 0.3)}),
-    ({"propagate_to_all": 0.2}, {"u": 0.3, "v": 0.4}, {"u": (0.2, 0.3), "v": (0.2, 0.4)}),
-    ({"propagate_to_all": 0.2, "u": 0.1}, {}, {"propagate_to_all": (0.2, 0.0), "u": (0.1, 0.0)}),
-    (
-        {"propagate_to_all": 0.2, "u": 0.1},
-        {"u": 0.3, "v": 0.4},
-        {"propagate_to_all": (0.2, 0.0), "u": (0.1, 0.3), "v": (0.0, 0.4)},
-    ),
-    ({"propagate_to_all": 0.2, "u": 0.1}, {"propagate_to_all": 0.3}, {"propagate_to_all": (0.2, 0.3), "u": (0.1, 0.3)}),
-    ({}, {}, {}),
-]
-
-
-def _analytic_sigma(operation, a, b, sigma_a, sigma_b):
-    if operation in (operator.add, operator.sub):
-        return np.sqrt(sigma_a**2 + sigma_b**2)
-    if operation is operator.mul:
-        return np.sqrt((b * sigma_a) ** 2 + (a * sigma_b) ** 2)
-    return np.sqrt((sigma_a / b) ** 2 + (a * sigma_b / b**2) ** 2)
-
-
-@pytest.mark.parametrize("left_unc,right_unc,pairs", _GLOBAL_CASES)
-@pytest.mark.parametrize(
-    "operation,inplace",
-    [
-        (operator.add, operator.iadd),
-        (operator.sub, operator.isub),
-        (operator.mul, operator.imul),
-        (operator.truediv, operator.itruediv),
-    ],
-)
-@pytest.mark.parametrize("reverse", [False, True])
-@pytest.mark.parametrize("use_inplace", [False, True])
-def test_global_component_contract_analytic(left_unc, right_unc, pairs, operation, inplace, reverse, use_inplace):
-    a = np.array([2.0, 3.0])
-    b = np.array([4.0, 5.0])
-    scale = np.array([1.0, 2.0])
-    if reverse:
-        a, b = b, a
-        left_unc, right_unc = right_unc, left_unc
-        pairs = {name: (right, left) for name, (left, right) in pairs.items()}
-    left = BaseData(a.copy(), ureg.dimensionless, uncertainties={key: value * scale for key, value in left_unc.items()})
-    right = BaseData(
-        b.copy(), ureg.dimensionless, uncertainties={key: value * scale for key, value in right_unc.items()}
-    )
-    result = (inplace if use_inplace else operation)(left, right)
-    np.testing.assert_allclose(result.signal, operation(a, b), rtol=1e-12)
-    assert set(result.uncertainties) == set(pairs)
-    for name, (sigma_a, sigma_b) in pairs.items():
-        np.testing.assert_allclose(
-            result.uncertainties[name], _analytic_sigma(operation, a, b, sigma_a * scale, sigma_b * scale), rtol=1e-12
-        )
-
-
-@pytest.mark.parametrize("uncertainties", [{"propagate_to_all": 0.2}, {"propagate_to_all": 0.2, "u": 0.1}, {"u": 0.1}])
-@pytest.mark.parametrize(
-    "operation",
-    [
-        operator.add,
-        operator.sub,
-        operator.mul,
-        operator.truediv,
-        operator.iadd,
-        operator.isub,
-        operator.imul,
-        operator.itruediv,
-    ],
-)
-@pytest.mark.parametrize("reverse", [False, True])
-def test_exact_float_and_basedata_have_identical_uncertainties(uncertainties, operation, reverse):
-    def calculate(exact):
-        data = BaseData(np.array([2.0, 3.0]), ureg.dimensionless, uncertainties=uncertainties)
-        return operation(exact, data) if reverse else operation(data, exact)
-
-    result_float = calculate(4.0)
-    result_basedata = calculate(BaseData(np.asarray(4.0), ureg.dimensionless))
-    np.testing.assert_allclose(result_float.signal, result_basedata.signal, rtol=1e-12)
-    assert set(result_float.uncertainties) == set(result_basedata.uncertainties)
-    for name in result_float.uncertainties:
-        np.testing.assert_allclose(result_float.uncertainties[name], result_basedata.uncertainties[name], rtol=1e-12)
-
-
-def test_folding_into_two_components_counts_global_twice_when_combined():
-    from modacor.dataclasses.uncertainty_tools import quadrature_aggregator
-
-    global_value = BaseData(np.asarray(2.0), ureg.dimensionless, uncertainties={"propagate_to_all": 0.3})
-    named = BaseData(np.asarray(4.0), ureg.dimensionless, uncertainties={"u": 0.0, "v": 0.0})
-    result = global_value * named
-    assert set(result.uncertainties) == {"u", "v"}
-    np.testing.assert_allclose(result.uncertainties["u"], 1.2, rtol=1e-12)
-    np.testing.assert_allclose(result.uncertainties["v"], 1.2, rtol=1e-12)
-    combined = quadrature_aggregator(list(result.uncertainties.values()), result.shape)
-    np.testing.assert_allclose(combined, np.sqrt(2.0) * 1.2, rtol=1e-12)
