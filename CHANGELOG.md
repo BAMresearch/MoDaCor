@@ -1,8 +1,38 @@
 # CHANGELOG
 
+## v1.15.0 (2026-11-01)
+
+### Bug fixes
+
+* fix: preserve array and arithmetic contracts in Stage 0 edge cases ([`180b085`](https://github.com/BAMresearch/MoDaCor/commit/180b085ec2c3a7a91a9ee8ee3192224dd2b69fac))
+
+* fix: fold global uncertainties atomically in estimate producers ([`17c67aa`](https://github.com/BAMresearch/MoDaCor/commit/17c67aa5d90f7d054ae03dc0f82fa6d7a746ea54))
+
+* fix: convert unary inputs without mutating BaseData ([`779084a`](https://github.com/BAMresearch/MoDaCor/commit/779084aab8745db7b70516484489fac8bd6d33fc))
+
+* fix: make in-place arithmetic atomic and alias safe ([`80ff485`](https://github.com/BAMresearch/MoDaCor/commit/80ff485897150b63a15c5871ba28d11d09b02942))
+
+* fix: give BaseData independent array ownership ([`59cd747`](https://github.com/BAMresearch/MoDaCor/commit/59cd7476a1cef0cd8f1a0855b3079e45bf59d532))
+
+### Documentation
+
+* docs: use the updated Stage 0 specification and restore guide guidance ([`fd56f6f`](https://github.com/BAMresearch/MoDaCor/commit/fd56f6f5da52d77d0b6daac2080f88071587c233))
+
+* docs: document Stage 0 uncertainty rules and input migration ([`401e759`](https://github.com/BAMresearch/MoDaCor/commit/401e75948b132c6cc90f948aa66ad488e8c985c8))
+
+### Features
+
+* feat: enforce Stage 0 uncertainty key resolution ([`684ca8e`](https://github.com/BAMresearch/MoDaCor/commit/684ca8e3a84a4f16a2d4ed03d8c8a129ab31f4c3))
+
+### Testing
+
+* test: check T0-04b with the specification's values ([`8f0dea5`](https://github.com/BAMresearch/MoDaCor/commit/8f0dea57248d09a3749601784a4e99a2155c4176))
+
 ## v1.14.0 (2026-11-01)
 
 ### Bug fixes
+
+* fix: keep propagate_to_all uncertainties in BaseData arithmetic ([`3ea4ec2`](https://github.com/BAMresearch/MoDaCor/commit/3ea4ec2bbeb42b02b7f9afa2e46c93de7543f2ed))
 
 * fix: accept creatable sink directories and keep dry-run warnings intact ([`19ca5d3`](https://github.com/BAMresearch/MoDaCor/commit/19ca5d3bc0b4040bfd4533c0fbd83a345e1ca322))
 
@@ -11,6 +41,8 @@
 * ci: install the attenuation extra so the xraylib tests run in CI ([`6dd5eef`](https://github.com/BAMresearch/MoDaCor/commit/6dd5eefc9be0248d98c7f771bdb07ecafd771b3b))
 
 ### Documentation
+
+* docs: drop the reverted propagate_to_all fix from the v1.14.0 changelog ([`0bbe59d`](https://github.com/BAMresearch/MoDaCor/commit/0bbe59dc36840859cf972e3f9c7899af29aa1a3b))
 
 * docs: point R17 to the uncertainty Stage 0 specification in remediation tracker ([`4c08d1e`](https://github.com/BAMresearch/MoDaCor/commit/4c08d1ee9ec2026cd6f349a62654d38a16af83da))
 
@@ -49,6 +81,10 @@
 ### Refactoring
 
 * refactor: share one configuration-scalar unit conversion helper ([`4e72925`](https://github.com/BAMresearch/MoDaCor/commit/4e7292576d369e2c6195a8f59edf9c57d6997c20))
+
+### Unknown Scope
+
+* revert: withdraw the interim propagate_to_all key rules ahead of Stage 0 ([`ef78822`](https://github.com/BAMresearch/MoDaCor/commit/ef7882243d2f1f8fd4cd344440d0182fb010de60))
 
 ## v1.13.0 (2026-10-31)
 
