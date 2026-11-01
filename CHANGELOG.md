@@ -4,8 +4,6 @@
 
 ### Bug fixes
 
-* fix: keep propagate_to_all uncertainties in BaseData arithmetic ([`3ea4ec2`](https://github.com/BAMresearch/MoDaCor/commit/3ea4ec2bbeb42b02b7f9afa2e46c93de7543f2ed))
-
 * fix: accept creatable sink directories and keep dry-run warnings intact ([`19ca5d3`](https://github.com/BAMresearch/MoDaCor/commit/19ca5d3bc0b4040bfd4533c0fbd83a345e1ca322))
 
 ### Continuous integration
@@ -51,10 +49,6 @@
 ### Refactoring
 
 * refactor: share one configuration-scalar unit conversion helper ([`4e72925`](https://github.com/BAMresearch/MoDaCor/commit/4e7292576d369e2c6195a8f59edf9c57d6997c20))
-
-### Unknown Scope
-
-* revert: withdraw the interim propagate_to_all key rules ahead of Stage 0 ([`ef78822`](https://github.com/BAMresearch/MoDaCor/commit/ef7882243d2f1f8fd4cd344440d0182fb010de60))
 
 ## v1.13.0 (2026-10-31)
 
