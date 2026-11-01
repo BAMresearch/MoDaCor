@@ -87,15 +87,15 @@ def validate_rank_of_data(instance, attribute, value) -> None:
 
 def signal_converter(value: int | float | np.ndarray) -> np.ndarray:
     """
-    Convert the input value to a numpy array if it is not already one.
+    Convert the input to an owned array, preserving an array input's dtype.
     """
-    return np.array(value, dtype=float) if not isinstance(value, np.ndarray) else value
+    return value.copy() if isinstance(value, np.ndarray) else np.array(value, dtype=float)
 
 
 def dict_signal_converter(value: Dict[str, int | float | np.ndarray]) -> Dict[str, np.ndarray]:
     """
     Convert a dictionary of values to a dictionary of numpy arrays.
-    Each value in the dictionary is converted to a numpy array if it is not already one.
+    Every value is copied so separate containers never share uncertainty storage.
     """
     return {k: signal_converter(v) for k, v in value.items()}
 
@@ -410,9 +410,9 @@ def _uncertainty_key_plan(
 
 
 def _writable_full_shape_uncertainty(owner: BaseData, source: Any, key: str) -> np.ndarray:
+    # The mutable mapping can contain views or externally assigned arrays. Even
+    # an owning ndarray can be shared by another key/container, so always detach.
     arr = np.asarray(source, dtype=float)
-    if key in owner.uncertainties and arr.shape == owner.signal.shape and arr.flags.writeable:
-        return arr
     target = np.empty_like(owner.signal, dtype=float)
     target[...] = arr
     return target
@@ -991,11 +991,11 @@ class BaseData(UncertaintyOpsMixin):
         # simple unit conversion, can be done to scalar
         # Convert signal
         cfact = new_units.m_from(self.units)
-        self.signal *= cfact
+        signal = np.asarray(self.signal * cfact)
+        uncertainties = {key: np.asarray(value * abs(cfact)) for key, value in self.uncertainties.items()}
+        self.signal = signal
+        self.uncertainties = uncertainties
         self.units = new_units
-        # Convert uncertainty
-        for key in self.uncertainties:  # fastest as far as my limited testing goes against iterating over items():
-            self.uncertainties[key] *= cfact
 
     def indexed(self, indexer: Any, *, rank_of_data: int | None = None) -> "BaseData":
         """
@@ -1060,10 +1060,10 @@ class BaseData(UncertaintyOpsMixin):
         themselves are still shared.
         """
         new = BaseData(
-            signal=np.array(self.signal, copy=True),
+            signal=self.signal,
             units=self.units,
-            uncertainties=_copy_uncertainties(self.uncertainties),
-            weights=np.array(self.weights, copy=True),
+            uncertainties=self.uncertainties,
+            weights=self.weights,
             axes=list(self.axes) if with_axes else [],
             rank_of_data=self.rank_of_data,
         )

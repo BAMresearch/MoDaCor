@@ -224,7 +224,8 @@ class TestBinaryOpsWithUncertainties(unittest.TestCase):
         result /= divisor
 
         self.assertEqual(id(result), original_object_id)
-        self.assertIs(result.uncertainties["Poisson"], original_uncertainty)
+        self.assertFalse(np.shares_memory(result.uncertainties["Poisson"], original_uncertainty))
+        np.testing.assert_allclose(original_uncertainty, np.sqrt(signal))
         self.assertEqual(result.rank_of_data, 2)
         self.assertEqual(result.units, expected.units)
         np.testing.assert_allclose(result.signal, expected.signal)
@@ -266,7 +267,8 @@ class TestBinaryOpsWithUncertainties(unittest.TestCase):
         base -= subtrahend
 
         self.assertEqual(id(base), original_object_id)
-        self.assertIs(base.uncertainties["Poisson"], original_uncertainty)
+        self.assertFalse(np.shares_memory(base.uncertainties["Poisson"], original_uncertainty))
+        np.testing.assert_allclose(original_uncertainty, np.sqrt(signal))
         self.assertEqual(base.rank_of_data, 2)
         self.assertEqual(base.units, expected.units)
         np.testing.assert_allclose(base.signal, expected.signal)
