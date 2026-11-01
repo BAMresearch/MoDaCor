@@ -99,8 +99,8 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R14 | The `required` argument flag is never enforced | contract | S | medium | open |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
-| R17 | BaseData silently drops `propagate_to_all` uncertainties | bug | S | high | done |
-| R18 | Transmission uncertainties left in percent while the value is converted | bug | XS | high | in progress |
+| R17 | BaseData silently drops `propagate_to_all` uncertainties | bug | S | high | done; mixed-key rule under revision |
+| R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | scope under discussion |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -2446,7 +2446,10 @@ finite-difference test.
 
 ## R17 — BaseData silently drops `propagate_to_all` uncertainties
 
-**Status:** done on branch `quality-remediation-r08-r13-r15` (commit `3ea4ec2`). Found when R08's equivalence guard stopped
+**Status:** done on branch `quality-remediation-r08-r13-r15` (commit `3ea4ec2`).
+The maintainer is revising the last contract row, "neither global-only":
+the handling of an operand that carries `propagate_to_all` together with other keys
+(2026-11-01; new rules to follow). Found when R08's equivalence guard stopped
 the `SubtractInterpolated1D` refactor.
 
 **Problem.** `propagate_to_all` is a special uncertainty key: when it is an
@@ -2562,8 +2565,21 @@ made after the R17 commit.
 
 ## R18 — Transmission uncertainties left in percent while the value is converted
 
-**Status:** in progress on branch `quality-remediation-r08-r13-r15`. Found
-2026-10-31 by R08's capillary equivalence guard.
+**Status:** scope under discussion (maintainer, 2026-11-01). The scope is
+widened from the two-step transmission fix to central unit handling.
+
+**Direction (to be discussed).**
+- Conversion lives in BaseData: a non-mutating `in_units()` shares one code
+  path with `to_units()` and promotes integer signals to float.
+- Kernel-boundary accessors return the value and the uncertainties in the
+  same units, so they cannot drift apart: `magnitudes(units)` and
+  `scalar_components(units)`.
+- `scalar_in_units` stays for configuration numbers only.
+- An AST guard test (like R03's) blocks module-local conversions of data,
+  with a short reasoned allow-list.
+- Weights are dimensionless relative weights by contract, so unit conversion
+  does not touch them; document this.
+- The two transmission steps below are fixed with the central API.
 
 **Problem.** Two steps convert the measured transmission's nominal value to
 dimensionless, but read its uncertainties from the unconverted BaseData. A
