@@ -241,3 +241,37 @@ def test_t0_12_multiply_keeps_container_identity(operand):
     a *= operand
     assert a is reference
     assert_data_equal(reference, expected)
+
+
+@pytest.mark.parametrize(
+    "function,units,target",
+    [
+        ("log", ureg.percent, ureg.dimensionless),
+        ("exp", ureg.percent, ureg.dimensionless),
+        ("arcsin", ureg.percent, ureg.dimensionless),
+        ("arccos", ureg.percent, ureg.dimensionless),
+        ("arctan", ureg.percent, ureg.dimensionless),
+        ("sin", ureg.degree, ureg.radian),
+        ("cos", ureg.degree, ureg.radian),
+        ("tan", ureg.degree, ureg.radian),
+    ],
+)
+def test_t0_10_unary_inline_conversion_preserves_input(function, units, target):
+    x = BaseData(np.array([20.0, 40.0]), units, {"u": np.array([1.0, 2.0]), "v": 0.5})
+    before = x.copy()
+    signal_ref = x.signal
+    unc_refs = dict(x.uncertainties)
+    converted = x.copy()
+    converted.to_units(target)
+    expected = getattr(converted, function)()
+    result = getattr(x, function)()
+    assert_data_equal(result, expected)
+    assert_data_equal(x, before)
+    assert x.signal is signal_ref
+    for key in unc_refs:
+        assert x.uncertainties[key] is unc_refs[key]
+    if function == "sin":
+        assert_allclose(result.signal, np.sin(np.deg2rad([20.0, 40.0])))
+        assert_allclose(result.uncertainties["u"], np.abs(np.cos(np.deg2rad([20.0, 40.0]))) * np.deg2rad([1.0, 2.0]))
+    if function == "exp":
+        assert_allclose(result.uncertainties["u"], np.exp([0.2, 0.4]) * [0.01, 0.02])

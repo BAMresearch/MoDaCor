@@ -391,20 +391,32 @@ def _inplace_add_sub(target: BaseData, other: BaseData, *, sign: float) -> BaseD
     return _install_inplace_result(target, _binary_basedata_op(target, other, op))
 
 
+def _unary_inputs(element: BaseData, input_units: pint.Unit | None = None):
+    """Return signal and all sigmas with one inline conversion; never mutate input."""
+    _validate_uncertainties(element)
+    factor = 1.0 if input_units is None else float(input_units.m_from(element.units))
+    if factor == 1.0:
+        return element.signal, element.uncertainties
+    return element.signal * factor, {
+        key: np.asarray(value) * abs(factor) for key, value in element.uncertainties.items()
+    }
+
+
 def _unary_basedata_op(
     element: BaseData,
     func: Callable[[np.ndarray], np.ndarray],
     dfunc: Callable[[np.ndarray], np.ndarray],
     out_units: pint.Unit,
     domain: Callable[[np.ndarray], np.ndarray] | None = None,
+    input_units: pint.Unit | None = None,
 ) -> BaseData:
     """
     Generic unary op: y = func(x), σ_y ≈ |dfunc(x)| σ_x, with an optional domain.
 
     Outside the domain, signal and uncertainties are set to NaN (using np.where-style masking).
     """
-    _validate_uncertainties(element)
-    x = np.asarray(element.signal)
+    signal, uncertainties = _unary_inputs(element, input_units)
+    x = np.asarray(signal)
     if domain is None:
         valid = np.ones_like(x, dtype=bool)
     else:
@@ -422,7 +434,7 @@ def _unary_basedata_op(
         uncertainties={},
     )
 
-    for key, err in element.uncertainties.items():
+    for key, err in uncertainties.items():
         validate_broadcast(x, np.asarray(err), f"uncertainties['{key}']")
         err_b = np.broadcast_to(err, x.shape)
 
@@ -919,22 +931,22 @@ class BaseData(UncertaintyOpsMixin):
 
 def squeeze_basedata_element(element: BaseData) -> BaseData:
     """Squeeze: remove single-dimensional entries from the shape of the signal."""
-    _validate_uncertainties(element)
+    signal, uncertainties = _unary_inputs(element)
     result = BaseData(
-        signal=np.squeeze(element.signal),
+        signal=np.squeeze(signal),
         units=element.units,
-        uncertainties={k: np.squeeze(v) for k, v in element.uncertainties.items()},
+        uncertainties={k: np.squeeze(v) for k, v in uncertainties.items()},
     )
     return _inherit_metadata(element, result)
 
 
 def negate_basedata_element(element: BaseData) -> BaseData:
     """Negate a BaseData element with uncertainty and units propagation."""
-    _validate_uncertainties(element)
+    signal, uncertainties = _unary_inputs(element)
     result = BaseData(
-        signal=-element.signal,
+        signal=-signal,
         units=element.units,
-        uncertainties=_copy_uncertainties(element.uncertainties),
+        uncertainties=uncertainties,
     )
     return _inherit_metadata(element, result)
 
@@ -980,10 +992,9 @@ def powered_basedata_element(element: BaseData, exponent: float) -> BaseData:
 
 def log_basedata_element(element: BaseData) -> BaseData:
     """Natural log: y = ln(x), σ_y ≈ |1/x| σ_x. x must be > 0."""
-    # ensure element is dimensionless:
-    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
+        input_units=ureg.dimensionless,
         func=np.log,
         dfunc=lambda x: 1.0 / x,
         out_units=ureg.dimensionless,
@@ -993,10 +1004,9 @@ def log_basedata_element(element: BaseData) -> BaseData:
 
 def exp_basedata_element(element: BaseData) -> BaseData:
     """Exponential: y = exp(x), σ_y ≈ exp(x) σ_x. Argument should be dimensionless."""
-    # ensure element is dimensionless:
-    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
+        input_units=ureg.dimensionless,
         func=np.exp,
         dfunc=np.exp,
         out_units=ureg.dimensionless,
@@ -1005,10 +1015,9 @@ def exp_basedata_element(element: BaseData) -> BaseData:
 
 def sin_basedata_element(element: BaseData) -> BaseData:
     """Sine: y = sin(x), σ_y ≈ |cos(x)| σ_x. x in radians."""
-    # ensure element is in radian:
-    element.to_units(ureg.radian)
     return _unary_basedata_op(
         element=element,
+        input_units=ureg.radian,
         func=np.sin,
         dfunc=np.cos,
         out_units=ureg.dimensionless,
@@ -1017,10 +1026,9 @@ def sin_basedata_element(element: BaseData) -> BaseData:
 
 def cos_basedata_element(element: BaseData) -> BaseData:
     """Cosine: y = cos(x), σ_y ≈ |sin(x)| σ_x. x in radians."""
-    # ensure element is in radian:
-    element.to_units(ureg.radian)
     return _unary_basedata_op(
         element=element,
+        input_units=ureg.radian,
         func=np.cos,
         dfunc=np.sin,  # derivative is -sin(x), abs removes sign
         out_units=ureg.dimensionless,
@@ -1029,10 +1037,9 @@ def cos_basedata_element(element: BaseData) -> BaseData:
 
 def tan_basedata_element(element: BaseData) -> BaseData:
     """Tangent: y = tan(x), σ_y ≈ |1/cos^2(x)| σ_x. x in radians."""
-    # ensure element is in radian:
-    element.to_units(ureg.radian)
     return _unary_basedata_op(
         element=element,
+        input_units=ureg.radian,
         func=np.tan,
         dfunc=lambda x: 1.0 / (np.cos(x) ** 2),
         out_units=ureg.dimensionless,
@@ -1041,10 +1048,9 @@ def tan_basedata_element(element: BaseData) -> BaseData:
 
 def arcsin_basedata_element(element: BaseData) -> BaseData:
     """Arcsin: y = arcsin(x), σ_y ≈ |1/sqrt(1-x^2)| σ_x. x dimensionless, |x| <= 1."""
-    # ensure element is dimensionless:
-    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
+        input_units=ureg.dimensionless,
         func=np.arcsin,
         dfunc=lambda x: 1.0 / np.sqrt(1.0 - x**2),
         out_units=ureg.radian,
@@ -1054,10 +1060,9 @@ def arcsin_basedata_element(element: BaseData) -> BaseData:
 
 def arccos_basedata_element(element: BaseData) -> BaseData:
     """Arccos: y = arccos(x), σ_y ≈ |1/sqrt(1-x^2)| σ_x. x dimensionless, |x| <= 1."""
-    # ensure element is dimensionless:
-    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
+        input_units=ureg.dimensionless,
         func=np.arccos,
         dfunc=lambda x: 1.0 / np.sqrt(1.0 - x**2),  # abs removes the sign
         out_units=ureg.radian,
@@ -1067,10 +1072,9 @@ def arccos_basedata_element(element: BaseData) -> BaseData:
 
 def arctan_basedata_element(element: BaseData) -> BaseData:
     """Arctan: y = arctan(x), σ_y ≈ |1/(1+x^2)| σ_x. x dimensionless."""
-    # ensure element is dimensionless:
-    element.to_dimensionless()
     return _unary_basedata_op(
         element=element,
+        input_units=ureg.dimensionless,
         func=np.arctan,
         dfunc=lambda x: 1.0 / (1.0 + x**2),
         out_units=ureg.radian,
