@@ -99,7 +99,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R14 | The `required` argument flag is never enforced | contract | S | medium | open |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
-| R17 | BaseData silently drops `propagate_to_all` uncertainties | bug | S | high | done; mixed-key rule under revision |
+| R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | in progress (own branch and PR) |
 | R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | approved |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
@@ -1646,7 +1646,8 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
 **Status:** in progress on branch `quality-remediation-r08-r13-r15`. The
 classification and Commit A (the scalar helper) are done. Commit B stopped at
 the equivalence guard: BaseData dropped a sole `propagate_to_all` component.
-That is a BaseData bug, now R17, which is fixed first.
+That is a BaseData bug, now R17 (Stage 0). The remaining Commit B rows and the
+kernel moves resume once Stage 0 (R17) and R18 have landed.
 
 **Inventory (2026-10-31, after R07).** A pattern search (`.magnitude`,
 `.m_as(`, `np.asarray(… .signal)`, `float(… .signal)`, `.to(…).magnitude`)
@@ -2446,11 +2447,24 @@ finite-difference test.
 
 ## R17 — BaseData silently drops `propagate_to_all` uncertainties
 
-**Status:** done on branch `quality-remediation-r08-r13-r15` (commit `3ea4ec2`).
-The maintainer is revising the last contract row, "neither global-only":
-the handling of an operand that carries `propagate_to_all` together with other keys
-(2026-11-01; new rules to follow). Found when R08's equivalence guard stopped
-the `SubtractInterpolated1D` refactor.
+**Status:** superseded by the uncertainty-propagation specification, Stage 0
+(maintainer, 2026-11-01). It is implemented on its own branch,
+`uncertainty-stage0` from `main`, as its own PR.
+- The interim fix `3ea4ec2` (union rule for mixed mappings) is reverted on
+  `quality-remediation-r08-r13-r15`. Stage 0 makes a mixed mapping raise
+  `ValueError` instead (R0.1).
+- The material is in `auxiliary/modacor_stage0_handoff.zip`: HANDOFF.md, the
+  normative specification, `repro.py` and RFC v8. The archive is not
+  committed; the specification and the RFC are added to the docs by the
+  Stage 0 PR.
+- Stage 0 scope (specification §4):
+  - one key planner (G + E keeps G, which fixes the loss found here);
+  - mixed mappings raise `ValueError`, with the producer "legacy fold" (R0.4);
+  - ownership and copy semantics;
+  - in-place safety and an in-place `__imul__`;
+  - scalar operands without full-size zero arrays;
+  - unary operations that do not mutate their input.
+- Stages 1 and 2 follow later.
 
 **Problem.** `propagate_to_all` is a special uncertainty key: when it is an
 operand's only key, it acts as a global fallback. The rules live in
