@@ -100,7 +100,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
 | R17 | BaseData silently drops `propagate_to_all` uncertainties | bug | S | high | done; mixed-key rule under revision |
-| R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | scope under discussion |
+| R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | approved |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -2565,21 +2565,71 @@ made after the R17 commit.
 
 ## R18 — Transmission uncertainties left in percent while the value is converted
 
-**Status:** scope under discussion (maintainer, 2026-11-01). The scope is
-widened from the two-step transmission fix to central unit handling.
+**Status:** approved (maintainer, 2026-11-01). The scope is widened from the
+two-step transmission fix to central unit handling.
 
-**Direction (to be discussed).**
-- Conversion lives in BaseData: a non-mutating `in_units()` shares one code
-  path with `to_units()` and promotes integer signals to float.
-- Kernel-boundary accessors return the value and the uncertainties in the
-  same units, so they cannot drift apart: `magnitudes(units)` and
-  `scalar_components(units)`.
-- `scalar_in_units` stays for configuration numbers only.
-- An AST guard test (like R03's) blocks module-local conversions of data,
-  with a short reasoned allow-list.
-- Weights are dimensionless relative weights by contract, so unit conversion
-  does not touch them; document this.
-- The two transmission steps below are fixed with the central API.
+**Decisions (2026-11-01).**
+
+1. **Central conversion in BaseData.**
+   - Add a non-mutating `in_units(units) -> BaseData` that shares one code path
+     with the in-place `to_units()`. Both convert signal and uncertainties, and
+     promote integer signals to float.
+   - Weights are dimensionless relative weights by contract; conversion
+     leaves them alone. Document this.
+2. **Kernel-boundary accessors return value and uncertainties together, in
+   the same units.** `magnitudes(units) -> (ndarray, {name: ndarray})` and
+   `scalar_components(units) -> (float, {name: float})`, the latter with the
+   scalar-or-constant-array policy.
+   - `scalar_in_units` is for configuration numbers only and raises
+     TypeError for BaseData.
+3. **Module-level arithmetic.** It SHOULD go through BaseData, unless that
+   measurably and severely affects performance; such an exception is
+   commented at the site with its measurement. Measured overhead: about
+   90 µs per scalar operation; ×20 on 1,000-point curves (0.12 ms); ×2.7 on
+   1 Mpx arrays (9.4 ms against 3.5 ms).
+4. **Safe dimensionless reduction, applied only when wrapping scalars.** This
+   covers building BaseData from scalar metadata or configuration. The
+   reduction:
+   - folds pure-number units (%, ‰, ppm, plain scale factors) into the
+     magnitude;
+   - cancels same-dimension pairs (m/mm);
+   - never touches `count`, angle units (`rad`, `deg`, …), `sr` or `px`.
+
+   Pint's own `to_reduced_units()` must not be used: it reduces `count/sr`
+   and `count/%` to bare numbers. Results of operations keep whatever Pint
+   produces.
+5. **Guard test.** An AST guard flags module-local data conversions
+   (`.to(…).magnitude`, `.m_as(`, `.m_from(`, `ureg.Quantity(`) under
+   `src/modacor/modules`, with a short reasoned allow-list (plot display,
+   configuration scalars).
+6. **New `ConvertUnits` step for output units.**
+   - Configuration: `units: {basedata_key: target_units, …}`.
+     `with_processing_keys` takes a list of bundles or `"*"` for every
+     bundle.
+   - Missing keys: with `"*"`, bundles lacking a key are skipped and logged
+     at INFO. With an explicit list, a missing key is an error.
+   - Conversion is in place, so axis references stay valid; uncertainties
+     are converted and weights are untouched.
+   - The dependency contract comes from a mapping-valued role on `units`.
+7. **Retire `AngleToQ.output_units`.** AngleToQ returns Q in its natural
+   units (1/m, as XSGeometryFromPixelCoordinates does), and pipelines add a
+   ConvertUnits step. This is an interface change: an entry in
+   `interface-migrations.md`, a minor release, and the MoDaCor-examples
+   `DLS/I22/pipelines/I22_USAXS.yaml` updated after the release.
+   XSGeometryFromPixelCoordinates gets no `output_units`; ConvertUnits covers
+   it.
+8. **The transmission bug** (below) is fixed with the central API.
+
+**Sub-steps.**
+- **R18a:** API, reduction at scalar wrapping, docs.
+- **R18b:** transmission fixes.
+- **R18c:** `scalar_in_units` numbers-only, the guard, and migration of the
+  flagged sites.
+- **R18d:** ConvertUnits, AngleToQ retirement, migration note, author-guide
+  "Units" section.
+
+Every change outside the listed intentional ones must leave results
+identical.
 
 **Problem.** Two steps convert the measured transmission's nominal value to
 dimensionless, but read its uncertainties from the unconverted BaseData. A
