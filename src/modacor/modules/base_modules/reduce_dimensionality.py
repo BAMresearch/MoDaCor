@@ -21,14 +21,16 @@ import numpy as np
 from attrs import define, field
 from attrs import validators as v
 
-from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.basedata import BaseData, _validate_uncertainties
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
-from modacor.modules.helpers import finalize_weighted_scatter, leading_non_data_axes
 
 # Facility-pluggable logger; by default this uses std logging
+from modacor.models.uncertainty import validate_uncertainty_keys, with_uncertainty_estimates
+from modacor.modules.helpers import finalize_weighted_scatter, leading_non_data_axes
+
 logger = MessageHandler(name=__name__)
 
 _COLLISION_POLICIES = frozenset({"error", "overwrite_existing", "keep_existing", "propagate"})
@@ -340,8 +342,10 @@ class ReduceDimensionality(ProcessStep):
         exclusion_mask: np.ndarray | None,
         estimator_specs: tuple[_EstimatorSpec, ...],
         uncertainties_out: dict[str, np.ndarray],
-    ) -> None:
-        """Calculate requested estimates and merge them into ``uncertainties_out``."""
+    ) -> dict[str, np.ndarray]:
+        """Prepare all estimator updates, including a batch legacy fold."""
+        _validate_uncertainties(bd)
+        validate_uncertainty_keys(uncertainties_out)
 
         active_specs: list[_EstimatorSpec] = []
         for spec in estimator_specs:
@@ -362,7 +366,7 @@ class ReduceDimensionality(ProcessStep):
             active_specs.append(spec)
 
         if not active_specs:
-            return
+            return dict(uncertainties_out)
 
         x_eff, w_eff, _ = ReduceDimensionality._effective_values_and_weights(
             bd=bd,
@@ -385,6 +389,7 @@ class ReduceDimensionality(ProcessStep):
         sum_w_squared_deviations = np.sum(weighted_squared_deviations, axis=axis)
 
         estimates_by_ddof = {}
+        new_estimates = {}
         for spec in active_specs:
             estimates = estimates_by_ddof.get(spec.ddof)
             if estimates is None:
@@ -399,18 +404,20 @@ class ReduceDimensionality(ProcessStep):
             estimate = np.asarray(getattr(estimates, spec.method))
             existing = uncertainties_out.get(spec.output_key)
             if existing is None:
-                uncertainties_out[spec.output_key] = estimate
+                new_estimates[spec.output_key] = estimate
             elif spec.collision_policy == "overwrite_existing":
                 logger.warning(
                     f"ReduceDimensionality: overwriting existing propagated uncertainty {spec.output_key!r}."
                 )
-                uncertainties_out[spec.output_key] = estimate
+                new_estimates[spec.output_key] = estimate
             else:  # propagate; error and keep_existing were handled above
                 logger.warning(
                     f"ReduceDimensionality: combining existing and estimated uncertainty "
                     f"{spec.output_key!r} in quadrature."
                 )
-                uncertainties_out[spec.output_key] = np.hypot(np.asarray(existing, dtype=float), estimate)
+                new_estimates[spec.output_key] = np.hypot(np.asarray(existing, dtype=float), estimate)
+
+        return with_uncertainty_estimates(uncertainties_out, new_estimates)
 
     @staticmethod
     def _normalize_axes(axes: Any) -> int | tuple[int, ...] | None:
@@ -481,6 +488,7 @@ class ReduceDimensionality(ProcessStep):
             'mean' → μ = Σ w x / Σ w
             'sum'  → S = Σ w x
         """
+        _validate_uncertainties(bd)
         x = bd.signal
         scalar_weight = ReduceDimensionality._scalar_weight(bd.weights) if use_weights else 1.0
 
@@ -493,7 +501,7 @@ class ReduceDimensionality(ProcessStep):
                 scalar_weight=scalar_weight,
             )
             if estimator_specs:
-                ReduceDimensionality._estimate_uncertainties_from_scatter(
+                result.uncertainties = ReduceDimensionality._estimate_uncertainties_from_scatter(
                     bd=bd,
                     axis=axis,
                     use_weights=use_weights,
@@ -544,7 +552,7 @@ class ReduceDimensionality(ProcessStep):
             uncertainties_out[key] = sigma
 
         if estimator_specs:
-            ReduceDimensionality._estimate_uncertainties_from_scatter(
+            uncertainties_out = ReduceDimensionality._estimate_uncertainties_from_scatter(
                 bd=bd,
                 axis=axis,
                 use_weights=use_weights,
@@ -606,6 +614,7 @@ class ReduceDimensionality(ProcessStep):
         reduction: str,
         scalar_weight: float,
     ) -> BaseData:
+        _validate_uncertainties(bd)
         x = bd.signal
 
         if nan_policy == "propagate":
@@ -724,6 +733,7 @@ class ReduceDimensionality(ProcessStep):
         for key in self._normalised_processing_keys():
             databundle: DataBundle = self.processing_data.get(key)
             bd: BaseData = databundle["signal"]
+            _validate_uncertainties(bd)
             axis = self._resolve_axes(axes_spec, bd)
 
             if axis == ():

@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from attrs import define
 
-from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.basedata import BaseData, _validate_uncertainties
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
@@ -228,6 +228,8 @@ class Integrate1D(ProcessStep):
         reference_axis: BaseData,
         domain: _IntegrationDomain,
     ) -> BaseData:
+        _validate_uncertainties(signal)
+        _validate_uncertainties(reference_axis)
         values = np.asarray(signal.signal, dtype=float).squeeze()[domain.common][domain.sort_order]
         values = cls._collapse_duplicate_values(values, domain)
         uncertainties = {

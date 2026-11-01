@@ -23,7 +23,9 @@ from typing import Any
 
 import numpy as np
 
-from .basedata import BaseData
+from modacor.models.uncertainty import validate_uncertainty_keys
+
+from .basedata import BaseData, _validate_uncertainties
 from .messagehandler import MessageHandler
 
 Aggregator = Callable[[list[np.ndarray], tuple[int, ...]], np.ndarray]
@@ -86,6 +88,11 @@ def combine_uncertainty_keys(
     target_name: str = "",
 ) -> None:
     """Apply configured combinations to ``basedata.uncertainties`` in-place."""
+    _validate_uncertainties(basedata)
+    for sources in combinations.values():
+        if "propagate_to_all" in sources:
+            raise ValueError("propagate_to_all cannot be a source key in uncertainty combinations.")
+    uncertainties = dict(basedata.uncertainties)
     signal_shape = basedata.signal.shape
     new_keys: set[str] = set()
     sources_to_remove: set[str] = set()
@@ -96,9 +103,9 @@ def combine_uncertainty_keys(
         missing_sources: list[str] = []
 
         for src_key in source_keys:
-            if src_key in basedata.uncertainties:
+            if src_key in uncertainties:
                 present_sources.append(src_key)
-                available.append(basedata.uncertainties[src_key])
+                available.append(uncertainties[src_key])
             else:
                 missing_sources.append(src_key)
 
@@ -121,7 +128,7 @@ def combine_uncertainty_keys(
             raise RuntimeError(f"No uncertainties available to combine for destination '{dest_key}' on {target_descr}.")
 
         combined = aggregator(available, signal_shape)
-        basedata.uncertainties[dest_key] = combined
+        uncertainties[dest_key] = combined
         new_keys.add(dest_key)
 
         if drop_sources:
@@ -129,4 +136,6 @@ def combine_uncertainty_keys(
 
     if drop_sources:
         for source_key in sources_to_remove - new_keys:
-            basedata.uncertainties.pop(source_key, None)
+            uncertainties.pop(source_key, None)
+    validate_uncertainty_keys(uncertainties)
+    basedata.uncertainties = uncertainties

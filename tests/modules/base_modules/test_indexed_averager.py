@@ -230,3 +230,19 @@ def test_indexed_averager_no_mask_dependency_by_default():
         "curve.sum_weights",
         "curve.effective_sample_size",
     }
+
+
+def test_stage0_batch_legacy_fold_uses_same_global_for_sem_and_std(caplog):
+    bundle = _bundle()
+    bundle["signal"].uncertainties = {"propagate_to_all": np.full(4, 2.0)}
+    original = bundle["signal"].uncertainties
+    with caplog.at_level("INFO"):
+        _, result = _run(bundle, stats_keys=["signal"])
+    uncertainty = result["signal"].uncertainties
+    assert set(uncertainty) == {"SEM", "STD"}
+    assert_allclose(uncertainty["SEM"], np.hypot(np.sqrt(0.125), np.sqrt(2)))
+    assert_allclose(uncertainty["STD"], np.hypot(0.5, np.sqrt(2)))
+    assert set(original) == {"propagate_to_all"}
+    records = [r for r in caplog.records if "legacy fold" in r.message]
+    assert len(records) == 1
+    assert "SEM" in records[0].message and "STD" in records[0].message

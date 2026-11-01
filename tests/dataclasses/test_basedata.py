@@ -42,7 +42,7 @@ def simple_basedata():
 # ---------------------------------------------------------------------------
 
 
-def test_signal_converter_converts_scalars_and_preserves_arrays():
+def test_signal_converter_converts_scalars_and_copies_arrays():
     # Scalar int → array
     arr1 = signal_converter(5)
     assert isinstance(arr1, np.ndarray)
@@ -55,10 +55,11 @@ def test_signal_converter_converts_scalars_and_preserves_arrays():
     assert arr2.shape == ()
     assert arr2.item() == pytest.approx(3.14)
 
-    # ndarray → unchanged
+    # ndarray → equal values in independent storage (S0.2)
     original = np.array([[1, 2], [3, 4]], dtype=float)
     arr3 = signal_converter(original)
-    assert arr3 is original
+    np.testing.assert_array_equal(arr3, original)
+    assert not np.shares_memory(arr3, original)
 
 
 def test_validate_broadcast_accepts_scalars_and_matching_shapes():

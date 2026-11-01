@@ -9,10 +9,11 @@ import numpy as np
 from attrs import define
 
 from modacor import ureg
-from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.basedata import BaseData, _validate_uncertainties
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.models.uncertainty import with_uncertainty_estimates
 from modacor.modules.helpers import finalize_weighted_scatter, normalize_str_list
 
 __all__ = ["IndexedAverager"]
@@ -276,6 +277,7 @@ class IndexedAverager(ProcessStep):
             raise KeyError(f"IndexedAverager: DataBundle is missing required keys {missing!r}.")
 
         value = bundle[value_key]
+        _validate_uncertainties(value)
         axis = None if axis_key is None else bundle[axis_key]
         shape = value.shape
         value_values = np.asarray(value.signal, dtype=float).ravel()
@@ -291,6 +293,7 @@ class IndexedAverager(ProcessStep):
         valid = nonnegative_indices & np.isfinite(value_values)
         axis_values = None
         if axis is not None:
+            _validate_uncertainties(axis)
             axis_values = _broadcast(axis.signal, shape, f"axis {axis_key!r}").astype(float)
             valid &= np.isfinite(axis_values)
 
@@ -433,7 +436,7 @@ class IndexedAverager(ProcessStep):
 
         stats_keys = self._stats_keys(inputs.value_key, inputs.axis_key)
         if inputs.value_key in stats_keys:
-            value_uncertainties["SEM"], value_uncertainties["STD"] = _scatter_statistics(
+            sem, std = _scatter_statistics(
                 grouped.values,
                 mean_values,
                 grouped.dense_indices,
@@ -441,8 +444,9 @@ class IndexedAverager(ProcessStep):
                 grouped.sum_weights,
                 grouped.sum_squared_weights,
             )
+            value_uncertainties = with_uncertainty_estimates(value_uncertainties, {"SEM": sem, "STD": std})
         if inputs.axis_key is not None and inputs.axis_key in stats_keys:
-            axis_uncertainties["SEM"], axis_uncertainties["STD"] = _scatter_statistics(
+            sem, std = _scatter_statistics(
                 grouped.axis_values,
                 mean_axis,
                 grouped.dense_indices,
@@ -450,6 +454,7 @@ class IndexedAverager(ProcessStep):
                 grouped.sum_weights,
                 grouped.sum_squared_weights,
             )
+            axis_uncertainties = with_uncertainty_estimates(axis_uncertainties, {"SEM": sem, "STD": std})
 
         bin_ids = BaseData(grouped.bin_ids, ureg.dimensionless, rank_of_data=1)
         axis_output = None

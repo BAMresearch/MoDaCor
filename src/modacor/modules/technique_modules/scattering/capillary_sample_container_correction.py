@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from modacor import ureg
-from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.basedata import BaseData, _validate_uncertainties
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import (
     ProcessStepDependencies,
@@ -25,9 +25,9 @@ from modacor.models.attenuation import (
     direct_beam_transmission,
 )
 from modacor.models.uncertainty import (
-    combine_uncertainty_component,
     nominal_and_finite_difference,
     uncertainties_from_derivative,
+    with_uncertainty_estimates,
 )
 from modacor.modules.technique_modules.scattering.capillary_self_absorption_correction import (
     CapillarySelfAbsorptionCorrection,
@@ -298,6 +298,8 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
 
     @staticmethod
     def _restore_masked_values(corrected: BaseData, original: BaseData, mask: np.ndarray) -> None:
+        _validate_uncertainties(corrected)
+        _validate_uncertainties(original)
         corrected.signal = np.where(mask, original.signal, corrected.signal)
         for name, values in corrected.uncertainties.items():
             original_values = original.uncertainties.get(name)
@@ -324,12 +326,14 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
             -wall_scale_mu_derivative * empty_signal.signal / sample_factor
             - numerator * sample_factor_mu_derivative / sample_factor**2
         )
+        _validate_uncertainties(corrected)
+        components = {}
         for name, uncertainty in sample_mu_uncertainties.items():
-            combine_uncertainty_component(
-                corrected.uncertainties,
-                name,
-                np.abs(corrected_mu_derivative) * uncertainty,
-            )
+            component = np.abs(corrected_mu_derivative) * uncertainty
+            if name in corrected.uncertainties:
+                component = np.hypot(corrected.uncertainties[name], component)
+            components[name] = component
+        corrected.uncertainties = with_uncertainty_estimates(corrected.uncertainties, components)
 
     def calculate(self) -> dict[str, DataBundle]:
         filled_key = self.configuration["filled_processing_key"]

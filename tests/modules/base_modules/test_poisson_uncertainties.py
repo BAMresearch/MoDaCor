@@ -59,3 +59,17 @@ class TestPoissonUncertainties(unittest.TestCase):
         expected_variances = np.arange(0, 100).reshape((10, 10)).astype(float).clip(min=1)
         actual_variances = self.test_processing_data["bundle"]["signal"].variances["Poisson"]
         np.testing.assert_allclose(expected_variances, actual_variances)
+
+
+def test_stage0_mixed_mapping_is_rejected_without_mutation():
+    import pytest
+
+    signal = BaseData(np.array([100.0]), ureg.count, {"propagate_to_all": 5.0})
+    signal.uncertainties["Poisson"] = np.array([8.0])
+    processing = ProcessingData(sample=DataBundle(signal=signal))
+    step = PoissonUncertainties(io_sources=TEST_IO_SOURCES, configuration={"with_processing_keys": ["sample"]})
+    with pytest.raises(ValueError, match="propagate_to_all"):
+        step.execute(processing)
+    np.testing.assert_array_equal(signal.signal, [100.0])
+    np.testing.assert_array_equal(signal.uncertainties["Poisson"], [8.0])
+    np.testing.assert_array_equal(signal.uncertainties["propagate_to_all"], 5.0)
