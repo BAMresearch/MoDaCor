@@ -5,9 +5,16 @@ __all__ = [
     "combine_uncertainty_component",
     "nominal_and_finite_difference",
     "uncertainties_from_derivative",
+    "validate_uncertainty_keys",
 ]
 
 import numpy as np
+
+
+def validate_uncertainty_keys(uncertainties) -> None:
+    """Reject mixed reserved-key mappings, including mutable dictionary inputs."""
+    if "propagate_to_all" in uncertainties and len(uncertainties) != 1:
+        raise ValueError("propagate_to_all must be the only uncertainty key; keep it alone or rename it.")
 
 
 def combine_uncertainty_component(target: dict[str, np.ndarray], name: str, values) -> None:

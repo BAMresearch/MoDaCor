@@ -27,6 +27,7 @@ from attrs import define, field, setters
 from attrs import validators as v
 
 from modacor import ureg
+from modacor.models.uncertainty import validate_uncertainty_keys
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,8 @@ class _VarianceDict(MutableMapping):
         return x in self._parent.uncertainties
 
     def __setitem__(self, key, var):
+        _validate_uncertainties(self._parent)
+        validate_uncertainty_keys({**self._parent.uncertainties, key: var})
         # Accept scaling or array‐like, coerce to ndarray
         arr = np.asarray(var, dtype=float)
         # Validate broadcast to signal
@@ -97,6 +100,7 @@ def dict_signal_converter(value: Dict[str, int | float | np.ndarray]) -> Dict[st
     Convert a dictionary of values to a dictionary of numpy arrays.
     Every value is copied so separate containers never share uncertainty storage.
     """
+    validate_uncertainty_keys(value)
     return {k: signal_converter(v) for k, v in value.items()}
 
 
@@ -233,138 +237,90 @@ def _inherit_binary_metadata(left: BaseData, right: BaseData, result: BaseData) 
     return result
 
 
-def _binary_basedata_op(
-    left: BaseData,
-    right: BaseData,
-    op: Callable[[Any, Any], Any],
-) -> BaseData:
-    """
-    Apply a binary arithmetic operation to two BaseData objects, propagating
-    uncertainties using standard first-order, uncorrelated error propagation.
+def _validate_uncertainties(element: BaseData) -> None:
+    """Validate the mutable mapping before any operation can write."""
+    validate_uncertainty_keys(element.uncertainties)
+    for key, value in element.uncertainties.items():
+        arr = np.asarray(value)
+        validate_broadcast(element.signal, arr, f"uncertainties[{key}]")
+        if np.any(arr < 0):
+            raise ValueError(f"uncertainties[{key}] must be nonnegative.")
 
-    Semantics
-    ---------
-    - Uncertainty dict entries are treated as independent sources keyed by name.
-    - "propagate_to_all" is treated as a *global fallback* only when it is the sole key
-      on an operand. Otherwise it is treated like a normal key name and participates via
-      rule 4 (union, no cross-key combining).
 
-    Rules for result uncertainty keys:
-    1) If both operands have only "propagate_to_all":
-         result.uncertainties = {"propagate_to_all": σ}
-    2) If exactly one operand has only "propagate_to_all" and the other has non-global keys:
-         result.uncertainties contains only the other operand's non-global keys.
-         The global term contributes into each of those keys.
-    3) Matching non-global keys propagate and combine by key.
-    4) Non-matching non-global keys: transfer/propagate each key independently into the result
-         (union of keys), without cross-key combining.
-
-    Propagation formulas (uncorrelated, first-order)
-    -----------------------------------------------
-    Let A = left.signal * left.units, B = right.signal * right.units, R = op(A, B).
-    Using magnitudes A_val, B_val and absolute σA, σB:
-
-    - Add/Sub:   σR² = σA² + σB²  (after converting σA, σB to result units)
-    - Mul:       σR² = (B σA)² + (A σB)²
-    - Div:       σR² = (σA/B)² + (A σB/B²)²
-    """
-    # Nominal result (pint handles unit logic & broadcasting)
-    A_q = left.signal * left.units
-    B_q = right.signal * right.units
-    base_result = op(A_q, B_q)
-    base_signal = np.asarray(base_result.magnitude, dtype=float)
-    result_units = base_result.units
-    out_shape = base_signal.shape
-
-    # Broadcast nominal magnitudes to the result shape
-    A_val = np.broadcast_to(np.asarray(left.signal, dtype=float), out_shape)
-    B_val = np.broadcast_to(np.asarray(right.signal, dtype=float), out_shape)
-
-    left_unc = left.uncertainties
-    right_unc = right.uncertainties
-
-    # "global-only" if and only if propagate_to_all is the sole key
-    left_global = left_unc.get("propagate_to_all") if set(left_unc.keys()) == {"propagate_to_all"} else None
-    right_global = right_unc.get("propagate_to_all") if set(right_unc.keys()) == {"propagate_to_all"} else None
-
-    left_non_global_keys = set(left_unc.keys()) - {"propagate_to_all"}
-    right_non_global_keys = set(right_unc.keys()) - {"propagate_to_all"}
-
-    # Decide output keys per rules
-    if left_global is not None and right_global is not None:
-        out_keys = {"propagate_to_all"}
-        drop_global_key = False  # we *do* want it
-    elif left_global is not None and right_non_global_keys:
-        out_keys = set(right_non_global_keys)
-        drop_global_key = True
-    elif right_global is not None and left_non_global_keys:
-        out_keys = set(left_non_global_keys)
-        drop_global_key = True
-    else:
-        # General case: union of non-global keys
-        out_keys = left_non_global_keys | right_non_global_keys
-        drop_global_key = True  # we never emit propagate_to_all unless both-global-only
-
-    def _as_broadcast_float(err: Any) -> np.ndarray:
-        arr = np.asarray(err, dtype=float)
-        return np.broadcast_to(arr, out_shape)
-
-    def _get_err(unc_map: Dict[str, np.ndarray], key: str, global_err: Any | None) -> Any:
-        """Return uncertainty for `key`, falling back to global_err if provided, else 0."""
-        if key in unc_map:
-            return unc_map[key]
-        if global_err is not None:
-            return global_err
-        return 0.0
-
-    # Precompute unit conversion factors (magnitudes)
+def _binary_units(left: BaseData, right: BaseData, op) -> tuple[pint.Unit, float, float]:
+    """Resolve units using scalar Pint arithmetic, without frame-sized quantities."""
+    units = op(1 * left.units, 1 * right.units).units
     if op in (operator.add, operator.sub):
-        cf_A = result_units.m_from(left.units)
-        cf_B = result_units.m_from(right.units)
+        return units, float(units.m_from(left.units)), float(units.m_from(right.units))
+    source_units = left.units * right.units if op is operator.mul else left.units / right.units
+    factor = float(units.m_from(source_units))
+    return units, factor, factor
 
-        result_unc: Dict[str, np.ndarray] = {}
-        for key in out_keys:
-            sigma_A = _as_broadcast_float(_get_err(left_unc, key, left_global)) * cf_A
-            sigma_B = _as_broadcast_float(_get_err(right_unc, key, right_global)) * cf_B
-            result_unc[key] = np.sqrt(sigma_A**2 + sigma_B**2)
 
-    elif op is operator.mul:
-        # Convert from left.units * right.units to result_units
-        cf_AB = result_units.m_from(left.units * right.units)
+def _propagated_uncertainties(left: BaseData, right: BaseData, op, shape, plan, factors):
+    """Propagate only present terms; finish before allocating the result signal."""
+    keys, global_a, global_b = plan
+    factor_a, factor_b = factors
+    a, b = left.signal, right.signal
+    result = {}
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        for key in keys:
+            sigma_a = left.uncertainties.get(key, global_a)
+            sigma_b = right.uncertainties.get(key, global_b)
+            sigma = np.empty(shape, dtype=float)
 
-        result_unc = {}
-        for key in out_keys:
-            sigma_A = _as_broadcast_float(_get_err(left_unc, key, left_global))
-            sigma_B = _as_broadcast_float(_get_err(right_unc, key, right_global))
-            termA = (B_val * sigma_A) * cf_AB
-            termB = (A_val * sigma_B) * cf_AB
-            result_unc[key] = np.sqrt(termA**2 + termB**2)
+            def term(source, side, out):
+                if op in (operator.add, operator.sub):
+                    np.multiply(source, abs(factor_a if side == "a" else factor_b), out=out)
+                elif op is operator.mul:
+                    np.multiply(source, b if side == "a" else a, out=out)
+                    out *= abs(factor_a)
+                elif side == "a":
+                    np.divide(source, b, out=out)
+                    out *= abs(factor_a)
+                else:
+                    np.multiply(source, a, out=out)
+                    np.divide(out, b, out=out)
+                    np.divide(out, b, out=out)
+                    out *= abs(factor_b)
+                np.abs(out, out=out)
 
-    elif op is operator.truediv:
-        # Convert from left.units / right.units to result_units
-        cf_A_div_B = result_units.m_from(left.units / right.units)
+            if sigma_a is not None:
+                term(sigma_a, "a", sigma)
+                if sigma_b is not None:
+                    scratch = np.empty(shape, dtype=float)
+                    term(sigma_b, "b", scratch)
+                    np.hypot(sigma, scratch, out=sigma)
+                    del scratch
+            else:
+                term(sigma_b, "b", sigma)
+            if op is operator.truediv:
+                np.copyto(sigma, np.nan, where=np.broadcast_to(b == 0, shape))
+            result[key] = sigma
+    return result
 
-        result_unc = {}
-        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-            for key in out_keys:
-                sigma_A = _as_broadcast_float(_get_err(left_unc, key, left_global))
-                sigma_B = _as_broadcast_float(_get_err(right_unc, key, right_global))
 
-                termA = (sigma_A / B_val) * cf_A_div_B
-                termB = (A_val * sigma_B / (B_val**2)) * cf_A_div_B
-                sigma = np.sqrt(termA**2 + termB**2)
-
-                # Division by zero -> undefined uncertainty
-                sigma = np.where(B_val == 0.0, np.nan, sigma)
-                result_unc[key] = sigma
+def _binary_basedata_op(left: BaseData, right: BaseData, op: Callable[[Any, Any], Any]) -> BaseData:
+    """First-order independent-operand propagation using the Stage 0 key table."""
+    _validate_uncertainties(left)
+    _validate_uncertainties(right)
+    plan = _uncertainty_key_plan(left.uncertainties, right.uncertainties)
+    shape = np.broadcast_shapes(left.signal.shape, right.signal.shape)
+    _validate_binary_metadata_compatibility(left, right, shape)
+    units, factor_a, factor_b = _binary_units(left, right, op)
+    uncertainties = _propagated_uncertainties(left, right, op, shape, plan, (factor_a, factor_b))
+    if op in (operator.add, operator.sub):
+        signal = op(left.signal * factor_a, right.signal * factor_b)
     else:
-        raise NotImplementedError(f"Operation {op} not supported in _binary_basedata_op")  # noqa: E713
-
-    # Only emit propagate_to_all in the both-global-only case
-    if drop_global_key:
-        result_unc.pop("propagate_to_all", None)
-
-    result = BaseData(signal=base_signal, units=result_units, uncertainties=result_unc)
+        signal = op(np.asarray(left.signal, dtype=float), right.signal)
+        if factor_a != 1.0:
+            signal *= factor_a
+    # These arrays were allocated above and belong exclusively to this result.
+    # Public constructors still copy all inputs. Adopt internal results without
+    # duplicating an entire detector frame for each uncertainty key.
+    result = BaseData(signal=0.0, units=units)
+    result.signal = np.asarray(signal, dtype=float)
+    result.uncertainties = uncertainties
     return _inherit_binary_metadata(left, right, result)
 
 
@@ -392,20 +348,19 @@ def _uncertainty_key_plan(
     left_unc: Dict[str, np.ndarray],
     right_unc: Dict[str, np.ndarray],
 ) -> tuple[set[str], Any | None, Any | None]:
-    left_global = left_unc.get("propagate_to_all") if set(left_unc.keys()) == {"propagate_to_all"} else None
-    right_global = right_unc.get("propagate_to_all") if set(right_unc.keys()) == {"propagate_to_all"} else None
-
-    left_non_global_keys = set(left_unc.keys()) - {"propagate_to_all"}
-    right_non_global_keys = set(right_unc.keys()) - {"propagate_to_all"}
-
-    if left_global is not None and right_global is not None:
-        out_keys = {"propagate_to_all"}
-    elif left_global is not None and right_non_global_keys:
-        out_keys = set(right_non_global_keys)
-    elif right_global is not None and left_non_global_keys:
-        out_keys = set(left_non_global_keys)
+    validate_uncertainty_keys(left_unc)
+    validate_uncertainty_keys(right_unc)
+    left_global = left_unc.get("propagate_to_all")
+    right_global = right_unc.get("propagate_to_all")
+    left_keys, right_keys = set(left_unc), set(right_unc)
+    if left_global is not None and right_keys - {"propagate_to_all"}:
+        out_keys = right_keys
+    elif right_global is not None and left_keys - {"propagate_to_all"}:
+        out_keys = left_keys
     else:
-        out_keys = left_non_global_keys | right_non_global_keys
+        out_keys = left_keys | right_keys
+    if left_keys and right_keys and left_global is None and right_global is None and left_keys != right_keys:
+        logger.debug("Uncertainty key sets differ; propagating their union with absent terms treated as zero.")
     return out_keys, left_global, right_global
 
 
@@ -459,6 +414,8 @@ def _propagate_inplace_division_uncertainties(
 
 
 def _inplace_truediv_metadata_neutral(target: BaseData, other: BaseData) -> BaseData | None:
+    _validate_uncertainties(target)
+    _validate_uncertainties(other)
     if _has_structural_metadata(other):
         return None
 
@@ -490,6 +447,8 @@ def _inplace_truediv_metadata_neutral(target: BaseData, other: BaseData) -> Base
 
 
 def _inplace_add_sub(target: BaseData, other: BaseData, *, sign: float) -> BaseData | None:
+    _validate_uncertainties(target)
+    _validate_uncertainties(other)
     try:
         out_shape = np.broadcast_shapes(target.signal.shape, other.signal.shape)
     except ValueError:
@@ -550,6 +509,7 @@ def _unary_basedata_op(
 
     Outside the domain, signal and uncertainties are set to NaN (using np.where-style masking).
     """
+    _validate_uncertainties(element)
     x = np.asarray(element.signal)
     if domain is None:
         valid = np.ones_like(x, dtype=bool)
@@ -603,42 +563,11 @@ class UncertaintyOpsMixin:
         if not isinstance(self, BaseData):
             return NotImplemented
 
-        # --- numbers.Real: treat as dimensionless for * and /, same units for + and -
-        if isinstance(other, numbers.Real):
-            scalar = float(other)
-            if op in (operator.mul, operator.truediv):
-                # dimensionless scalar
-                scalar_units = ureg.dimensionless
-            else:
-                # additive scalar, interpret as self.units
-                scalar_units = self.units
-
-            signal = np.full_like(self.signal, scalar, dtype=float)
-            other = BaseData(
-                signal=signal,
-                units=scalar_units,
-                uncertainties={k: np.zeros_like(v, dtype=float) for k, v in self.uncertainties.items()},
-            )
-
-        # --- pint.Quantity: for +/-, use same units as self; for */÷, keep its own units
-        elif isinstance(other, pint.Quantity):
-            if op in (operator.add, operator.sub):
-                q = other.to(self.units)
-                scalar_units = self.units
-            else:
-                q = other
-                scalar_units = q.units
-
-            scalar = float(q.magnitude)
-            signal = np.full_like(self.signal, scalar, dtype=float)
-            other = BaseData(
-                signal=signal,
-                units=scalar_units,
-                uncertainties={k: np.zeros_like(v, dtype=float) for k, v in self.uncertainties.items()},
-            )
-
-        elif not isinstance(other, BaseData):
-            # unsupported type
+        if op in (operator.add, operator.sub):
+            other = _coerce_inplace_add_sub_operand(self, other)
+        else:
+            other = _coerce_inplace_divisor(other)
+        if other is None:
             return NotImplemented
 
         # Now both operands are BaseData
@@ -848,6 +777,7 @@ class BaseData(UncertaintyOpsMixin):
         Post-initialization to ensure that the shapes of elements in variances dict,
         and the shapes of weights are compatible with the signal array.
         """
+        _validate_uncertainties(self)
         # Validate uncertainties directly. Going through ``variances`` would
         # square every array and can allocate gigabytes for large detector data.
         for kind, uncertainty in self.uncertainties.items():
@@ -883,12 +813,16 @@ class BaseData(UncertaintyOpsMixin):
             raise TypeError(f"variances must be a dict, got {type(value)}.")
         if not all(isinstance(v, (np.ndarray, int, float)) for v in value.values()):
             raise TypeError("All variances must be int, float or numpy arrays.")
-        # (Optionally clear existing uncertainties, or merge—here we'll just overwrite keys:)
-        self.uncertainties.clear()  # clear existing uncertainties
+        _validate_uncertainties(self)
+        validate_uncertainty_keys(value)
+        uncertainties = {}
         for kind, var in value.items():
             arr = np.asarray(var, dtype=float)
             validate_broadcast(self.signal, arr, f"variances[{kind}]")
-            self.uncertainties[kind] = arr**0.5
+            if np.any(arr < 0):
+                raise ValueError(f"variances[{kind}] must be nonnegative.")
+            uncertainties[kind] = np.asarray(arr**0.5)
+        self.uncertainties = uncertainties
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -918,8 +852,7 @@ class BaseData(UncertaintyOpsMixin):
         """
         Convert the signal and uncertainties to dimensionless units if possible.
         """
-        if self.units != ureg.dimensionless:
-            self.to_units(ureg.dimensionless)
+        self.to_units(ureg.dimensionless)
 
     @property
     def is_dimensionless(self) -> bool:
@@ -960,6 +893,7 @@ class BaseData(UncertaintyOpsMixin):
         """
         Convert the signal and uncertainties to new units.
         """
+        _validate_uncertainties(self)
         try:
             new_units = ureg.Unit(new_units)  # ensure new_units is a pint.Unit
         except pint.errors.UndefinedUnitError as e:
@@ -1018,6 +952,7 @@ class BaseData(UncertaintyOpsMixin):
           want axes to track slicing semantics more strictly, a higher-level
           helper can be added later.
         """
+        _validate_uncertainties(self)
         sig = np.asarray(self.signal)[indexer]
 
         # Slice uncertainties with the same indexer
@@ -1059,6 +994,7 @@ class BaseData(UncertaintyOpsMixin):
         Axes are shallow-copied (list copy) by default, so axis objects
         themselves are still shared.
         """
+        _validate_uncertainties(self)
         new = BaseData(
             signal=self.signal,
             units=self.units,
@@ -1086,6 +1022,7 @@ class BaseData(UncertaintyOpsMixin):
 
 def squeeze_basedata_element(element: BaseData) -> BaseData:
     """Squeeze: remove single-dimensional entries from the shape of the signal."""
+    _validate_uncertainties(element)
     result = BaseData(
         signal=np.squeeze(element.signal),
         units=element.units,
@@ -1096,6 +1033,7 @@ def squeeze_basedata_element(element: BaseData) -> BaseData:
 
 def negate_basedata_element(element: BaseData) -> BaseData:
     """Negate a BaseData element with uncertainty and units propagation."""
+    _validate_uncertainties(element)
     result = BaseData(
         signal=-element.signal,
         units=element.units,
