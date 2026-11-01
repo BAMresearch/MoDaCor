@@ -122,11 +122,6 @@ def validate_broadcast(signal: np.ndarray, arr: np.ndarray, name: str) -> None:
         raise ValueError(f"'{name}' with shape {arr.shape} does not broadcast to signal shape {signal.shape}.")
 
 
-def _copy_uncertainties(unc_dict: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-    """Deep-copy the uncertainties dict (to avoid aliasing between objects)."""
-    return {k: np.array(v, copy=True) for k, v in unc_dict.items()}
-
-
 def _inherit_metadata(source: BaseData, result: BaseData) -> BaseData:
     """
     Copy metadata-like attributes from `source` to `result` (axes, rank_of_data, weights)
@@ -291,7 +286,12 @@ def _propagated_uncertainties(left: BaseData, right: BaseData, op, shape, plan, 
                 if sigma_b is not None:
                     scratch = np.empty(shape, dtype=float)
                     term(sigma_b, "b", scratch)
-                    np.hypot(sigma, scratch, out=sigma)
+                    # Preserve the generic arithmetic NaN/Inf policy, including
+                    # NaN + Inf -> NaN, using only the two existing buffers.
+                    np.square(sigma, out=sigma)
+                    np.square(scratch, out=scratch)
+                    np.add(sigma, scratch, out=sigma)
+                    np.sqrt(sigma, out=sigma)
                     del scratch
             else:
                 term(sigma_b, "b", sigma)
@@ -310,10 +310,17 @@ def _binary_basedata_op(left: BaseData, right: BaseData, op: Callable[[Any, Any]
     _validate_binary_metadata_compatibility(left, right, shape)
     units, factor_a, factor_b = _binary_units(left, right, op)
     uncertainties = _propagated_uncertainties(left, right, op, shape, plan, (factor_a, factor_b))
+    signal = np.empty(shape, dtype=float)
+    ufunc = {operator.add: np.add, operator.sub: np.subtract, operator.mul: np.multiply, operator.truediv: np.divide}[
+        op
+    ]
     if op in (operator.add, operator.sub):
-        signal = op(left.signal * factor_a, right.signal * factor_b)
+        # The result uses the left unit, so its factor is normally one. Scale
+        # the right operand into the output buffer rather than a transient frame.
+        np.multiply(right.signal, factor_b, out=signal)
+        ufunc(left.signal if factor_a == 1.0 else left.signal * factor_a, signal, out=signal)
     else:
-        signal = op(np.asarray(left.signal, dtype=float), right.signal)
+        ufunc(left.signal, right.signal, out=signal)
         if factor_a != 1.0:
             signal *= factor_a
     # These arrays were allocated above and belong exclusively to this result.
@@ -601,12 +608,12 @@ class BaseData(UncertaintyOpsMixin):
         as ``uncertainties[k]**2``.
 
         Binary operations propagate uncertainties using first-order, uncorrelated propagation.
-        Keys are treated as *independent sources*.
+        Each key is propagated separately using the independent-operand approximation.
 
         Special key: ``"propagate_to_all"``
         ---------------------------------
         ``"propagate_to_all"`` is treated as a *global* uncertainty **only when it is the sole
-        key present** on an operand.
+        key present** on an operand. A mixed mapping raises ``ValueError``.
 
         The propagation rules for an operation ``result = op(a, b)`` are:
 
@@ -620,9 +627,15 @@ class BaseData(UncertaintyOpsMixin):
         3. If both operands contain matching non-global keys, those keys are propagated and
            combined by key.
 
-        4. If both operands contain non-global keys but with no matches, the result contains
+        4. If both operands contain differing sets of non-global keys, the result contains
            the union of keys, and each key is propagated from its originating operand only
            (no cross-key combining).
+
+        5. A global-only operand meeting an empty mapping retains ``"propagate_to_all"``.
+
+        An empty mapping means unquantified, not exact, even though absent terms are
+        treated as zero by this arithmetic. Aliases are computationally safe, but physical
+        correlation is not represented: uncertainty in ``a - a`` does not cancel.
     weights : np.ndarray, optional
         Weights for `signal` (default is a scaling 1.0) for use in averaging operations.
         Must broadcast to `signal.shape`.
@@ -687,11 +700,9 @@ class BaseData(UncertaintyOpsMixin):
         Post-initialization to ensure that the shapes of elements in variances dict,
         and the shapes of weights are compatible with the signal array.
         """
-        _validate_uncertainties(self)
         # Validate uncertainties directly. Going through ``variances`` would
         # square every array and can allocate gigabytes for large detector data.
-        for kind, uncertainty in self.uncertainties.items():
-            validate_broadcast(self.signal, uncertainty, f"uncertainties[{kind}]")
+        _validate_uncertainties(self)
 
         # Validate weights
         validate_broadcast(self.signal, self.weights, "weights")
@@ -835,8 +846,8 @@ class BaseData(UncertaintyOpsMixin):
         # simple unit conversion, can be done to scalar
         # Convert signal
         cfact = new_units.m_from(self.units)
-        signal = np.asarray(self.signal * cfact)
-        uncertainties = {key: np.asarray(value * abs(cfact)) for key, value in self.uncertainties.items()}
+        signal = np.asanyarray(self.signal * cfact)
+        uncertainties = {key: np.asanyarray(value * abs(cfact)) for key, value in self.uncertainties.items()}
         self.signal = signal
         self.uncertainties = uncertainties
         self.units = new_units

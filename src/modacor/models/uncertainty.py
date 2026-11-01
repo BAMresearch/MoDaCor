@@ -32,10 +32,10 @@ def with_uncertainty_estimates(existing, estimates) -> dict[str, np.ndarray]:
     validate_uncertainty_keys(existing)
     validate_uncertainty_keys(estimates)
     if estimates and "propagate_to_all" in existing and "propagate_to_all" not in estimates:
-        result = {key: np.hypot(value, existing["propagate_to_all"]) for key, value in estimates.items()}
+        result = {key: np.asarray(np.hypot(value, existing["propagate_to_all"])) for key, value in estimates.items()}
         logger.info("Stage 0 legacy fold into uncertainty estimates %s", sorted(result))
         return result
-    result = {**existing, **estimates}
+    result = {**existing, **{key: np.asarray(value) for key, value in estimates.items()}}
     validate_uncertainty_keys(result)
     return result
 

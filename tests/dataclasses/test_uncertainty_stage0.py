@@ -308,6 +308,7 @@ def test_t0_04b_batch_fold_and_later_producer_limitation(caplog):
         x.uncertainties = with_uncertainty_estimates(x.uncertainties, {"SEM": np.array(3.0), "STD": np.array(4.0)})
         x.uncertainties = with_uncertainty_estimates(x.uncertainties, {"later": np.array(2.0)})
     assert set(x.uncertainties) == {"SEM", "STD", "later"}
+    assert all(isinstance(value, np.ndarray) for value in x.uncertainties.values())
     assert_allclose(x.uncertainties["SEM"], np.hypot(3, 5))
     assert_allclose(x.uncertainties["STD"], np.hypot(4, 5))
     assert_allclose(x.uncertainties["later"], 2)
@@ -356,3 +357,39 @@ def test_t0_01_mixed_row_in_both_orders(op, iop, mapping, reverse):
         assert a.units == before_units
         for key in before_unc:
             assert_array_equal(a.uncertainties[key], before_unc[key])
+
+
+def test_s0_02_unit_conversion_preserves_masked_arrays():
+    x = BaseData(np.ma.array([1.0, 2.0], mask=[False, True]), ureg.m)
+    source = x.signal
+    x.to_units(ureg.cm)
+    assert isinstance(x.signal, np.ma.MaskedArray)
+    assert_array_equal(x.signal.mask, [False, True])
+    assert_allclose(x.signal.compressed(), [100.0])
+    assert_allclose(source.data, [1.0, 2.0])
+
+
+@pytest.mark.parametrize("op,iop", zip(OPS, IOPS))
+def test_i0_01_nan_inf_policy_matches_independent_quadrature(op, iop):
+    a = BaseData(np.array([4.0]), ureg.m, {"u": np.array([np.nan])})
+    b = BaseData(np.array([2.0]), ureg.m, {"u": np.array([np.inf])})
+    assert np.isnan(op(a, b).uncertainties["u"][0])
+    assert np.isnan(iop(a, b).uncertainties["u"][0])
+
+
+@pytest.mark.parametrize("op", OPS)
+@pytest.mark.parametrize("right_unit", [ureg.m, ureg.cm])
+def test_s0_07_binary_allocation_and_pint_conversion(op, right_unit):
+    shape = (1000, 1000)
+    a = BaseData(np.full(shape, 4.0), ureg.m, {"u": np.full(shape, 0.2), "v": np.full(shape, 0.3)})
+    b = BaseData(np.full(shape, 2.0), right_unit, {"u": np.full(shape, 0.1), "v": np.full(shape, 0.4)})
+    tracemalloc.start()
+    result = op(a, b)
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    assert peak <= 3 * a.signal.nbytes + 65536
+    nominal = op(4 * ureg.m, 2 * right_unit)
+    assert result.units == nominal.units
+    assert_allclose(result.signal[0, 0], nominal.magnitude)
+    if op in (operator.add, operator.sub):
+        assert_allclose(result.uncertainties["u"][0, 0], np.hypot(0.2, (0.1 * right_unit).to(ureg.m).magnitude))

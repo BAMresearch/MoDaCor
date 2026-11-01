@@ -1080,6 +1080,7 @@ def test_stage0_batch_estimators_fold_original_global_into_each_key(use_weights,
                 "STD": {"method": "standard_deviation", "ddof": 1},
             },
             use_weights=use_weights,
+            weights=np.ones_like(signal),
         )
     expected_std = np.std(signal, axis=0, ddof=1)
     assert set(result.uncertainties) == {"SEM", "STD"}
