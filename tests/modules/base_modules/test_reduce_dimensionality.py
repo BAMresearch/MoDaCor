@@ -1066,3 +1066,24 @@ def test_direct_mask_dependency_contract_reads_mask_and_signal_but_only_writes_s
     assert contract.source_refs == frozenset()
     assert contract.processing_reads == frozenset({"sample.signal", "sample.quality_mask"})
     assert contract.processing_writes == frozenset({"sample.signal"})
+
+
+@pytest.mark.parametrize("use_weights", [False, True])
+def test_stage0_batch_estimators_fold_original_global_into_each_key(use_weights, caplog):
+    signal = np.array([[1.0, 2.0], [3.0, 6.0]])
+    with caplog.at_level("INFO"):
+        result = _run_reduction_with_estimators(
+            signal=signal,
+            uncertainties={"propagate_to_all": np.full_like(signal, 2.0)},
+            estimators={
+                "SEM": {"method": "standard_error_mean", "ddof": 1},
+                "STD": {"method": "standard_deviation", "ddof": 1},
+            },
+            use_weights=use_weights,
+        )
+    expected_std = np.std(signal, axis=0, ddof=1)
+    assert set(result.uncertainties) == {"SEM", "STD"}
+    np.testing.assert_allclose(result.uncertainties["SEM"], np.hypot(expected_std / np.sqrt(2), np.sqrt(2)))
+    np.testing.assert_allclose(result.uncertainties["STD"], np.hypot(expected_std, np.sqrt(2)))
+    records = [r for r in caplog.records if "legacy fold" in r.message]
+    assert len(records) == 1

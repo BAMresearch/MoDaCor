@@ -27,3 +27,15 @@ def test_named_uncertainty_helpers_scale_and_combine_independent_components():
     np.testing.assert_allclose(propagated["sample"], [0.2, 0.3])
     combine_uncertainty_component(propagated, "sample", np.array([0.15, 0.4]))
     np.testing.assert_allclose(propagated["sample"], np.hypot([0.2, 0.3], [0.15, 0.4]))
+
+
+def test_stage0_numerical_helpers_reject_mixed_keys_before_writes():
+    import pytest
+
+    target = {"propagate_to_all": np.array(3.0)}
+    with pytest.raises(ValueError, match="propagate_to_all"):
+        combine_uncertainty_component(target, "named", np.array(4.0))
+    assert set(target) == {"propagate_to_all"}
+    target["named"] = np.array(4.0)
+    with pytest.raises(ValueError, match="propagate_to_all"):
+        uncertainties_from_derivative(2.0, target)

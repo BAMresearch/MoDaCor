@@ -17,7 +17,7 @@ import numpy as np
 import pint
 
 from modacor import ureg
-from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.basedata import BaseData, _validate_uncertainties
 
 
 def require_scalar(name: str, bd: BaseData) -> BaseData:
@@ -81,6 +81,7 @@ def prepare_static_scalar(
       - effective sample size n_eff = (sum(w)^2) / sum(w^2)
       - sem = sqrt(var) / sqrt(n_eff)
     """
+    _validate_uncertainties(bd)
     if not bd.units.is_compatible_with(require_units):
         raise ValueError(f"Value must be in {require_units}, got {bd.units}")
 

@@ -27,7 +27,7 @@ from attrs import define, field, setters
 from attrs import validators as v
 
 from modacor import ureg
-from modacor.models.uncertainty import validate_uncertainty_keys
+from modacor.models.uncertainty import validate_uncertainty_keys, with_uncertainty_estimates
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +53,14 @@ class _VarianceDict(MutableMapping):
 
     def __setitem__(self, key, var):
         _validate_uncertainties(self._parent)
-        validate_uncertainty_keys({**self._parent.uncertainties, key: var})
         # Accept scaling or array‐like, coerce to ndarray
         arr = np.asarray(var, dtype=float)
         # Validate broadcast to signal
         validate_broadcast(self._parent.signal, arr, f"variances[{key}]")
+        if np.any(arr < 0):
+            raise ValueError(f"variances[{key}] must be nonnegative.")
         # Store sqrt(var) as the one‐sigma uncertainty
-        self._parent.uncertainties[key] = np.asarray(arr**0.5)
+        self._parent.uncertainties = with_uncertainty_estimates(self._parent.uncertainties, {key: np.asarray(arr**0.5)})
 
     def __delitem__(self, key):
         del self._parent.uncertainties[key]

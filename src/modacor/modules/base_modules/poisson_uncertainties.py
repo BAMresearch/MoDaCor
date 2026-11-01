@@ -18,9 +18,11 @@ from pathlib import Path
 
 import numpy as np
 
+from modacor.dataclasses.basedata import _validate_uncertainties
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.models.uncertainty import with_uncertainty_estimates
 
 # from typing import Any
 
@@ -64,6 +66,7 @@ class PoissonUncertainties(ProcessStep):
         output = {}
         for key in self._normalised_processing_keys():
             databundle = data.get(key)
+            _validate_uncertainties(databundle["signal"])
             signal = databundle["signal"].signal
 
             # Store sigma directly. Assigning through ``variances`` would first
@@ -71,6 +74,8 @@ class PoissonUncertainties(ProcessStep):
             poisson_sigma = np.array(signal, dtype=float, copy=True)
             np.maximum(poisson_sigma, 1.0, out=poisson_sigma)
             np.sqrt(poisson_sigma, out=poisson_sigma)
-            databundle["signal"].uncertainties["Poisson"] = poisson_sigma
+            databundle["signal"].uncertainties = with_uncertainty_estimates(
+                databundle["signal"].uncertainties, {"Poisson": poisson_sigma}
+            )
             output[key] = databundle
         return output

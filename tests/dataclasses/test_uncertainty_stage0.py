@@ -275,3 +275,84 @@ def test_t0_10_unary_inline_conversion_preserves_input(function, units, target):
         assert_allclose(result.uncertainties["u"], np.abs(np.cos(np.deg2rad([20.0, 40.0]))) * np.deg2rad([1.0, 2.0]))
     if function == "exp":
         assert_allclose(result.uncertainties["u"], np.exp([0.2, 0.4]) * [0.01, 0.02])
+
+
+def test_t0_04_actual_poisson_legacy_fold(caplog):
+    from modacor.dataclasses.databundle import DataBundle
+    from modacor.dataclasses.processing_data import ProcessingData
+    from modacor.io.io_sources import IoSources
+    from modacor.modules import PoissonUncertainties
+
+    x = BaseData(np.array([100.0]), ureg.count, {"propagate_to_all": 5.0})
+    original_mapping = x.uncertainties
+    processing = ProcessingData()
+    processing["sample"] = DataBundle(signal=x)
+    step = PoissonUncertainties(io_sources=IoSources(), configuration={"with_processing_keys": ["sample"]})
+    with caplog.at_level("INFO"):
+        step.execute(processing)
+    assert set(x.uncertainties) == {"Poisson"}
+    assert set(original_mapping) == {"propagate_to_all"}
+    assert_allclose(x.uncertainties["Poisson"], np.hypot(10, 5))
+    assert_allclose((x / 2).uncertainties["Poisson"], np.sqrt(125) / 2)
+    records = [record for record in caplog.records if "legacy fold" in record.message]
+    assert len(records) == 1
+    assert "Poisson" in records[0].message
+
+
+def test_t0_04b_batch_fold_and_later_producer_limitation(caplog):
+    from modacor.models.uncertainty import with_uncertainty_estimates
+
+    x = BaseData(100.0, ureg.count, {"propagate_to_all": 5.0})
+    original_mapping = x.uncertainties
+    with caplog.at_level("INFO"):
+        x.uncertainties = with_uncertainty_estimates(x.uncertainties, {"SEM": np.array(3.0), "STD": np.array(4.0)})
+        x.uncertainties = with_uncertainty_estimates(x.uncertainties, {"later": np.array(2.0)})
+    assert set(x.uncertainties) == {"SEM", "STD", "later"}
+    assert_allclose(x.uncertainties["SEM"], np.hypot(3, 5))
+    assert_allclose(x.uncertainties["STD"], np.hypot(4, 5))
+    assert_allclose(x.uncertainties["later"], 2)
+    assert set(original_mapping) == {"propagate_to_all"}
+    records = [record for record in caplog.records if "legacy fold" in record.message]
+    assert len(records) == 1
+    assert "SEM" in records[0].message and "STD" in records[0].message
+
+
+def test_variance_setters_validate_and_fold_atomically():
+    x = BaseData(np.ones(2), ureg.m, {"propagate_to_all": 3.0})
+    old = x.uncertainties
+    x.variances["u"] = np.array([16.0, 16.0])
+    assert set(old) == {"propagate_to_all"}
+    assert set(x.uncertainties) == {"u"}
+    assert_allclose(x.uncertainties["u"], 5)
+    snapshot = x.copy()
+    for invalid in ({"propagate_to_all": 1.0, "u": 2.0}, {"u": np.ones(3)}, {"u": -1.0}):
+        with pytest.raises(ValueError):
+            x.variances = invalid
+        assert_data_equal(x, snapshot)
+    with pytest.raises(ValueError):
+        x.variances["propagate_to_all"] = 1.0
+    assert_data_equal(x, snapshot)
+    with pytest.raises(ValueError):
+        x.variances["u"] = -1.0
+    assert_data_equal(x, snapshot)
+
+
+@pytest.mark.parametrize("op,iop", zip(OPS, IOPS))
+@pytest.mark.parametrize("mapping", MAPPINGS)
+@pytest.mark.parametrize("reverse", [False, True])
+def test_t0_01_mixed_row_in_both_orders(op, iop, mapping, reverse):
+    a = BaseData(np.array([4.0, 9.0]), ureg.m, {"propagate_to_all": 0.2})
+    a.uncertainties["u"] = np.ones(2)
+    b = BaseData(2.0, ureg.m, mapping)
+    if reverse:
+        a, b = b, a
+    before_signal = a.signal.copy()
+    before_units = a.units
+    before_unc = {k: np.copy(v) for k, v in a.uncertainties.items()}
+    for operation in (op, iop):
+        with pytest.raises(ValueError, match="propagate_to_all"):
+            operation(a, b)
+        assert_array_equal(a.signal, before_signal)
+        assert a.units == before_units
+        for key in before_unc:
+            assert_array_equal(a.uncertainties[key], before_unc[key])

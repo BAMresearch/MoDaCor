@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from modacor import ureg
-from modacor.dataclasses.basedata import BaseData
+from modacor.dataclasses.basedata import BaseData, _validate_uncertainties
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
@@ -152,6 +152,8 @@ class FindCenterOfMass1D(ProcessStep):
         signal: BaseData,
         axis: BaseData,
     ) -> dict[str, np.ndarray]:
+        _validate_uncertainties(signal)
+        _validate_uncertainties(axis)
         propagated: dict[str, np.ndarray] = {}
         for name, uncertainty in signal.uncertainties.items():
             sigma = np.broadcast_to(np.asarray(uncertainty, dtype=float), signal.shape)

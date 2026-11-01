@@ -595,3 +595,53 @@ def test_dependency_contract_includes_direct_mu_uncertainty_sources():
         processing_reads=baseline.processing_reads,
         processing_writes=baseline.processing_writes,
     )
+
+
+def test_stage0_capillary_residual_components_legacy_fold(caplog):
+    processing = _processing_data()
+    config = _configuration(
+        input_state="transmission_normalized",
+        sample_mu_units_source="measurement::/sample_mu@units",
+        transmission_units_source="measurement::/transmission@units",
+        sample_mu=None,
+        sample_mu_source="measurement::/sample_mu",
+        sample_mu_uncertainties_sources={"propagate_to_all": "measurement::/sample_mu_sem"},
+        transmission_source="measurement::/transmission",
+        transmission_uncertainties_sources={"measurement": "measurement::/transmission_sem"},
+    )
+    step = CapillarySelfAbsorptionCorrection(io_sources=_sources(), configuration=config)
+    with caplog.at_level("INFO"):
+        step.execute(processing)
+    correction = processing["sample"]["capillary_self_absorption"]
+    assert set(correction.uncertainties) == {"measurement"}
+    assert np.any(correction.uncertainties["measurement"] > 0.0)
+    records = [r for r in caplog.records if "legacy fold" in r.message]
+    assert len(records) == 1
+
+
+def test_stage0_correlated_mu_components_fold_together_and_mask_validation_is_atomic(caplog):
+    cls = CapillarySampleContainerCorrection
+    corrected = BaseData(np.array([4.0, 4.0]), ureg.count, {"propagate_to_all": 3.0})
+    filled = BaseData(np.array([10.0, 10.0]), ureg.count)
+    empty = BaseData(np.array([2.0, 2.0]), ureg.count)
+    with caplog.at_level("INFO"):
+        cls._add_correlated_sample_mu_uncertainties(
+            corrected,
+            filled,
+            empty,
+            np.full(2, 2.0),
+            np.ones(2),
+            np.ones(2),
+            np.zeros(2),
+            np.ones(2),
+            {"u": 0.5, "v": 1.0},
+        )
+    assert set(corrected.uncertainties) == {"u", "v"}
+    np.testing.assert_allclose(corrected.uncertainties["u"], np.hypot(1, 3))
+    np.testing.assert_allclose(corrected.uncertainties["v"], np.hypot(2, 3))
+    assert len([r for r in caplog.records if "legacy fold" in r.message]) == 1
+    corrected.uncertainties["propagate_to_all"] = np.ones(2)
+    original_signal = corrected.signal.copy()
+    with pytest.raises(ValueError, match="propagate_to_all"):
+        cls._restore_masked_values(corrected, filled, np.ones(2, dtype=bool))
+    np.testing.assert_array_equal(corrected.signal, original_signal)
