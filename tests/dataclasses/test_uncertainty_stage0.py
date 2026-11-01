@@ -305,12 +305,14 @@ def test_t0_04b_batch_fold_and_later_producer_limitation(caplog):
     x = BaseData(100.0, ureg.count, {"propagate_to_all": 5.0})
     original_mapping = x.uncertainties
     with caplog.at_level("INFO"):
-        x.uncertainties = with_uncertainty_estimates(x.uncertainties, {"SEM": np.array(3.0), "STD": np.array(4.0)})
+        x.uncertainties = with_uncertainty_estimates(x.uncertainties, {"SEM": np.array(10.0), "STD": np.array(20.0)})
         x.uncertainties = with_uncertainty_estimates(x.uncertainties, {"later": np.array(2.0)})
     assert set(x.uncertainties) == {"SEM", "STD", "later"}
     assert all(isinstance(value, np.ndarray) for value in x.uncertainties.values())
-    assert_allclose(x.uncertainties["SEM"], np.hypot(3, 5))
-    assert_allclose(x.uncertainties["STD"], np.hypot(4, 5))
+    assert_allclose(x.uncertainties["SEM"], 11.18, atol=5e-3)
+    assert_allclose(x.uncertainties["STD"], 20.62, atol=5e-3)
+    assert_allclose(x.uncertainties["SEM"], np.hypot(10, 5))
+    assert_allclose(x.uncertainties["STD"], np.hypot(20, 5))
     assert_allclose(x.uncertainties["later"], 2)
     assert set(original_mapping) == {"propagate_to_all"}
     records = [record for record in caplog.records if "legacy fold" in record.message]
