@@ -150,3 +150,94 @@ def test_t0_09_scalar_peak_allocation():
     assert_allclose(result.signal[0, 0], 2)
     # Python bookkeeping is not frame storage; permit 64 KiB overhead.
     assert peak <= 4 * frame.signal.nbytes + 65536
+
+
+IOPS = (operator.iadd, operator.isub, operator.imul, operator.itruediv)
+
+
+@pytest.mark.parametrize("left_unc", MAPPINGS)
+@pytest.mark.parametrize("right_unc", MAPPINGS)
+@pytest.mark.parametrize("op,iop", zip(OPS, IOPS))
+@pytest.mark.parametrize("reverse", [False, True])
+def test_t0_01_key_table_in_place(left_unc, right_unc, op, iop, reverse):
+    a = BaseData(np.array([4.0, 9.0]), ureg.m, left_unc)
+    b = BaseData(2.0, ureg.m, right_unc)
+    if reverse:
+        a, b = b, a
+    expected = op(a, b)
+    reference = a
+    result = iop(a, b)
+    assert result is reference
+    assert_data_equal(result, expected)
+
+
+@pytest.mark.parametrize("op,iop", zip(OPS, IOPS))
+@pytest.mark.parametrize("alias", ["self", "signal", "uncertainty", "cross_array", "multiple_keys"])
+def test_t0_07_t0_11_t0_12_snapshot_alias_safety(op, iop, alias):
+    a = BaseData(np.array([4.0, 9.0]), ureg.m, {"u": np.array([2.0, 3.0])})
+    b = BaseData(np.array([2.0, 3.0]), ureg.m, {"u": np.array([0.1, 0.2])})
+    if alias == "self":
+        b = a
+    elif alias == "signal":
+        b.signal = a.signal[::-1]
+    elif alias == "uncertainty":
+        b.uncertainties["u"] = a.uncertainties["u"][::-1]
+    elif alias == "cross_array":
+        b.signal = a.uncertainties["u"]
+        b.uncertainties["u"] = a.signal
+    else:
+        a.uncertainties["v"] = a.uncertainties["u"]
+    expected = op(a.copy(), b.copy())
+    original_b = b.copy()
+    result = iop(a, b)
+    assert result is a
+    assert_data_equal(result, expected)
+    if b is not a:
+        assert_data_equal(b, original_b)
+    if alias == "self" and op is operator.truediv:
+        assert_allclose(result.uncertainties["u"], [np.sqrt(0.5), np.sqrt(2) / 3])
+    if alias == "self" and op is operator.sub:
+        assert_allclose(result.uncertainties["u"], np.sqrt(2) * np.array([2.0, 3.0]))
+
+
+@pytest.mark.parametrize("op,iop", zip(OPS, IOPS))
+@pytest.mark.parametrize("failure", ["broadcast", "units", "mixed", "metadata", "signal_shape"])
+def test_t0_08_t0_12_failure_is_atomic(op, iop, failure):
+    a = BaseData(np.full(3, 10.0), ureg.m, {"u": np.ones(3)}, rank_of_data=1)
+    b = BaseData(np.ones(3), ureg.m, {"u": np.ones(3)}, rank_of_data=1)
+    if failure == "broadcast":
+        b.uncertainties["u"] = np.ones(5)
+    elif failure == "units":
+        b.units = ureg.degC if op in (operator.mul, operator.truediv) else ureg.s
+    elif failure == "mixed":
+        b.uncertainties["propagate_to_all"] = np.ones(3)
+    elif failure == "metadata":
+        b.rank_of_data = 0
+        b.axes = [None]
+    else:
+        b.signal = np.ones(5)
+    before = a.copy()
+    signal_ref = a.signal
+    unc_ref = a.uncertainties["u"]
+    with pytest.raises((ValueError, TypeError)) as regular_error:
+        op(a, b)
+    with pytest.raises(type(regular_error.value)):
+        iop(a, b)
+    assert_data_equal(a, before)
+    assert a.signal is signal_ref
+    assert a.uncertainties["u"] is unc_ref
+    assert a.axes == before.axes
+    assert a.rank_of_data == before.rank_of_data
+    assert_array_equal(a.weights, before.weights)
+
+
+@pytest.mark.parametrize(
+    "operand", [2.0, 2.0 * ureg.s, BaseData(np.array([2.0, 3.0]), ureg.s, {"v": np.array([0.1, 0.2])})]
+)
+def test_t0_12_multiply_keeps_container_identity(operand):
+    a = BaseData(np.array([4.0, 9.0]), ureg.m, {"u": np.array([2.0, 3.0])})
+    expected = a * operand
+    reference = a
+    a *= operand
+    assert a is reference
+    assert_data_equal(reference, expected)
