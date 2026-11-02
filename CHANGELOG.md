@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v1.16.1 (2026-11-02)
+
+### Bug fixes
+
+* fix: log one ConvertUnits summary instead of a line per skipped key ([`f68d4e7`](https://github.com/BAMresearch/MoDaCor/commit/f68d4e75539461ab402c83cbf726b6f8e1c3d287))
+
+### Documentation
+
+* docs: record the R18 follow-ups in the remediation tracker ([`0849b44`](https://github.com/BAMresearch/MoDaCor/commit/0849b44d6474e3f27328f34e8540e36e47f288ff))
+
 ## v1.16.0 (2026-11-02)
 
 ### Bug fixes
