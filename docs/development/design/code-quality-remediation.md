@@ -2047,6 +2047,8 @@ explicitly limited to the completed helper refactor.
 
 - **B3:** relocated material_attenuation `_linear_attenuation_from_xraylib` (v1.16.0 lines 133–134). Mass attenuation and density are BaseData scalars in cm²/g and g/cm³; their product is read with scalar_components("1/m"). Three mocked xraylib cases match the previous multiplication and factor-100 formula. Suite: 1323 passed; all 266 release calls / 685 component arrays match. No AST-guard exception added.
 
+- **B4:** relocated capillary residual and component merge (v1.16.0 lines 726–746). Builds attenuation BaseData with sample-mu components and divides by dimensionless scalar transmission BaseData. The central scalar accessor preserves constant-array metadata inputs; inactive pixels are restored to residual 1 and all sigmas 0. Legacy-fold logging is retained. Existing nine E/G/N mapping-table cases, shared/distinct names and scalar/array percent cases run against the frozen release snapshots: 1323 tests pass, all 266 calls / 685 uncertainty arrays agree. The six table rows correspond to these four Part B commits (two rows each for interpolation and residual formation).
+
 **Review log.**
 
 - **Classification (2026-10-31): approved, with scope decisions.** Commit
