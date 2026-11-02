@@ -2055,6 +2055,8 @@ explicitly limited to the completed helper refactor.
 
 - **C / integration:** relocated Integrate1D duplicate grouping, duplicate means and quadrature signal/sigma reductions (v1.16.0 lines 160–244) into models.integration: IntegrationDomain, prepare_integration_domain, collapse_duplicate_values, integrated_uncertainty, integrate_samples_1d. The adapter still selects the common mask, handles bundle/configuration/unit metadata and validates BaseData uncertainty mappings. Numerical order, stable sorting, descending domains and duplicate policies are unchanged. Five new kernel/boundary cases plus existing module tests: 1330 passed; 266 release calls / 685 component arrays match. The seven-run integration timing and benchmark-array comparison are recorded in the final timing table.
 
+- **C / uncertainty:** relocated the two FindCenterOfMass1D signal/axis sensitivity contractions (v1.16.0 lines 160 and 163) to models.uncertainty.sensitivity_contraction. The adapter keeps broadcasting, input validation and signal:/axis: component names. The kernel is the identical sqrt(sum((sensitivity*sigma)**2)) expression; a focused test covers both module branches and the existing NaN policy. Suite: 1326 passed; all 266 release calls / 685 component arrays match. No measured coordinate uncertainty was added to other steps (R16 remains untouched).
+
 **Review log.**
 
 - **Classification (2026-10-31): approved, with scope decisions.** Commit

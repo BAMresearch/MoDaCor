@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 __all__ = [
+    "sensitivity_contraction",
     "combine_uncertainty_component",
     "combine_uncertainty_components",
     "uncertainty_key_plan",
@@ -113,3 +114,8 @@ def uncertainties_from_derivative(
     if derivative is None:
         return {}
     return {name: np.abs(derivative) * uncertainty for name, uncertainty in parameter_uncertainties.items()}
+
+
+def sensitivity_contraction(sensitivity: np.ndarray, sigma: np.ndarray) -> np.ndarray:
+    """Contract independent absolute sigmas with numerical sensitivities."""
+    return np.asarray(np.sqrt(np.sum((sensitivity * sigma) ** 2)))
