@@ -20,6 +20,7 @@ from modacor.modules.base_modules.bitwise_or_masks import BitwiseOrMasks
 from modacor.modules.base_modules.combine_uncertainties import CombineUncertainties
 from modacor.modules.base_modules.combine_uncertainties_max import CombineUncertaintiesMax
 from modacor.modules.base_modules.concatenate_databundles import ConcatenateDatabundles
+from modacor.modules.base_modules.convert_units import ConvertUnits
 from modacor.modules.base_modules.copy_databundle_keys import CopyDataBundleKeys
 from modacor.modules.base_modules.dilate_mask import DilateMask
 from modacor.modules.base_modules.divide import Divide
@@ -75,6 +76,7 @@ __all__ = [
     "CombineUncertainties",
     "CombineUncertaintiesMax",
     "ConcatenateDatabundles",
+    "ConvertUnits",
     "CopyDataBundleKeys",
     "DetectorEfficiencyCorrection",
     "FlatPlateSelfAbsorptionCorrection",

@@ -87,9 +87,9 @@ def prepare_static_scalar(
 
     # scalar passthrough
     if np.size(bd.signal) == 1:
-        out = bd.squeeze().copy()
-        out.rank_of_data = 0
-        return out
+        return BaseData.from_scalar(
+            bd.signal.squeeze(), bd.units, uncertainties=bd.uncertainties, weights=bd.weights.squeeze()
+        )
 
     x = bd.signal.ravel()
 
@@ -127,7 +127,7 @@ def prepare_static_scalar(
     var = float(np.sum(w * (x - mean) ** 2) / wsum)
     sem = float(np.sqrt(var) / np.sqrt(n_eff))
 
-    return BaseData(
+    return BaseData.from_scalar(
         signal=np.array(mean, dtype=float),
         units=bd.units,
         uncertainties={uncertainty_key: np.array(sem, dtype=float)},

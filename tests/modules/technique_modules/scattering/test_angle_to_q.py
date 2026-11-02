@@ -11,7 +11,7 @@ from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.geometry.scattering_angle import signed_q_from_angle
 from modacor.io.io_sources import IoSources
-from modacor.modules import AngleToQ
+from modacor.modules import AngleToQ, ConvertUnits
 
 
 def _processing_data() -> ProcessingData:
@@ -44,7 +44,7 @@ class DummyAngleToQ(AngleToQ):
 def _run_step(processing_data: ProcessingData, *, photon: BaseData, **configuration) -> BaseData:
     step = DummyAngleToQ(photon=photon, io_sources=IoSources())
     step.processing_data = processing_data
-    step.modify_config_by_kwargs(with_processing_keys=["scan"], output_units="1/nm", **configuration)
+    step.modify_config_by_kwargs(with_processing_keys=["scan"], **configuration)
     return step.calculate()["scan"]["Q"]
 
 
@@ -57,10 +57,10 @@ def test_angle_to_q_uses_energy_center_and_retains_sign() -> None:
 
     q = _run_step(_processing_data(), photon=energy)
 
-    wavelength_nm = (ureg.planck_constant * ureg.speed_of_light / (14.0 * ureg.keV)).to("nm").magnitude
-    expected = signed_q_from_angle(np.array([-5.0, 0.0, 5.0]) * 1.0e-6, wavelength_nm)
+    wavelength_m = (ureg.planck_constant * ureg.speed_of_light / (14.0 * ureg.keV)).to("m").magnitude
+    expected = signed_q_from_angle(np.array([-5.0, 0.0, 5.0]) * 1.0e-6, wavelength_m)
     assert_allclose(q.signal, expected)
-    assert q.units == ureg.Unit("1/nm")
+    assert q.units == ureg.Unit("1/m")
     assert set(q.uncertainties) == {"encoder", "centre", "energy"}
     assert q.signal[0] < 0.0 < q.signal[2]
 
@@ -80,7 +80,7 @@ def test_angle_to_q_accepts_wavelength_and_bragg_angle() -> None:
 
     expected = signed_q_from_angle(
         np.array([-5.0, 0.0, 5.0]) * 1.0e-6,
-        np.asarray(0.1),
+        np.asarray(1e-10),
         convention="bragg_angle",
     )
     assert_allclose(q.signal, expected)
@@ -124,3 +124,21 @@ def test_angle_to_q_center_dependency_is_exact() -> None:
 def test_angle_to_q_rejects_non_photon_metadata_units() -> None:
     with pytest.raises(ValueError, match="energy or wavelength units"):
         _run_step(_processing_data(), photon=BaseData(np.asarray(1.0), ureg.second))
+
+
+def test_output_units_is_removed():
+    with pytest.raises(KeyError, match="output_units"):
+        AngleToQ(configuration={"output_units": "1/nm"})
+
+
+def test_convert_units_selects_q_output_units():
+    processing = _processing_data()
+    q = _run_step(processing, photon=BaseData(0.1, "nm", uncertainties={"wavelength": 0.0001}))
+    signal = q.signal.copy()
+    uncertainties = {key: value.copy() for key, value in q.uncertainties.items()}
+    ConvertUnits(configuration={"with_processing_keys": ["scan"], "units": {"Q": "1/nm"}}).execute(processing)
+    assert processing["scan"]["Q"] is q
+    assert q.units == ureg.Unit("1/nm")
+    assert_allclose(q.signal, signal * 1e-9, rtol=1e-12, atol=0)
+    for key, values in uncertainties.items():
+        assert_allclose(q.uncertainties[key], values * 1e-9, rtol=1e-12, atol=0)

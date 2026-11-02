@@ -111,7 +111,7 @@ class IndexByCoordinate(ProcessStep):
         units_config = self.configuration.get("bin_units")
         configured_units = coordinate.units if units_config is None else ureg.Unit(units_config)
         try:
-            conversion = coordinate.units.m_from(configured_units)
+            conversion = scalar_in_units(1.0, coordinate.units, name="bin_units", units=configured_units)
         except Exception as exc:  # Pint exposes several dimensionality error types
             raise ValueError(
                 f"IndexByCoordinate: bin_units {configured_units!s} are incompatible with "

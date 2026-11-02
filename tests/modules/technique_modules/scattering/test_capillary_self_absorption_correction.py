@@ -645,3 +645,118 @@ def test_stage0_correlated_mu_components_fold_together_and_mask_validation_is_at
     with pytest.raises(ValueError, match="propagate_to_all"):
         cls._restore_masked_values(corrected, filled, np.ones(2, dtype=bool))
     np.testing.assert_array_equal(corrected.signal, original_signal)
+
+
+@pytest.mark.parametrize("shape", [(), (2, 1, 1)])
+@pytest.mark.parametrize("uncertainty_key", ["transmission_SEM", "propagate_to_all"])
+def test_percent_transmission_matches_dimensionless(monkeypatch, shape, uncertainty_key):
+    original_data = CapillarySource.get_data
+    original_metadata = CapillarySource.get_static_metadata
+    results = []
+    for units, factor in [("dimensionless", 1.0), ("percent", 100.0)]:
+
+        def get_data(self, key, load_slice=...):
+            if key == "/transmission":
+                return np.full(shape, 0.5 * factor)
+            if key == "/transmission_sem":
+                return np.full(shape, 0.01 * factor)
+            return original_data(self, key, load_slice)
+
+        def get_metadata(self, key):
+            return units if "transmission" in key else original_metadata(self, key)
+
+        monkeypatch.setattr(CapillarySource, "get_data", get_data)
+        monkeypatch.setattr(CapillarySource, "get_static_metadata", get_metadata)
+        data = _processing_data()
+        step = CapillarySelfAbsorptionCorrection(io_sources=_sources(), processing_data=data)
+        step.modify_config_by_dict(
+            _configuration(
+                input_state="transmission_normalized",
+                transmission_source="measurement::/transmission",
+                transmission_units_source="measurement::/transmission@units",
+                transmission_uncertainties_sources={uncertainty_key: "measurement::/transmission_sem"},
+                sample_mu_uncertainties_sources={"propagate_to_all": "measurement::/sample_mu_sem"},
+            )
+        )
+        step.calculate()
+        results.append(data["sample"])
+    for key, expected in results[0].items():
+        actual = results[1][key]
+        np.testing.assert_allclose(actual.signal, expected.signal, rtol=1e-12, atol=0)
+        assert actual.uncertainties.keys() == expected.uncertainties.keys()
+        for component in expected.uncertainties:
+            np.testing.assert_allclose(
+                actual.uncertainties[component], expected.uncertainties[component], rtol=1e-12, atol=0
+            )
+
+
+@pytest.mark.parametrize("mu_category", ["E", "G", "N"])
+@pytest.mark.parametrize("transmission_category", ["E", "G", "N"])
+def test_measured_transmission_uncertainty_mapping_table(mu_category, transmission_category):
+    def source_mapping(category, specific, reference):
+        keys = [] if category == "E" else ["propagate_to_all"] if category == "G" else ["common", specific]
+        return dict.fromkeys(keys, reference)
+
+    def calculate(mu_mapping, transmission_mapping):
+        step = _run(
+            _processing_data(),
+            input_state="transmission_normalized",
+            sample_mu_uncertainties_sources=mu_mapping,
+            transmission_source="measurement::/transmission",
+            transmission_units_source="measurement::/transmission@units",
+            transmission_uncertainties_sources=transmission_mapping,
+        )
+        return step.processing_data["sample"]["capillary_self_absorption"]
+
+    mu_ref = "measurement::/sample_mu_sem"
+    transmission_ref = "measurement::/transmission_sem"
+    mu_only = calculate({"mu": mu_ref}, {})
+    transmission_only = calculate({}, {"transmission": transmission_ref})
+    mu_mapping = source_mapping(mu_category, "mu", mu_ref)
+    transmission_mapping = source_mapping(transmission_category, "transmission", transmission_ref)
+    actual = calculate(mu_mapping, transmission_mapping)
+    named = (set(mu_mapping) | set(transmission_mapping)) - {"propagate_to_all"}
+    expected_keys = named or ({"propagate_to_all"} if "G" in (mu_category, transmission_category) else set())
+    assert actual.uncertainties.keys() == expected_keys
+    np.testing.assert_allclose(actual.signal, mu_only.signal, rtol=1e-12, atol=0)
+    for key in expected_keys:
+        mu = mu_only.uncertainties["mu"] if key in mu_mapping or mu_category == "G" else 0.0
+        transmission = (
+            transmission_only.uncertainties["transmission"]
+            if key in transmission_mapping or transmission_category == "G"
+            else 0.0
+        )
+        np.testing.assert_allclose(actual.uncertainties[key], np.hypot(mu, transmission), rtol=1e-12, atol=0)
+
+
+@pytest.mark.parametrize("existing_category", ["E", "G", "N"])
+@pytest.mark.parametrize("mu_category", ["E", "G", "N"])
+def test_container_sample_mu_component_mapping_table(existing_category, mu_category):
+    def mapping(category, specific, sigma):
+        keys = [] if category == "E" else ["propagate_to_all"] if category == "G" else ["common", specific]
+        return dict.fromkeys(keys, sigma)
+
+    existing = mapping(existing_category, "measurement", 3.0)
+    mu_mapping = mapping(mu_category, "mu", 0.5)
+    corrected = BaseData(np.array([4.0, 4.0]), "count", existing)
+    CapillarySampleContainerCorrection._add_correlated_sample_mu_uncertainties(
+        corrected,
+        BaseData(np.array([10.0, 10.0]), "count"),
+        BaseData(np.array([2.0, 2.0]), "count"),
+        np.full(2, 2.0),
+        np.ones(2),
+        np.ones(2),
+        np.zeros(2),
+        np.ones(2),
+        mu_mapping,
+    )
+    named = (set(existing) | set(mu_mapping)) - {"propagate_to_all"}
+    expected_keys = named or ({"propagate_to_all"} if "G" in (existing_category, mu_category) else set())
+    assert corrected.uncertainties.keys() == expected_keys
+    for key in expected_keys:
+        measurement = 3.0 if key in existing or existing_category == "G" else 0.0
+        # The complete-expression derivative is -2; sigma_mu=.5 contributes 1.
+        sample_mu = 1.0 if key in mu_mapping or mu_category == "G" else 0.0
+        np.testing.assert_allclose(
+            corrected.uncertainties[key], np.full(2, np.hypot(measurement, sample_mu)), rtol=1e-12, atol=0
+        )

@@ -219,7 +219,7 @@ def _relative_depends_on(io_sources: IoSources, source_reference: str, path: str
 
 
 def _basedata_scalar(value: float, units: str) -> BaseData:
-    return BaseData(signal=np.asarray(value, dtype=float), units=ureg.Unit(units), rank_of_data=0)
+    return BaseData.from_scalar(signal=np.asarray(value, dtype=float), units=ureg.Unit(units), rank_of_data=0)
 
 
 def load_nexus_detector_frame_inputs(

@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
-import numpy as np
 import pytest
 
 from modacor import ureg
@@ -16,20 +15,14 @@ def test_configuration_conversion_matches_old_pint_formula(value, units, target)
     assert scalar_in_units(value, target, name="configuration", units=units) == pytest.approx(expected, rel=1e-12)
 
 
-@pytest.mark.parametrize("shape", [(), (1,), (2, 3)])
-def test_basedata_scalar_or_exactly_constant_conversion_preserves_input(shape):
-    data = BaseData(np.full(shape, 2.0), ureg.mm, uncertainties={"measured": np.full(shape, 0.1)})
-    assert scalar_in_units(data, "m", name="length") == pytest.approx(0.002, rel=1e-12)
-    np.testing.assert_array_equal(data.signal, np.full(shape, 2.0))
-    np.testing.assert_array_equal(data.uncertainties["measured"], np.full(shape, 0.1))
-    assert data.units == ureg.mm
+def test_basedata_requires_uncertainty_aware_accessor():
+    with pytest.raises(TypeError, match="length.*configuration number"):
+        scalar_in_units(BaseData(2.0, ureg.mm), "m", name="length")
 
 
 @pytest.mark.parametrize(
     "value,units,target",
     [
-        (BaseData(np.array([1.0, 2.0]), ureg.m), None, "m"),
-        (BaseData(np.asarray(1.0), ureg.m), "mm", "m"),
         (1.0, "second", "m"),
     ],
 )

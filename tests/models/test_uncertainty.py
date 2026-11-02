@@ -32,10 +32,11 @@ def test_named_uncertainty_helpers_scale_and_combine_independent_components():
 def test_stage0_numerical_helpers_reject_mixed_keys_before_writes():
     import pytest
 
-    target = {"propagate_to_all": np.array(3.0)}
+    target = {"propagate_to_all": np.array(3.0), "named": np.array(4.0)}
+    before = dict(target)
     with pytest.raises(ValueError, match="propagate_to_all"):
-        combine_uncertainty_component(target, "named", np.array(4.0))
-    assert set(target) == {"propagate_to_all"}
-    target["named"] = np.array(4.0)
+        combine_uncertainty_component(target, "other", np.array(5.0))
+    assert target.keys() == before.keys()
+    assert all(target[key] is before[key] for key in target)
     with pytest.raises(ValueError, match="propagate_to_all"):
         uncertainties_from_derivative(2.0, target)

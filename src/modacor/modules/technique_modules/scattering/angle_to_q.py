@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["AngleToQ"]
-__version__ = "20261003.1"
+__version__ = "20261101.1"
 
 from pathlib import Path
 
@@ -92,11 +92,6 @@ class AngleToQ(ProcessStep):
                 "default": "Q",
                 "doc": "Output BaseData key.",
             },
-            "output_units": {
-                "type": str,
-                "default": "1/nm",
-                "doc": "Momentum-transfer output units.",
-            },
         },
         step_keywords=[
             "scattering angle",
@@ -111,7 +106,8 @@ class AngleToQ(ProcessStep):
             "Uses Q = 4*pi/lambda*sin(angle/2) for scattering_angle/two_theta and "
             "Q = 4*pi/lambda*sin(angle) for bragg_angle/theta. Photon metadata is loaded from IoSources; "
             "energy or wavelength representation is inferred from its units and converted with "
-            "uncertainty-aware BaseData arithmetic. The angle sign is retained."
+            "uncertainty-aware BaseData arithmetic. The angle sign is retained. Q is returned in 1/m; "
+            "use ConvertUnits to select output units."
         ),
     )
 
@@ -141,7 +137,7 @@ class AngleToQ(ProcessStep):
         configured = self.configuration.get("angle_zero")
         if configured is not None:
             units = ureg.Unit(self.configuration.get("angle_zero_units") or angle.units)
-            zero = BaseData(np.asarray(float(configured)), units)
+            zero = BaseData.from_scalar(float(configured), units)
             zero.to_units(angle.units)
             return zero
         center_key = self._optional_key(self.configuration["center_key"])
@@ -169,7 +165,6 @@ class AngleToQ(ProcessStep):
         output_key = str(self.configuration["output_key"]).strip()
         if not output_key:
             raise ValueError("AngleToQ output_key must not be empty.")
-        output_units = ureg.Unit(self.configuration["output_units"])
         factor = q_angle_factor(str(self.configuration["angle_convention"]))
         four_pi = BaseData(signal=np.asarray(4.0 * np.pi), units=ureg.dimensionless)
         wavelength = self._photon_wavelength()
@@ -180,7 +175,6 @@ class AngleToQ(ProcessStep):
             angle = bundle[angle_key].copy(with_axes=True)
             relative_angle = angle - self._angle_zero(bundle, angle)
             q = four_pi * (relative_angle * factor).sin() / wavelength
-            q.to_units(output_units)
             bundle[output_key] = q
             output[processing_key] = bundle
         return output

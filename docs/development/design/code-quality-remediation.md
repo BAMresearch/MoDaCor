@@ -95,11 +95,11 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | open |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | open |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
-| R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | in progress |
+| R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | done |
 | R14 | The `required` argument flag is never enforced | contract | S | medium | open |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
-| R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | in progress (own branch and PR) |
+| R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | done (v1.15.0, PR #154) |
 | R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | approved |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
@@ -2185,7 +2185,7 @@ This item should get its own branch and pull request.
 
 ## R13 — CI never exercises the xraylib (attenuation) path
 
-**Status:** in progress on branch `quality-remediation-r08-r13-r15`.
+**Status:** done (PR #152).
 xraylib 4.3.0 publishes manylinux wheels for CPython 3.10–3.15 (x86_64 and
 aarch64), so CI can install it directly. Plan: add the `attenuation` extra to
 the default `[testenv]`.
@@ -2227,8 +2227,10 @@ guards. Verified with `tox -e py312 -- -rs`:
 
 - **(2026-10-31): approved.** Commit `6dd5eef`. `tox -e py312` now skips 3
   tests (the chunk-memory opt-in and two Tiled tests, which have their own
-  env), down from 4: the xraylib test runs. Still to confirm: the CI log after
-  the push.
+  env), down from 4: the xraylib test runs. Confirmed in CI (PR #152, py3.12 job): the
+  environment installs `xraylib==4.3.0` and
+  `test_xraylib_accepts_element_formula_and_rejects_typo` PASSED. The only
+  skips are the chunk-memory opt-in and the two Tiled tests.
 
 ---
 
@@ -2448,12 +2450,12 @@ finite-difference test.
 ## R17 — BaseData silently drops `propagate_to_all` uncertainties
 
 **Status:** superseded by the uncertainty-propagation specification, Stage 0
-(maintainer, 2026-11-01). It is implemented on its own branch,
-`uncertainty-stage0` from `main`, as its own PR.
+(maintainer, 2026-11-01). Implemented on its own branch, `uncertainty-stage0`
+from `main`; merged as PR #154 and released in v1.15.0.
 - The interim fix `3ea4ec2` (union rule for mixed mappings) is reverted on
   `quality-remediation-r08-r13-r15`. Stage 0 makes a mixed mapping raise
   `ValueError` instead (R0.1).
-- The material is in `auxiliary/modacor_stage0_handoff.zip`: HANDOFF.md, the
+- The material is in `auxiliary/modacor_stage0_handoff.zip`: `HANDOFF.md`, the
   normative specification, `repro.py` and RFC v8. The archive is not
   committed; the specification and the RFC are added to the docs by the
   Stage 0 PR.
@@ -2574,13 +2576,35 @@ made after the R17 commit.
     caution.
   - No existing test expectation changed. The MoDaCor-examples tests (23)
     pass before and after.
+- **(2026-11-01): Stage 0 approved; PR #154 opened as a draft.** Commits
+  `59cd747` … `401e759` (Codex), plus reviewer follow-ups `8f0dea5` and `fd56f6f`.
+  - Re-ran: full suite **1717 passed, 1 skipped**; tox `py312` **1715 passed,
+    3 skipped**; `docs` and `lint` pass. The opt-in RSS chunk-memory test passes.
+  - `main`'s own suite run against the branch fails only the three tests
+    that asserted the old behaviour (array identity, uncertainty-buffer
+    identity), plus one doc-generator path artefact of the out-of-tree run.
+  - F4 stays 15.0 by design: T0-05 keeps the union rule in Stage 0.
+  - Design change: in-place operators now compute the full result and then
+    install it, replacing the September 2026 in-place fast paths. Measured on
+    8 × 1024² with 2 keys: same speed within about 10%; in-place peak memory
+    rises from about 2 to 3 frames (keys + 1, within S0.7); out-of-place and
+    `*=` peak memory falls from about 8 to 3 frames. Exact-mode capillary:
+    0.119 s on both, identical results.
+  - Follow-ups made by the reviewer: the specification copy is now the
+    maintainer's updated version (R0.4 multi-estimate, T0-04b values); T0-04b
+    uses the specification's σ 10 and 20; the guide again links the
+    combination modules, keeps the naming and collision guidance, and warns
+    that a global term counted in every named estimate is over-counted when
+    those estimates are combined.
+  - Open: `CombineUncertainties` itself carries no over-count caution (it was
+    in the reverted interim fix only).
 
 ---
 
-## R18 — Transmission uncertainties left in percent while the value is converted
+## R18 — Central unit conversion for BaseData (includes the transmission-unit bug)
 
-**Status:** approved (maintainer, 2026-11-01). The scope is widened from the
-two-step transmission fix to central unit handling.
+**Status:** implemented (2026-11-02), including the maintainer-authorized
+capillary mapping follow-up. The separate examples migration follows release.
 
 **Decisions (2026-11-01).**
 
@@ -2671,9 +2695,141 @@ dimensionless inputs give identical factors and uncertainties for both steps.
 This changes results only for non-dimensionless transmission inputs, so it is
 a `fix:`.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- **R18a:** `magnitudes` is the single conversion implementation, shared by
+  `_unary_inputs`, `to_units` and `in_units`. Conversion validates first and
+  preserves masked arrays; fresh converted arrays are adopted without another
+  copy. `scalar_components` preserves global-only mappings and enforces the
+  scalar-or-exactly-constant policy. `from_scalar` runs constructor validation.
+- Scalar ingestion routes: scalar/size-one `basedata_from_sources`, configured
+  `scalar_quantity_from_config_or_source`, capillary `_scalar_basedata`,
+  `prepare_static_scalar` (passthrough and weighted summary), AngleToQ configured
+  zero, and NeXus detector-frame `_basedata_scalar`. Numeric decoding now belongs
+  to BaseData; text metadata has a separate text-only decoder.
+- Release comparison: v1.15.0 (`d4226f6`) module/dataclass tests passed (1236);
+  219 successful public-step calls were captured outside the repository and
+  compared per bundle/key, nominal array and every named uncertainty at
+  `rtol=1e-12, atol=0` (equivalent unit changes normalized). R18a: 1261 passed,
+  including the unchanged 424 Stage 0 cases; all baseline arrays agree.
+- Initial median timings (7 repeats, scalar 1000 calls, 1 Mpx 20 calls, two
+  uncertainty keys): release binary scalar 45.39 µs, frame 6.116 ms; R18a
+  46.26 µs, 6.964 ms. Binary implementation is unchanged; reviewer alternated
+  release/current measurements and confirmed unchanged timings (2026-11-02). Release
+  copy-then-convert frame 3.457 ms; `in_units` frame 1.563 ms. v1.15.0 has no
+  `in_units`, so its comparison uses the equivalent copy-plus-`to_units` path.
+
+- **R18b:** both transmission adapters now obtain nominal values and sigmas
+  together in dimensionless units, including constant-array sources. Capillary's
+  `with_uncertainty_estimates` fold remains in place. Eight parameterized
+  percent-versus-dimensionless cases cover scalar/constant-array input and
+  named/global-only mappings, comparing every output component at `rtol=1e-12`.
+  Module/dataclass suite: 1269 passed; all 219 release calls / 463 uncertainty
+  arrays agree. Grep of all module Pint and BaseData conversions found no other
+  converted-nominal/unconverted-sigma pair.
+- R18b observation (fixed separately after maintainer approval, 2026-11-02):
+  capillary with named sample-mu estimates
+  plus a global-only transmission mapping raises the existing Stage 0 mixed-key
+  validation error; the fold supports the opposite direction. This is outside
+  the original transmission-unit fix; the separately authorized mapping merge
+  below implements the §4.3 behavior in both directions.
+
+- **R18c:** `scalar_in_units` accepts real configuration numbers only and
+  rejects BaseData with TypeError. Material-attenuation and capillary data
+  callers use `scalar_components`; capillary configuration arrays use
+  `magnitudes`, and IndexByCoordinate's configured unit factor uses the scalar
+  helper. The AST guard covers `.to(...).magnitude`, `.m_as`, `.m_from`, and
+  `ureg.Quantity`, excluding deprecated modules. Its two function-scoped
+  exceptions are `plot_1d_visualization._convert_values` (display values and
+  error bars) and `helpers.quantities.scalar_in_units` (configuration numbers,
+  with BaseData explicitly rejected). No other exceptions remain.
+  Module/dataclass suite: 1270 passed; all release nominal arrays and 463 named
+  uncertainty arrays from 219 calls match at `rtol=1e-12`.
+
+- **R18d / ConvertUnits:** exported public step, mapping-valued read/write
+  dependency role, exact explicit-bundle paths and conservative wildcard
+  contract. Wildcard selection logs each absent key at INFO; explicit lists
+  fail with bundle/key context. In-place conversion preserves object/axis
+  identity and weights. Eight focused cases cover multiple bundles/keys,
+  partially present keys, conversion errors, uncertainty scaling and contracts.
+  Added the step to the reference generator's module groups and regenerated
+  reference pages. Module/dataclass suite: 1280 passed; release comparison
+  remains 219 calls / 463 named uncertainty arrays at `rtol=1e-12`.
+
+- **Review follow-up (2026-11-02), folded into R18a:** shared unit parsing
+  restores invalid-unit ValueError; native-unit access skips Pint compatibility
+  and conversion-factor work, while retaining uncertainty validation. Named
+  scalar errors preserve configuration parameter context at all migrated call
+  sites. After autosquash: 1291 module/dataclass tests passed, and the 219-call /
+  463-component release comparison passed at `rtol=1e-12, atol=0`.
+  Median scalar `sqrt` with one named sigma (9 repeats of 10000 calls):
+  release 22.724 µs, corrected 22.767 µs. No further binary timing runs needed.
+- **Separately authorized capillary mapping fix (2026-11-02):** moved the
+  §4.3 planner into `models.uncertainty.uncertainty_key_plan`, imported by
+  BaseData under its existing private name. `combine_uncertainty_components`
+  uses that same planner for atomic independent-component quadrature in both
+  directions, including named plus global. Both capillary residual attachment
+  and container `_add_correlated_sample_mu_uncertainties` use it; the single
+  component helper delegates to it too. No production single-component helper
+  callers remain after the Stage 0 audit. Named-estimate producers continue to
+  use their separate `with_uncertainty_estimates` transition, unchanged.
+  Tests cover all E/G/N pairs for sample-mu/transmission and corrected-signal/
+  sample-mu attachments, distinct and shared names, ownership and invalid-input
+  atomicity. Existing global-to-named legacy-fold logging is retained.
+  Focused suite: 1328 passed; all 219 release calls / 463 component arrays
+  retain their values. The newly working N+G case is the authorized bug fix.
+
+- **R18d / AngleToQ (2026-11-02):** removed `output_units`; Q now retains
+  its natural 1/m units. The wavelength fixture stays at 0.1 nm; only the
+  expected calculation uses 1e-10 m, correcting the fixture-edit stop from
+  2026-11-01. Tests cover rejected old configuration and subsequent ConvertUnits
+  scaling, including all uncertainty keys. Added the interface migration and
+  author-guide Units section; regenerated references. The migration YAML parses
+  with `Pipeline.from_yaml`. Final comparison: 1311 module/dataclass tests pass,
+  with 219 release calls / 463 component arrays equivalent at `rtol=1e-12`.
+- **Final checks (2026-11-02):** `.venv-dev/bin/python -m pytest tests -q`:
+  1808 passed, 1 skipped, 2 subtests passed; the 424 Stage 0 tests are unchanged.
+  Tox py312: 1806 passed, 3 skipped, 2 subtests passed (optional memory and Tiled
+  checks skipped). Tox lint, docs (warnings-as-errors) and manifest pass.
+  Lint initially found import layout left by the separate planner import;
+  corrected using the tox environment's isort. Manifest initially could not
+  resolve PyPI inside the sandbox; the same tox check passed with network access.
+- MoDaCor-examples `tests DLS/I22/tests`: 21 passed, 2 expected failures in
+  I22_USAXS graph construction (`test_usaxs_pipeline_expands_to_the_complete_execution_graph`
+  and `test_usaxs_pipeline_graphs_group_each_authored_step_block`). Its YAML
+  still configures removed `AngleToQ.output_units: 1/nm`; remove that setting
+  and append ConvertUnits after release. That repository's existing user edits
+  were left unchanged. No new numerical stop condition was encountered.
 
 **Review log.** _(reviewer)_
+
+- **(2026-11-01): first four commits reviewed; changes requested.**
+  - The reduction rule is correct for 21 probed units: `count`, angle units
+    (deg, mrad, arcmin, turn), `sr` and `px` are kept; %, ‰ and ppm fold;
+    m/mm and J/eV cancel.
+  - Paired timings against v1.15.0: binary operations unchanged (the reported
+    +14% was noise). Requested: `to_units` must raise `ValueError` for an
+    invalid unit string again; restore the scalar unary time (23 → 34 µs);
+    keep the parameter name in `scalar_components` errors.
+  - The capillary mixed-key error was reproduced on v1.15.0 (named `sample_mu`
+    estimates with a global-only transmission). Fix authorized under §4.3 of
+    the uncertainty specification.
+- **(2026-11-02): approved.** Commits `1afb738` … `aa7ba7a`.
+  - Re-ran: full suite **1808 passed, 1 skipped**; tox `py312` **1806 passed,
+    3 skipped**; `docs` and `lint` pass.
+  - The review fixes hold: `to_units("notaunit")` raises `ValueError`; errors
+    read "sample_mu: Cannot convert …"; scalar `sqrt` and the binary
+    operations time the same as v1.15.0.
+  - Capillary: all three `sample_mu`/transmission combinations run. With a
+    global-only transmission, the folded `sample_mu_SEM` equals the quadrature
+    sum of the separate components from the named run (rtol 1e-12), with an
+    identical signal and `Poisson` term.
+  - `combine_uncertainty_component` now folds a named addition into a
+    global-only mapping (R0.4) instead of rejecting it; it has no callers in
+    `src`, and its test now checks a genuinely mixed input.
+  - After release: migrate MoDaCor-examples `I22_USAXS.yaml` (remove
+    `AngleToQ.output_units`, add `ConvertUnits`); its two graph tests fail
+    until then.
 
 ---
 

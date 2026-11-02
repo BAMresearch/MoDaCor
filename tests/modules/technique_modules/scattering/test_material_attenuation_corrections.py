@@ -14,7 +14,6 @@ from modacor.dataclasses.process_step import ProcessStepDependencies
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.io.io_sources import IoSources
 from modacor.modules.helpers.scattering.material_attenuation import (
-    _decode_scalar,
     energy_kev_from_config_or_wavelength,
     material_attenuation_from_config,
     scalar_quantity_from_config_or_source,
@@ -142,12 +141,14 @@ def test_material_attenuation_can_derive_energy_from_wavelength():
 
 
 def test_material_attenuation_accepts_broadcast_constant_as_scalar():
-    assert _decode_scalar(np.full((5, 1, 1, 1), 0.154)) == pytest.approx(0.154)
+    assert BaseData(np.full((5, 1, 1, 1), 0.154), "dimensionless").scalar_components("dimensionless")[
+        0
+    ] == pytest.approx(0.154)
 
 
 def test_material_attenuation_rejects_varying_array_as_scalar():
     with pytest.raises(ValueError, match="scalar or constant-valued array"):
-        _decode_scalar(np.array([0.154, 0.071]))
+        BaseData(np.array([0.154, 0.071]), "dimensionless").scalar_components("dimensionless")
 
 
 def test_detector_efficiency_dependency_contract_tracks_sources_and_cos_alpha():

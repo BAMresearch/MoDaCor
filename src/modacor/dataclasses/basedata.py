@@ -27,7 +27,9 @@ from attrs import define, field, setters
 from attrs import validators as v
 
 from modacor import ureg
+from modacor.models.uncertainty import uncertainty_key_plan as _uncertainty_key_plan
 from modacor.models.uncertainty import validate_uncertainty_keys, with_uncertainty_estimates
+from modacor.units import scalar_reduced_units
 
 logger = logging.getLogger(__name__)
 
@@ -352,26 +354,6 @@ def _coerce_inplace_add_sub_operand(target: BaseData, other: Any) -> BaseData | 
     return None
 
 
-def _uncertainty_key_plan(
-    left_unc: Dict[str, np.ndarray],
-    right_unc: Dict[str, np.ndarray],
-) -> tuple[set[str], Any | None, Any | None]:
-    validate_uncertainty_keys(left_unc)
-    validate_uncertainty_keys(right_unc)
-    left_global = left_unc.get("propagate_to_all")
-    right_global = right_unc.get("propagate_to_all")
-    left_keys, right_keys = set(left_unc), set(right_unc)
-    if left_global is not None and right_keys - {"propagate_to_all"}:
-        out_keys = right_keys
-    elif right_global is not None and left_keys - {"propagate_to_all"}:
-        out_keys = left_keys
-    else:
-        out_keys = left_keys | right_keys
-    if left_keys and right_keys and left_global is None and right_global is None and left_keys != right_keys:
-        logger.debug("Uncertainty key sets differ; propagating their union with absent terms treated as zero.")
-    return out_keys, left_global, right_global
-
-
 def _install_inplace_result(target: BaseData, result: BaseData) -> BaseData:
     """Commit a fully checked result while preserving the container identity.
 
@@ -399,15 +381,17 @@ def _inplace_add_sub(target: BaseData, other: BaseData, *, sign: float) -> BaseD
     return _install_inplace_result(target, _binary_basedata_op(target, other, op))
 
 
+def _parse_units(units: str | pint.Unit) -> pint.Unit:
+    """Parse conversion targets with the public invalid-unit ValueError contract."""
+    try:
+        return units if isinstance(units, pint.Unit) else ureg.Unit(units)
+    except pint.errors.UndefinedUnitError as exc:
+        raise ValueError(f"Invalid unit provided: {units}.") from exc
+
+
 def _unary_inputs(element: BaseData, input_units: pint.Unit | None = None):
     """Return signal and all sigmas with one inline conversion; never mutate input."""
-    _validate_uncertainties(element)
-    factor = 1.0 if input_units is None else float(input_units.m_from(element.units))
-    if factor == 1.0:
-        return element.signal, element.uncertainties
-    return element.signal * factor, {
-        key: np.asarray(value) * abs(factor) for key, value in element.uncertainties.items()
-    }
+    return element.magnitudes(input_units)
 
 
 def _unary_basedata_op(
@@ -637,7 +621,8 @@ class BaseData(UncertaintyOpsMixin):
         treated as zero by this arithmetic. Aliases are computationally safe, but physical
         correlation is not represented: uncertainty in ``a - a`` does not cancel.
     weights : np.ndarray, optional
-        Weights for `signal` (default is a scaling 1.0) for use in averaging operations.
+        Dimensionless relative weights (default 1.0) for averaging operations.
+        Unit conversion never rescales weights.
         Must broadcast to `signal.shape`.
     axes : List[BaseData | None]
         Optional metadata for each axis of `signal`. Defaults to an empty list.
@@ -661,6 +646,10 @@ class BaseData(UncertaintyOpsMixin):
     to_units(new_units: pint.Unit):
         Converts internal `signal` and all `uncertainties` to `new_units` if compatible with
         the existing `units`. Raises `TypeError` or `ValueError` on invalid input.
+    in_units(units): Returns independent converted data with the same relative weights.
+    magnitudes(units): Returns signal and named uncertainties in the same units, without mutation.
+    scalar_components(units): Returns floats for scalar or exactly constant arrays.
+    from_scalar(signal, units, uncertainties): Wraps metadata with safe pure-number unit reduction.
     to_base_units(): Converts internal signal and uncertainties to the base units implied by current units.
     to_dimensionless(): Converts internal signal and uncertainties to dimensionless units if possible.
     is_dimensionless() -> bool:
@@ -810,47 +799,102 @@ class BaseData(UncertaintyOpsMixin):
                 "This is not supported yet because uncertainties require explicit rules (e.g. delta units)."
             ) from e
 
-    def to_units(self, new_units: pint.Unit, multiplicative_conversion=True) -> None:
+    @classmethod
+    def from_scalar(cls, signal, units, uncertainties=None, **kwargs) -> Self:
+        """Wrap scalar metadata/configuration with safe pure-number reduction.
+
+        Count, angle (including derived angle units), steradian and pixel labels
+        survive reduction. Normal constructors and arithmetic retain their units.
+        Constructor validation, including the uncertainty-key rule, runs first.
         """
-        Convert the signal and uncertainties to new units.
+        result = cls(signal=signal, units=units, uncertainties={} if uncertainties is None else uncertainties, **kwargs)
+        if result.signal.size != 1:
+            raise ValueError(f"Expected a scalar, got shape {result.signal.shape}.")
+        result.to_units(scalar_reduced_units(result.units))
+        return result
+
+    def magnitudes(self, units: str | pint.Unit | None) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+        """Return signal and every absolute sigma in the same requested units.
+
+        Does not mutate this object. Identity conversions may return borrowed
+        arrays; callers needing owned storage should use :meth:`in_units`.
+        Uncertainties are validated before conversion, including identity cases.
+        ``None`` requests native units without any Pint conversion work.
         """
         _validate_uncertainties(self)
+        if units is None:
+            return self.signal, self.uncertainties
+        target = _parse_units(units)
+        if target == self.units:
+            return self.signal, self.uncertainties
+        if not self.units.is_compatible_with(target):
+            raise ValueError(f"Cannot convert from {self.units} to {target}. Units are not compatible.")
+        factor = float(target.m_from(self.units))
+        if factor == 1.0:
+            return self.signal, self.uncertainties
+        return np.asanyarray(self.signal * factor), {
+            key: np.asanyarray(value * abs(factor)) for key, value in self.uncertainties.items()
+        }
+
+    @staticmethod
+    def _constant_scalar(value) -> float:
+        """Decode one scalar or an exactly constant numeric array."""
+        arr = np.asarray(value).reshape(-1)
+        if not arr.size or not np.allclose(arr, arr[0], rtol=0.0, atol=0.0, equal_nan=True):
+            raise ValueError(f"Expected a scalar or constant-valued array, got shape {np.shape(value)}.")
+        return float(arr[0])
+
+    def scalar_components(self, units: str | pint.Unit, *, name: str | None = None) -> tuple[float, dict[str, float]]:
+        """Return a scalar value and named sigmas in ``units`` without mutation.
+
+        Each array must be scalar or exactly constant; sigmas must also be finite
+        and nonnegative. A global-only mapping retains ``propagate_to_all``.
+        """
         try:
-            new_units = ureg.Unit(new_units)  # ensure new_units is a pint.Unit
-        except pint.errors.UndefinedUnitError as e:
-            raise ValueError(f"Invalid unit provided: {new_units}.") from e
+            signal, uncertainties = self.magnitudes(units)
+            value = self._constant_scalar(signal)
+            components = {}
+            for key, values in uncertainties.items():
+                sigma = self._constant_scalar(values)
+                if not np.isfinite(sigma) or sigma < 0:
+                    raise ValueError(f"Uncertainty {key!r} must be finite and non-negative.")
+                components[key] = sigma
+            return value, components
+        except (pint.PintError, ValueError, TypeError, IndexError) as exc:
+            if name is None:
+                raise
+            raise ValueError(f"{name}: {exc}") from exc
 
-        if not isinstance(new_units, ureg.Unit):
-            raise TypeError(f"new_units must be a pint.Unit, got {type(new_units)}.")
+    def in_units(self, units: str | pint.Unit) -> Self:
+        """Return an independent converted object; weights keep their values.
 
-        if not self.units.is_compatible_with(new_units):
-            raise ValueError(f"""
-              Cannot convert from {self.units} to {new_units}. Units are not compatible.
-            """)
+        Freshly converted arrays are adopted without a second detector-frame
+        copy. Axes keep their references in an independent list.
+        """
+        signal, uncertainties = self.magnitudes(units)
+        result = type(self)(signal=0.0, units=ureg.Unit(units))
+        result.signal = (
+            np.asanyarray(signal, dtype=float).copy() if signal is self.signal else np.asanyarray(signal, dtype=float)
+        )
+        result.uncertainties = {
+            key: value.copy() if value is self.uncertainties[key] else value for key, value in uncertainties.items()
+        }
+        return _inherit_metadata(self, result)
 
-        # If the units are the same, no conversion is needed
-        if self.units == new_units:
-            logger.debug("No unit conversion needed, units are the same.")
-            return
+    def to_units(self, new_units: str | pint.Unit, multiplicative_conversion=True) -> None:
+        """Convert signal and sigmas in place by rebinding arrays; keep weights.
 
-        if not multiplicative_conversion:
-            # This path is subtle for offset units (e.g. degC <-> K) and we
-            # don't want to silently get uncertainties wrong.
-            raise NotImplementedError(
-                "Non-multiplicative unit conversions are not yet implemented for BaseData.\n"
-                "If you need this, we should design explicit rules (e.g. using delta units)."
-            )
-
-        logger.debug(f"Converting from {self.units} to {new_units}.")
-
-        # simple unit conversion, can be done to scalar
-        # Convert signal
-        cfact = new_units.m_from(self.units)
-        signal = np.asanyarray(self.signal * cfact)
-        uncertainties = {key: np.asanyarray(value * abs(cfact)) for key, value in self.uncertainties.items()}
-        self.signal = signal
+        Shares conversion with ``in_units`` and ``magnitudes``. Integer signals
+        become floating point. Non-multiplicative conversions are unsupported.
+        """
+        _validate_uncertainties(self)
+        target = _parse_units(new_units)
+        if not multiplicative_conversion and self.units != target:
+            raise NotImplementedError("Non-multiplicative unit conversions are not yet implemented for BaseData.")
+        signal, uncertainties = self.magnitudes(target)
+        self.signal = np.asanyarray(signal, dtype=float)
         self.uncertainties = uncertainties
-        self.units = new_units
+        self.units = target
 
     def indexed(self, indexer: Any, *, rank_of_data: int | None = None) -> "BaseData":
         """

@@ -255,6 +255,40 @@ For steps that operate on existing bundles, prefer
 `self._normalised_processing_keys()` instead of duplicating input-selection
 logic.
 
+## Units
+
+Scientific arithmetic in modules SHOULD use `BaseData` so Pint units and every
+named uncertainty propagate together. Keep reusable numerical/physics kernels
+in `geometry` or `models`; their adapters restore explicit units and uncertainty
+semantics at the `BaseData` boundary.
+
+A performance exception requires measurements showing a severe cost and a
+comment at the arithmetic site documenting those timings and why the exception
+is needed. The R18 decision record includes earlier measurements of about 90 µs
+per scalar operation, 0.12 ms on 1000-point curves (20 times the raw calculation),
+and 9.4 ms on 1 Mpx arrays (2.7 times the raw calculation). These are context for
+measuring the actual workload, not blanket permission to bypass BaseData.
+
+At a numerical-kernel boundary, use `signal, uncertainties = data.magnitudes(units)`
+or `value, components = data.scalar_components(units)` to obtain the nominal
+value and every absolute sigma in the same units without mutating the input.
+The scalar accessor accepts scalars or exactly constant arrays and preserves
+uncertainty names, including a global-only `propagate_to_all`. Identity
+`magnitudes` conversions may return borrowed arrays; `in_units` supplies
+independent storage. Never convert a nominal value and then read sigmas from the
+unconverted object.
+
+`scalar_in_units` accepts configuration numbers only; it raises TypeError for
+BaseData. Wrap scalar metadata/configuration with `BaseData.from_scalar` (source
+loaders do this for scalar sources). This folds pure-number units and matching
+dimensional factors into magnitudes while preserving count, angle, steradian
+and pixel labels. General constructors and arithmetic results are not reduced.
+
+Weights are dimensionless relative weights. Unit conversions do not scale them.
+Produce results in natural units and use the public `ConvertUnits` step for
+pipeline-selected output units, such as `units: {Q: 1/nm}`. Its in-place
+`to_units` conversion preserves coordinate-axis references.
+
 ## Documentation metadata
 
 `ProcessStepDescriber` is not optional bookkeeping. It drives both runtime

@@ -41,6 +41,7 @@ MODULE_GROUPS: dict[str, tuple[str, ...]] = {
         "SinkProcessingData",
     ),
     "Arithmetic and normalization": (
+        "ConvertUnits",
         "Divide",
         "DivideDatabundles",
         "FindScaleFactor1D",

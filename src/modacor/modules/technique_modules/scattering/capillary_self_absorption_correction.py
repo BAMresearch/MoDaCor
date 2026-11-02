@@ -27,8 +27,8 @@ from modacor.models.attenuation import (
     trapezoid_beam_profile,
 )
 from modacor.models.uncertainty import (
+    combine_uncertainty_components,
     nominal_and_finite_difference,
-    with_uncertainty_estimates,
 )
 from modacor.modules.helpers import scalar_in_units
 from modacor.modules.helpers.scattering.material_attenuation import scalar_quantity_from_config_or_source
@@ -36,7 +36,7 @@ from modacor.modules.helpers.scattering.material_attenuation import scalar_quant
 
 def _length_array(value, units: str, *, name: str, shape=None) -> np.ndarray:
     try:
-        converted = ureg.Quantity(np.asarray(value, dtype=float), ureg.Unit(str(units))).to("m").magnitude
+        converted = BaseData(np.asarray(value, dtype=float), ureg.Unit(str(units))).magnitudes("m")[0]
     except Exception as error:
         raise ValueError(f"{name} must use units compatible with length.") from error
     result = np.asarray(converted, dtype=float)
@@ -382,7 +382,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             default_units=units,
             required=required,
         )
-        return 0.0 if data is None else scalar_in_units(data, units, name=name)
+        return 0.0 if data is None else data.scalar_components(units, name=name)[0]
 
     def _scalar_basedata(self, name: str, units: str, *, required: bool) -> BaseData:
         """Load a scalar quantity, retaining units and named uncertainties for arithmetic."""
@@ -395,33 +395,16 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             uncertainty_sources=self.configuration[f"{name}_uncertainties_sources"],
         )
         if data is None:
-            return BaseData(signal=np.asarray(0.0), units=ureg.Unit(units))
-        value, uncertainties = self._scalar_components(data, units, name=name)
-        return BaseData(
+            return BaseData.from_scalar(signal=0.0, units=units)
+        value, uncertainties = data.scalar_components(units, name=name)
+        return BaseData.from_scalar(
             signal=np.asarray(value),
             units=ureg.Unit(units),
             uncertainties={key: np.asarray(sigma) for key, sigma in uncertainties.items()},
         )
 
     def _scalar_with_uncertainties(self, name: str, units: str, *, required: bool) -> tuple[float, dict[str, float]]:
-        return self._scalar_components(self._scalar_basedata(name, units, required=required), units, name=name)
-
-    @staticmethod
-    def _scalar_components(data: BaseData, units: str, *, name: str) -> tuple[float, dict[str, float]]:
-        """Validate constant-valued input or reduce a quantity at the numerical boundary."""
-        value = scalar_in_units(data, units, name=name)
-        converted = data.copy(with_axes=False)
-        converted.to_units(ureg.Unit(units))
-        uncertainties = {}
-        for uncertainty_name, uncertainty_values in converted.uncertainties.items():
-            values = np.asarray(uncertainty_values, dtype=float).reshape(-1)
-            if values.size != 1 and not np.allclose(values, values[0], rtol=0.0, atol=0.0, equal_nan=True):
-                raise ValueError(f"{name} uncertainty {uncertainty_name!r} must be scalar or constant-valued.")
-            uncertainty = float(values[0])
-            if not np.isfinite(uncertainty) or uncertainty < 0.0:
-                raise ValueError(f"{name} uncertainty {uncertainty_name!r} must be finite and non-negative.")
-            uncertainties[uncertainty_name] = uncertainty
-        return value, uncertainties
+        return self._scalar_basedata(name, units, required=required).scalar_components(units, name=name)
 
     def _is_configured(self, name: str) -> bool:
         return self.configuration.get(f"{name}_source") is not None or self.configuration.get(name) is not None
@@ -457,7 +440,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             if not np.isfinite(transmission.signal) or not 0.0 < transmission.signal <= 1.0:
                 raise ValueError("sample_phase_transmission must be finite and in (0, 1].")
         sample_mu = -transmission.log() / thickness
-        return _ResolvedSampleMu(*self._scalar_components(sample_mu, "1/m", name="sample_mu"))
+        return _ResolvedSampleMu(*sample_mu.scalar_components("1/m", name="sample_mu"))
 
     def _geometry_and_coefficients(
         self,
@@ -626,7 +609,8 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             units_source=self.configuration.get("transmission_units_source"),
             uncertainty_sources=self.configuration["transmission_uncertainties_sources"],
         )
-        value = scalar_in_units(transmission, "dimensionless", name="transmission")
+        transmission = transmission.in_units("dimensionless")
+        value, _ = transmission.scalar_components("dimensionless", name="transmission")
         if not np.isfinite(value) or value <= 0.0 or value > 1.0:
             raise ValueError("transmission must be finite and in (0, 1].")
         return transmission
@@ -669,10 +653,10 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 calculated_transmission_values, mu_delta, central_mu_difference
             )
         measured_transmission = self._measured_transmission()
-        measured_value = (
-            1.0
+        measured_value, measured_uncertainties = (
+            (1.0, {})
             if measured_transmission is None
-            else scalar_in_units(measured_transmission, "dimensionless", name="transmission")
+            else measured_transmission.scalar_components("dimensionless", name="transmission")
         )
         evaluation_mode = str(self.configuration["evaluation_mode"]).strip().lower()
         if evaluation_mode not in {"adaptive", "exact"}:
@@ -755,13 +739,11 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             }
             if measured_transmission is not None:
                 components = {}
-                for name, values in measured_transmission.uncertainties.items():
+                for name, values in measured_uncertainties.items():
                     component = attenuation * np.asarray(values, dtype=float) / measured_value**2
                     component[~active] = 0.0
-                    if name in correction_uncertainties:
-                        component = np.hypot(correction_uncertainties[name], component)
                     components[name] = component
-                correction_uncertainties = with_uncertainty_estimates(correction_uncertainties, components)
+                correction_uncertainties = combine_uncertainty_components(correction_uncertainties, components)
 
             transmission_uncertainties = {}
             if transmission_mu_derivative is not None:

@@ -14,7 +14,7 @@ __version__ = "20251213.2"
 from collections import ChainMap
 from typing import Iterable
 
-__all__ = ["configure_detector_pixel_units", "remove_pixel_units"]
+__all__ = ["configure_detector_pixel_units", "remove_pixel_units", "scalar_reduced_units"]
 
 
 def _delete_from_mapping(mapping, key: str) -> bool:
@@ -107,3 +107,35 @@ def configure_detector_pixel_units(ureg) -> None:
     remove_pixel_units(ureg)
     ureg.define(_DETECTOR_PIXEL_DEFINITION)
     ureg.define(_DETECTOR_PIXEL_ALIASES)
+
+
+def scalar_reduced_units(units):
+    """Return a scalar's reduced unit, preserving counting and angular labels.
+
+    Only unprotected pure-number factors and matching dimensional factors are
+    reduced. This is deliberately not Pint's ``to_reduced_units``: named
+    dimensionless count, angle, solid-angle and detector-pixel units matter.
+    Arithmetic results must not pass through this scalar-ingestion policy.
+    """
+    registry = units._REGISTRY
+    protected = {"count", "radian", "steradian", "pixel"}
+
+    def is_protected(name):
+        if name in protected:
+            return True
+        definition = registry._units[name]
+        return any(is_protected(ref) for ref in definition.reference if not ref.startswith("["))
+
+    target = registry.dimensionless
+    groups = {}
+    for name, power in units._units.items():
+        unit = registry.Unit(name)
+        if is_protected(name):
+            target *= unit**power
+        elif unit.dimensionality:
+            dimension = unit.dimensionality
+            representative, exponent = groups.get(dimension, (unit, 0))
+            groups[dimension] = representative, exponent + power
+    for unit, exponent in groups.values():
+        target *= unit**exponent
+    return target
