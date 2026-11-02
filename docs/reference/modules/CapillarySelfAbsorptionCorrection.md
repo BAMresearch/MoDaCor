@@ -7,7 +7,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 - **Import path:** `modacor.modules.technique_modules.scattering.capillary_self_absorption_correction.CapillarySelfAbsorptionCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/capillary_self_absorption_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/capillary_self_absorption_correction.py)
 - **Module ID:** CapillarySelfAbsorptionCorrection
-- **Module version:** 20261030.4
+- **Module version:** 20261102.1
 - **Keywords:** sample, self absorption, capillary, cylinder, transmission
 
 ## Required data keys
@@ -44,7 +44,6 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 | `profile_retained_fraction_key` | write | `"capillary_beam_profile_retained_fraction"` |
 
 ## Required arguments
-- with_processing_keys
 - beam_profile
 
 ## Default configuration
@@ -189,7 +188,7 @@ Correct detector-resolved sample self-absorption in a centred cylindrical capill
 | `wall_thickness_source` | str or NoneType | No | - | - | Optional IoSources reference for wall thickness. |
 | `wall_thickness_units` | str | No | m | - | Wall-thickness units. |
 | `wall_thickness_units_source` | str or NoneType | No | - | - | Optional IoSources reference for wall-thickness units. |
-| `with_processing_keys` | list | Yes | ["sample"] | - | ProcessingData keys whose detector signal should be corrected. |
+| `with_processing_keys` | list | No | ["sample"] | - | ProcessingData keys whose detector signal should be corrected. |
 
 ## References
 https://doi.org/10.1021/acs.cgd.5c00551

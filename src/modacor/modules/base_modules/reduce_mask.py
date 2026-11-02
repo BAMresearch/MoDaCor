@@ -11,7 +11,7 @@ __date__ = "23/09/2026"
 __status__ = "Development"
 
 __all__ = ["ReduceMask"]
-__version__ = "20260927.2"
+__version__ = "20261102.1"
 
 from pathlib import Path
 from typing import Any
@@ -39,7 +39,7 @@ class ReduceMask(ProcessStep):
         arguments={
             "with_processing_keys": {
                 "type": list,
-                "required": True,
+                "required": False,
                 "default": ["sample"],
                 "doc": "Single processing key identifying the DataBundle to update.",
             },

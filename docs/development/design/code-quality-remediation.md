@@ -2333,7 +2333,7 @@ guards. Verified with `tox -e py312 -- -rs`:
 
 ## R14 — The `required` argument flag is never enforced
 
-**Status:** open. Found during the R07c review.
+**Status:** in review. Option (a), with approved conditional-input validation.
 
 **Problem.** Argument specs can say `"required": True`, but nothing at
 runtime checks it. Only `scripts/generate_module_doc.py` reads it, to fill the
@@ -2355,7 +2355,82 @@ nothing.
 with tests. Every existing combination of `required: True` and `default` has
 been checked.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- Independently audited `modacor.modules.__all__` on `dc83cd3`: **63** required
+  arguments in **35** steps, **47** placeholder defaults and **16** usable
+  defaults. The latter now remain optional with unchanged defaults:
+
+  | Step | Arguments made optional (usable defaults preserved) |
+  | --- | --- |
+  | ApplyMask | `with_processing_keys`, `basedata_to_mask` |
+  | AttenuatorPlateCorrection | `with_processing_keys` |
+  | BitwiseOrMasks | `with_processing_keys` |
+  | CapillarySelfAbsorptionCorrection | `with_processing_keys` |
+  | DetectorEfficiencyCorrection | `with_processing_keys` |
+  | DilateMask | `with_processing_keys` |
+  | FlatPlateSelfAbsorptionCorrection | `with_processing_keys` |
+  | PolarizationCorrection | `with_processing_keys` |
+  | ReduceMask | `with_processing_keys` |
+  | ThresholdMask | `with_processing_keys` |
+  | AppendProcessingData | `rank_of_data` |
+  | CapillarySampleContainerCorrection | `filled_processing_key`, `empty_processing_key` |
+  | ConcatenateDatabundles | `data_keys`, `output_processing_key` |
+
+- Stop condition found and reported before implementation: **16** expanded
+  geometry steps in **7** example YAMLs legitimately omit **8** required source
+  arguments, using `detector_frame` and `sample_z_override`. Maintainer approved
+  making these optional and extending the shared missing-input hook:
+  `PixelCoordinates3D.det_coord_{x,y,z}_source` and
+  `PixelCoordinates3D.pixel_pitch_{slow,fast}_source`, plus
+  `XSGeometryFromPixelCoordinates.pixel_pitch_{slow,fast}_source` and
+  `XSGeometryFromPixelCoordinates.sample_z_source`.
+  Their docs name the alternatives. The final audit has **39** unconditional
+  required arguments and those eight conditional source arguments.
+- `missing_required_arguments()` is the shared extension point used before
+  preparation/calculation and during YAML/spec loading. Both geometry overrides
+  extend `super()`, list missing individual sources, and name their alternatives.
+  Zero (including `sample_z_override: 0`) and False are supplied values.
+- Registration now validates the pipeline using the service registry and
+  expansion limit inside its existing ValueError/409 boundary; runs retain
+  RUN_FAILED/500 and store the original message and traceback. Added
+  `tests/server/test_required_argument_errors.py` for both paths. Existing
+  server/client assertions are unchanged.
+- Changed existing tests (configuration only; no numerical expectations changed):
+  `test_pixel_coordinates_3d.py`: `test_pixel_coordinates_2d_identity_basis_constant_z_and_expected_x_y`,
+  `test_pixel_coordinates_2d_offset_origin_shifts_coordinates`, and
+  `test_pixel_coordinates_rod0_returns_scalars` (dummy supplies source refs);
+  `test_xs_geometry_from_pixel_coordinates.py`:
+  `test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arrays`,
+  `test_geometry_from_pixel_coordinates_accepts_equivalent_photon_energy`,
+  `test_geometry_from_pixel_coordinates_detector_normal_is_normalized`,
+  `test_geometry_from_pixel_coordinates_uses_nexus_detector_frame`, and
+  `test_geometry_from_pixel_coordinates_uses_nexus_sample_z_override`
+  (dummy supplies source/unit refs); `tests/runner/test_pipeline.py`:
+  `test_pipeline_from_yaml_accepts_tuple_config_from_yaml_sequence`
+  (supplies detector-frame configuration).
+- Added `tests/dataclasses/test_required_arguments.py`: all public metadata,
+  invalid required defaults, missing/empty values, zero/False, validation before
+  preparation, UnitsLabelUpdate's former no-op, YAML/spec IDs, and geometry
+  adapters/all sources/neither/partial sources at execute/YAML/spec boundaries.
+- Re-audited every tracked example YAML after expansion: **12** pipelines,
+  **645** public step instances, **0** missing-input failures. The ten pipelines
+  using only public steps also load fully (**633** nodes). Two B21 pipelines
+  reference unavailable custom steps (`FramewiseIndexedAverager`,
+  `B21FrameQualityFilter`); their public steps pass individual construction and
+  missing-input validation. No repository pipeline YAML was found among tracked
+  YAML files. MoDaCor-examples was not edited.
+- Regenerated module references and documented the required/default contract,
+  conditional hook, review point, and migration advice.
+- Review follow-up: typed required arguments also accept empty placeholders
+  during type validation so the shared load/execute check reports them together
+  with step identity, rather than an early TypeError. Added execute/YAML/spec
+  coverage for all typed empty values, plus zero/False sample-z overrides.
+  Required/default/schema/server review checks: **121 passed**.
+- R14 validation: focused boundary/geometry/loader checks **120 passed**; full
+  access-traced development suite **1939 passed, 1 skipped**, 2 subtests passed;
+  flake8 and isort clean. Combined tox/examples results follow after R09/R10.
+
 
 **Review log.** _(reviewer)_
 

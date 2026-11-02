@@ -7,7 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from modacor.dataclasses.helpers import basedata_from_sources
-from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.dataclasses.process_step_describer import ProcessStepDescriber, argument_value_is_missing
 
 __coding__ = "utf-8"
 __authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
@@ -15,7 +15,7 @@ __copyright__ = "Copyright 2026, The MoDaCor team"
 __date__ = "04/01/2026"
 __status__ = "Development"
 
-__version__ = "20260927.2"
+__version__ = "20261102.1"
 __all__ = ["CanonicalDetectorFrame", "PixelCoordinates3D"]
 
 from typing import Dict, Tuple
@@ -121,9 +121,9 @@ class PixelCoordinates3D(ProcessStep):
         arguments={
             "det_coord_z_source": {
                 "type": (str, type(None)),
-                "required": True,
+                "required": False,
                 "default": None,
-                "doc": "IoSources key for detector z-coordinate signal.",
+                "doc": "IoSources key for detector z-coordinate signal. Required unless detector_frame is given.",
             },
             "det_coord_z_units_source": {
                 "type": (str, type(None)),
@@ -137,9 +137,9 @@ class PixelCoordinates3D(ProcessStep):
             },
             "det_coord_x_source": {
                 "type": (str, type(None)),
-                "required": True,
+                "required": False,
                 "default": None,
-                "doc": "IoSources key for detector x-coordinate signal.",
+                "doc": "IoSources key for detector x-coordinate signal. Required unless detector_frame is given.",
             },
             "det_coord_x_units_source": {
                 "type": (str, type(None)),
@@ -153,9 +153,9 @@ class PixelCoordinates3D(ProcessStep):
             },
             "det_coord_y_source": {
                 "type": (str, type(None)),
-                "required": True,
+                "required": False,
                 "default": None,
-                "doc": "IoSources key for detector y-coordinate signal.",
+                "doc": "IoSources key for detector y-coordinate signal. Required unless detector_frame is given.",
             },
             "det_coord_y_units_source": {
                 "type": (str, type(None)),
@@ -169,9 +169,11 @@ class PixelCoordinates3D(ProcessStep):
             },
             "pixel_pitch_slow_source": {
                 "type": (str, type(None)),
-                "required": True,
+                "required": False,
                 "default": None,
-                "doc": "IoSources key for slow-axis detector element size signal.",
+                "doc": (
+                    "IoSources key for slow-axis detector element size signal. Required unless detector_frame is given."
+                ),
             },
             "pixel_pitch_slow_units_source": {
                 "type": (str, type(None)),
@@ -185,9 +187,11 @@ class PixelCoordinates3D(ProcessStep):
             },
             "pixel_pitch_fast_source": {
                 "type": (str, type(None)),
-                "required": True,
+                "required": False,
                 "default": None,
-                "doc": "IoSources key for fast-axis detector element size signal.",
+                "doc": (
+                    "IoSources key for fast-axis detector element size signal. Required unless detector_frame is given."
+                ),
             },
             "pixel_pitch_fast_units_source": {
                 "type": (str, type(None)),
@@ -240,6 +244,22 @@ class PixelCoordinates3D(ProcessStep):
             units_source=self.configuration[f"{key}_units_source"],
             uncertainty_sources=self.configuration[f"{key}_uncertainties_sources"],
         )
+
+    def missing_required_arguments(self) -> list[str]:
+        """Extend required inputs with the geometry adapter alternatives."""
+        missing = super().missing_required_arguments()
+        if argument_value_is_missing(self.configuration.get("detector_frame")):
+            source_keys = (
+                "det_coord_x_source",
+                "det_coord_y_source",
+                "det_coord_z_source",
+                "pixel_pitch_slow_source",
+                "pixel_pitch_fast_source",
+            )
+            absent = [key for key in source_keys if argument_value_is_missing(self.configuration.get(key))]
+            if absent:
+                missing.append("supply detector_frame, or " + ", ".join(absent))
+        return missing
 
     def dependency_contract(self) -> ProcessStepDependencies:
         base_contract = super().dependency_contract()

@@ -7,7 +7,7 @@ Correct angle-dependent self-absorption for a transmission-normalized flat sampl
 - **Import path:** `modacor.modules.technique_modules.scattering.flat_plate_self_absorption_correction.FlatPlateSelfAbsorptionCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/flat_plate_self_absorption_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/flat_plate_self_absorption_correction.py)
 - **Module ID:** FlatPlateSelfAbsorptionCorrection
-- **Module version:** 20260927.2
+- **Module version:** 20261102.1
 - **Keywords:** sample, self absorption, flat plate, transmission
 
 ## Required data keys
@@ -29,7 +29,6 @@ Correct angle-dependent self-absorption for a transmission-normalized flat sampl
 | `cos_alpha_key` | read | `"CosAlpha"` |
 
 ## Required arguments
-- with_processing_keys
 - transmission_source
 
 ## Default configuration
@@ -58,7 +57,7 @@ Correct angle-dependent self-absorption for a transmission-normalized flat sampl
 | `transmission_source` | str | Yes | - | - | IoSources key for the sample transmission factor. |
 | `transmission_uncertainties_sources` | dict | No | {} | - | Mapping of uncertainty names to IoSources keys for sample transmission. |
 | `transmission_units_source` | str or NoneType | No | - | - | Optional IoSources key for transmission units. |
-| `with_processing_keys` | list | Yes | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
+| `with_processing_keys` | list | No | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
 
 ## Notes
 For s=1/cos(2theta), x=(s-1) ln(T), the relative attenuation is expm1(x)/x. The expression is the depth integral for scattering generated uniformly through a plate and is not the same as transmission through a separate downstream attenuator.

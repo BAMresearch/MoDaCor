@@ -15,7 +15,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["ApplyMask"]
-__version__ = "20260927.2"
+__version__ = "20261102.1"
 
 from pathlib import Path
 
@@ -47,7 +47,7 @@ class ApplyMask(ProcessStep):
         arguments={
             "with_processing_keys": {
                 "type": list,
-                "required": True,
+                "required": False,
                 "default": ["sample"],
                 "doc": "Single processing key identifying the DataBundle to update.",
             },
@@ -59,7 +59,7 @@ class ApplyMask(ProcessStep):
             },
             "basedata_to_mask": {
                 "type": list,
-                "required": True,
+                "required": False,
                 "default": ["signal"],
                 "doc": "List of BaseData keys to apply the mask to.",
                 "dependency_role": "processing_read_write_basedata_key_list",

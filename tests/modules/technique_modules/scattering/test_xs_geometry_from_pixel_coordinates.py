@@ -66,6 +66,8 @@ class DummyXSGeometryFromPixelCoordinates(XSGeometryFromPixelCoordinates):
 
     def __init__(self, *, sources: dict[str, BaseData], **kwargs):
         super().__init__(**kwargs)
+        self.modify_config_by_kwargs(**{f"{name}_source": f"fixture::/{name}" for name in sources})
+        self.modify_config_by_kwargs(photon_units_source="fixture::/photon@units")
         self._sources = sources
 
     def _load_from_sources(self, key: str) -> BaseData:

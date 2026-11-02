@@ -7,7 +7,7 @@ Divide signal by angle-dependent detector absorption efficiency.
 - **Import path:** `modacor.modules.technique_modules.scattering.detector_efficiency_correction.DetectorEfficiencyCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/detector_efficiency_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/detector_efficiency_correction.py)
 - **Module ID:** DetectorEfficiencyCorrection
-- **Module version:** 20261030.2
+- **Module version:** 20261102.1
 - **Keywords:** detector, efficiency, attenuation, absorption
 
 ## Required data keys
@@ -29,7 +29,7 @@ Divide signal by angle-dependent detector absorption efficiency.
 | `cos_alpha_key` | read | `"CosAlpha"` |
 
 ## Required arguments
-- with_processing_keys
+- _None_
 
 ## Default configuration
 ```json
@@ -95,7 +95,7 @@ Divide signal by angle-dependent detector absorption efficiency.
 | `wavelength_source` | str or NoneType | No | - | - | Optional IoSources key for incident wavelength. |
 | `wavelength_units` | str | No | angstrom | - | Units for wavelength. |
 | `wavelength_units_source` | str or NoneType | No | - | - | Optional IoSources key for wavelength units. |
-| `with_processing_keys` | list | Yes | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
+| `with_processing_keys` | list | No | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
 
 ## Notes
 Material parameters can be provided as direct values or *_source paths. xraylib is used for material lookup unless linear_attenuation_coefficient is configured directly.

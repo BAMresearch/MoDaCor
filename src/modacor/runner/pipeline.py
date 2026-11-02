@@ -193,6 +193,7 @@ class Pipeline:
                 step_id=step_id,
                 configuration=configuration,
             )
+            step_instance.validate_required_arguments()
             if short_title is not None:
                 step_instance.short_title = str(short_title)
 
@@ -284,6 +285,7 @@ class Pipeline:
 
             step_cls = registry.get(module_name)
             step = step_cls(io_sources=None, io_sinks=None, step_id=step_id, configuration=config)
+            step.validate_required_arguments()
 
             process_step_instances[step_id] = step
 

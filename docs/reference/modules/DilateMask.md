@@ -7,7 +7,7 @@ Dilate a 2D integer mask over selected axes while preserving uint32 reason bits.
 - **Import path:** `modacor.modules.base_modules.dilate_mask.DilateMask`
 - **Source:** [`src/modacor/modules/base_modules/dilate_mask.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/dilate_mask.py)
 - **Module ID:** DilateMask
-- **Module version:** 20261030.1
+- **Module version:** 20261102.1
 - **Keywords:** mask, dilate, morphology, bitfield
 
 ## Required data keys
@@ -25,7 +25,7 @@ _No fixed data keys declared._
 | `target_mask_key` | write | `"mask"` |
 
 ## Required arguments
-- with_processing_keys
+- _None_
 
 ## Default configuration
 ```json
@@ -51,7 +51,7 @@ _No fixed data keys declared._
 | `radius` | int | No | 1 | - | Dilation radius in pixels. |
 | `source_mask_key` | str | No | mask | processing_read_basedata_key | BaseData key for the mask to dilate. |
 | `target_mask_key` | str | No | mask | processing_write_basedata_key | BaseData key for the dilated mask output. |
-| `with_processing_keys` | list | Yes | ["sample"] | - | Single processing key identifying the DataBundle to update. |
+| `with_processing_keys` | list | No | ["sample"] | - | Single processing key identifying the DataBundle to update. |
 
 ## Notes
 

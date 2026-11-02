@@ -15,7 +15,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["ThresholdMask"]
-__version__ = "20261030.1"
+__version__ = "20261102.1"
 
 from pathlib import Path
 from typing import Any
@@ -51,7 +51,7 @@ class ThresholdMask(ProcessStep):
         arguments={
             "with_processing_keys": {
                 "type": list,
-                "required": True,
+                "required": False,
                 "default": ["sample"],
                 "doc": "Single processing key identifying the DataBundle to update.",
             },

@@ -449,6 +449,11 @@ class RuntimeService:
         trace_snapshot_step_ids = [str(step_id) for step_id in trace.get("snapshot_step_ids", []) or []]
         trace_snapshot_processing_data = bool(trace.get("snapshot_processing_data", False) or trace_snapshot_step_ids)
         try:
+            Pipeline.from_yaml(
+                pipeline_yaml,
+                registry=self.process_step_registry,
+                max_expanded_steps=self.policy.max_expanded_pipeline_steps,
+            )
             session = self.manager.create_session(
                 session_id=session_id,
                 name=payload.get("name"),

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySelfAbsorptionCorrection"]
-__version__ = "20261030.4"
+__version__ = "20261102.1"
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -85,7 +85,7 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
         arguments={
             "with_processing_keys": {
                 "type": list,
-                "required": True,
+                "required": False,
                 "default": ["sample"],
                 "doc": "ProcessingData keys whose detector signal should be corrected.",
             },

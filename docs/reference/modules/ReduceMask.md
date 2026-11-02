@@ -7,7 +7,7 @@ Reduce an integer mask over configured axes while preserving uint32 reason bits.
 - **Import path:** `modacor.modules.base_modules.reduce_mask.ReduceMask`
 - **Source:** [`src/modacor/modules/base_modules/reduce_mask.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/reduce_mask.py)
 - **Module ID:** ReduceMask
-- **Module version:** 20260927.2
+- **Module version:** 20261102.1
 - **Keywords:** mask, reduce, bitfield
 
 ## Required data keys
@@ -25,7 +25,7 @@ _No fixed data keys declared._
 | `target_mask_key` | write | `"mask"` |
 
 ## Required arguments
-- with_processing_keys
+- _None_
 
 ## Default configuration
 ```json
@@ -47,7 +47,7 @@ _No fixed data keys declared._
 | `reduction` | str | No | any | - | Use 'any' to OR mask bits across axes, or 'all' to AND bits across axes. |
 | `source_mask_key` | str | No | mask | processing_read_basedata_key | BaseData key for the mask to reduce. |
 | `target_mask_key` | str | No | mask | processing_write_basedata_key | BaseData key for the reduced mask output. |
-| `with_processing_keys` | list | Yes | ["sample"] | - | Single processing key identifying the DataBundle to update. |
+| `with_processing_keys` | list | No | ["sample"] | - | Single processing key identifying the DataBundle to update. |
 
 ## Notes
 For 'any', a bit remains set if it is set in any reduced element. For 'all', a bit remains set only if it is set in all reduced elements.

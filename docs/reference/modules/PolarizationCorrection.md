@@ -7,7 +7,7 @@ Divide signal by the linear-polarization intensity factor.
 - **Import path:** `modacor.modules.technique_modules.scattering.polarization_correction.PolarizationCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/polarization_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/polarization_correction.py)
 - **Module ID:** PolarizationCorrection
-- **Module version:** 20261030.2
+- **Module version:** 20261102.1
 - **Keywords:** polarization, polarisation, scattering, correction
 
 ## Required data keys
@@ -31,7 +31,7 @@ Divide signal by the linear-polarization intensity factor.
 | `two_theta_key` | read | `"TwoTheta"` |
 
 ## Required arguments
-- with_processing_keys
+- _None_
 
 ## Default configuration
 ```json
@@ -61,7 +61,7 @@ Divide signal by the linear-polarization intensity factor.
 | `polarization_factor` | int or float or NoneType | No | - | - | Fraction of horizontally polarized intensity. Defaults to 0.5 (unpolarized) when unset or None. |
 | `psi_key` | str | No | Psi | processing_read_basedata_key | BaseData key containing the detector azimuth. |
 | `two_theta_key` | str | No | TwoTheta | processing_read_basedata_key | BaseData key containing the scattering angle 2theta. |
-| `with_processing_keys` | list | Yes | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
+| `with_processing_keys` | list | No | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
 
 ## Notes
 

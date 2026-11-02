@@ -7,7 +7,7 @@ Combine multiple mask arrays stored as different BaseData keys in the same DataB
 - **Import path:** `modacor.modules.base_modules.bitwise_or_masks.BitwiseOrMasks`
 - **Source:** [`src/modacor/modules/base_modules/bitwise_or_masks.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/bitwise_or_masks.py)
 - **Module ID:** BitwiseOrMasks
-- **Module version:** 20260927.2
+- **Module version:** 20261102.1
 - **Keywords:** mask, bitmask, bitwise, or, databundle
 
 ## Required data keys
@@ -25,7 +25,6 @@ _No fixed data keys declared._
 | `target_mask_key` | read_write | `"mask"` |
 
 ## Required arguments
-- with_processing_keys
 - source_mask_keys
 
 ## Default configuration
@@ -44,7 +43,7 @@ _No fixed data keys declared._
 |---|---|---|---|---|---|
 | `source_mask_keys` | list | Yes | [] | processing_read_basedata_key_list | List of BaseData keys to OR into the target mask. |
 | `target_mask_key` | str | No | mask | processing_read_write_basedata_key | BaseData key for the target mask inside the DataBundle. |
-| `with_processing_keys` | list | Yes | ["sample"] | - | Single processing key identifying the DataBundle to update. |
+| `with_processing_keys` | list | No | ["sample"] | - | Single processing key identifying the DataBundle to update. |
 
 ## References
 NeXus mask bit-field convention (NXdata/NXdetector masks)

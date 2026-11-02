@@ -10,7 +10,7 @@ __copyright__ = "Copyright 2025, The MoDaCor team"
 __date__ = "16/11/2025"
 __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
-__version__ = "20261031.1"
+__version__ = "20261102.1"
 
 from abc import abstractmethod
 from collections.abc import Iterable
@@ -27,7 +27,7 @@ from ..io.io_sinks import IoSinks
 from ..io.io_sources import IoSources
 from .databundle import DataBundle
 from .messagehandler import MessageHandler
-from .process_step_describer import DEPENDENCY_ROLES, ProcessStepDescriber
+from .process_step_describer import DEPENDENCY_ROLES, ProcessStepDescriber, argument_value_is_missing
 from .processing_data import ProcessingData
 
 
@@ -407,8 +407,25 @@ class ProcessStep:
         """
         raise NotImplementedError("Subclasses must implement this method")
 
+    def missing_required_arguments(self) -> list[str]:
+        """List missing inputs; overrides extend this list for alternative inputs."""
+        return [
+            name
+            for name, spec in self.effective_config_schema().items()
+            if spec["required"] and argument_value_is_missing(self.configuration.get(name))
+        ]
+
+    def validate_required_arguments(self) -> None:
+        """Raise one ValueError naming the step and every missing required input."""
+        missing = self.missing_required_arguments()
+        if missing:
+            raise ValueError(
+                f"{type(self).__name__} ({self.step_id}): missing required arguments: {'; '.join(missing)}"
+            )
+
     def execute(self, data: ProcessingData) -> None:
         """Execute the process step on the given data."""
+        self.validate_required_arguments()
         self.processing_data = data
         if not self.__prepared:
             self.prepare_execution()
@@ -494,6 +511,9 @@ class ProcessStep:
 
         config_spec = schema[key]
         value = _normalize_config_value_for_spec(value, config_spec)
+        if config_spec["required"] and argument_value_is_missing(value):
+            # Report all missing inputs together at the load/execute boundary, even for typed arguments.
+            return
         if value is None:
             if config_spec["allow_none"]:
                 return

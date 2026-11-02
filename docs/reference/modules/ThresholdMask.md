@@ -7,7 +7,7 @@ Create a uint32 mask by evaluating bounds on a selected BaseData signal array.
 - **Import path:** `modacor.modules.base_modules.threshold_mask.ThresholdMask`
 - **Source:** [`src/modacor/modules/base_modules/threshold_mask.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/threshold_mask.py)
 - **Module ID:** ThresholdMask
-- **Module version:** 20261030.1
+- **Module version:** 20261102.1
 - **Keywords:** mask, threshold, databundle
 
 ## Required data keys
@@ -25,7 +25,7 @@ _No fixed data keys declared._
 | `target_mask_key` | write | `"threshold_mask"` |
 
 ## Required arguments
-- with_processing_keys
+- _None_
 
 ## Default configuration
 ```json
@@ -49,7 +49,7 @@ _No fixed data keys declared._
 | `source_basedata_key` | str | No | signal | processing_read_basedata_key | BaseData key whose signal array is evaluated to create the mask. |
 | `target_mask_key` | str | No | threshold_mask | processing_write_basedata_key | BaseData key for the mask to create inside the DataBundle. |
 | `upper_bound` | float or int or NoneType | No | - | - | Optional inclusive upper-bound magnitude in the source signal's current units. |
-| `with_processing_keys` | list | Yes | ["sample"] | - | Single processing key identifying the DataBundle to update. |
+| `with_processing_keys` | list | No | ["sample"] | - | Single processing key identifying the DataBundle to update. |
 
 ## Notes
 
