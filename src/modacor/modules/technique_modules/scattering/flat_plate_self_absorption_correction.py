@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["FlatPlateSelfAbsorptionCorrection"]
-__version__ = "20260927.2"
+__version__ = "20261102.1"
 
 from pathlib import Path
 
@@ -40,7 +40,7 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
         arguments={
             "with_processing_keys": {
                 "type": list,
-                "required": True,
+                "required": False,
                 "default": ["sample"],
                 "doc": "ProcessingData keys whose signal should be corrected.",
             },

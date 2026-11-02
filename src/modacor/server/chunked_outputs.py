@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -28,6 +29,8 @@ from modacor.io.runtime_support import build_sink_from_spec
 from .runtime_policy import RuntimePolicy
 
 __all__ = ["ChunkedOutputManager", "ChunkedOutputResource"]
+
+logger = logging.getLogger(__name__)
 
 
 def _utc_now_iso() -> str:
@@ -316,9 +319,13 @@ class ChunkedOutputManager:
                         ),
                     )
                 except Exception:
+                    # Publication boundary: recover plan state after any backend error, then re-raise.
+                    logger.exception("Chunk publication failed for output %s", output_id)
                     try:
                         resource.sink.inspect_chunked(resource.subpath, plan=plan, offset=0, limit=1)
                     except Exception:
+                        # Recovery boundary: log secondary backend failures without masking the original.
+                        logger.exception("Failed to inspect output %s after publication failure", output_id)
                         pass
                     else:
                         resource.plan = plan

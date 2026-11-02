@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySampleContainerCorrection"]
-__version__ = "20261030.4"
+__version__ = "20261102.1"
 
 from copy import deepcopy
 from pathlib import Path
@@ -52,13 +52,13 @@ _ARGUMENTS.update(
     {
         "filled_processing_key": {
             "type": str,
-            "required": True,
+            "required": False,
             "default": "sample",
             "doc": "DataBundle containing the filled-capillary measurement and output signal.",
         },
         "empty_processing_key": {
             "type": str,
-            "required": True,
+            "required": False,
             "default": "background",
             "doc": "DataBundle containing the matching empty-capillary measurement.",
         },

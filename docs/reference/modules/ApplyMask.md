@@ -7,7 +7,7 @@ Apply a uint32 bitfield mask to one or more BaseData signal arrays in the same D
 - **Import path:** `modacor.modules.base_modules.apply_mask.ApplyMask`
 - **Source:** [`src/modacor/modules/base_modules/apply_mask.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/apply_mask.py)
 - **Module ID:** ApplyMask
-- **Module version:** 20260927.2
+- **Module version:** 20261102.1
 - **Keywords:** mask, signal, apply, databundle
 
 ## Required data keys
@@ -26,8 +26,7 @@ _No fixed data keys declared._
 | `mask_key` | read | `"mask"` |
 
 ## Required arguments
-- with_processing_keys
-- basedata_to_mask
+- _None_
 
 ## Default configuration
 ```json
@@ -46,10 +45,10 @@ _No fixed data keys declared._
 ## Argument specification
 | Argument | Type | Required | Default | Dependency role | Description |
 |---|---|---|---|---|---|
-| `basedata_to_mask` | list | Yes | ["signal"] | processing_read_write_basedata_key_list | List of BaseData keys to apply the mask to. |
+| `basedata_to_mask` | list | No | ["signal"] | processing_read_write_basedata_key_list | List of BaseData keys to apply the mask to. |
 | `mask_key` | str | No | mask | processing_read_basedata_key | BaseData key for the mask to be used inside the DataBundle. |
 | `masked_value` | str or int or float or NoneType | No | nan | - | Replacement value for masked pixels. Use 'nan' for NaN, or a numeric value such as 0 or -1. |
-| `with_processing_keys` | list | Yes | ["sample"] | - | Single processing key identifying the DataBundle to update. |
+| `with_processing_keys` | list | No | ["sample"] | - | Single processing key identifying the DataBundle to update. |
 
 ## References
 NeXus mask bit-field convention (NXdata/NXdetector masks)

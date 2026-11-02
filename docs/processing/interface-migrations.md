@@ -15,6 +15,24 @@ The synthetic [Quickstart](../getting-started/quickstart.md) is unaffected.
 Ordinary explicit `steps` documents also remain valid; the `step_blocks` and
 `for_each` schema is additive.
 
+## R14: required step arguments are enforced
+
+Pipeline YAML/spec loading and step execution now raise `ValueError` when a
+required argument is missing, `None`, blank (including whitespace), or an empty
+container. The message names the step class, step ID, and every missing input.
+Supply the argument, or remove a step that did nothing, such as
+`UnitsLabelUpdate` without `update_pairs`. Zero and `False` remain valid values.
+
+Arguments with usable defaults remain optional and keep their defaults.
+Geometry steps accept either `detector_frame` or their individual detector
+sources; `XSGeometryFromPixelCoordinates` also accepts `sample_z_override`
+instead of `sample_z_source`. Missing alternatives now produce the same clear
+validation error at load and execution time.
+
+Module authors must use placeholder defaults for `required: True` arguments;
+the describer rejects a usable default when class metadata is defined. Express
+alternative input requirements by extending `missing_required_arguments()`.
+
 ## Stage 0: mixed `propagate_to_all` mappings raise ValueError
 
 An uncertainty mapping containing both `propagate_to_all` and another key now

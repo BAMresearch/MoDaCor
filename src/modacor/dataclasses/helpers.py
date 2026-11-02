@@ -22,7 +22,7 @@ __all__ = ["basedata_from_sources"]
 
 def basedata_from_sources(
     io_sources: IoSources,
-    signal_source: str,
+    signal_source: str | None,
     units_source: str | None = None,
     uncertainty_sources: dict[str, str] = {},
     weights_source: str | None = None,
@@ -33,8 +33,8 @@ def basedata_from_sources(
     ----------
     io_sources : IoSources
         The IoSources object to load data from.
-    signal_source : str
-        The source key for the signal data.
+    signal_source : str | None
+        Required non-blank source key for the signal data. None raises ValueError.
     unit_source : str | None, optional
         The source key for the units data, by default None.
         for iosources that support attributes, the units can also be stored as an attribute.
@@ -44,6 +44,8 @@ def basedata_from_sources(
     weights_source : str | None, optional
         Optional source key for BaseData weights, by default None.
     """
+    if signal_source is None or not signal_source.strip():
+        raise ValueError("signal_source is required")
     signal = io_sources.get_data(signal_source)
     units = ureg.Unit(io_sources.get_static_metadata(units_source)) if units_source is not None else ureg.dimensionless
     uncertainties = {name: io_sources.get_data(source) for name, source in uncertainty_sources.items()}

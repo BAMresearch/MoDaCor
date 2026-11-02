@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -622,6 +623,8 @@ def _write_chunk_payload(
         )
         h5.flush()
     except Exception:
+        # Transaction boundary: record any write failure and re-raise with its original traceback.
+        logging.getLogger(__name__).exception("Chunk write failed for %s", chunk_id)
         _set_status(manifest_entry, "failed")
         h5.flush()
         raise

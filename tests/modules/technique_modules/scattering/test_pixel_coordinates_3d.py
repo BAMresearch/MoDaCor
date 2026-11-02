@@ -90,6 +90,12 @@ class DummyPixelCoordinates3D(PixelCoordinates3D):
 
     def __init__(self, *, frame: CanonicalDetectorFrame, **kwargs):
         super().__init__(**kwargs)
+        self.modify_config_by_kwargs(
+            **{
+                f"{name}_source": f"fixture::/{name}"
+                for name in ("det_coord_x", "det_coord_y", "det_coord_z", "pixel_pitch_slow", "pixel_pitch_fast")
+            }
+        )
         self._frame = frame
 
     def _load_canonical_frame(self, *, RoD, detector_shape, reference_signal):

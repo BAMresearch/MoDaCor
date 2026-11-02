@@ -66,6 +66,9 @@ python -m sphinx -E -W --keep-going -b html docs dist/docs
   metadata, focused dependency assertions, and the full access-traced suite;
   reserve `no_contract_trace` for deliberately inconsistent test steps.
 - Preserve docstrings and type hints when simplifying code.
+- Use `required: True` only for inputs without usable defaults. Check placeholder
+  defaults and override `missing_required_arguments()` for alternative inputs,
+  extending `super()` so loading and execution report the same missing values.
 - Avoid leaving unfinished pages or stale backlog state after structural
   refactors.
 

@@ -7,7 +7,7 @@ Apply angle-dependent attenuator plate transmission.
 - **Import path:** `modacor.modules.technique_modules.scattering.attenuator_plate_correction.AttenuatorPlateCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/attenuator_plate_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/attenuator_plate_correction.py)
 - **Module ID:** AttenuatorPlateCorrection
-- **Module version:** 20261030.2
+- **Module version:** 20261102.1
 - **Keywords:** attenuator, plate, attenuation, absorption, transmission
 
 ## Required data keys
@@ -29,7 +29,7 @@ Apply angle-dependent attenuator plate transmission.
 | `cos_alpha_key` | read | `"CosAlpha"` |
 
 ## Required arguments
-- with_processing_keys
+- _None_
 
 ## Default configuration
 ```json
@@ -97,7 +97,7 @@ Apply angle-dependent attenuator plate transmission.
 | `wavelength_source` | str or NoneType | No | - | - | Optional IoSources key for incident wavelength. |
 | `wavelength_units` | str | No | angstrom | - | Units for wavelength. |
 | `wavelength_units_source` | str or NoneType | No | - | - | Optional IoSources key for wavelength units. |
-| `with_processing_keys` | list | Yes | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
+| `with_processing_keys` | list | No | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
 
 ## Notes
 Material parameters can be provided as direct values or *_source paths. xraylib is used for material lookup unless linear_attenuation_coefficient is configured directly. The default applies a physical correction by dividing by transmission; apply_as='multiply' is provided for DAWN cross-validation where the recorded operation applies the attenuation factor itself.

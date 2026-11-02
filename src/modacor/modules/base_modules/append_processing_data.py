@@ -12,7 +12,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["AppendProcessingData"]
-__version__ = "20251030.3"
+__version__ = "20261102.1"
 
 from pathlib import Path
 from typing import Any
@@ -89,7 +89,7 @@ class AppendProcessingData(ProcessStep):
             },
             "rank_of_data": {
                 "type": (int, str),
-                "required": True,
+                "required": False,
                 "default": 2,
                 "doc": "BaseData rank as int or IoSources metadata reference.",
             },

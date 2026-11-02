@@ -101,6 +101,21 @@ pipeline YAML, graph specs, `modify_config_by_dict(...)`, or
 `modify_config_by_kwargs(...)` are validated against the same schema. Unknown
 keys raise `KeyError`; wrong value types raise `TypeError`.
 
+`required: True` means an argument has no usable default and must be supplied.
+Its default must be omitted or be a placeholder: `None`, a blank string, or an
+empty dict/list/tuple/set. The describer rejects usable defaults for required
+arguments when the class metadata is defined. Missing keys, `None`, blank
+strings (including whitespace), and empty containers fail validation; `0` and
+`False` count as supplied values. Pipeline YAML/spec loading and `execute()`
+raise `ValueError` naming the step class, step ID, and all missing inputs before
+preparation or calculation.
+
+For alternative inputs, mark the individual arguments optional and override
+`missing_required_arguments()`: call `super()`, then append messages naming the
+alternative and any missing individual inputs. For example, `PixelCoordinates3D`
+requires either `detector_frame` or all coordinate and pixel-pitch sources.
+Use this shared hook so pipeline loading and execution apply the same rule.
+
 For new module-specific settings, add entries to `documentation.arguments`:
 
 ```python
@@ -129,7 +144,7 @@ required flag, and docs text. This keeps existing keys such as
 `with_processing_keys` compatible while moving module-specific validation into
 the public metadata.
 
-The central schema checks key presence and top-level value types. Keep
+The central schema checks required values and top-level value types. Keep
 step-local validation in `calculate()` or helper methods for semantic rules such
 as non-empty strings, mutually exclusive options, source-reference shape, or
 nested dictionary contents.

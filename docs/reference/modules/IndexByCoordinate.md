@@ -7,7 +7,7 @@ Assign one coordinate value per input point to a one-dimensional bin index.
 - **Import path:** `modacor.modules.base_modules.index_by_coordinate.IndexByCoordinate`
 - **Source:** [`src/modacor/modules/base_modules/index_by_coordinate.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/index_by_coordinate.py)
 - **Module ID:** IndexByCoordinate
-- **Module version:** 20261001.1
+- **Module version:** 20261102.1
 - **Keywords:** indexing, binning, coordinate, reduction
 
 ## Required data keys

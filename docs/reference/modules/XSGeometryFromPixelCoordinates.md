@@ -7,7 +7,7 @@ Compute Q-vector components and angles from lab-frame pixel coordinates.
 - **Import path:** `modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordinates.XSGeometryFromPixelCoordinates`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/xs_geometry_from_pixel_coordinates.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/xs_geometry_from_pixel_coordinates.py)
 - **Module ID:** XSGeometryFromPixelCoordinates
-- **Module version:** 20261003.1
+- **Module version:** 20261102.1
 - **Keywords:** geometry, Q, Psi, TwoTheta, Solid Angle, Omega, scattering
 
 ## Required data keys
@@ -45,11 +45,8 @@ This step extends the declared dependencies with additional runtime dependencies
 _No data-key roles declared._
 
 ## Required arguments
-- sample_z_source
 - photon_source
 - photon_units_source
-- pixel_pitch_slow_source
-- pixel_pitch_fast_source
 
 ## Default configuration
 ```json
@@ -84,14 +81,14 @@ _No data-key roles declared._
 | `photon_source` | str or NoneType | Yes | - | - | IoSources key for photon energy or wavelength metadata. |
 | `photon_uncertainties_sources` | dict | No | {} | - | Uncertainty sources for photon energy or wavelength metadata. |
 | `photon_units_source` | str or NoneType | Yes | - | - | IoSources key for photon energy or wavelength units. |
-| `pixel_pitch_fast_source` | str or NoneType | Yes | - | - | IoSources key for fast-axis detector element size signal. |
+| `pixel_pitch_fast_source` | str or NoneType | No | - | - | IoSources key for fast-axis detector element size signal. Required unless detector_frame is given. |
 | `pixel_pitch_fast_uncertainties_sources` | dict | No | {} | - | Uncertainty sources for fast-axis detector element size. |
 | `pixel_pitch_fast_units_source` | str or NoneType | No | - | - | IoSources key for fast-axis detector element size units; prefer length units such as m or mm. |
-| `pixel_pitch_slow_source` | str or NoneType | Yes | - | - | IoSources key for slow-axis detector element size signal. |
+| `pixel_pitch_slow_source` | str or NoneType | No | - | - | IoSources key for slow-axis detector element size signal. Required unless detector_frame is given. |
 | `pixel_pitch_slow_uncertainties_sources` | dict | No | {} | - | Uncertainty sources for slow-axis detector element size. |
 | `pixel_pitch_slow_units_source` | str or NoneType | No | - | - | IoSources key for slow-axis detector element size units; prefer length units such as m or mm. |
 | `sample_z_override` | dict or int or float or NoneType | No | - | - | Optional sample z-position override. Mapping form accepts either value/units or {'type': 'nexus', 'source': '<ref>', 'transform_path': '<path>'}. |
-| `sample_z_source` | str or NoneType | Yes | - | - | IoSources key for sample z-position signal. |
+| `sample_z_source` | str or NoneType | No | - | - | IoSources key for sample z-position signal. Required unless sample_z_override is given. |
 | `sample_z_uncertainties_sources` | dict | No | {} | - | Uncertainty sources for sample z-position. |
 | `sample_z_units_source` | str or NoneType | No | - | - | IoSources key for sample z-position units. |
 

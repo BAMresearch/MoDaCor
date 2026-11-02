@@ -12,7 +12,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 __all__ = ["BitwiseOrMasks"]
-__version__ = "20260927.2"
+__version__ = "20261102.1"
 
 from pathlib import Path
 
@@ -43,7 +43,7 @@ class BitwiseOrMasks(ProcessStep):
         arguments={
             "with_processing_keys": {
                 "type": list,
-                "required": True,
+                "required": False,
                 "default": ["sample"],
                 "doc": "Single processing key identifying the DataBundle to update.",
             },

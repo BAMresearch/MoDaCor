@@ -932,7 +932,7 @@ class BaseData(UncertaintyOpsMixin):
         try:
             w_arr = np.asarray(self.weights, dtype=float)
             new_weights = w_arr[indexer].copy()
-        except Exception:
+        except (IndexError, TypeError, ValueError):
             new_weights = np.array(1.0, dtype=float)
 
         # Decide rank_of_data for the result

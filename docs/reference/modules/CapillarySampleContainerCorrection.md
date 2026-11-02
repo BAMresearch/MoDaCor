@@ -7,7 +7,7 @@ Subtract empty-capillary wall scattering on its filled-capillary attenuation sca
 - **Import path:** `modacor.modules.technique_modules.scattering.capillary_sample_container_correction.CapillarySampleContainerCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/capillary_sample_container_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/capillary_sample_container_correction.py)
 - **Module ID:** CapillarySampleContainerCorrection
-- **Module version:** 20261030.4
+- **Module version:** 20261102.1
 - **Keywords:** sample, container, capillary, absorption, subtraction
 
 ## Required data keys
@@ -46,8 +46,6 @@ _No fixed data keys declared._
 
 ## Required arguments
 - beam_profile
-- filled_processing_key
-- empty_processing_key
 
 ## Default configuration
 ```json
@@ -155,10 +153,10 @@ _No fixed data keys declared._
 | `empty_centre_mu_units` | str | No | 1/m | - | Empty-centre-mu reciprocal-length units. |
 | `empty_centre_mu_units_source` | str or NoneType | No | - | - | Optional IoSources reference for empty-centre-mu units. |
 | `empty_mask_key` | str or NoneType | No | - | - | Empty-capillary mask key; None uses mask_key (no mask if both are None). A configured key must exist. |
-| `empty_processing_key` | str | Yes | background | - | DataBundle containing the matching empty-capillary measurement. |
+| `empty_processing_key` | str | No | background | - | DataBundle containing the matching empty-capillary measurement. |
 | `evaluation_mode` | str | No | adaptive | - | Adaptive detector-grid interpolation or exact active-pixel point rays. |
 | `filled_calculated_transmission_key` | str | No | capillary_filled_calculated_transmission | - | Output key for calculated filled-capillary transmission. |
-| `filled_processing_key` | str | Yes | sample | - | DataBundle containing the filled-capillary measurement and output signal. |
+| `filled_processing_key` | str | No | sample | - | DataBundle containing the filled-capillary measurement and output signal. |
 | `incident_direction` | tuple | No | [0.0, 0.0, 1.0] | - | Incident beam propagation direction in the lab frame. |
 | `mask_key` | str or NoneType | No | - | processing_read_basedata_key | Boolean mask key; None means no mask. A configured key must exist; True pixels retain identity factors. |
 | `max_depth` | int | No | 10 | - | Maximum adaptive subdivision depth. |

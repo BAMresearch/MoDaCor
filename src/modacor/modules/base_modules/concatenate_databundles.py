@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["ConcatenateDatabundles"]
-__version__ = "20261002.1"
+__version__ = "20261102.1"
 
 from pathlib import Path
 
@@ -38,14 +38,14 @@ class ConcatenateDatabundles(ProcessStep):
             },
             "data_keys": {
                 "type": (list, str),
-                "required": True,
+                "required": False,
                 "default": ["signal", "Q"],
                 "doc": "Matching one-dimensional BaseData entries to concatenate.",
             },
             "output_processing_key": {
                 "type": str,
                 "allow_none": False,
-                "required": True,
+                "required": False,
                 "default": "concatenated",
                 "doc": "ProcessingData key receiving the pooled DataBundle.",
             },

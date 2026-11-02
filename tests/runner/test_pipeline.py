@@ -178,6 +178,7 @@ def test_pipeline_from_yaml_accepts_tuple_config_from_yaml_sequence():
         requires_steps: []
         configuration:
           basis_fast: [0.0, 1.0, 0.0]
+          detector_frame: {type: nexus, source: sample, detector_path: /detector}
     """
 
     pipeline = Pipeline.from_yaml(yaml_str)

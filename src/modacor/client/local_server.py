@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import sys
@@ -13,6 +14,8 @@ from typing import IO, Any
 from .runtime import RuntimeClient
 
 __all__ = ["LocalRuntimeServer"]
+
+logger = logging.getLogger(__name__)
 
 
 class LocalRuntimeServer:
@@ -84,6 +87,8 @@ class LocalRuntimeServer:
             try:
                 self.client.wait_until_ready(timeout=self.startup_timeout)
             except Exception:
+                # Lifecycle boundary: clean up after any startup error and preserve its traceback.
+                logger.exception("Local runtime startup failed (log: %s)", self.log_path)
                 self.stop()
                 raise
             return self.client
@@ -103,6 +108,8 @@ class LocalRuntimeServer:
             )
             self._wait_for_startup()
         except Exception:
+            # Lifecycle boundary: clean up after any launch error and preserve its traceback.
+            logger.exception("Local runtime launch failed (log: %s)", self.log_path)
             self.stop()
             raise
         return self.client

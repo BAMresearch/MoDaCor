@@ -180,6 +180,7 @@ def create_app(  # noqa: C901
             )
             raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
         except Exception as exc:
+            # HTTP boundary: log arbitrary service/plugin failures and preserve INTERNAL_ERROR.
             message = f"{type(exc).__name__}: {exc}"
             logger.exception(
                 "%s %s session_id=%s %s",

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
@@ -17,6 +18,8 @@ from modacor.io.io_sources import IoSources
 from modacor.runner.pipeline import Pipeline
 
 __all__ = ["PipelineRunError", "RunResult", "run_pipeline_job"]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -138,6 +141,8 @@ def run_pipeline_job(
             if should_stop:
                 break
     except Exception as exc:
+        # Run boundary: arbitrary step/plugin failures retain traceback and optional partial results.
+        logger.exception("Pipeline failed at step %s", current_step_id)
         if not capture_partial_on_error:
             raise
         partial_result = RunResult(

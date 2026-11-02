@@ -92,11 +92,11 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | done |
 | R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | done |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | approved |
-| R09 | Narrow broad `except Exception` handlers | robustness | M | medium | open |
-| R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | open |
+| R09 | Narrow broad `except Exception` handlers | robustness | M | medium | approved |
+| R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | item 1 done; 2–3 open |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | done |
-| R14 | The `required` argument flag is never enforced | contract | S | medium | open |
+| R14 | The `required` argument flag is never enforced | contract | S | medium | approved |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
 | R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | done (v1.15.0, PR #154) |
@@ -2177,7 +2177,7 @@ performance stop was cleared in review; no new stop condition arose.
 
 ## R09 — Narrow broad `except Exception` handlers
 
-**Status:** open
+**Status:** in review
 
 **Problem.** There are broad `except Exception` handlers in
 `server/runtime_service.py` (7), `io/tiled/tiled_source.py` (3),
@@ -2200,15 +2200,90 @@ Pint or I/O call and turn every error, including programming errors, into a
 narrowed, with a test that an unexpected exception type now propagates. No
 change to the server's API error responses (`tests/server` unchanged).
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- Independently recounted on `origin/main` (`dc83cd3`): **30** broad handlers
+  in **16** non-deprecated files. Classification: **19 (a)** deliberate
+  boundaries, **11 (b)** narrowable handlers. File/line references below are
+  from that baseline; paths are relative to `src/modacor/`.
+- Server boundaries retain all response codes and chained causes; added comments
+  and traceback logging for path/decode validation and pilot-publication recovery.
+  Other boundaries are retained with explicit rationale and traceback logging.
+- Narrowed conversion handlers preserve expected fallbacks. Handlers that wrap
+  errors chain with `from exc`/`from error`; non-raising fallback handlers have
+  no replacement exception to chain. Unexpected RuntimeError propagates.
+
+| File:line | Guarded snippet | Class | Reason / handling |
+| --- | --- | --- | --- |
+| `server/runtime_service.py:429` | `read_text / policy validation` | (a) | Keep the established 422 path/policy boundary; warning logs the traceback. |
+| `server/runtime_service.py:723` | `decode_npy / put_array` | (a) | Keep the established 422 decoder/store boundary; warning logs the traceback. |
+| `server/runtime_service.py:901` | `process run` | (a) | Top-level run boundary stores and logs the traceback with RUN_FAILED or I/O codes. |
+| `server/runtime_service.py:926` | `prepare_process_plan` | (a) | Keep DRY_RUN_FAILED; chained cause is logged at the API boundary. |
+| `server/runtime_service.py:1272` | `publish chunk` | (a) | Arbitrary sink implementations: chained publication error reaches the run record. |
+| `server/runtime_service.py:1511` | `publish fallback chunk` | (a) | Same publication boundary during recovery; chained error reaches the run record. |
+| `server/runtime_service.py:1570` | `fallback run` | (a) | Recovery boundary stores and logs its own traceback. |
+| `server/api.py:182` | `service endpoint` | (a) | HTTP boundary logs traceback and preserves INTERNAL_ERROR. |
+| `server/io_utils.py:183` | `build source` | (a) | Plugin construction boundary chains cause into SOURCE_UNAVAILABLE run traceback. |
+| `server/io_utils.py:293` | `build sink` | (a) | Plugin construction boundary chains cause into SINK_UNAVAILABLE run traceback. |
+| `server/chunked_outputs.py:318` | `initialize/publish pilot` | (a) | Recover plan state after arbitrary sink errors, log traceback, and re-raise. |
+| `server/chunked_outputs.py:321` | `inspect after failed pilot` | (a) | Secondary recovery failure must not mask the original; log its traceback. |
+| `client/local_server.py:86` | `wait_until_ready` | (a) | Lifecycle cleanup must run for any startup failure; log traceback and re-raise. |
+| `client/local_server.py:105` | `Popen / startup wait` | (a) | Same cleanup boundary for initial startup; log traceback and re-raise. |
+| `runner/pipeline_runner.py:140` | `execute scheduled steps` | (a) | Arbitrary steps/plugins: log traceback, re-raise or chain with partial result. |
+| `runner/pipeline.py:811` | `render_tracer_event` | (a) | Optional diagnostic rendering must not abort scientific processing; log traceback. |
+| `runner/pipeline.py:843` | `safe_dump config` | (a) | Same optional rendering boundary, including custom YAML representers; log traceback. |
+| `io/csv/csv_source.py:128` | `configured loader method` | (a) | Arbitrary user-supplied loader boundary logs traceback and re-raises unchanged. |
+| `io/hdf/hdf_chunked_processing_sink.py:624` | `pending writes / trace / flush` | (a) | Transaction boundary marks manifest failed for any write error, logs and re-raises. |
+| `io/tiled/tiled_source.py:261` | `to_records / asarray` | (b) | Only TypeError/ValueError indicate unsupported conversion; retain fallback. |
+| `io/tiled/tiled_source.py:278` | `asarray(values)` | (b) | Only TypeError/ValueError indicate unsupported conversion; retain fallback. |
+| `io/tiled/tiled_source.py:341` | `structure()` | (b) | Installed Tiled BaseClient.structure raises NotImplementedError for resizable structures; retain fallback only for it. |
+| `io/hdf/hdf_processing_sink.py:207` | `to_dict()` | (b) | Only TypeError/ValueError indicate nonconvertible metadata; retain string fallback. |
+| `io/hdf/hdf_processing_sink.py:212` | `item()` | (b) | Only TypeError/ValueError indicate nonscalar metadata; retain string fallback. |
+| `modules/technique_modules/scattering/capillary_self_absorption_correction.py:39` | `BaseData(...).magnitudes` | (b) | Catch PintError/TypeError/ValueError for unit parsing, numeric validation and incompatibility; chain ValueError. |
+| `modules/technique_modules/scattering/capillary_self_absorption_correction.py:54` | `scalar_in_units` | (b) | Helper already wraps expected conversion errors in ValueError; chain it. |
+| `modules/technique_modules/scattering/polarization_correction.py:111` | `to_units(radian)` | (b) | Catch PintError/TypeError/ValueError for conversion/validation; chain ValueError. |
+| `modules/base_modules/index_by_coordinate.py:115` | `scalar_in_units` | (b) | Helper wraps expected conversion errors in ValueError; chain it. |
+| `dataclasses/trace_event.py:45` | `item()` | (b) | Catch TypeError/ValueError for nonscalar JSON metadata; retain string fallback. |
+| `dataclasses/basedata.py:935` | `asarray(weights)[indexer]` | (b) | Catch IndexError/TypeError/ValueError for incompatible weights; preserve scalar fallback. |
+
+- Additional approved input validation under R09:
+  `dataclasses/helpers.basedata_from_sources` rejects missing, None or blank
+  `signal_source` with `ValueError("signal_source is required")` before I/O.
+  This fixes the former NoneType.split AttributeError; it is not an additional
+  broad handler in the baseline count.
+- Server/client validation after boundary comments/logging: **110 passed**,
+  with existing assertions unchanged. I/O/runner/client validation: **320 passed**.
+  Added `tests/io/test_io_exception_propagation.py`: one injected RuntimeError
+  regression per narrowed HDF/Tiled handler, plus expected fallback cases.
+- Added `tests/dataclasses/test_data_exception_propagation.py` for the two
+  narrowed container handlers, expected fallbacks, and None/blank source
+  validation; `tests/modules/test_module_exception_propagation.py` covers all
+  four narrowed scientific conversion handlers and chaining of expected errors.
+  No existing server/client tests or numerical expectations were modified by R09.
+- Regression proof against archived `dc83cd3` source: I/O tests **5 failed,
+  7 passed**; modules/dataclasses tests **9 failed, 9 passed**. Failures comprise
+  all **11** unexpected-exception cases and the three source-validation cases.
+  Current I/O/runner/server/client checks **320 passed**; modules/dataclasses
+  checks **1421 passed**, 2 subtests passed. There remain exactly **19** broad
+  handlers, all the documented boundaries. Final combined checks are recorded
+  under R10 below.
+
 
 **Review log.** _(reviewer)_
+
+- **(2026-11-02): approved.** All 30 handlers classified: 19 deliberate
+  boundaries (kept, commented, traceback logged or kept in the run record)
+  and 11 narrowed with `from exc` chaining. Spot-checked that the narrowed
+  types match what the guarded calls raise (for example `scalar_in_units`
+  wraps Pint errors in `ValueError`). Propagation tests cover the narrowed
+  groups. No existing server or client test changed; a new test shows the R14
+  error passes through the existing registration and run error codes.
 
 ---
 
 ## R10 — Conventions
 
-**Status:** open. Low priority; a good filler task.
+**Status:** item 1 done; items 2 (file headers) and 3 (`step_reference`) open, pending maintainer decisions.
 
 **Scope.**
 
@@ -2230,9 +2305,40 @@ change to the server's API error responses (`tests/server` unchanged).
 
 **Acceptance criteria.** As in the scope above; reference pages regenerated.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- Item 1 done: `_ResolvedSampleMu` is now a frozen, slotted attrs record using
+  `@frozen(slots=True)`. Its fields, construction, and scientific use are unchanged.
+  `MaterialAttenuation` already uses attrs; the former statistics helper record
+  now lives in `models/statistics.py`, where dataclasses remain allowed.
+- Items 2 and 3 remain open for maintainer decisions. No file-header convention
+  or scientific references were changed.
+- Validation: focused capillary tests **67 passed**; attrs identity, frozen-field
+  assignment, and slots verified directly.
+- Final combined R14/R09/R10 checks (access trace active; no opt-outs added):
+  `.venv-dev/bin/python -m pytest tests -q`: **1993 passed, 1 skipped**,
+  2 subtests passed. `tox -e py312`: **1991 passed, 3 skipped**,
+  2 subtests passed. The skips are the opt-in RSS test and, in tox only, the
+  two optional Tiled integration tests. Both runs retain the three existing
+  divide-by-zero warnings from inverse/unary operations.
+- `tox -e lint`, `tox -e docs` (reference freshness and warning-as-error
+  Sphinx), and `tox -e manifest`: **passed**. Manifest's first isolated build
+  could not reach PyPI in the sandbox; its network-enabled retry passed.
+- MoDaCor-examples `tests` and `DLS/I22/tests`, with this branch's `src` on
+  PYTHONPATH: **23 passed**, identical to **23 passed** against archived
+  `dc83cd3` source. No files in that repository were edited; its four existing
+  modified files were left intact. All existing numerical assertions pass
+  unchanged; no numerical stop condition occurred.
+- The only task stop was R14's geometry alternatives, resolved by the
+  maintainer's explicit approval. `auxiliary/` remains untracked and excluded.
+  All commits remain local; nothing was pushed.
+
 
 **Review log.** _(reviewer)_
+
+- **(2026-11-02): item 1 approved.** `_ResolvedSampleMu` is a frozen, slotted
+  attrs class; the records in `models/` stay dataclasses, as allowed. Items 2
+  and 3 wait for maintainer decisions.
 
 ---
 
@@ -2333,7 +2439,7 @@ guards. Verified with `tox -e py312 -- -rs`:
 
 ## R14 — The `required` argument flag is never enforced
 
-**Status:** open. Found during the R07c review.
+**Status:** in review. Option (a), with approved conditional-input validation.
 
 **Problem.** Argument specs can say `"required": True`, but nothing at
 runtime checks it. Only `scripts/generate_module_doc.py` reads it, to fill the
@@ -2355,9 +2461,102 @@ nothing.
 with tests. Every existing combination of `required: True` and `default` has
 been checked.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- Independently audited `modacor.modules.__all__` on `dc83cd3`: **63** required
+  arguments in **35** steps, **47** placeholder defaults and **16** usable
+  defaults. The latter now remain optional with unchanged defaults:
+
+  | Step | Arguments made optional (usable defaults preserved) |
+  | --- | --- |
+  | ApplyMask | `with_processing_keys`, `basedata_to_mask` |
+  | AttenuatorPlateCorrection | `with_processing_keys` |
+  | BitwiseOrMasks | `with_processing_keys` |
+  | CapillarySelfAbsorptionCorrection | `with_processing_keys` |
+  | DetectorEfficiencyCorrection | `with_processing_keys` |
+  | DilateMask | `with_processing_keys` |
+  | FlatPlateSelfAbsorptionCorrection | `with_processing_keys` |
+  | PolarizationCorrection | `with_processing_keys` |
+  | ReduceMask | `with_processing_keys` |
+  | ThresholdMask | `with_processing_keys` |
+  | AppendProcessingData | `rank_of_data` |
+  | CapillarySampleContainerCorrection | `filled_processing_key`, `empty_processing_key` |
+  | ConcatenateDatabundles | `data_keys`, `output_processing_key` |
+
+- Stop condition found and reported before implementation: **16** expanded
+  geometry steps in **7** example YAMLs legitimately omit **8** required source
+  arguments, using `detector_frame` and `sample_z_override`. Maintainer approved
+  making these optional and extending the shared missing-input hook:
+  `PixelCoordinates3D.det_coord_{x,y,z}_source` and
+  `PixelCoordinates3D.pixel_pitch_{slow,fast}_source`, plus
+  `XSGeometryFromPixelCoordinates.pixel_pitch_{slow,fast}_source` and
+  `XSGeometryFromPixelCoordinates.sample_z_source`.
+  Their docs name the alternatives. The final audit has **39** unconditional
+  required arguments and those eight conditional source arguments.
+- `missing_required_arguments()` is the shared extension point used before
+  preparation/calculation and during YAML/spec loading. Both geometry overrides
+  extend `super()`, list missing individual sources, and name their alternatives.
+  Zero (including `sample_z_override: 0`) and False are supplied values.
+- Registration now validates the pipeline using the service registry and
+  expansion limit inside its existing ValueError/409 boundary; runs retain
+  RUN_FAILED/500 and store the original message and traceback. Added
+  `tests/server/test_required_argument_errors.py` for both paths. Existing
+  server/client assertions are unchanged.
+- Changed existing tests (configuration only; no numerical expectations changed):
+  `test_pixel_coordinates_3d.py`: `test_pixel_coordinates_2d_identity_basis_constant_z_and_expected_x_y`,
+  `test_pixel_coordinates_2d_offset_origin_shifts_coordinates`, and
+  `test_pixel_coordinates_rod0_returns_scalars` (dummy supplies source refs);
+  `test_xs_geometry_from_pixel_coordinates.py`:
+  `test_geometry_from_pixel_coordinates_2d_identity_normal_matches_expected_arrays`,
+  `test_geometry_from_pixel_coordinates_accepts_equivalent_photon_energy`,
+  `test_geometry_from_pixel_coordinates_detector_normal_is_normalized`,
+  `test_geometry_from_pixel_coordinates_uses_nexus_detector_frame`, and
+  `test_geometry_from_pixel_coordinates_uses_nexus_sample_z_override`
+  (dummy supplies source/unit refs); `tests/runner/test_pipeline.py`:
+  `test_pipeline_from_yaml_accepts_tuple_config_from_yaml_sequence`
+  (supplies detector-frame configuration).
+- Added `tests/dataclasses/test_required_arguments.py`: all public metadata,
+  invalid required defaults, missing/empty values, zero/False, validation before
+  preparation, UnitsLabelUpdate's former no-op, YAML/spec IDs, and geometry
+  adapters/all sources/neither/partial sources at execute/YAML/spec boundaries.
+- Re-audited every tracked example YAML after expansion: **12** pipelines,
+  **645** public step instances, **0** missing-input failures. The ten pipelines
+  using only public steps also load fully (**633** nodes). Two B21 pipelines
+  reference unavailable custom steps (`FramewiseIndexedAverager`,
+  `B21FrameQualityFilter`); their public steps pass individual construction and
+  missing-input validation. No repository pipeline YAML was found among tracked
+  YAML files. MoDaCor-examples was not edited.
+- Regenerated module references and documented the required/default contract,
+  conditional hook, review point, and migration advice.
+- Review follow-up: typed required arguments also accept empty placeholders
+  during type validation so the shared load/execute check reports them together
+  with step identity, rather than an early TypeError. Added execute/YAML/spec
+  coverage for all typed empty values, plus zero/False sample-z overrides.
+  Required/default/schema/server review checks: **121 passed**.
+- R14 validation: focused boundary/geometry/loader checks **120 passed**; full
+  access-traced development suite **1939 passed, 1 skipped**, 2 subtests passed;
+  flake8 and isort clean. Final combined results are recorded under R10 above.
+
 
 **Review log.** _(reviewer)_
+
+- **(2026-11-02): stop at the example pipelines; conditional inputs approved.**
+  `PixelCoordinates3D` and `XSGeometryFromPixelCoordinates` accept either
+  `detector_frame` (and `sample_z_override`) or their individual sources, so
+  eight arguments are conditionally required. With neither form, the steps
+  failed with `AttributeError: 'NoneType' object has no attribute 'split'`.
+  They now extend `missing_required_arguments()` with their either/or rule,
+  and `basedata_from_sources` rejects a missing `signal_source` clearly.
+- **(2026-11-02): approved.** Rule: `required` means the argument has no usable
+  default. The describer rejects a usable default for a required argument; 16
+  such arguments became optional and keep their defaults. `execute()` and both
+  pipeline-loading paths report every missing input, with step class and id,
+  through one `validate_required_arguments()` method (reviewer fixup).
+  - Re-ran: full suite **1993 passed, 1 skipped**; tox `py312` **1991 passed,
+    3 skipped**; `lint` and `docs` pass; MoDaCor-examples tests 23 passed.
+  - Loaded all 12 example pipeline YAMLs with the branch: 10 load; the two
+    B21 pipelines fail identically on `main`, because their custom steps are
+    registered by the notebooks, not by MoDaCor.
 
 ---
 

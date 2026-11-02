@@ -38,6 +38,16 @@ DEPENDENCY_ROLES = frozenset(
 _MISSING = object()
 
 
+def argument_value_is_missing(value: Any) -> bool:
+    """Whether an argument has no supplied value; zero and False are supplied."""
+    return (
+        value is _MISSING
+        or value is None
+        or (isinstance(value, str) and not value.strip())
+        or (isinstance(value, (dict, list, tuple, set)) and not value)
+    )
+
+
 def _normalize_str_list(value: Any, field_name: str) -> list[str]:
     if value is None:
         return []
@@ -153,6 +163,12 @@ class ProcessStepDescriber:
     # # for produced_values dictionary key names in this list, the produced_values are cached
     # # on first run, and reused on subsequent runs. Maybe two chaches, one for per-file and
     # # one for per-execution.
+
+    @arguments.validator
+    def _validate_required_defaults(self, attribute, arguments):
+        for name, spec in arguments.items():
+            if spec["required"] and not argument_value_is_missing(spec["default"]):
+                raise ValueError(f"{self.calling_id}: required argument {name!r} must have a placeholder default.")
 
     def copy(self) -> "ProcessStepDescriber":
         return evolve(self)

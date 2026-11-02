@@ -11,7 +11,7 @@ __date__ = "02/09/2026"
 __status__ = "Development"
 
 __all__ = ["DilateMask"]
-__version__ = "20261030.1"
+__version__ = "20261102.1"
 
 from pathlib import Path
 from typing import Any
@@ -43,7 +43,7 @@ class DilateMask(ProcessStep):
         arguments={
             "with_processing_keys": {
                 "type": list,
-                "required": True,
+                "required": False,
                 "default": ["sample"],
                 "doc": "Single processing key identifying the DataBundle to update.",
             },

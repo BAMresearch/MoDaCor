@@ -5,12 +5,13 @@
 from __future__ import annotations
 
 __all__ = ["PolarizationCorrection"]
-__version__ = "20261030.2"
+__version__ = "20261102.2"
 
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pint
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
@@ -40,7 +41,7 @@ class PolarizationCorrection(ProcessStep):
         arguments={
             "with_processing_keys": {
                 "type": list,
-                "required": True,
+                "required": False,
                 "default": ["sample"],
                 "doc": "ProcessingData keys whose signal should be corrected.",
             },
@@ -108,7 +109,7 @@ class PolarizationCorrection(ProcessStep):
         angle = value.copy(with_axes=False)
         try:
             angle.to_units(ureg.radian)
-        except Exception as exc:
+        except (pint.PintError, TypeError, ValueError) as exc:
             raise ValueError(f"{name} must have angular units compatible with radians.") from exc
         return np.asarray(angle.signal, dtype=float)
 
