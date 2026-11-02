@@ -8,22 +8,12 @@ __version__ = "20260929.2"
 from pathlib import Path
 
 import numpy as np
-from attrs import define
 
 from modacor.dataclasses.basedata import BaseData, _validate_uncertainties
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
-from modacor.models.integration import quadrature_weights_1d
-
-
-@define(frozen=True, slots=True)
-class _IntegrationDomain:
-    common: np.ndarray
-    sort_order: np.ndarray
-    duplicate_groups: np.ndarray | None
-    duplicate_counts: np.ndarray | None
-    quadrature_weights: np.ndarray
+from modacor.models.integration import IntegrationDomain, integrate_samples_1d, prepare_integration_domain
 
 
 class Integrate1D(ProcessStep):
@@ -158,89 +148,12 @@ class Integrate1D(ProcessStep):
         return signals, reference_axis, axis, common
 
     @staticmethod
-    def _prepare_integration_domain(
-        axis: np.ndarray,
-        common: np.ndarray,
-        *,
-        method: str,
-        sort_axis: bool,
-        duplicate_axis: str,
-    ) -> _IntegrationDomain:
-        valid_axis = axis[common]
-        if valid_axis.size < 2:
-            raise ValueError("Integrate1D common domain contains fewer than two valid points.")
-
-        sort_order = np.arange(valid_axis.size)
-        if sort_axis:
-            sort_order = np.argsort(valid_axis, kind="stable")
-            valid_axis = valid_axis[sort_order]
-        differences = np.diff(valid_axis)
-        if not (np.all(differences >= 0.0) or np.all(differences <= 0.0)):
-            raise ValueError("Integrate1D axis must be strictly monotonic.")
-
-        if duplicate_axis not in {"error", "mean"}:
-            raise ValueError("Integrate1D duplicate_axis must be 'error' or 'mean'.")
-        duplicate_groups: np.ndarray | None = None
-        duplicate_counts: np.ndarray | None = None
-        if np.any(differences == 0.0):
-            if duplicate_axis == "error":
-                raise ValueError("Integrate1D axis must be strictly monotonic.")
-            group_starts = np.concatenate(([True], differences != 0.0))
-            duplicate_groups = np.cumsum(group_starts) - 1
-            duplicate_counts = np.bincount(duplicate_groups)
-            valid_axis = valid_axis[group_starts]
-        if valid_axis.size < 2:
-            raise ValueError("Integrate1D common domain contains fewer than two distinct coordinates.")
-
-        return _IntegrationDomain(
-            common=common,
-            sort_order=sort_order,
-            duplicate_groups=duplicate_groups,
-            duplicate_counts=duplicate_counts,
-            quadrature_weights=quadrature_weights_1d(valid_axis, method),
-        )
-
-    @staticmethod
-    def _collapse_duplicate_values(values: np.ndarray, domain: _IntegrationDomain) -> np.ndarray:
-        if domain.duplicate_groups is None:
-            return values
-        if domain.duplicate_counts is None:  # pragma: no cover - construction invariant
-            raise RuntimeError("Duplicate coordinate groups are missing their sample counts.")
-        return np.bincount(domain.duplicate_groups, weights=values) / domain.duplicate_counts
-
-    @staticmethod
-    def _integrated_uncertainty(
-        component: np.ndarray,
-        signal: BaseData,
-        domain: _IntegrationDomain,
-    ) -> np.ndarray:
-        values = np.broadcast_to(component, signal.signal.shape).squeeze()[domain.common][domain.sort_order]
-        if domain.duplicate_groups is not None:
-            if domain.duplicate_counts is None:  # pragma: no cover - construction invariant
-                raise RuntimeError("Duplicate coordinate groups are missing their sample counts.")
-            values = np.sqrt(np.bincount(domain.duplicate_groups, weights=values**2)) / domain.duplicate_counts
-        return np.asarray(np.sqrt(np.sum((values * domain.quadrature_weights) ** 2)))
-
-    @classmethod
-    def _integrate_signal(
-        cls,
-        signal: BaseData,
-        reference_axis: BaseData,
-        domain: _IntegrationDomain,
-    ) -> BaseData:
+    def _integrate_signal(signal: BaseData, reference_axis: BaseData, domain: IntegrationDomain) -> BaseData:
         _validate_uncertainties(signal)
         _validate_uncertainties(reference_axis)
-        values = np.asarray(signal.signal, dtype=float).squeeze()[domain.common][domain.sort_order]
-        values = cls._collapse_duplicate_values(values, domain)
-        uncertainties = {
-            name: cls._integrated_uncertainty(component, signal, domain)
-            for name, component in signal.uncertainties.items()
-        }
+        nominal, uncertainties = integrate_samples_1d(signal.signal, signal.uncertainties, domain)
         return BaseData(
-            signal=np.asarray(np.sum(values * domain.quadrature_weights)),
-            units=signal.units * reference_axis.units,
-            uncertainties=uncertainties,
-            rank_of_data=0,
+            signal=nominal, units=signal.units * reference_axis.units, uncertainties=uncertainties, rank_of_data=0
         )
 
     @staticmethod
@@ -295,7 +208,7 @@ class Integrate1D(ProcessStep):
             axis_key,
             mask_key,
         )
-        domain = self._prepare_integration_domain(
+        domain = prepare_integration_domain(
             axis,
             common,
             method=method,
