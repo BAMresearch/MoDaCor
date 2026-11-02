@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 __all__ = ["ConvertUnits"]
-__version__ = "20261101.1"
+__version__ = "20261102.1"
 
 from pathlib import Path
 
@@ -43,7 +43,7 @@ class ConvertUnits(ProcessStep):
         step_doc="Convert selected BaseData signals and all their named uncertainties to compatible units.",
         step_note=(
             "Conversion mutates each BaseData in place, preserving axis references and dimensionless relative weights. "
-            "With '*' missing data keys are skipped and logged at INFO; with explicit bundles they raise KeyError."
+            "With '*' missing data keys are skipped, with one INFO summary per step; with explicit bundles they raise KeyError."
         ),
     )
 
@@ -57,12 +57,13 @@ class ConvertUnits(ProcessStep):
             raise TypeError("ConvertUnits: with_processing_keys must be a list or '*'.")
         bundle_keys = list(self.processing_data) if wildcard else self._normalised_processing_keys()
         output = {}
+        skipped: dict[str, list[str]] = {key: [] for key in targets}
         for bundle_key in bundle_keys:
             bundle = self.processing_data[bundle_key]
             for key, target in targets.items():
                 if key not in bundle:
                     if wildcard:
-                        self.logger.info(f"ConvertUnits: skipping missing key {key!r} in bundle {bundle_key!r}.")
+                        skipped[key].append(bundle_key)
                         continue
                     raise KeyError(f"ConvertUnits: bundle {bundle_key!r} is missing key {key!r}.")
                 data = bundle[key]
@@ -73,4 +74,12 @@ class ConvertUnits(ProcessStep):
                         f"ConvertUnits: bundle {bundle_key!r}, key {key!r}: cannot convert {data.units} to {target!r}."
                     ) from exc
             output[bundle_key] = bundle
+        if wildcard and any(skipped.values()):
+            # One summary per step; '*' over many bundles would otherwise log a line per absent key.
+            converted = ", ".join(
+                f"{key!r} in {len(bundle_keys) - len(absent)} of {len(bundle_keys)}" for key, absent in skipped.items()
+            )
+            self.logger.info(f"ConvertUnits: converted {converted} bundles; bundles without a key were skipped.")
+            missing = {key: bundles for key, bundles in skipped.items() if bundles}
+            self.logger.debug(f"ConvertUnits: bundles skipped per key: {missing}")
         return output
