@@ -222,3 +222,35 @@ The former direct `yaml` and `spec` datasets are not retained as aliases.
 Readers of MoDaCor HDF provenance must select the authored representation for
 the submitted document or the expanded representation for the graph that was
 executed.
+
+## R18: AngleToQ output_units removed; use ConvertUnits
+
+`AngleToQ` now always returns momentum transfer Q in its natural units, `1/m`.
+The `output_units` configuration option is removed. Remove it from existing
+AngleToQ steps and add a ConvertUnits step after angle conversion (or before
+writing output). ConvertUnits scales both values and all absolute uncertainty
+components, while preserving axis references and relative weights.
+
+```yaml
+name: converted_q
+steps:
+  angle_to_q:
+    module: AngleToQ
+    configuration:
+      with_processing_keys: [sample]
+      photon_source: measurement::/beam/wavelength
+      photon_units_source: measurement::/beam/wavelength@units
+      center_key: null
+  output_units:
+    module: ConvertUnits
+    requires_steps: [angle_to_q]
+    configuration:
+      with_processing_keys: [sample]
+      units: {Q: 1/nm}
+```
+
+Use `with_processing_keys: "*"` to convert every bundle containing Q; missing
+keys are logged and skipped. Explicit bundle lists require every configured key.
+This pipeline-configuration change is released as a minor version under the
+pre-v2 policy. MoDaCor-examples `DLS/I22/pipelines/I22_USAXS.yaml` needs the same
+migration after the release.

@@ -2603,8 +2603,8 @@ made after the R17 commit.
 
 ## R18 — Transmission uncertainties left in percent while the value is converted
 
-**Status:** approved (maintainer, 2026-11-01). The scope is widened from the
-two-step transmission fix to central unit handling.
+**Status:** implemented (2026-11-02), including the maintainer-authorized
+capillary mapping follow-up. The separate examples migration follows release.
 
 **Decisions (2026-11-01).**
 
@@ -2778,6 +2778,28 @@ a `fix:`.
   atomicity. Existing global-to-named legacy-fold logging is retained.
   Focused suite: 1328 passed; all 219 release calls / 463 component arrays
   retain their values. The newly working N+G case is the authorized bug fix.
+
+- **R18d / AngleToQ (2026-11-02):** removed `output_units`; Q now retains
+  its natural 1/m units. The wavelength fixture stays at 0.1 nm; only the
+  expected calculation uses 1e-10 m, correcting the fixture-edit stop from
+  2026-11-01. Tests cover rejected old configuration and subsequent ConvertUnits
+  scaling, including all uncertainty keys. Added the interface migration and
+  author-guide Units section; regenerated references. The migration YAML parses
+  with `Pipeline.from_yaml`. Final comparison: 1311 module/dataclass tests pass,
+  with 219 release calls / 463 component arrays equivalent at `rtol=1e-12`.
+- **Final checks (2026-11-02):** `.venv-dev/bin/python -m pytest tests -q`:
+  1808 passed, 1 skipped, 2 subtests passed; the 424 Stage 0 tests are unchanged.
+  Tox py312: 1806 passed, 3 skipped, 2 subtests passed (optional memory and Tiled
+  checks skipped). Tox lint, docs (warnings-as-errors) and manifest pass.
+  Lint initially found import layout left by the separate planner import;
+  corrected using the tox environment's isort. Manifest initially could not
+  resolve PyPI inside the sandbox; the same tox check passed with network access.
+- MoDaCor-examples `tests DLS/I22/tests`: 21 passed, 2 expected failures in
+  I22_USAXS graph construction (`test_usaxs_pipeline_expands_to_the_complete_execution_graph`
+  and `test_usaxs_pipeline_graphs_group_each_authored_step_block`). Its YAML
+  still configures removed `AngleToQ.output_units: 1/nm`; remove that setting
+  and append ConvertUnits after release. That repository's existing user edits
+  were left unchanged. No new numerical stop condition was encountered.
 
 **Review log.** _(reviewer)_
 

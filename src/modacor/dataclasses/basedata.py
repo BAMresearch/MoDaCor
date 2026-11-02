@@ -28,10 +28,7 @@ from attrs import validators as v
 
 from modacor import ureg
 from modacor.models.uncertainty import uncertainty_key_plan as _uncertainty_key_plan
-from modacor.models.uncertainty import (
-    validate_uncertainty_keys,
-    with_uncertainty_estimates,
-)
+from modacor.models.uncertainty import validate_uncertainty_keys, with_uncertainty_estimates
 from modacor.units import scalar_reduced_units
 
 logger = logging.getLogger(__name__)
@@ -649,6 +646,10 @@ class BaseData(UncertaintyOpsMixin):
     to_units(new_units: pint.Unit):
         Converts internal `signal` and all `uncertainties` to `new_units` if compatible with
         the existing `units`. Raises `TypeError` or `ValueError` on invalid input.
+    in_units(units): Returns independent converted data with the same relative weights.
+    magnitudes(units): Returns signal and named uncertainties in the same units, without mutation.
+    scalar_components(units): Returns floats for scalar or exactly constant arrays.
+    from_scalar(signal, units, uncertainties): Wraps metadata with safe pure-number unit reduction.
     to_base_units(): Converts internal signal and uncertainties to the base units implied by current units.
     to_dimensionless(): Converts internal signal and uncertainties to dimensionless units if possible.
     is_dimensionless() -> bool:
