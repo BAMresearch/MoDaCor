@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## v1.16.0 (2026-11-02)
+
+### Bug fixes
+
+* fix: apply the global-uncertainty rule in capillary uncertainty merges ([`751b0ac`](https://github.com/BAMresearch/MoDaCor/commit/751b0ac030adad494b877404f1ba2b30cc9f9355))
+
+* fix: convert transmission uncertainties together with their values ([`34eb1f7`](https://github.com/BAMresearch/MoDaCor/commit/34eb1f76401b83b41d50c20378c4150588a24c10))
+
+### Documentation
+
+* docs: record the R18 review in the remediation tracker ([`c335c55`](https://github.com/BAMresearch/MoDaCor/commit/c335c55beea23bc9fb55c96c99ea624b1d75955f))
+
+* docs: record the Stage 0 uncertainty review in the remediation tracker ([`6511b56`](https://github.com/BAMresearch/MoDaCor/commit/6511b56600236481cb7cf544eb682209389c450a))
+
+* docs: record the R13 CI confirmation in remediation tracker ([`092a014`](https://github.com/BAMresearch/MoDaCor/commit/092a014c53df66b0b0d9c763a89963473d86ebaf))
+
+### Features
+
+* feat: return AngleToQ results in natural units ([`aa7ba7a`](https://github.com/BAMresearch/MoDaCor/commit/aa7ba7a8db54e5f6e7aca616a38e6b80bf574df3))
+
+* feat: add ConvertUnits step ([`fd89749`](https://github.com/BAMresearch/MoDaCor/commit/fd897497fc5b7abcf7a3b18b2165cada5a8d361a))
+
+* feat: central unit conversion and scalar accessors for BaseData ([`1afb738`](https://github.com/BAMresearch/MoDaCor/commit/1afb738387f9d8ec70bacf54c8fbb262db193888))
+
+### Refactoring
+
+* refactor: route module unit conversions through BaseData ([`dfe7c5a`](https://github.com/BAMresearch/MoDaCor/commit/dfe7c5aa851f801d9fc70a49ec9b4a4c7173e4b7))
+
+### Testing
+
+* test: compare capillary mapping-table signals within rounding ([`8314a88`](https://github.com/BAMresearch/MoDaCor/commit/8314a884343d89c1f90768d3c23754efa11b8863))
+
 ## v1.15.0 (2026-11-01)
 
 ### Bug fixes
