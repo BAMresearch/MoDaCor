@@ -16,7 +16,7 @@ from modacor.models.binning import assign_bin_indices, generate_bin_edges, valid
 from modacor.modules.helpers import scalar_in_units
 
 __all__ = ["IndexByCoordinate"]
-__version__ = "20261001.1"
+__version__ = "20261102.1"
 
 
 class IndexByCoordinate(ProcessStep):
@@ -112,7 +112,7 @@ class IndexByCoordinate(ProcessStep):
         configured_units = coordinate.units if units_config is None else ureg.Unit(units_config)
         try:
             conversion = scalar_in_units(1.0, coordinate.units, name="bin_units", units=configured_units)
-        except Exception as exc:  # Pint exposes several dimensionality error types
+        except ValueError as exc:
             raise ValueError(
                 f"IndexByCoordinate: bin_units {configured_units!s} are incompatible with "
                 f"coordinate units {coordinate.units!s}."

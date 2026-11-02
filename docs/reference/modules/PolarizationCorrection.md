@@ -7,7 +7,7 @@ Divide signal by the linear-polarization intensity factor.
 - **Import path:** `modacor.modules.technique_modules.scattering.polarization_correction.PolarizationCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/polarization_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/polarization_correction.py)
 - **Module ID:** PolarizationCorrection
-- **Module version:** 20261102.1
+- **Module version:** 20261102.2
 - **Keywords:** polarization, polarisation, scattering, correction
 
 ## Required data keys

@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 __all__ = ["CapillarySelfAbsorptionCorrection"]
-__version__ = "20261102.1"
+__version__ = "20261102.2"
 
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pint
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
@@ -36,7 +37,7 @@ from modacor.modules.helpers.scattering.material_attenuation import scalar_quant
 def _length_array(value, units: str, *, name: str, shape=None) -> np.ndarray:
     try:
         converted = BaseData(np.asarray(value, dtype=float), ureg.Unit(str(units))).magnitudes("m")[0]
-    except Exception as error:
+    except (pint.PintError, TypeError, ValueError) as error:
         raise ValueError(f"{name} must use units compatible with length.") from error
     result = np.asarray(converted, dtype=float)
     if shape is not None and result.shape != shape:
@@ -51,7 +52,7 @@ def _rotation_radians(profile_config: dict[str, Any]) -> float:
     units = str(profile_config.get("rotation_units", "degree"))
     try:
         return scalar_in_units(value, "radian", name="beam_profile rotation", units=units)
-    except Exception as error:
+    except ValueError as error:
         raise ValueError("beam_profile rotation must use angular units.") from error
 
 

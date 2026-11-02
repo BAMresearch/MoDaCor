@@ -2177,7 +2177,7 @@ performance stop was cleared in review; no new stop condition arose.
 
 ## R09 — Narrow broad `except Exception` handlers
 
-**Status:** in progress
+**Status:** in review
 
 **Problem.** There are broad `except Exception` handlers in
 `server/runtime_service.py` (7), `io/tiled/tiled_source.py` (3),
@@ -2255,7 +2255,17 @@ change to the server's API error responses (`tests/server` unchanged).
   with existing assertions unchanged. I/O/runner/client validation: **320 passed**.
   Added `tests/io/test_io_exception_propagation.py`: one injected RuntimeError
   regression per narrowed HDF/Tiled handler, plus expected fallback cases.
-- Implementation/validation continues in the modules/dataclasses commit. Final focused/full/tox/example results follow.
+- Added `tests/dataclasses/test_data_exception_propagation.py` for the two
+  narrowed container handlers, expected fallbacks, and None/blank source
+  validation; `tests/modules/test_module_exception_propagation.py` covers all
+  four narrowed scientific conversion handlers and chaining of expected errors.
+  No existing server/client tests or numerical expectations were modified by R09.
+- Regression proof against archived `dc83cd3` source: I/O tests **5 failed,
+  7 passed**; modules/dataclasses tests **9 failed, 9 passed**. Failures comprise
+  all **11** unexpected-exception cases and the three source-validation cases.
+  Current I/O/runner/server/client checks **320 passed**; modules/dataclasses
+  checks **1421 passed**, 2 subtests passed. There remain exactly **19** broad
+  handlers, all the documented boundaries. Full/tox/example results follow.
 
 
 **Review log.** _(reviewer)_

@@ -42,7 +42,7 @@ def _to_jsonable(value: Any) -> Any:
     if hasattr(value, "item") and callable(getattr(value, "item")):
         try:
             return _to_jsonable(value.item())
-        except Exception:
+        except (TypeError, ValueError):
             pass
 
     return str(value)
