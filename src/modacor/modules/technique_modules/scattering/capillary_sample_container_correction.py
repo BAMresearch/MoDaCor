@@ -25,9 +25,9 @@ from modacor.models.attenuation import (
     direct_beam_transmission,
 )
 from modacor.models.uncertainty import (
+    combine_uncertainty_components,
     nominal_and_finite_difference,
     uncertainties_from_derivative,
-    with_uncertainty_estimates,
 )
 from modacor.modules.technique_modules.scattering.capillary_self_absorption_correction import (
     CapillarySelfAbsorptionCorrection,
@@ -330,10 +330,8 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
         components = {}
         for name, uncertainty in sample_mu_uncertainties.items():
             component = np.abs(corrected_mu_derivative) * uncertainty
-            if name in corrected.uncertainties:
-                component = np.hypot(corrected.uncertainties[name], component)
             components[name] = component
-        corrected.uncertainties = with_uncertainty_estimates(corrected.uncertainties, components)
+        corrected.uncertainties = combine_uncertainty_components(corrected.uncertainties, components)
 
     def calculate(self) -> dict[str, DataBundle]:
         filled_key = self.configuration["filled_processing_key"]

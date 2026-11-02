@@ -27,7 +27,11 @@ from attrs import define, field, setters
 from attrs import validators as v
 
 from modacor import ureg
-from modacor.models.uncertainty import validate_uncertainty_keys, with_uncertainty_estimates
+from modacor.models.uncertainty import uncertainty_key_plan as _uncertainty_key_plan
+from modacor.models.uncertainty import (
+    validate_uncertainty_keys,
+    with_uncertainty_estimates,
+)
 from modacor.units import scalar_reduced_units
 
 logger = logging.getLogger(__name__)
@@ -351,26 +355,6 @@ def _coerce_inplace_add_sub_operand(target: BaseData, other: Any) -> BaseData | 
     if isinstance(other, BaseData):
         return other
     return None
-
-
-def _uncertainty_key_plan(
-    left_unc: Dict[str, np.ndarray],
-    right_unc: Dict[str, np.ndarray],
-) -> tuple[set[str], Any | None, Any | None]:
-    validate_uncertainty_keys(left_unc)
-    validate_uncertainty_keys(right_unc)
-    left_global = left_unc.get("propagate_to_all")
-    right_global = right_unc.get("propagate_to_all")
-    left_keys, right_keys = set(left_unc), set(right_unc)
-    if left_global is not None and right_keys - {"propagate_to_all"}:
-        out_keys = right_keys
-    elif right_global is not None and left_keys - {"propagate_to_all"}:
-        out_keys = left_keys
-    else:
-        out_keys = left_keys | right_keys
-    if left_keys and right_keys and left_global is None and right_global is None and left_keys != right_keys:
-        logger.debug("Uncertainty key sets differ; propagating their union with absent terms treated as zero.")
-    return out_keys, left_global, right_global
 
 
 def _install_inplace_result(target: BaseData, result: BaseData) -> BaseData:

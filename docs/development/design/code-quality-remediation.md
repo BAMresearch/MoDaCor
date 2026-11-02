@@ -2714,8 +2714,8 @@ a `fix:`.
   including the unchanged 424 Stage 0 cases; all baseline arrays agree.
 - Initial median timings (7 repeats, scalar 1000 calls, 1 Mpx 20 calls, two
   uncertainty keys): release binary scalar 45.39 µs, frame 6.116 ms; R18a
-  46.26 µs, 6.964 ms. Binary implementation is unchanged; repeat paired
-  measurements before the final report to distinguish timing noise. Release
+  46.26 µs, 6.964 ms. Binary implementation is unchanged; reviewer alternated
+  release/current measurements and confirmed unchanged timings (2026-11-02). Release
   copy-then-convert frame 3.457 ms; `in_units` frame 1.563 ms. v1.15.0 has no
   `in_units`, so its comparison uses the equivalent copy-plus-`to_units` path.
 
@@ -2727,11 +2727,12 @@ a `fix:`.
   Module/dataclass suite: 1269 passed; all 219 release calls / 463 uncertainty
   arrays agree. Grep of all module Pint and BaseData conversions found no other
   converted-nominal/unconverted-sigma pair.
-- Additional observation (not changed): capillary with named sample-mu estimates
+- R18b observation (fixed separately after maintainer approval, 2026-11-02):
+  capillary with named sample-mu estimates
   plus a global-only transmission mapping raises the existing Stage 0 mixed-key
   validation error; the fold supports the opposite direction. This is outside
-  the permitted transmission-unit fix. Regression cases exercise global sample
-  mu with named/global transmission, retaining the existing behavior.
+  the original transmission-unit fix; the separately authorized mapping merge
+  below implements the §4.3 behavior in both directions.
 
 - **R18c:** `scalar_in_units` accepts real configuration numbers only and
   rejects BaseData with TypeError. Material-attenuation and capillary data
@@ -2754,6 +2755,29 @@ a `fix:`.
   Added the step to the reference generator's module groups and regenerated
   reference pages. Module/dataclass suite: 1280 passed; release comparison
   remains 219 calls / 463 named uncertainty arrays at `rtol=1e-12`.
+
+- **Review follow-up (2026-11-02), folded into R18a:** shared unit parsing
+  restores invalid-unit ValueError; native-unit access skips Pint compatibility
+  and conversion-factor work, while retaining uncertainty validation. Named
+  scalar errors preserve configuration parameter context at all migrated call
+  sites. After autosquash: 1291 module/dataclass tests passed, and the 219-call /
+  463-component release comparison passed at `rtol=1e-12, atol=0`.
+  Median scalar `sqrt` with one named sigma (9 repeats of 10000 calls):
+  release 22.724 µs, corrected 22.767 µs. No further binary timing runs needed.
+- **Separately authorized capillary mapping fix (2026-11-02):** moved the
+  §4.3 planner into `models.uncertainty.uncertainty_key_plan`, imported by
+  BaseData under its existing private name. `combine_uncertainty_components`
+  uses that same planner for atomic independent-component quadrature in both
+  directions, including named plus global. Both capillary residual attachment
+  and container `_add_correlated_sample_mu_uncertainties` use it; the single
+  component helper delegates to it too. No production single-component helper
+  callers remain after the Stage 0 audit. Named-estimate producers continue to
+  use their separate `with_uncertainty_estimates` transition, unchanged.
+  Tests cover all E/G/N pairs for sample-mu/transmission and corrected-signal/
+  sample-mu attachments, distinct and shared names, ownership and invalid-input
+  atomicity. Existing global-to-named legacy-fold logging is retained.
+  Focused suite: 1328 passed; all 219 release calls / 463 component arrays
+  retain their values. The newly working N+G case is the authorized bug fix.
 
 **Review log.** _(reviewer)_
 

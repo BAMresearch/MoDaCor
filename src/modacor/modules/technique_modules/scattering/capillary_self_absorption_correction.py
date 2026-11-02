@@ -27,8 +27,8 @@ from modacor.models.attenuation import (
     trapezoid_beam_profile,
 )
 from modacor.models.uncertainty import (
+    combine_uncertainty_components,
     nominal_and_finite_difference,
-    with_uncertainty_estimates,
 )
 from modacor.modules.helpers import scalar_in_units
 from modacor.modules.helpers.scattering.material_attenuation import scalar_quantity_from_config_or_source
@@ -742,10 +742,8 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 for name, values in measured_uncertainties.items():
                     component = attenuation * np.asarray(values, dtype=float) / measured_value**2
                     component[~active] = 0.0
-                    if name in correction_uncertainties:
-                        component = np.hypot(correction_uncertainties[name], component)
                     components[name] = component
-                correction_uncertainties = with_uncertainty_estimates(correction_uncertainties, components)
+                correction_uncertainties = combine_uncertainty_components(correction_uncertainties, components)
 
             transmission_uncertainties = {}
             if transmission_mu_derivative is not None:
