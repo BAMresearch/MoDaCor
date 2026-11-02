@@ -2601,7 +2601,7 @@ made after the R17 commit.
 
 ---
 
-## R18 — Transmission uncertainties left in percent while the value is converted
+## R18 — Central unit conversion for BaseData (includes the transmission-unit bug)
 
 **Status:** implemented (2026-11-02), including the maintainer-authorized
 capillary mapping follow-up. The separate examples migration follows release.
@@ -2802,6 +2802,34 @@ a `fix:`.
   were left unchanged. No new numerical stop condition was encountered.
 
 **Review log.** _(reviewer)_
+
+- **(2026-11-01): first four commits reviewed; changes requested.**
+  - The reduction rule is correct for 21 probed units: `count`, angle units
+    (deg, mrad, arcmin, turn), `sr` and `px` are kept; %, ‰ and ppm fold;
+    m/mm and J/eV cancel.
+  - Paired timings against v1.15.0: binary operations unchanged (the reported
+    +14% was noise). Requested: `to_units` must raise `ValueError` for an
+    invalid unit string again; restore the scalar unary time (23 → 34 µs);
+    keep the parameter name in `scalar_components` errors.
+  - The capillary mixed-key error was reproduced on v1.15.0 (named `sample_mu`
+    estimates with a global-only transmission). Fix authorized under §4.3 of
+    the uncertainty specification.
+- **(2026-11-02): approved.** Commits `1afb738` … `aa7ba7a`.
+  - Re-ran: full suite **1808 passed, 1 skipped**; tox `py312` **1806 passed,
+    3 skipped**; `docs` and `lint` pass.
+  - The review fixes hold: `to_units("notaunit")` raises `ValueError`; errors
+    read "sample_mu: Cannot convert …"; scalar `sqrt` and the binary
+    operations time the same as v1.15.0.
+  - Capillary: all three `sample_mu`/transmission combinations run. With a
+    global-only transmission, the folded `sample_mu_SEM` equals the quadrature
+    sum of the separate components from the named run (rtol 1e-12), with an
+    identical signal and `Poisson` term.
+  - `combine_uncertainty_component` now folds a named addition into a
+    global-only mapping (R0.4) instead of rejecting it; it has no callers in
+    `src`, and its test now checks a genuinely mixed input.
+  - After release: migrate MoDaCor-examples `I22_USAXS.yaml` (remove
+    `AngleToQ.output_units`, add `ConvertUnits`); its two graph tests fail
+    until then.
 
 ---
 
