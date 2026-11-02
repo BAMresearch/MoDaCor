@@ -2045,6 +2045,8 @@ explicitly limited to the completed helper refactor.
 
 - **B2:** relocated SubtractInterpolated1D remapping (v1.16.0 lines 208–231). Both indexed branches now use BaseData arithmetic and exact dimensionless weight containers. Existing coefficient/index selection, invalid-output NaNs and output metadata remain unchanged. Six focused cases compare the release formula for linear/nearest modes with global-only, named and empty uncertainty mappings (including exact points and out-of-range points). Suite: 1320 passed; 266 release calls / 685 component arrays match.
 
+- **B3:** relocated material_attenuation `_linear_attenuation_from_xraylib` (v1.16.0 lines 133–134). Mass attenuation and density are BaseData scalars in cm²/g and g/cm³; their product is read with scalar_components("1/m"). Three mocked xraylib cases match the previous multiplication and factor-100 formula. Suite: 1323 passed; all 266 release calls / 685 component arrays match. No AST-guard exception added.
+
 **Review log.**
 
 - **Classification (2026-10-31): approved, with scope decisions.** Commit

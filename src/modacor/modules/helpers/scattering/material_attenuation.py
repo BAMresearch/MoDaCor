@@ -125,8 +125,9 @@ def _linear_attenuation_from_xraylib(chemical_formula: str, density_g_cm3: float
     except ValueError as exc:
         raise ValueError(f"Invalid chemical_formula {chemical_formula!r} for xraylib attenuation lookup.") from exc
 
-    linear_cm_inv = mass_attenuation_cm2_g * density_g_cm3
-    return linear_cm_inv * 100.0
+    mass_attenuation = BaseData.from_scalar(mass_attenuation_cm2_g, "cm^2/g")
+    density = BaseData.from_scalar(density_g_cm3, "g/cm^3")
+    return (mass_attenuation * density).scalar_components("1/m", name="linear_attenuation_coefficient")[0]
 
 
 def material_attenuation_from_config(io_sources: IoSources, cfg: dict[str, Any]) -> MaterialAttenuation:
