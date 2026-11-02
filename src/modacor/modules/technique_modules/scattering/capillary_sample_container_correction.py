@@ -23,6 +23,7 @@ from modacor.models.attenuation import (
     attenuation_factors_at_detectors,
     beam_chord_quadrature,
     direct_beam_transmission,
+    sample_container_mu_derivative,
 )
 from modacor.models.uncertainty import (
     combine_uncertainty_components,
@@ -320,11 +321,14 @@ class CapillarySampleContainerCorrection(CapillarySelfAbsorptionCorrection):
     ) -> None:
         if sample_factor_mu_derivative is None or wall_filled_mu_derivative is None:
             return
-        wall_scale_mu_derivative = wall_filled_mu_derivative / wall_empty_factor
-        numerator = filled_signal.signal - wall_scale * empty_signal.signal
-        corrected_mu_derivative = (
-            -wall_scale_mu_derivative * empty_signal.signal / sample_factor
-            - numerator * sample_factor_mu_derivative / sample_factor**2
+        corrected_mu_derivative = sample_container_mu_derivative(
+            filled_signal.signal,
+            empty_signal.signal,
+            sample_factor,
+            sample_factor_mu_derivative,
+            wall_scale,
+            wall_filled_mu_derivative,
+            wall_empty_factor,
         )
         _validate_uncertainties(corrected)
         components = {}

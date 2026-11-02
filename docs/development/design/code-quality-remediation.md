@@ -2057,6 +2057,10 @@ explicitly limited to the completed helper refactor.
 
 - **C / uncertainty:** relocated the two FindCenterOfMass1D signal/axis sensitivity contractions (v1.16.0 lines 160 and 163) to models.uncertainty.sensitivity_contraction. The adapter keeps broadcasting, input validation and signal:/axis: component names. The kernel is the identical sqrt(sum((sensitivity*sigma)**2)) expression; a focused test covers both module branches and the existing NaN policy. Suite: 1326 passed; all 266 release calls / 685 component arrays match. No measured coordinate uncertainty was added to other steps (R16 remains untouched).
 
+- **C / attenuation:** moved the complete-expression shared-mu derivative from CapillarySampleContainerCorrection._add_correlated_sample_mu_uncertainties (v1.16.0 lines 323–329) into models.attenuation.concentric_cylinder.sample_container_mu_derivative, exported through models.attenuation. The same operations and order retain the intentional numerator/denominator correlation; the adapter retains names, masking and the Stage 0 mapping combiner. Two focused cases check release values, adapter outputs and exact correlated cancellation. Suite: 1354 passed; all 266 release calls / 685 component arrays match at rtol=1e-12, atol=0, NaNs equal.
+
+- **Performance review and resumption:** the initial final indexed median (107.750 ms versus post-B 95.566 ms, +12.7%) triggered the former single-run stop. Its minimum was 98.03 ms, the immediate post-extraction check was 96.043 ms, and no subsequent step changed IndexedAverager. The maintainer identified measurement noise after three reviewer-alternated checks (release 95.6–98.1 ms, branch 95.8–97.0 ms) and authorized resumption. The refined guard uses at least three alternating release/branch pairs and stops only for a >10% slowdown in every pair; the accepted interpolation cost remains separate. Fresh paired results and final checks follow below.
+
 **Review log.**
 
 - **Classification (2026-10-31): approved, with scope decisions.** Commit
