@@ -7,7 +7,7 @@ Convert selected BaseData signals and all their named uncertainties to compatibl
 - **Import path:** `modacor.modules.base_modules.convert_units.ConvertUnits`
 - **Source:** [`src/modacor/modules/base_modules/convert_units.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/convert_units.py)
 - **Module ID:** ConvertUnits
-- **Module version:** 20261101.1
+- **Module version:** 20261102.1
 - **Keywords:** units, conversion, output
 
 ## Required data keys
@@ -41,4 +41,4 @@ _No fixed data keys declared._
 | `with_processing_keys` | list or str | No | * | - | List of DataBundle keys, or '*' for all bundles. Missing data keys are skipped only with '*'. |
 
 ## Notes
-Conversion mutates each BaseData in place, preserving axis references and dimensionless relative weights. With '*' missing data keys are skipped and logged at INFO; with explicit bundles they raise KeyError.
+Conversion mutates each BaseData in place, preserving axis references and dimensionless relative weights. With '*' missing data keys are skipped, with one INFO summary per step; with explicit bundles they raise KeyError.

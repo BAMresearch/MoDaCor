@@ -2830,6 +2830,15 @@ a `fix:`.
   - After release: migrate MoDaCor-examples `I22_USAXS.yaml` (remove
     `AngleToQ.output_units`, add `ConvertUnits`); its two graph tests fail
     until then.
+- **(2026-11-02): follow-up after v1.16.0.**
+  - MoDaCor-examples `I22_USAXS.yaml` migrated: three final `ConvertUnits`
+    steps report Q, `signed_Q`, the bin edges, the Q-based fit ranges and the
+    transmission integrals in 1/nm. On the real data, the final `pooled`
+    output and both integrals match v1.15.0 at rtol 1e-12; intermediate
+    `sample_merged` values differ only at rounding level.
+  - The `"*"` selection logged 231 INFO lines per USAXS run, one per bundle
+    lacking a key. `ConvertUnits` now logs one INFO summary per step, with the
+    skipped bundle names at DEBUG.
 
 ---
 

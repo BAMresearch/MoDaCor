@@ -44,12 +44,18 @@ def test_wildcard_skips_missing_keys_and_logs(caplog):
     processing = data()
     del processing["background"]["Q"]
     processing["empty"] = DataBundle()
-    step = ConvertUnits(configuration={"with_processing_keys": "*", "units": {"Q": "1/nm"}})
-    with caplog.at_level(logging.INFO):
+    step = ConvertUnits(configuration={"with_processing_keys": "*", "units": {"Q": "1/nm", "signal": "count/sr"}})
+    with caplog.at_level(logging.DEBUG, logger=step.logger.name):
         step.execute(processing)
     assert "Q" not in processing["background"]
     assert processing["sample"]["Q"].units == ureg.Unit("1/nm")
-    assert "'Q'" in caplog.text and "'background'" in caplog.text and "'empty'" in caplog.text
+    messages = [(record.levelno, record.getMessage()) for record in caplog.records if record.name == step.logger.name]
+    summaries = [message for level, message in messages if level == logging.INFO]
+    assert summaries == [
+        "ConvertUnits: converted 'Q' in 1 of 3, 'signal' in 2 of 3 bundles; bundles without a key were skipped."
+    ]
+    details = [message for level, message in messages if level == logging.DEBUG and "skipped per key" in message]
+    assert len(details) == 1 and "'background'" in details[0] and "'empty'" in details[0]
 
 
 def test_explicit_missing_key_names_bundle_and_key():
