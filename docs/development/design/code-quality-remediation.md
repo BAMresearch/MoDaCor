@@ -1643,11 +1643,10 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
 
 ## R08 — Audit remaining unit stripping in modules
 
-**Status:** in progress on branch `quality-remediation-r08-r13-r15`. The
-classification and Commit A (the scalar helper) are done. Commit B stopped at
-the equivalence guard: BaseData dropped a sole `propagate_to_all` component.
-That is a BaseData bug, now R17 (Stage 0). The remaining Commit B rows and the
-kernel moves resume once Stage 0 (R17) and R18 have landed.
+**Status:** in progress on `quality-remediation-r08b`, based on v1.16.0
+(`0d0839b`). Stage 0 and R18 have landed; the identical-result Part B rows
+and Part C kernel extractions resume under the 2026-11-02 brief. The ten
+missing-uncertainty rows remain in R16.
 
 **Inventory (2026-10-31, after R07).** A pattern search (`.magnitude`,
 `.m_as(`, `np.asarray(… .signal)`, `float(… .signal)`, `.to(…).magnitude`)
@@ -2039,6 +2038,10 @@ here for a separate scientific decision; this refactor does not correct it.
 No R08 performance before/after comparison was run on this resumed attempt,
 since no R08 implementation was applied; the earlier timing table remains
 explicitly limited to the completed helper refactor.
+
+**R08 B/C implementation (2026-11-02).**
+
+- **B1:** relocated FindScaleFactor1D `_combined_sigma` (v1.16.0 lines 40–48). Uses `quadrature_aggregator`, retaining scalar/broadcast output shapes and the empty-mapping 1.0 fallback. Three focused cases cover empty, global-only and named/broadcast sigmas. Focused module/dataclass suite: 1314 passed; all 266 release calls / 685 component arrays match at rtol=1e-12, atol=0 (including the original 219 calls).
 
 **Review log.**
 

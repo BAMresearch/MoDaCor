@@ -345,3 +345,16 @@ def test_find_scale_factor_dependency_contract_is_exact():
             "work.fit_reduced_chi_square",
         },
     )
+
+
+@pytest.mark.parametrize("components", [{}, {"propagate_to_all": 0.2}, {"a": [0.1, 0.2, 0.3], "b": 0.4}])
+def test_combined_sigma_matches_release_formula(components):
+    from modacor.modules.base_modules.find_scale_factor1d import _combined_sigma
+
+    data = BaseData(np.ones(3), "count", uncertainties=components)
+    expected = (
+        np.asarray(1.0)
+        if not components
+        else np.sqrt(sum(np.asarray(value, dtype=float) ** 2 for value in components.values()))
+    )
+    np.testing.assert_allclose(_combined_sigma(data), expected, rtol=1e-12, atol=0)
