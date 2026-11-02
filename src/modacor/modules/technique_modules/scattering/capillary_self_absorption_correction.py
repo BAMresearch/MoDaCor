@@ -4,12 +4,12 @@ from __future__ import annotations
 __all__ = ["CapillarySelfAbsorptionCorrection"]
 __version__ = "20261102.2"
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pint
+from attrs import frozen
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
@@ -56,7 +56,7 @@ def _rotation_radians(profile_config: dict[str, Any]) -> float:
         raise ValueError("beam_profile rotation must use angular units.") from error
 
 
-@dataclass(frozen=True, slots=True)
+@frozen(slots=True)
 class _ResolvedSampleMu:
     value: float
     uncertainties: dict[str, float]

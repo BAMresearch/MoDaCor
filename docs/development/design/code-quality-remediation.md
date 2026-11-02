@@ -92,11 +92,11 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | done |
 | R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | done |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | approved |
-| R09 | Narrow broad `except Exception` handlers | robustness | M | medium | open |
-| R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | open |
+| R09 | Narrow broad `except Exception` handlers | robustness | M | medium | in review |
+| R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | item 1 done; 2–3 open |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | done |
-| R14 | The `required` argument flag is never enforced | contract | S | medium | open |
+| R14 | The `required` argument flag is never enforced | contract | S | medium | in review |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
 | R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | done (v1.15.0, PR #154) |
@@ -2265,7 +2265,8 @@ change to the server's API error responses (`tests/server` unchanged).
   all **11** unexpected-exception cases and the three source-validation cases.
   Current I/O/runner/server/client checks **320 passed**; modules/dataclasses
   checks **1421 passed**, 2 subtests passed. There remain exactly **19** broad
-  handlers, all the documented boundaries. Full/tox/example results follow.
+  handlers, all the documented boundaries. Final combined checks are recorded
+  under R10 below.
 
 
 **Review log.** _(reviewer)_
@@ -2274,7 +2275,7 @@ change to the server's API error responses (`tests/server` unchanged).
 
 ## R10 — Conventions
 
-**Status:** open. Low priority; a good filler task.
+**Status:** item 1 done; items 2 (file headers) and 3 (`step_reference`) open, pending maintainer decisions.
 
 **Scope.**
 
@@ -2296,7 +2297,34 @@ change to the server's API error responses (`tests/server` unchanged).
 
 **Acceptance criteria.** As in the scope above; reference pages regenerated.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- Item 1 done: `_ResolvedSampleMu` is now a frozen, slotted attrs record using
+  `@frozen(slots=True)`. Its fields, construction, and scientific use are unchanged.
+  `MaterialAttenuation` already uses attrs; the former statistics helper record
+  now lives in `models/statistics.py`, where dataclasses remain allowed.
+- Items 2 and 3 remain open for maintainer decisions. No file-header convention
+  or scientific references were changed.
+- Validation: focused capillary tests **67 passed**; attrs identity, frozen-field
+  assignment, and slots verified directly.
+- Final combined R14/R09/R10 checks (access trace active; no opt-outs added):
+  `.venv-dev/bin/python -m pytest tests -q`: **1993 passed, 1 skipped**,
+  2 subtests passed. `tox -e py312`: **1991 passed, 3 skipped**,
+  2 subtests passed. The skips are the opt-in RSS test and, in tox only, the
+  two optional Tiled integration tests. Both runs retain the three existing
+  divide-by-zero warnings from inverse/unary operations.
+- `tox -e lint`, `tox -e docs` (reference freshness and warning-as-error
+  Sphinx), and `tox -e manifest`: **passed**. Manifest's first isolated build
+  could not reach PyPI in the sandbox; its network-enabled retry passed.
+- MoDaCor-examples `tests` and `DLS/I22/tests`, with this branch's `src` on
+  PYTHONPATH: **23 passed**, identical to **23 passed** against archived
+  `dc83cd3` source. No files in that repository were edited; its four existing
+  modified files were left intact. All existing numerical assertions pass
+  unchanged; no numerical stop condition occurred.
+- The only task stop was R14's geometry alternatives, resolved by the
+  maintainer's explicit approval. `auxiliary/` remains untracked and excluded.
+  All commits remain local; nothing was pushed.
+
 
 **Review log.** _(reviewer)_
 
@@ -2495,7 +2523,7 @@ been checked.
   Required/default/schema/server review checks: **121 passed**.
 - R14 validation: focused boundary/geometry/loader checks **120 passed**; full
   access-traced development suite **1939 passed, 1 skipped**, 2 subtests passed;
-  flake8 and isort clean. Combined tox/examples results follow after R09/R10.
+  flake8 and isort clean. Final combined results are recorded under R10 above.
 
 
 **Review log.** _(reviewer)_
