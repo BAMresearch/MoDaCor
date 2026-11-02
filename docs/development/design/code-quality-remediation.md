@@ -2177,7 +2177,7 @@ performance stop was cleared in review; no new stop condition arose.
 
 ## R09 — Narrow broad `except Exception` handlers
 
-**Status:** open
+**Status:** in progress
 
 **Problem.** There are broad `except Exception` handlers in
 `server/runtime_service.py` (7), `io/tiled/tiled_source.py` (3),
@@ -2200,7 +2200,60 @@ Pint or I/O call and turn every error, including programming errors, into a
 narrowed, with a test that an unexpected exception type now propagates. No
 change to the server's API error responses (`tests/server` unchanged).
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.**
+
+- Independently recounted on `origin/main` (`dc83cd3`): **30** broad handlers
+  in **16** non-deprecated files. Classification: **19 (a)** deliberate
+  boundaries, **11 (b)** narrowable handlers. File/line references below are
+  from that baseline; paths are relative to `src/modacor/`.
+- Server boundaries retain all response codes and chained causes; added comments
+  and traceback logging for path/decode validation and pilot-publication recovery.
+  Other boundaries are retained with explicit rationale and traceback logging.
+- Narrowed conversion handlers preserve expected fallbacks. Handlers that wrap
+  errors chain with `from exc`/`from error`; non-raising fallback handlers have
+  no replacement exception to chain. Unexpected RuntimeError propagates.
+
+| File:line | Guarded snippet | Class | Reason / handling |
+| --- | --- | --- | --- |
+| `server/runtime_service.py:429` | `read_text / policy validation` | (a) | Keep the established 422 path/policy boundary; warning logs the traceback. |
+| `server/runtime_service.py:723` | `decode_npy / put_array` | (a) | Keep the established 422 decoder/store boundary; warning logs the traceback. |
+| `server/runtime_service.py:901` | `process run` | (a) | Top-level run boundary stores and logs the traceback with RUN_FAILED or I/O codes. |
+| `server/runtime_service.py:926` | `prepare_process_plan` | (a) | Keep DRY_RUN_FAILED; chained cause is logged at the API boundary. |
+| `server/runtime_service.py:1272` | `publish chunk` | (a) | Arbitrary sink implementations: chained publication error reaches the run record. |
+| `server/runtime_service.py:1511` | `publish fallback chunk` | (a) | Same publication boundary during recovery; chained error reaches the run record. |
+| `server/runtime_service.py:1570` | `fallback run` | (a) | Recovery boundary stores and logs its own traceback. |
+| `server/api.py:182` | `service endpoint` | (a) | HTTP boundary logs traceback and preserves INTERNAL_ERROR. |
+| `server/io_utils.py:183` | `build source` | (a) | Plugin construction boundary chains cause into SOURCE_UNAVAILABLE run traceback. |
+| `server/io_utils.py:293` | `build sink` | (a) | Plugin construction boundary chains cause into SINK_UNAVAILABLE run traceback. |
+| `server/chunked_outputs.py:318` | `initialize/publish pilot` | (a) | Recover plan state after arbitrary sink errors, log traceback, and re-raise. |
+| `server/chunked_outputs.py:321` | `inspect after failed pilot` | (a) | Secondary recovery failure must not mask the original; log its traceback. |
+| `client/local_server.py:86` | `wait_until_ready` | (a) | Lifecycle cleanup must run for any startup failure; log traceback and re-raise. |
+| `client/local_server.py:105` | `Popen / startup wait` | (a) | Same cleanup boundary for initial startup; log traceback and re-raise. |
+| `runner/pipeline_runner.py:140` | `execute scheduled steps` | (a) | Arbitrary steps/plugins: log traceback, re-raise or chain with partial result. |
+| `runner/pipeline.py:811` | `render_tracer_event` | (a) | Optional diagnostic rendering must not abort scientific processing; log traceback. |
+| `runner/pipeline.py:843` | `safe_dump config` | (a) | Same optional rendering boundary, including custom YAML representers; log traceback. |
+| `io/csv/csv_source.py:128` | `configured loader method` | (a) | Arbitrary user-supplied loader boundary logs traceback and re-raises unchanged. |
+| `io/hdf/hdf_chunked_processing_sink.py:624` | `pending writes / trace / flush` | (a) | Transaction boundary marks manifest failed for any write error, logs and re-raises. |
+| `io/tiled/tiled_source.py:261` | `to_records / asarray` | (b) | Only TypeError/ValueError indicate unsupported conversion; retain fallback. |
+| `io/tiled/tiled_source.py:278` | `asarray(values)` | (b) | Only TypeError/ValueError indicate unsupported conversion; retain fallback. |
+| `io/tiled/tiled_source.py:341` | `structure()` | (b) | Installed Tiled BaseClient.structure raises NotImplementedError for resizable structures; retain fallback only for it. |
+| `io/hdf/hdf_processing_sink.py:207` | `to_dict()` | (b) | Only TypeError/ValueError indicate nonconvertible metadata; retain string fallback. |
+| `io/hdf/hdf_processing_sink.py:212` | `item()` | (b) | Only TypeError/ValueError indicate nonscalar metadata; retain string fallback. |
+| `modules/technique_modules/scattering/capillary_self_absorption_correction.py:39` | `BaseData(...).magnitudes` | (b) | Catch PintError/TypeError/ValueError for unit parsing, numeric validation and incompatibility; chain ValueError. |
+| `modules/technique_modules/scattering/capillary_self_absorption_correction.py:54` | `scalar_in_units` | (b) | Helper already wraps expected conversion errors in ValueError; chain it. |
+| `modules/technique_modules/scattering/polarization_correction.py:111` | `to_units(radian)` | (b) | Catch PintError/TypeError/ValueError for conversion/validation; chain ValueError. |
+| `modules/base_modules/index_by_coordinate.py:115` | `scalar_in_units` | (b) | Helper wraps expected conversion errors in ValueError; chain it. |
+| `dataclasses/trace_event.py:45` | `item()` | (b) | Catch TypeError/ValueError for nonscalar JSON metadata; retain string fallback. |
+| `dataclasses/basedata.py:935` | `asarray(weights)[indexer]` | (b) | Catch IndexError/TypeError/ValueError for incompatible weights; preserve scalar fallback. |
+
+- Additional approved input validation under R09:
+  `dataclasses/helpers.basedata_from_sources` rejects missing, None or blank
+  `signal_source` with `ValueError("signal_source is required")` before I/O.
+  This fixes the former NoneType.split AttributeError; it is not an additional
+  broad handler in the baseline count.
+- Implementation/validation continues in the I/O/runner/client and
+  modules/dataclasses commits. Final focused/full/tox/example results follow.
+
 
 **Review log.** _(reviewer)_
 

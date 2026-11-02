@@ -427,6 +427,8 @@ class RuntimeService:
                 pipeline_yaml = self.policy.validate_pipeline_yaml_path(yaml_path).read_text(encoding="utf-8")
                 self.policy.validate_pipeline_yaml_text(pipeline_yaml)
             except Exception as exc:
+                # API boundary: every path/policy failure retains the existing 422 response.
+                logger.warning("Failed to read pipeline yaml_path", exc_info=True, extra={"session_id": session_id})
                 raise ApiError(status_code=422, detail=f"Failed to read pipeline yaml_path: {exc}") from exc
         else:
             pipeline_yaml = str(yaml_text)
@@ -726,6 +728,8 @@ class RuntimeService:
             array = decode_npy(payload)
             self.manager.buffer_store.put_array(session_id, "source", source_ref, data_key, array)
         except Exception as exc:
+            # API boundary: arbitrary decoder/store failures retain the existing 422 response.
+            logger.warning("Invalid .npy buffer payload", exc_info=True, extra={"session_id": session_id})
             raise ApiError(status_code=422, detail=f"Invalid .npy buffer payload: {exc}") from exc
         return {
             "session_id": session_id,
@@ -904,6 +908,7 @@ class RuntimeService:
                 elapsed_s=elapsed_s,
             )
         except Exception as exc:
+            # Run boundary: record and log every failure, including plugin/programming errors.
             return self._handle_process_failure(
                 session=session,
                 session_id=session_id,
@@ -929,6 +934,7 @@ class RuntimeService:
                 max_expanded_steps=self.policy.max_expanded_pipeline_steps,
             )
         except Exception as exc:
+            # API boundary: the chained cause is logged by the API with the unchanged error code.
             raise ApiError(
                 status_code=500,
                 detail={
@@ -1275,6 +1281,7 @@ class RuntimeService:
                 else:
                     published_chunk_spec = request.chunk_output.chunk_spec
             except Exception as exc:
+                # Publication boundary: preserve every backend failure for the run-error record.
                 raise _ChunkPublicationError(
                     request.chunk_output.output_id,
                     request.chunk_output.chunk_spec,
@@ -1514,6 +1521,7 @@ class RuntimeService:
                     else:
                         published_chunk_spec = request.chunk_output.chunk_spec
                 except Exception as exc:
+                    # Publication boundary: preserve every backend failure for the run-error record.
                     raise _ChunkPublicationError(
                         request.chunk_output.output_id,
                         request.chunk_output.chunk_spec,
@@ -1573,6 +1581,7 @@ class RuntimeService:
                 response["chunk_output"] = done["chunk_output"]
             return response
         except Exception as fallback_exc:
+            # Recovery boundary: retain the traceback of any failed fallback in the run record.
             original_exception = (
                 fallback_exc.original_exception
                 if isinstance(fallback_exc, (PipelineRunError, _ChunkPublicationError))

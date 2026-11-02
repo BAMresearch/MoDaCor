@@ -181,6 +181,7 @@ def build_sources_from_session(
                 runtime_policy=runtime_policy,
             )
         except Exception as exc:
+            # Backend boundary: chain arbitrary source failures for the run's traceback and I/O code.
             raise IOBuildError(
                 ref=ref, kind="source", io_type=str(reg["type"]), location=str(reg["location"]), cause=exc
             ) from exc
@@ -291,6 +292,7 @@ def build_sinks_from_session(
                 **policy.sink_builder_kwargs(),
             )
         except Exception as exc:
+            # Backend boundary: chain arbitrary sink failures for the run's traceback and I/O code.
             raise IOBuildError(
                 ref=ref, kind="sink", io_type=str(reg["type"]), location=str(reg["location"]), cause=exc
             ) from exc
