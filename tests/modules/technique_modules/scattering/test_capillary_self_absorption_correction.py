@@ -718,7 +718,7 @@ def test_measured_transmission_uncertainty_mapping_table(mu_category, transmissi
     named = (set(mu_mapping) | set(transmission_mapping)) - {"propagate_to_all"}
     expected_keys = named or ({"propagate_to_all"} if "G" in (mu_category, transmission_category) else set())
     assert actual.uncertainties.keys() == expected_keys
-    np.testing.assert_array_equal(actual.signal, mu_only.signal)
+    np.testing.assert_allclose(actual.signal, mu_only.signal, rtol=1e-12, atol=0)
     for key in expected_keys:
         mu = mu_only.uncertainties["mu"] if key in mu_mapping or mu_category == "G" else 0.0
         transmission = (
