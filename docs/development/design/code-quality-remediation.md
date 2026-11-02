@@ -2049,6 +2049,8 @@ explicitly limited to the completed helper refactor.
 
 - **B4:** relocated capillary residual and component merge (v1.16.0 lines 726–746). Builds attenuation BaseData with sample-mu components and divides by dimensionless scalar transmission BaseData. The central scalar accessor preserves constant-array metadata inputs; inactive pixels are restored to residual 1 and all sigmas 0. Legacy-fold logging is retained. Existing nine E/G/N mapping-table cases, shared/distinct names and scalar/array percent cases run against the frozen release snapshots: 1323 tests pass, all 266 calls / 685 uncertainty arrays agree. The six table rows correspond to these four Part B commits (two rows each for interpolation and residual formation).
 
+- **C / statistics:** moved WeightedScatterEstimates and finalize_weighted_scatter from modules/helpers/statistics.py to models/statistics.py, removing the helper module and both helper exports. Moved prepare_static_scalar numerical body (v1.16.0 detector_data.py lines 96–130) into static_weighted_mean_sem; unit validation, scalar passthrough and BaseData wrapping remain in the adapter. Existing statistical operations/ddof/zero-weight/NaN rules are unchanged. Moved helper tests to tests/models/test_statistics.py and added four kernel/boundary checks. Suite including models tests and package boundaries: 1331 passed; all 266 calls / 685 component arrays match.
+
 **Review log.**
 
 - **Classification (2026-10-31): approved, with scope decisions.** Commit

@@ -18,6 +18,7 @@ import pint
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData, _validate_uncertainties
+from modacor.models.statistics import static_weighted_mean_sem
 
 
 def require_scalar(name: str, bd: BaseData) -> BaseData:
@@ -91,41 +92,7 @@ def prepare_static_scalar(
             bd.signal.squeeze(), bd.units, uncertainties=bd.uncertainties, weights=bd.weights.squeeze()
         )
 
-    x = bd.signal.ravel()
-
-    # --- robust weights handling ---
-    if bd.weights is None:
-        w = np.ones_like(x)
-    else:
-        w_raw = np.asarray(bd.weights, dtype=float)
-
-        # allow scalar/length-1 weights
-        if w_raw.size == 1:
-            w = np.full_like(x, float(w_raw.reshape(-1)[0]))
-        else:
-            # allow broadcastable weights (e.g. (5,1,1,1) vs (5,))
-            try:
-                w = np.broadcast_to(w_raw, np.shape(bd.signal)).ravel()
-            except ValueError as e:
-                raise ValueError(
-                    f"weights shape {w_raw.shape} does not match signal shape {np.shape(bd.signal)}"
-                ) from e
-
-        if w.size != x.size:
-            raise ValueError(f"weights size {w.size} does not match signal size {x.size}")
-
-    wsum = float(np.sum(w))
-    if wsum <= 0:
-        raise ValueError("weights must sum to > 0")
-
-    mean = float(np.sum(w * x) / wsum)
-
-    # effective N for SEM (works for equal weights too)
-    n_eff = float((wsum**2) / np.sum(w**2))
-
-    # weighted population variance about the weighted mean
-    var = float(np.sum(w * (x - mean) ** 2) / wsum)
-    sem = float(np.sqrt(var) / np.sqrt(n_eff))
+    mean, sem = static_weighted_mean_sem(bd.signal, bd.weights)
 
     return BaseData.from_scalar(
         signal=np.array(mean, dtype=float),

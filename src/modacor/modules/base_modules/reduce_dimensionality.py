@@ -26,10 +26,11 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.models.statistics import finalize_weighted_scatter
 
 # Facility-pluggable logger; by default this uses std logging
 from modacor.models.uncertainty import validate_uncertainty_keys, with_uncertainty_estimates
-from modacor.modules.helpers import finalize_weighted_scatter, leading_non_data_axes
+from modacor.modules.helpers import leading_non_data_axes
 
 logger = MessageHandler(name=__name__)
 

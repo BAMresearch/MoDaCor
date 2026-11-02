@@ -13,8 +13,9 @@ from modacor.dataclasses.basedata import BaseData, _validate_uncertainties
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.models.statistics import finalize_weighted_scatter
 from modacor.models.uncertainty import with_uncertainty_estimates
-from modacor.modules.helpers import finalize_weighted_scatter, normalize_str_list
+from modacor.modules.helpers import normalize_str_list
 
 __all__ = ["IndexedAverager"]
 __version__ = "20261030.1"
