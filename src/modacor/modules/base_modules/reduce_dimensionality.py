@@ -26,10 +26,20 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.models.reduction import (
+    axis_scatter_moments,
+    effective_values_and_weights,
+    scalar_weight_reduction,
+    weighted_axis_reduction,
+)
 from modacor.models.statistics import finalize_weighted_scatter
 
 # Facility-pluggable logger; by default this uses std logging
-from modacor.models.uncertainty import validate_uncertainty_keys, with_uncertainty_estimates
+from modacor.models.uncertainty import (
+    combine_uncertainty_components,
+    validate_uncertainty_keys,
+    with_uncertainty_estimates,
+)
 from modacor.modules.helpers import leading_non_data_axes
 
 logger = MessageHandler(name=__name__)
@@ -225,36 +235,6 @@ class ReduceDimensionality(ProcessStep):
         return np.bitwise_and(mask_u32, np.uint32(mask_bits)) != 0
 
     @staticmethod
-    def _effective_values_and_weights(
-        *,
-        bd: BaseData,
-        use_weights: bool,
-        nan_policy: str,
-        exclusion_mask: np.ndarray | None,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Apply explicit-mask and NaN selection to values and effective weights."""
-
-        x = np.asarray(bd.signal, dtype=float)
-        if use_weights:
-            weights = np.broadcast_to(np.asarray(bd.weights, dtype=float), x.shape)
-        else:
-            weights = np.broadcast_to(np.array(1.0), x.shape)
-
-        if exclusion_mask is None:
-            effective_mask = np.zeros(x.shape, dtype=bool)
-        else:
-            effective_mask = np.asarray(exclusion_mask, dtype=bool)
-
-        if nan_policy == "omit":
-            effective_mask = effective_mask | np.isnan(x) | np.isnan(weights)
-        elif nan_policy != "propagate":
-            raise ValueError(f"Invalid nan_policy: {nan_policy!r}. Use 'omit' or 'propagate'.")
-
-        x_eff = np.where(effective_mask, 0.0, x)
-        w_eff = np.where(effective_mask, 0.0, weights)
-        return x_eff, w_eff, effective_mask
-
-    @staticmethod
     def _normalize_uncertainty_estimation(
         configuration: Mapping[str, Any] | None,
         *,
@@ -369,25 +349,15 @@ class ReduceDimensionality(ProcessStep):
         if not active_specs:
             return dict(uncertainties_out)
 
-        x_eff, w_eff, _ = ReduceDimensionality._effective_values_and_weights(
-            bd=bd,
+        x_eff, w_eff, _ = effective_values_and_weights(
+            signal=bd.signal,
+            weights=bd.weights,
             use_weights=use_weights,
             nan_policy=nan_policy,
             exclusion_mask=exclusion_mask,
         )
 
-        if np.any(np.isfinite(w_eff) & (w_eff < 0.0)):
-            raise ValueError("Scatter-derived uncertainty estimators require non-negative effective weights.")
-
-        sum_w = np.sum(w_eff, axis=axis)
-        sum_w2 = np.sum(w_eff**2, axis=axis)
-        sum_w_keepdims = np.sum(w_eff, axis=axis, keepdims=True)
-        sum_wx_keepdims = np.sum(w_eff * x_eff, axis=axis, keepdims=True)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            mean_keepdims = sum_wx_keepdims / sum_w_keepdims
-        deviations = x_eff - mean_keepdims
-        weighted_squared_deviations = np.where(w_eff == 0.0, 0.0, w_eff * deviations**2)
-        sum_w_squared_deviations = np.sum(weighted_squared_deviations, axis=axis)
+        sum_w, sum_w2, sum_w_squared_deviations = axis_scatter_moments(x_eff, w_eff, axis)
 
         estimates_by_ddof = {}
         new_estimates = {}
@@ -416,7 +386,9 @@ class ReduceDimensionality(ProcessStep):
                     f"ReduceDimensionality: combining existing and estimated uncertainty "
                     f"{spec.output_key!r} in quadrature."
                 )
-                new_estimates[spec.output_key] = np.hypot(np.asarray(existing, dtype=float), estimate)
+                new_estimates[spec.output_key] = combine_uncertainty_components(
+                    {spec.output_key: np.asarray(existing, dtype=float)}, {spec.output_key: estimate}
+                )[spec.output_key]
 
         return with_uncertainty_estimates(uncertainties_out, new_estimates)
 
@@ -455,14 +427,6 @@ class ReduceDimensionality(ProcessStep):
             )
             return resolved
         return ReduceDimensionality._normalize_axes(axes)
-
-    @staticmethod
-    def _axis_count(shape: tuple[int, ...], axis: int | tuple[int, ...] | None) -> int:
-        if axis is None:
-            return int(np.prod(shape))
-        if isinstance(axis, tuple):
-            return int(np.prod([shape[a if a >= 0 else len(shape) + a] for a in axis]))
-        return int(shape[axis if axis >= 0 else len(shape) + axis])
 
     @staticmethod
     def _scalar_weight(weights: np.ndarray) -> float | None:
@@ -513,44 +477,16 @@ class ReduceDimensionality(ProcessStep):
                 )
             return result
 
-        x_eff, w_eff, effective_mask = ReduceDimensionality._effective_values_and_weights(
-            bd=bd,
+        signal_out, uncertainties_out, output_weights = weighted_axis_reduction(
+            bd.signal,
+            bd.uncertainties,
+            bd.weights,
+            axis=axis,
             use_weights=use_weights,
             nan_policy=nan_policy,
+            reduction=reduction,
             exclusion_mask=exclusion_mask,
         )
-
-        # Weighted sums
-        w_sum = np.sum(w_eff, axis=axis)
-        wx_sum = np.sum(w_eff * x_eff, axis=axis)
-
-        # Σ w_i^2 σ_i^2 for each key
-        uncertainties_out: dict[str, np.ndarray] = {}
-
-        # Precompute denom for mean case
-        if reduction == "mean":
-            denom = np.where(w_sum == 0, np.nan, w_sum)
-            signal_out = wx_sum / denom
-        elif reduction == "sum":
-            # For sum, just take Σ w x (or Σ x when use_weights=False)
-            signal_out = wx_sum
-        else:
-            raise ValueError(f"Invalid reduction: {reduction!r}. Use 'mean' or 'sum'.")
-
-        for key, err in bd.uncertainties.items():
-            err_arr = np.asarray(err, dtype=float)
-            err_arr = np.broadcast_to(err_arr, x.shape)
-
-            err_arr_eff = np.where(effective_mask, 0.0, err_arr)
-
-            var_sum = np.sum((w_eff**2) * (err_arr_eff**2), axis=axis)
-
-            if reduction == "mean":
-                sigma = np.sqrt(var_sum) / denom
-            else:  # 'sum'
-                sigma = np.sqrt(var_sum)
-
-            uncertainties_out[key] = sigma
 
         if estimator_specs:
             uncertainties_out = ReduceDimensionality._estimate_uncertainties_from_scatter(
@@ -568,7 +504,7 @@ class ReduceDimensionality(ProcessStep):
             signal=signal_out,
             units=bd.units,
             uncertainties=uncertainties_out,
-            weights=np.array(1.0) if reduction == "mean" else w_sum,
+            weights=output_weights,
         )
 
         # --- metadata: axes + rank_of_data ---
@@ -617,65 +553,20 @@ class ReduceDimensionality(ProcessStep):
     ) -> BaseData:
         _validate_uncertainties(bd)
         x = bd.signal
-
-        if nan_policy == "propagate":
-            if reduction == "mean":
-                signal_out = np.mean(x, axis=axis)
-                denom = ReduceDimensionality._axis_count(x.shape, axis)
-            elif reduction == "sum":
-                signal_out = np.sum(x, axis=axis) * scalar_weight
-                denom = None
-            else:
-                raise ValueError(f"Invalid reduction: {reduction!r}. Use 'mean' or 'sum'.")
-
-            uncertainties_out = {}
-            for key, err in bd.uncertainties.items():
-                err_arr = np.broadcast_to(np.asarray(err, dtype=float), x.shape)
-                sigma = np.sqrt(np.sum(err_arr * err_arr, axis=axis))
-                if reduction == "mean":
-                    sigma = sigma / denom
-                else:
-                    sigma = sigma * abs(scalar_weight)
-                uncertainties_out[key] = sigma
-        elif nan_policy == "omit":
-            if np.isnan(scalar_weight):
-                signal_out = np.sum(np.full_like(x, np.nan), axis=axis)
-                uncertainties_out = {key: np.sum(np.full_like(x, np.nan), axis=axis) for key in bd.uncertainties}
-            else:
-                mask = np.isnan(x)
-                finite_count = np.sum(~mask, axis=axis)
-                x_eff = np.where(mask, 0.0, x)
-                if reduction == "mean":
-                    denom = np.where(finite_count == 0, np.nan, finite_count)
-                    signal_out = np.sum(x_eff, axis=axis) / denom
-                elif reduction == "sum":
-                    signal_out = np.sum(x_eff, axis=axis) * scalar_weight
-                    denom = None
-                else:
-                    raise ValueError(f"Invalid reduction: {reduction!r}. Use 'mean' or 'sum'.")
-
-                uncertainties_out = {}
-                for key, err in bd.uncertainties.items():
-                    err_arr = np.broadcast_to(np.asarray(err, dtype=float), x.shape)
-                    err_eff = np.where(mask, 0.0, err_arr)
-                    sigma = np.sqrt(np.sum(err_eff * err_eff, axis=axis))
-                    if reduction == "mean":
-                        sigma = sigma / denom
-                    else:
-                        sigma = sigma * abs(scalar_weight)
-                    uncertainties_out[key] = sigma
-        else:
-            raise ValueError(f"Invalid nan_policy: {nan_policy!r}. Use 'omit' or 'propagate'.")
+        signal_out, uncertainties_out, output_weights = scalar_weight_reduction(
+            bd.signal,
+            bd.uncertainties,
+            axis=axis,
+            nan_policy=nan_policy,
+            reduction=reduction,
+            scalar_weight=scalar_weight,
+        )
 
         result = BaseData(
             signal=signal_out,
             units=bd.units,
             uncertainties=uncertainties_out,
-            weights=(
-                np.array(1.0)
-                if reduction == "mean"
-                else np.full(signal_out.shape, scalar_weight * ReduceDimensionality._axis_count(x.shape, axis))
-            ),
+            weights=output_weights,
         )
 
         new_ndim = result.signal.ndim
