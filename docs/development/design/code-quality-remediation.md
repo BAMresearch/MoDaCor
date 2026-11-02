@@ -91,7 +91,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | done |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | done |
 | R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | done |
-| R08 | Audit remaining unit stripping in modules | contract | M | medium | in progress |
+| R08 | Audit remaining unit stripping in modules | contract | M | medium | approved |
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | open |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | open |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
@@ -2096,7 +2096,7 @@ The estimator-collision row delegates to the existing shared mapping combiner
 and producer transition rather than introducing another quadrature kernel.
 ConvertUnits, the AST allow-list and access-trace machinery are unchanged from
 origin/main; no trace opt-outs were introduced. The earlier single-run
-performance stop was cleared by maintainer review; no new stop condition arose.
+performance stop was cleared in review; no new stop condition arose.
 
 **Final validation (2026-11-02).**
 
@@ -2150,6 +2150,28 @@ performance stop was cleared by maintainer review; no new stop condition arose.
     shared component names before changing anything.
   - The proposed `modules/helpers/quantities.scalar_in_units` (moved and
     generalized, no parallel helper) is approved.
+- **(2026-11-02): performance stop cleared.** The 12.7% indexed-averaging
+  slowdown was single-run noise: the run's minimum was 98.0 ms against a
+  median of 107.8 ms, and none of the later commits touch `IndexedAverager`.
+  Alternating runs gave 95.6–98.1 ms on v1.16.0 and 95.8–97.0 ms on the branch.
+- **(2026-11-02): approved.** Commits `75222f1` … `6742adb`, rebased onto
+  v1.16.1.
+  - Re-ran: full suite **1855 passed, 1 skipped**; tox `py312` **1853 passed,
+    3 skipped**; `lint` and `docs` pass.
+  - Identical results against v1.16.1:
+    - the full I22 USAXS pipeline on real data (two samples, 44 bundles):
+      all 267 BaseData, signal and every uncertainty component, match at
+      rtol 1e-12;
+    - all 67 output arrays of the R08 benchmark cases match.
+  - Alternating timings against v1.16.1, two pairs: reductions, indexed
+    averaging, integration and both capillary steps in `exact` mode are
+    within ±1%. `SubtractInterpolated1D` takes +0.22 ms per call, as accepted.
+  - `models` gains `statistics` and `reduction`, and extends `integration`,
+    `uncertainty` and `attenuation`; the package-boundary test passes.
+    `modules/helpers/statistics.py` is removed without a re-export (no
+    external users).
+  - The capillary residual keeps the R0.4 legacy-fold INFO log when a
+    global-only mapping becomes named.
 
 ---
 
