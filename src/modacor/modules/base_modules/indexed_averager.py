@@ -13,8 +13,15 @@ from modacor.dataclasses.basedata import BaseData, _validate_uncertainties
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.models.reduction import (
+    group_observations,
+    grouped_mean,
+    grouped_scatter_statistics,
+    grouped_uncertainties,
+    grouped_weights,
+)
 from modacor.models.uncertainty import with_uncertainty_estimates
-from modacor.modules.helpers import finalize_weighted_scatter, normalize_str_list
+from modacor.modules.helpers import normalize_str_list
 
 __all__ = ["IndexedAverager"]
 __version__ = "20261030.1"
@@ -41,18 +48,6 @@ class _ReductionInputs:
     valid: np.ndarray
 
 
-@define(frozen=True, slots=True)
-class _GroupedObservations:
-    bin_ids: np.ndarray
-    selection: np.ndarray
-    dense_indices: np.ndarray
-    weights: np.ndarray
-    values: np.ndarray
-    axis_values: np.ndarray | None
-    sum_weights: np.ndarray
-    sum_squared_weights: np.ndarray
-
-
 def _broadcast(array: np.ndarray, shape: tuple[int, ...], description: str) -> np.ndarray:
     try:
         return np.broadcast_to(np.asarray(array), shape).ravel()
@@ -69,42 +64,11 @@ def _propagate_uncertainties(
     weights: np.ndarray,
     sum_weights: np.ndarray,
 ) -> dict[str, np.ndarray]:
-    result: dict[str, np.ndarray] = {}
-    for name, uncertainty in data.uncertainties.items():
-        selected = _broadcast(uncertainty, shape, f"uncertainty {name!r}")[selection]
-        variance_sum = np.bincount(
-            dense_indices,
-            weights=(weights**2) * (selected**2),
-            minlength=sum_weights.size,
-        )
-        result[name] = np.sqrt(variance_sum) / sum_weights
-    return result
-
-
-def _scatter_statistics(
-    values: np.ndarray,
-    means: np.ndarray,
-    dense_indices: np.ndarray,
-    weights: np.ndarray,
-    sum_weights: np.ndarray,
-    sum_squared_weights: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    deviations = values - means[dense_indices]
-    squared_deviation_sum = np.bincount(
-        dense_indices,
-        weights=weights * deviations**2,
-        minlength=sum_weights.size,
-    )
-    estimates = finalize_weighted_scatter(
-        sum_w=sum_weights,
-        sum_w2=sum_squared_weights,
-        sum_w_squared_deviations=squared_deviation_sum,
-        ddof=0,
-    )
-    enough_observations = estimates.effective_sample_size > 1.0
-    sem = np.where(enough_observations, estimates.standard_error_mean, np.nan)
-    std = np.where(enough_observations, estimates.standard_deviation, np.nan)
-    return sem, std
+    components = {
+        name: _broadcast(uncertainty, shape, f"uncertainty {name!r}")[selection]
+        for name, uncertainty in data.uncertainties.items()
+    }
+    return grouped_uncertainties(components, dense_indices=dense_indices, weights=weights, sum_weights=sum_weights)
 
 
 class IndexedAverager(ProcessStep):
@@ -315,65 +279,23 @@ class IndexedAverager(ProcessStep):
         )
 
     def _resolve_weights(self, inputs: _ReductionInputs) -> tuple[np.ndarray, np.ndarray]:
-        valid = inputs.valid.copy()
-        value = inputs.value
-        shape = inputs.shape
-        value_key = inputs.value_key
-
-        weights = np.ones(inputs.values.shape, dtype=float)
+        value, shape = inputs.value, inputs.shape
+        value_weights = None
         if self.configuration["use_value_weights"]:
-            weights *= _broadcast(value.weights, shape, f"weights for {value_key!r}").astype(float)
-
+            value_weights = _broadcast(value.weights, shape, f"weights for {inputs.value_key!r}").astype(float)
+        sigma = None
         if self.configuration["use_value_uncertainty_weights"]:
             uncertainty_key = self.configuration.get("uncertainty_weight_key")
             if not uncertainty_key:
                 raise ValueError("IndexedAverager: uncertainty_weight_key is required for uncertainty weighting.")
             if uncertainty_key not in value.uncertainties:
-                raise KeyError(f"IndexedAverager: uncertainty {uncertainty_key!r} is not present on {value_key!r}.")
-            sigma = _broadcast(
-                value.uncertainties[uncertainty_key],
-                shape,
-                f"uncertainty {uncertainty_key!r}",
-            ).astype(float)
-            usable_sigma = np.isfinite(sigma) & (sigma > 0.0)
-            valid &= usable_sigma
-            weights[usable_sigma] *= 1.0 / sigma[usable_sigma] ** 2
-
-        if np.any(valid & np.isfinite(weights) & (weights < 0.0)):
-            raise ValueError("IndexedAverager: weights must not be negative.")
-        valid &= np.isfinite(weights)
-        return weights, valid
-
-    @staticmethod
-    def _group_observations(
-        inputs: _ReductionInputs,
-        weights: np.ndarray,
-        valid: np.ndarray,
-    ) -> _GroupedObservations:
-        contributing = valid & (weights > 0.0)
-        if not np.any(contributing):
-            raise ValueError("IndexedAverager: no valid observations with positive weight remain.")
-
-        populated_bin_ids = np.unique(inputs.indices[contributing])
-        selection = valid & np.isin(inputs.indices, populated_bin_ids)
-        selected_indices = inputs.indices[selection]
-        dense_indices = np.searchsorted(populated_bin_ids, selected_indices)
-        selected_weights = weights[selection]
-        selected_values = inputs.values[selection]
-        n_bins = populated_bin_ids.size
-
-        sum_weights = np.bincount(dense_indices, weights=selected_weights, minlength=n_bins)
-        sum_squared_weights = np.bincount(dense_indices, weights=selected_weights**2, minlength=n_bins)
-        return _GroupedObservations(
-            bin_ids=populated_bin_ids,
-            selection=selection,
-            dense_indices=dense_indices,
-            weights=selected_weights,
-            values=selected_values,
-            axis_values=None if inputs.axis_values is None else inputs.axis_values[selection],
-            sum_weights=sum_weights,
-            sum_squared_weights=sum_squared_weights,
-        )
+                raise KeyError(
+                    f"IndexedAverager: uncertainty {uncertainty_key!r} is not present on {inputs.value_key!r}."
+                )
+            sigma = _broadcast(value.uncertainties[uncertainty_key], shape, f"uncertainty {uncertainty_key!r}").astype(
+                float
+            )
+        return grouped_weights(inputs.values.shape, inputs.valid, value_weights=value_weights, sigma=sigma)
 
     def _stats_keys(self, value_key: str, axis_key: str | None) -> set[str]:
         available = {value_key}
@@ -391,27 +313,19 @@ class IndexedAverager(ProcessStep):
     def _reduce_bundle(self, bundle: DataBundle) -> DataBundle:
         inputs = self._prepare_inputs(bundle)
         weights, valid = self._resolve_weights(inputs)
-        grouped = self._group_observations(inputs, weights, valid)
+        grouped = group_observations(inputs.indices, inputs.values, inputs.axis_values, weights, valid)
         n_bins = grouped.bin_ids.size
-        mean_values = (
-            np.bincount(
+        mean_values = grouped_mean(grouped.values, grouped.dense_indices, grouped.weights, grouped.sum_weights)
+        mean_axis = (
+            None
+            if grouped.axis_values is None
+            else grouped_mean(
+                grouped.axis_values,
                 grouped.dense_indices,
-                weights=grouped.weights * grouped.values,
-                minlength=n_bins,
+                grouped.weights,
+                grouped.sum_weights,
             )
-            / grouped.sum_weights
         )
-
-        mean_axis = None
-        if grouped.axis_values is not None:
-            mean_axis = (
-                np.bincount(
-                    grouped.dense_indices,
-                    weights=grouped.weights * grouped.axis_values,
-                    minlength=n_bins,
-                )
-                / grouped.sum_weights
-            )
 
         value_uncertainties = _propagate_uncertainties(
             inputs.value,
@@ -436,7 +350,7 @@ class IndexedAverager(ProcessStep):
 
         stats_keys = self._stats_keys(inputs.value_key, inputs.axis_key)
         if inputs.value_key in stats_keys:
-            sem, std = _scatter_statistics(
+            sem, std = grouped_scatter_statistics(
                 grouped.values,
                 mean_values,
                 grouped.dense_indices,
@@ -446,7 +360,7 @@ class IndexedAverager(ProcessStep):
             )
             value_uncertainties = with_uncertainty_estimates(value_uncertainties, {"SEM": sem, "STD": std})
         if inputs.axis_key is not None and inputs.axis_key in stats_keys:
-            sem, std = _scatter_statistics(
+            sem, std = grouped_scatter_statistics(
                 grouped.axis_values,
                 mean_axis,
                 grouped.dense_indices,

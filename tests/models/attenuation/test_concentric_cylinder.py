@@ -575,3 +575,50 @@ def test_invalid_integrator_inputs_are_rejected(override, message):
 
     with pytest.raises(ValueError, match=message):
         attenuation_factors_at_detectors(**arguments)
+
+
+def test_sample_container_shared_mu_derivative_matches_release_and_module():
+    from modacor.dataclasses.basedata import BaseData
+    from modacor.models.attenuation import sample_container_mu_derivative
+    from modacor.modules import CapillarySampleContainerCorrection
+
+    filled = np.array([10.0, 12.0])
+    empty = np.array([2.0, 3.0])
+    sample_factor = np.array([2.0, 4.0])
+    sample_derivative = np.array([1.0, 0.5])
+    scale = np.array([1.0, 0.5])
+    wall_derivative = np.array([0.2, 0.1])
+    wall_empty = np.array([1.0, 2.0])
+    derivative = sample_container_mu_derivative(
+        filled, empty, sample_factor, sample_derivative, scale, wall_derivative, wall_empty
+    )
+    np.testing.assert_allclose(derivative, [-2.2, -0.365625], rtol=1e-12, atol=0)
+    corrected = BaseData(np.array([4.0, 4.0]), "count", {"measurement": 0.3})
+    CapillarySampleContainerCorrection._add_correlated_sample_mu_uncertainties(
+        corrected,
+        BaseData(filled, "count"),
+        BaseData(empty, "count"),
+        sample_factor,
+        sample_derivative,
+        scale,
+        wall_derivative,
+        wall_empty,
+        {"mu": 0.5},
+    )
+    np.testing.assert_allclose(corrected.uncertainties["mu"], np.abs(derivative) * 0.5, rtol=1e-12, atol=0)
+    np.testing.assert_allclose(corrected.uncertainties["measurement"], 0.3, rtol=1e-12, atol=0)
+
+
+def test_sample_container_shared_mu_cancellation_is_retained():
+    from modacor.models.attenuation import sample_container_mu_derivative
+
+    derivative = sample_container_mu_derivative(
+        np.array([0.0]),
+        np.array([2.0]),
+        np.array([2.0]),
+        np.array([1.0]),
+        np.array([1.0]),
+        np.array([0.5]),
+        np.array([1.0]),
+    )
+    np.testing.assert_allclose(derivative, [0.0], rtol=1e-12, atol=0)

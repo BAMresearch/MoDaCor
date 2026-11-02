@@ -275,3 +275,15 @@ def test_formula_source_falls_back_only_for_unsupported_static_metadata():
     with pytest.raises(OSError, match="broken file"):
         text_from_config_or_source(sources, cfg, "chemical_formula")
     sources.get_data.assert_not_called()
+
+
+@pytest.mark.parametrize("mass,density", [(1.234, 2.345), (0.001, 19.3), (1000.0, 0.01)])
+def test_xraylib_unit_algebra_matches_release_conversion(monkeypatch, mass, density):
+    import sys
+    from types import SimpleNamespace
+
+    from modacor.modules.helpers.scattering.material_attenuation import _linear_attenuation_from_xraylib
+
+    monkeypatch.setitem(sys.modules, "xraylib", SimpleNamespace(CS_Total_CP=lambda formula, energy: mass))
+    actual = _linear_attenuation_from_xraylib("Si", density, 12.0)
+    np.testing.assert_allclose(actual, mass * density * 100.0, rtol=1e-12, atol=0)

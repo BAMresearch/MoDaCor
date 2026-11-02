@@ -23,6 +23,7 @@ from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, normalize_processing_key_values
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
+from modacor.dataclasses.uncertainty_tools import quadrature_aggregator
 from modacor.models.scaling import (
     DependentData1D,
     fit_lognormal_scale_factor_1d,
@@ -40,11 +41,9 @@ def _combined_sigma(bd: BaseData) -> np.ndarray:
     if not bd.uncertainties:
         return np.asarray(1.0)
 
-    sig2 = None
-    for u in bd.uncertainties.values():
-        arr = np.asarray(u, dtype=float)
-        sig2 = arr * arr if sig2 is None else sig2 + arr * arr
-    return np.sqrt(sig2)
+    components = list(bd.uncertainties.values())
+    shape = np.broadcast_shapes(*(np.shape(component) for component in components))
+    return quadrature_aggregator(components, shape)
 
 
 def _extract_dependent(bd: BaseData, uncertainty_key: str | None = None) -> DependentData1D:

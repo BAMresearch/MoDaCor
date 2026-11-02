@@ -207,27 +207,17 @@ class SubtractInterpolated1D(ProcessStep):
         left_source = source_indices[left]
         right_source = source_indices[right]
 
-        remapped_signal = (
-            left_weight * np.asarray(background_signal.signal)[left_source]
-            + right_weight * np.asarray(background_signal.signal)[right_source]
-        )
-        remapped_uncertainties = {}
-        for name, uncertainty in background_signal.uncertainties.items():
-            uncertainty = np.broadcast_to(np.asarray(uncertainty, dtype=float), background_signal.shape)
-            remapped_uncertainties[name] = np.sqrt(
-                (left_weight * uncertainty[left_source]) ** 2 + (right_weight * uncertainty[right_source]) ** 2
-            )
-
-        remapped_signal = np.asarray(remapped_signal, dtype=float)
-        remapped_signal[~valid] = np.nan
-        for uncertainty in remapped_uncertainties.values():
+        remapped = background_signal.indexed(left_source) * BaseData(
+            left_weight, ureg.dimensionless
+        ) + background_signal.indexed(right_source) * BaseData(right_weight, ureg.dimensionless)
+        remapped.signal[~valid] = np.nan
+        for uncertainty in remapped.uncertainties.values():
             uncertainty[~valid] = np.nan
-        remapped = BaseData(
-            signal=remapped_signal,
-            units=sample_signal.units,
-            uncertainties=remapped_uncertainties,
-            rank_of_data=1,
-        )
+        # The remapped values have the sample grid; source-axis metadata and
+        # averaging weights are not the remapped-background output contract.
+        remapped.axes = []
+        remapped.rank_of_data = 1
+        remapped.weights = np.array(1.0)
         result = sample_signal - remapped
         result.weights = np.broadcast_to(np.asarray(sample_signal.weights, dtype=float), sample_signal.shape).copy()
         result.weights[~valid] = 0.0

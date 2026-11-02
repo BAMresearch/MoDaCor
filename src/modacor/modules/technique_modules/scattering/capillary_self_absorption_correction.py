@@ -27,7 +27,6 @@ from modacor.models.attenuation import (
     trapezoid_beam_profile,
 )
 from modacor.models.uncertainty import (
-    combine_uncertainty_components,
     nominal_and_finite_difference,
 )
 from modacor.modules.helpers import scalar_in_units
@@ -658,6 +657,9 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
             if measured_transmission is None
             else measured_transmission.scalar_components("dimensionless", name="transmission")
         )
+        # A measured scalar may arrive as a constant metadata array. Retain the
+        # established scalar boundary before broadcasting over detector pixels.
+        transmission_data = BaseData.from_scalar(measured_value, ureg.dimensionless, measured_uncertainties)
         evaluation_mode = str(self.configuration["evaluation_mode"]).strip().lower()
         if evaluation_mode not in {"adaptive", "exact"}:
             raise ValueError("evaluation_mode must be adaptive or exact.")
@@ -724,8 +726,6 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
 
             if not np.all(np.isfinite(attenuation[active])) or np.any(attenuation[active] < minimum_factor):
                 raise ValueError("Capillary attenuation factor is too small or non-finite at active pixels.")
-            residual = attenuation / measured_value
-            residual[~active] = 1.0
             attenuation_uncertainties = {}
             if attenuation_mu_derivative is not None:
                 attenuation_uncertainties = {
@@ -734,16 +734,18 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                 }
                 for values in attenuation_uncertainties.values():
                     values[~active] = 0.0
-            correction_uncertainties = {
-                name: values / measured_value for name, values in attenuation_uncertainties.items()
-            }
-            if measured_transmission is not None:
-                components = {}
-                for name, values in measured_uncertainties.items():
-                    component = attenuation * np.asarray(values, dtype=float) / measured_value**2
-                    component[~active] = 0.0
-                    components[name] = component
-                correction_uncertainties = combine_uncertainty_components(correction_uncertainties, components)
+            rank = min(databundle["signal"].rank_of_data, attenuation.ndim)
+            attenuation_data = BaseData(attenuation, ureg.dimensionless, attenuation_uncertainties, rank_of_data=rank)
+            correction = attenuation_data / transmission_data
+            correction.signal[~active] = 1.0
+            for values in correction.uncertainties.values():
+                values[~active] = 0.0
+            if (
+                correction.uncertainties
+                and "propagate_to_all" not in correction.uncertainties
+                and ("propagate_to_all" in attenuation_uncertainties or "propagate_to_all" in measured_uncertainties)
+            ):
+                self.logger.info(f"Stage 0 legacy fold into uncertainty estimates {sorted(correction.uncertainties)}")
 
             transmission_uncertainties = {}
             if transmission_mu_derivative is not None:
@@ -752,19 +754,8 @@ class CapillarySelfAbsorptionCorrection(ProcessStep):
                     for name, uncertainty in resolved_sample_mu.uncertainties.items()
                 }
 
-            rank = min(databundle["signal"].rank_of_data, attenuation.ndim)
-            databundle[attenuation_key] = BaseData(
-                signal=attenuation,
-                units=ureg.dimensionless,
-                uncertainties=attenuation_uncertainties,
-                rank_of_data=rank,
-            )
-            databundle[correction_key] = BaseData(
-                signal=residual,
-                units=ureg.dimensionless,
-                uncertainties=correction_uncertainties,
-                rank_of_data=rank,
-            )
+            databundle[attenuation_key] = attenuation_data
+            databundle[correction_key] = correction
             databundle[transmission_key] = BaseData(
                 signal=np.asarray(calculated_transmission),
                 units=ureg.dimensionless,

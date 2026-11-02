@@ -40,3 +40,37 @@ def test_stage0_numerical_helpers_reject_mixed_keys_before_writes():
     assert all(target[key] is before[key] for key in target)
     with pytest.raises(ValueError, match="propagate_to_all"):
         uncertainties_from_derivative(2.0, target)
+
+
+def test_sensitivity_contraction_matches_release_expression_and_centroid_boundary():
+    from types import SimpleNamespace
+
+    from modacor.dataclasses.basedata import BaseData
+    from modacor.models.uncertainty import sensitivity_contraction
+    from modacor.modules import FindCenterOfMass1D
+
+    signal_sensitivity = np.array([0.1, -0.2, 0.4])
+    axis_sensitivity = np.array([0.3, 0.5, 0.2])
+    signal = BaseData(np.ones(3), "count", {"measured": np.array([0.2, 0.3, 0.5])})
+    axis = BaseData(np.arange(3.0), "m", {"calibration": 0.1})
+    for sensitivity, sigma in [
+        (signal_sensitivity, signal.uncertainties["measured"]),
+        (axis_sensitivity, axis.uncertainties["calibration"]),
+    ]:
+        actual = sensitivity_contraction(sensitivity, sigma)
+        np.testing.assert_allclose(actual, np.sqrt(np.sum((sensitivity * sigma) ** 2)), rtol=1e-12, atol=0)
+    result = SimpleNamespace(signal_sensitivity=signal_sensitivity, axis_sensitivity=axis_sensitivity)
+    components = FindCenterOfMass1D._propagated_uncertainties(result, signal, axis)
+    np.testing.assert_allclose(
+        components["signal:measured"],
+        sensitivity_contraction(signal_sensitivity, signal.uncertainties["measured"]),
+        rtol=1e-12,
+        atol=0,
+    )
+    np.testing.assert_allclose(
+        components["axis:calibration"],
+        sensitivity_contraction(axis_sensitivity, axis.uncertainties["calibration"]),
+        rtol=1e-12,
+        atol=0,
+    )
+    assert np.isnan(sensitivity_contraction(np.array([0.0, 1.0]), np.array([np.nan, 1.0])))

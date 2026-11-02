@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-__all__ = ["WeightedScatterEstimates", "finalize_weighted_scatter"]
+__all__ = ["WeightedScatterEstimates", "finalize_weighted_scatter", "static_weighted_mean_sem"]
 
 
 @dataclass(frozen=True)
@@ -73,3 +73,46 @@ def finalize_weighted_scatter(
         standard_error_mean=np.asarray(standard_error_mean),
         standard_error_sum=np.asarray(standard_error_sum),
     )
+
+
+def static_weighted_mean_sem(signal: np.ndarray, weights: np.ndarray | None) -> tuple[float, float]:
+    """Return weighted mean and population-scatter SEM of static observations.
+
+    Preserves the static-metadata convention: effective count is sum(w)^2 /
+    sum(w^2), with no ddof correction or propagation of measured input sigmas.
+    """
+    x = signal.ravel()
+
+    # --- robust weights handling ---
+    if weights is None:
+        w = np.ones_like(x)
+    else:
+        w_raw = np.asarray(weights, dtype=float)
+
+        # allow scalar/length-1 weights
+        if w_raw.size == 1:
+            w = np.full_like(x, float(w_raw.reshape(-1)[0]))
+        else:
+            # allow broadcastable weights (e.g. (5,1,1,1) vs (5,))
+            try:
+                w = np.broadcast_to(w_raw, np.shape(signal)).ravel()
+            except ValueError as e:
+                raise ValueError(f"weights shape {w_raw.shape} does not match signal shape {np.shape(signal)}") from e
+
+        if w.size != x.size:
+            raise ValueError(f"weights size {w.size} does not match signal size {x.size}")
+
+    wsum = float(np.sum(w))
+    if wsum <= 0:
+        raise ValueError("weights must sum to > 0")
+
+    mean = float(np.sum(w * x) / wsum)
+
+    # effective N for SEM (works for equal weights too)
+    n_eff = float((wsum**2) / np.sum(w**2))
+
+    # weighted population variance about the weighted mean
+    var = float(np.sum(w * (x - mean) ** 2) / wsum)
+    sem = float(np.sqrt(var) / np.sqrt(n_eff))
+
+    return mean, sem

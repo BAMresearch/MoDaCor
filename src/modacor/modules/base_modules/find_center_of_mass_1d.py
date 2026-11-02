@@ -15,6 +15,7 @@ from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies, processing_key_patterns
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.models.centroid import CentroidResult, intensity_centroid_1d
+from modacor.models.uncertainty import sensitivity_contraction
 from modacor.modules.helpers import scalar_in_units
 
 
@@ -157,10 +158,10 @@ class FindCenterOfMass1D(ProcessStep):
         propagated: dict[str, np.ndarray] = {}
         for name, uncertainty in signal.uncertainties.items():
             sigma = np.broadcast_to(np.asarray(uncertainty, dtype=float), signal.shape)
-            propagated[f"signal:{name}"] = np.asarray(np.sqrt(np.sum((result.signal_sensitivity * sigma) ** 2)))
+            propagated[f"signal:{name}"] = sensitivity_contraction(result.signal_sensitivity, sigma)
         for name, uncertainty in axis.uncertainties.items():
             sigma = np.broadcast_to(np.asarray(uncertainty, dtype=float), axis.shape)
-            propagated[f"axis:{name}"] = np.asarray(np.sqrt(np.sum((result.axis_sensitivity * sigma) ** 2)))
+            propagated[f"axis:{name}"] = sensitivity_contraction(result.axis_sensitivity, sigma)
         return propagated
 
     def calculate(self) -> dict[str, DataBundle]:

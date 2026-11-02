@@ -91,7 +91,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | done |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | done |
 | R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | done |
-| R08 | Audit remaining unit stripping in modules | contract | M | medium | in progress |
+| R08 | Audit remaining unit stripping in modules | contract | M | medium | approved |
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | open |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | open |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
@@ -1643,11 +1643,10 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
 
 ## R08 — Audit remaining unit stripping in modules
 
-**Status:** in progress on branch `quality-remediation-r08-r13-r15`. The
-classification and Commit A (the scalar helper) are done. Commit B stopped at
-the equivalence guard: BaseData dropped a sole `propagate_to_all` component.
-That is a BaseData bug, now R17 (Stage 0). The remaining Commit B rows and the
-kernel moves resume once Stage 0 (R17) and R18 have landed.
+**Status:** implementation complete on `quality-remediation-r08b` (2026-11-02),
+rebased without conflicts onto v1.16.1 (`835df4c`). Numerical comparisons and
+performance baselines remain v1.16.0 (`0d0839b`). Final validation is recorded
+below. The ten missing-uncertainty rows remain in R16.
 
 **Inventory (2026-10-31, after R07).** A pattern search (`.magnitude`,
 `.m_as(`, `np.asarray(… .signal)`, `float(… .signal)`, `.to(…).magnitude`)
@@ -2040,6 +2039,82 @@ No R08 performance before/after comparison was run on this resumed attempt,
 since no R08 implementation was applied; the earlier timing table remains
 explicitly limited to the completed helper refactor.
 
+**R08 B/C implementation (2026-11-02).**
+
+- **B1:** relocated FindScaleFactor1D `_combined_sigma` (v1.16.0 lines 40–48). Uses `quadrature_aggregator`, retaining scalar/broadcast output shapes and the empty-mapping 1.0 fallback. Three focused cases cover empty, global-only and named/broadcast sigmas. Focused module/dataclass suite: 1314 passed; all 266 release calls / 685 component arrays match at rtol=1e-12, atol=0 (including the original 219 calls).
+
+- **B2:** relocated SubtractInterpolated1D remapping (v1.16.0 lines 208–231). Both indexed branches now use BaseData arithmetic and exact dimensionless weight containers. Existing coefficient/index selection, invalid-output NaNs and output metadata remain unchanged. Six focused cases compare the release formula for linear/nearest modes with global-only, named and empty uncertainty mappings (including exact points and out-of-range points). Suite: 1320 passed; 266 release calls / 685 component arrays match.
+
+- **B3:** relocated material_attenuation `_linear_attenuation_from_xraylib` (v1.16.0 lines 133–134). Mass attenuation and density are BaseData scalars in cm²/g and g/cm³; their product is read with scalar_components("1/m"). Three mocked xraylib cases match the previous multiplication and factor-100 formula. Suite: 1323 passed; all 266 release calls / 685 component arrays match. No AST-guard exception added.
+
+- **B4:** relocated capillary residual and component merge (v1.16.0 lines 726–746). Builds attenuation BaseData with sample-mu components and divides by dimensionless scalar transmission BaseData. The central scalar accessor preserves constant-array metadata inputs; inactive pixels are restored to residual 1 and all sigmas 0. Legacy-fold logging is retained. Existing nine E/G/N mapping-table cases, shared/distinct names and scalar/array percent cases run against the frozen release snapshots: 1323 tests pass, all 266 calls / 685 uncertainty arrays agree. The six table rows correspond to these four Part B commits (two rows each for interpolation and residual formation).
+
+- **C / statistics:** moved WeightedScatterEstimates and finalize_weighted_scatter from modules/helpers/statistics.py to models/statistics.py, removing the helper module and both helper exports. Moved prepare_static_scalar numerical body (v1.16.0 detector_data.py lines 96–130) into static_weighted_mean_sem; unit validation, scalar passthrough and BaseData wrapping remain in the adapter. Existing statistical operations/ddof/zero-weight/NaN rules are unchanged. Moved helper tests to tests/models/test_statistics.py and added four kernel/boundary checks. Suite including models tests and package boundaries: 1329 passed; all 266 calls / 685 component arrays match.
+
+- **C / reduction:** relocated ReduceDimensionality preparation (v1.16.0 225–253), scatter moments (378–389), weighted reduction (513–547), scalar-weight reduction/NaN paths (616–665) and axis cardinality into models.reduction: effective_values_and_weights, axis_scatter_moments, weighted_axis_reduction, scalar_weight_reduction, axis_count. IndexedAverager grouped class/moments/means/scatter/sigmas/IV weights (v1.16.0 45–110, 318–375, 394–413) moved into GroupedObservations, group_observations, grouped_mean, grouped_scatter_statistics, grouped_uncertainties, grouped_weights. Adapters retain broadcasting/error context, configuration, masks, key names and BaseData metadata. Estimator collisions call combine_uncertainty_components before the unchanged batch producer path; no local hypot remains. Suite: 1322 module/dataclass/boundary tests and 23 new kernel tests pass; 266 release calls / 685 component arrays match. Seven-run medians versus post-B: scalar reduction 4.286→4.255 ms, weighted 5.532→5.351 ms, indexed 95.566→96.043 ms; all below 10%. All 17 corresponding benchmark arrays match release.
+
+- **C / integration:** relocated Integrate1D duplicate grouping, duplicate means and quadrature signal/sigma reductions (v1.16.0 lines 160–244) into models.integration: IntegrationDomain, prepare_integration_domain, collapse_duplicate_values, integrated_uncertainty, integrate_samples_1d. The adapter still selects the common mask, handles bundle/configuration/unit metadata and validates BaseData uncertainty mappings. Numerical order, stable sorting, descending domains and duplicate policies are unchanged. Five new kernel/boundary cases plus existing module tests: 1330 passed; 266 release calls / 685 component arrays match. The seven-run integration timing and benchmark-array comparison are recorded in the final timing table.
+
+- **C / uncertainty:** relocated the two FindCenterOfMass1D signal/axis sensitivity contractions (v1.16.0 lines 160 and 163) to models.uncertainty.sensitivity_contraction. The adapter keeps broadcasting, input validation and signal:/axis: component names. The kernel is the identical sqrt(sum((sensitivity*sigma)**2)) expression; a focused test covers both module branches and the existing NaN policy. Suite: 1326 passed; all 266 release calls / 685 component arrays match. No measured coordinate uncertainty was added to other steps (R16 remains untouched).
+
+- **C / attenuation:** moved the complete-expression shared-mu derivative from CapillarySampleContainerCorrection._add_correlated_sample_mu_uncertainties (v1.16.0 lines 323–329) into models.attenuation.concentric_cylinder.sample_container_mu_derivative, exported through models.attenuation. The same operations and order retain the intentional numerator/denominator correlation; the adapter retains names, masking and the Stage 0 mapping combiner. Two focused cases check release values, adapter outputs and exact correlated cancellation. Suite: 1354 passed; all 266 release calls / 685 component arrays match at rtol=1e-12, atol=0, NaNs equal.
+
+- **Performance review and resumption:** the initial final indexed median (107.750 ms versus post-B 95.566 ms, +12.7%) triggered the former single-run stop. Its minimum was 98.03 ms, the immediate post-extraction check was 96.043 ms, and no subsequent step changed IndexedAverager. The maintainer identified measurement noise after three reviewer-alternated checks (release 95.6–98.1 ms, branch 95.8–97.0 ms) and authorized resumption. The refined guard uses at least three alternating release/branch pairs and stops only for a >10% slowdown in every pair; the accepted interpolation cost remains separate. Fresh paired results and final checks follow below.
+
+**Final alternating performance check (2026-11-02).**
+
+Three complete release/branch pairs were measured in alternating subprocesses,
+with CPU-heavy validation held until all pairs finished. Each case has three
+warmups followed by seven measured `calculate()` calls per subprocess; fresh
+input containers are prepared outside the timed section. The median column
+uses all 21 samples per version, and the minimum column is their minimum. The
+last column compares each pair's seven-sample medians. Release is v1.16.0;
+branch includes the conflict-free rebase onto v1.16.1. The refined stop rule
+requires >10% slowdown in every pair for a Part C case. It did not trigger.
+The accepted Part B interpolation cost is +0.229 ms at the aggregate median.
+
+| Case | v1.16.0 median / minimum (ms) | Branch median / minimum (ms) | Paired median changes |
+| --- | ---: | ---: | --- |
+| reduction_scalar | 4.302 / 4.242 | 4.303 / 4.238 | +0.7%, +0.5%, +0.3% |
+| reduction_weighted | 5.377 / 5.334 | 5.362 / 5.320 | -0.7%, -0.3%, +1.3% |
+| indexed_1000x1000 | 95.791 / 95.579 | 95.788 / 95.201 | -0.5%, +0.9%, +0.1% |
+| integration_2000 | 0.179 / 0.172 | 0.180 / 0.169 | -0.8%, -4.0%, +13.2% |
+| capillary_self_100x100_exact | 777.525 / 772.767 | 777.301 / 771.051 | -0.2%, -0.1%, +0.1% |
+| capillary_composite_100x100_exact | 2224.673 / 2200.259 | 2217.099 / 2205.706 | -0.2%, -0.8%, -0.3% |
+| subtract_interpolated_2000 | 0.306 / 0.298 | 0.535 / 0.520 | +89.0%, +72.9%, +71.7% |
+
+Every pair's 67 stored benchmark nominal/component arrays agrees with release
+at `rtol=1e-12, atol=0`, NaNs equal (201 array comparisons across the three
+pairs). The post-rebase public-step harness also agrees on 266 calls and 685
+named uncertainty arrays, including the original 219 calls; the focused
+module/dataclass/models/boundary run passed 1444 tests.
+
+All 33 classified Part C rows are covered by the destination kernels above.
+Input coercion/broadcasting and mask selection stay at the adapters where they
+form the numerical boundary; no uncertainty or statistical policy was changed.
+The estimator-collision row delegates to the existing shared mapping combiner
+and producer transition rather than introducing another quadrature kernel.
+ConvertUnits, the AST allow-list and access-trace machinery are unchanged from
+origin/main; no trace opt-outs were introduced. The earlier single-run
+performance stop was cleared in review; no new stop condition arose.
+
+**Final validation (2026-11-02).**
+
+- `.venv-dev/bin/python -m pytest tests -q`: **1855 passed, 1 skipped**,
+  2 subtests passed. The opt-in subprocess RSS check is skipped; all 424
+  Stage 0 tests remain unchanged and pass. Access tracing stays active.
+- `tox -e py312`: **1853 passed, 3 skipped**, 2 subtests passed. Its additional
+  skips are the two optional Tiled integration checks.
+- `tox -e lint`, `tox -e docs`, and `tox -e manifest`: **passed**. Generated
+  reference checks are current; Sphinx builds with warnings treated as errors;
+  tracked files and the source distribution match.
+- MoDaCor-examples `tests DLS/I22/tests`, with this branch's `src` on PYTHONPATH:
+  **23 passed**. The examples checkout and its pre-existing user changes were
+  left untouched; pytest cache files were directed outside that repository.
+- Work is local only; nothing was pushed. `auxiliary/` remains untracked and
+  is absent from the implementation commits. No rebase conflict or numerical
+  stop condition occurred, and the refined paired performance guard passes.
+
 **Review log.**
 
 - **Classification (2026-10-31): approved, with scope decisions.** Commit
@@ -2075,6 +2150,28 @@ explicitly limited to the completed helper refactor.
     shared component names before changing anything.
   - The proposed `modules/helpers/quantities.scalar_in_units` (moved and
     generalized, no parallel helper) is approved.
+- **(2026-11-02): performance stop cleared.** The 12.7% indexed-averaging
+  slowdown was single-run noise: the run's minimum was 98.0 ms against a
+  median of 107.8 ms, and none of the later commits touch `IndexedAverager`.
+  Alternating runs gave 95.6–98.1 ms on v1.16.0 and 95.8–97.0 ms on the branch.
+- **(2026-11-02): approved.** Commits `75222f1` … `6742adb`, rebased onto
+  v1.16.1.
+  - Re-ran: full suite **1855 passed, 1 skipped**; tox `py312` **1853 passed,
+    3 skipped**; `lint` and `docs` pass.
+  - Identical results against v1.16.1:
+    - the full I22 USAXS pipeline on real data (two samples, 44 bundles):
+      all 267 BaseData, signal and every uncertainty component, match at
+      rtol 1e-12;
+    - all 67 output arrays of the R08 benchmark cases match.
+  - Alternating timings against v1.16.1, two pairs: reductions, indexed
+    averaging, integration and both capillary steps in `exact` mode are
+    within ±1%. `SubtractInterpolated1D` takes +0.22 ms per call, as accepted.
+  - `models` gains `statistics` and `reduction`, and extends `integration`,
+    `uncertainty` and `attenuation`; the package-boundary test passes.
+    `modules/helpers/statistics.py` is removed without a re-export (no
+    external users).
+  - The capillary residual keeps the R0.4 legacy-fold INFO log when a
+    global-only mapping becomes named.
 
 ---
 

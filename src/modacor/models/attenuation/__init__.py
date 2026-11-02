@@ -13,6 +13,7 @@ from modacor.models.attenuation.concentric_cylinder import (
     attenuation_factors_for_phase_at_detectors,
     beam_chord_quadrature,
     direct_beam_transmission,
+    sample_container_mu_derivative,
     uniform_cross_section_quadrature,
 )
 from modacor.models.attenuation.flat_plate import (
@@ -29,6 +30,7 @@ __all__ = [
     "attenuation_factors_for_phase_at_detectors",
     "beam_chord_quadrature",
     "direct_beam_transmission",
+    "sample_container_mu_derivative",
     "flat_plate_relative_attenuation",
     "flat_plate_relative_attenuation_derivative",
     "gaussian_beam_profile",

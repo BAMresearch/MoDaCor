@@ -8,6 +8,7 @@ __all__ = [
     "attenuation_factors_for_phase_at_detectors",
     "beam_chord_quadrature",
     "direct_beam_transmission",
+    "sample_container_mu_derivative",
     "uniform_cross_section_quadrature",
 ]
 __version__ = "20260906.1"
@@ -624,3 +625,26 @@ def adaptive_attenuation_factors_on_grid(
         exact_fallback_pixel_count=len(evaluator.fallback_indices),
         max_accepted_validation_relative_error=evaluator.maximum_accepted_relative_error,
     )
+
+
+def sample_container_mu_derivative(
+    filled_signal: np.ndarray,
+    empty_signal: np.ndarray,
+    sample_factor: np.ndarray,
+    sample_factor_mu_derivative: np.ndarray,
+    wall_scale: np.ndarray,
+    wall_filled_mu_derivative: np.ndarray,
+    wall_empty_factor: np.ndarray,
+) -> np.ndarray:
+    """Differentiate the complete sample/container expression for one shared mu.
+
+    The same sample attenuation parameter affects the numerator and denominator;
+    this contraction intentionally retains their correlation.
+    """
+    wall_scale_mu_derivative = wall_filled_mu_derivative / wall_empty_factor
+    numerator = filled_signal - wall_scale * empty_signal
+    corrected_mu_derivative = (
+        -wall_scale_mu_derivative * empty_signal / sample_factor
+        - numerator * sample_factor_mu_derivative / sample_factor**2
+    )
+    return corrected_mu_derivative
