@@ -204,12 +204,12 @@ def _json_ready(value: Any) -> Any:
     if hasattr(value, "to_dict") and callable(getattr(value, "to_dict")):
         try:
             return _json_ready(value.to_dict())
-        except Exception:  # pragma: no cover - defensive
+        except (TypeError, ValueError):
             pass
     if hasattr(value, "item") and callable(getattr(value, "item")):
         try:
             return _json_ready(value.item())
-        except Exception:  # pragma: no cover - defensive
+        except (TypeError, ValueError):
             pass
     return str(value)
 

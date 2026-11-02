@@ -2251,8 +2251,11 @@ change to the server's API error responses (`tests/server` unchanged).
   `signal_source` with `ValueError("signal_source is required")` before I/O.
   This fixes the former NoneType.split AttributeError; it is not an additional
   broad handler in the baseline count.
-- Implementation/validation continues in the I/O/runner/client and
-  modules/dataclasses commits. Final focused/full/tox/example results follow.
+- Server/client validation after boundary comments/logging: **110 passed**,
+  with existing assertions unchanged. I/O/runner/client validation: **320 passed**.
+  Added `tests/io/test_io_exception_propagation.py`: one injected RuntimeError
+  regression per narrowed HDF/Tiled handler, plus expected fallback cases.
+- Implementation/validation continues in the modules/dataclasses commit. Final focused/full/tox/example results follow.
 
 
 **Review log.** _(reviewer)_

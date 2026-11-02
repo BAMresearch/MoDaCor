@@ -12,6 +12,7 @@ __status__ = "Development"  # "Development", "Production"
 # end of header and standard imports
 
 import json
+import logging
 from graphlib import TopologicalSorter
 
 # quick hash at node-level (UI can show "config changed" without reading trace events)
@@ -33,6 +34,8 @@ from .pipeline_schema import StepOrigin, expand_pipeline_yaml
 from .process_step_registry import DEFAULT_PROCESS_STEP_REGISTRY, ProcessStepRegistry
 
 __all__ = ["Pipeline"]
+
+logger = logging.getLogger(__name__)
 
 
 @define
@@ -811,6 +814,8 @@ class Pipeline:
                     }
                 )
             except Exception as exc:
+                # Diagnostic boundary: arbitrary renderer errors must not abort processing.
+                logger.exception("Failed to render trace for step %s", step_id)
                 messages.append(
                     {
                         "kind": "rendered_trace_error",
@@ -843,6 +848,8 @@ class Pipeline:
                     }
                 )
             except Exception as exc:
+                # Diagnostic boundary: arbitrary YAML representers must not abort processing.
+                logger.exception("Failed to render configuration for step %s", step_id)
                 messages.append(
                     {
                         "kind": "rendered_config_error",

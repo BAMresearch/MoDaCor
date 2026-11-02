@@ -258,7 +258,7 @@ class TiledSource(IoSource):
             try:
                 records = to_records(index=False)
                 return np.asarray(records)
-            except Exception:  # noqa: BLE001 - best-effort conversion
+            except (TypeError, ValueError):
                 pass
 
         to_numpy = getattr(data_obj, "to_numpy", None)
@@ -275,7 +275,7 @@ class TiledSource(IoSource):
         if values is not None:
             try:
                 return np.asarray(values)
-            except Exception:  # noqa: BLE001
+            except (TypeError, ValueError):
                 pass
 
         return np.asarray(data_obj)
@@ -338,7 +338,7 @@ class TiledSource(IoSource):
         if callable(structure):
             try:
                 return structure()
-            except Exception as exc:  # noqa: BLE001
+            except NotImplementedError as exc:
                 self.logger.debug(f"Failed to obtain structure: {exc}")
                 return None
         return None

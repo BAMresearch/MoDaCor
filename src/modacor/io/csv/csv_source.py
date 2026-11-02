@@ -125,8 +125,8 @@ class CSVSource(IoSource):
 
         try:
             self._data_cache = self.method(self.resource_location, **self.iosource_method_kwargs)
-        except Exception as exc:  # noqa: BLE001
-            self.logger.error(f"Error while loading CSV data from {self.resource_location}: {exc}")
+        except Exception:  # Configurable-loader boundary: log any failure and re-raise unchanged.
+            self.logger.logger.exception("Error while loading CSV data from %s", self.resource_location)
             raise
 
         if self._data_cache is None:
