@@ -92,11 +92,11 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | done |
 | R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | done |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | approved |
-| R09 | Narrow broad `except Exception` handlers | robustness | M | medium | in review |
+| R09 | Narrow broad `except Exception` handlers | robustness | M | medium | approved |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | item 1 done; 2–3 open |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | done |
-| R14 | The `required` argument flag is never enforced | contract | S | medium | in review |
+| R14 | The `required` argument flag is never enforced | contract | S | medium | approved |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
 | R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
 | R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | done (v1.15.0, PR #154) |
@@ -2271,6 +2271,14 @@ change to the server's API error responses (`tests/server` unchanged).
 
 **Review log.** _(reviewer)_
 
+- **(2026-11-02): approved.** All 30 handlers classified: 19 deliberate
+  boundaries (kept, commented, traceback logged or kept in the run record)
+  and 11 narrowed with `from exc` chaining. Spot-checked that the narrowed
+  types match what the guarded calls raise (for example `scalar_in_units`
+  wraps Pint errors in `ValueError`). Propagation tests cover the narrowed
+  groups. No existing server or client test changed; a new test shows the R14
+  error passes through the existing registration and run error codes.
+
 ---
 
 ## R10 — Conventions
@@ -2327,6 +2335,10 @@ change to the server's API error responses (`tests/server` unchanged).
 
 
 **Review log.** _(reviewer)_
+
+- **(2026-11-02): item 1 approved.** `_ResolvedSampleMu` is a frozen, slotted
+  attrs class; the records in `models/` stay dataclasses, as allowed. Items 2
+  and 3 wait for maintainer decisions.
 
 ---
 
@@ -2527,6 +2539,24 @@ been checked.
 
 
 **Review log.** _(reviewer)_
+
+- **(2026-11-02): stop at the example pipelines; conditional inputs approved.**
+  `PixelCoordinates3D` and `XSGeometryFromPixelCoordinates` accept either
+  `detector_frame` (and `sample_z_override`) or their individual sources, so
+  eight arguments are conditionally required. With neither form, the steps
+  failed with `AttributeError: 'NoneType' object has no attribute 'split'`.
+  They now extend `missing_required_arguments()` with their either/or rule,
+  and `basedata_from_sources` rejects a missing `signal_source` clearly.
+- **(2026-11-02): approved.** Rule: `required` means the argument has no usable
+  default. The describer rejects a usable default for a required argument; 16
+  such arguments became optional and keep their defaults. `execute()` and both
+  pipeline-loading paths report every missing input, with step class and id,
+  through one `validate_required_arguments()` method (reviewer fixup).
+  - Re-ran: full suite **1993 passed, 1 skipped**; tox `py312` **1991 passed,
+    3 skipped**; `lint` and `docs` pass; MoDaCor-examples tests 23 passed.
+  - Loaded all 12 example pipeline YAMLs with the branch: 10 load; the two
+    B21 pipelines fail identically on `main`, because their custom steps are
+    registered by the notebooks, not by MoDaCor.
 
 ---
 
