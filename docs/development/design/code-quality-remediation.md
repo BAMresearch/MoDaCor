@@ -1643,10 +1643,10 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
 
 ## R08 — Audit remaining unit stripping in modules
 
-**Status:** in progress on `quality-remediation-r08b`, based on v1.16.0
-(`0d0839b`). Stage 0 and R18 have landed; the identical-result Part B rows
-and Part C kernel extractions resume under the 2026-11-02 brief. The ten
-missing-uncertainty rows remain in R16.
+**Status:** implementation complete on `quality-remediation-r08b` (2026-11-02),
+rebased without conflicts onto v1.16.1 (`835df4c`). Numerical comparisons and
+performance baselines remain v1.16.0 (`0d0839b`). Final validation is recorded
+below. The ten missing-uncertainty rows remain in R16.
 
 **Inventory (2026-10-31, after R07).** A pattern search (`.magnitude`,
 `.m_as(`, `np.asarray(… .signal)`, `float(… .signal)`, `.to(…).magnitude`)
@@ -2060,6 +2060,60 @@ explicitly limited to the completed helper refactor.
 - **C / attenuation:** moved the complete-expression shared-mu derivative from CapillarySampleContainerCorrection._add_correlated_sample_mu_uncertainties (v1.16.0 lines 323–329) into models.attenuation.concentric_cylinder.sample_container_mu_derivative, exported through models.attenuation. The same operations and order retain the intentional numerator/denominator correlation; the adapter retains names, masking and the Stage 0 mapping combiner. Two focused cases check release values, adapter outputs and exact correlated cancellation. Suite: 1354 passed; all 266 release calls / 685 component arrays match at rtol=1e-12, atol=0, NaNs equal.
 
 - **Performance review and resumption:** the initial final indexed median (107.750 ms versus post-B 95.566 ms, +12.7%) triggered the former single-run stop. Its minimum was 98.03 ms, the immediate post-extraction check was 96.043 ms, and no subsequent step changed IndexedAverager. The maintainer identified measurement noise after three reviewer-alternated checks (release 95.6–98.1 ms, branch 95.8–97.0 ms) and authorized resumption. The refined guard uses at least three alternating release/branch pairs and stops only for a >10% slowdown in every pair; the accepted interpolation cost remains separate. Fresh paired results and final checks follow below.
+
+**Final alternating performance check (2026-11-02).**
+
+Three complete release/branch pairs were measured in alternating subprocesses,
+with CPU-heavy validation held until all pairs finished. Each case has three
+warmups followed by seven measured `calculate()` calls per subprocess; fresh
+input containers are prepared outside the timed section. The median column
+uses all 21 samples per version, and the minimum column is their minimum. The
+last column compares each pair's seven-sample medians. Release is v1.16.0;
+branch includes the conflict-free rebase onto v1.16.1. The refined stop rule
+requires >10% slowdown in every pair for a Part C case. It did not trigger.
+The accepted Part B interpolation cost is +0.229 ms at the aggregate median.
+
+| Case | v1.16.0 median / minimum (ms) | Branch median / minimum (ms) | Paired median changes |
+| --- | ---: | ---: | --- |
+| reduction_scalar | 4.302 / 4.242 | 4.303 / 4.238 | +0.7%, +0.5%, +0.3% |
+| reduction_weighted | 5.377 / 5.334 | 5.362 / 5.320 | -0.7%, -0.3%, +1.3% |
+| indexed_1000x1000 | 95.791 / 95.579 | 95.788 / 95.201 | -0.5%, +0.9%, +0.1% |
+| integration_2000 | 0.179 / 0.172 | 0.180 / 0.169 | -0.8%, -4.0%, +13.2% |
+| capillary_self_100x100_exact | 777.525 / 772.767 | 777.301 / 771.051 | -0.2%, -0.1%, +0.1% |
+| capillary_composite_100x100_exact | 2224.673 / 2200.259 | 2217.099 / 2205.706 | -0.2%, -0.8%, -0.3% |
+| subtract_interpolated_2000 | 0.306 / 0.298 | 0.535 / 0.520 | +89.0%, +72.9%, +71.7% |
+
+Every pair's 67 stored benchmark nominal/component arrays agrees with release
+at `rtol=1e-12, atol=0`, NaNs equal (201 array comparisons across the three
+pairs). The post-rebase public-step harness also agrees on 266 calls and 685
+named uncertainty arrays, including the original 219 calls; the focused
+module/dataclass/models/boundary run passed 1444 tests.
+
+All 33 classified Part C rows are covered by the destination kernels above.
+Input coercion/broadcasting and mask selection stay at the adapters where they
+form the numerical boundary; no uncertainty or statistical policy was changed.
+The estimator-collision row delegates to the existing shared mapping combiner
+and producer transition rather than introducing another quadrature kernel.
+ConvertUnits, the AST allow-list and access-trace machinery are unchanged from
+origin/main; no trace opt-outs were introduced. The earlier single-run
+performance stop was cleared by maintainer review; no new stop condition arose.
+
+**Final validation (2026-11-02).**
+
+- `.venv-dev/bin/python -m pytest tests -q`: **1855 passed, 1 skipped**,
+  2 subtests passed. The opt-in subprocess RSS check is skipped; all 424
+  Stage 0 tests remain unchanged and pass. Access tracing stays active.
+- `tox -e py312`: **1853 passed, 3 skipped**, 2 subtests passed. Its additional
+  skips are the two optional Tiled integration checks.
+- `tox -e lint`, `tox -e docs`, and `tox -e manifest`: **passed**. Generated
+  reference checks are current; Sphinx builds with warnings treated as errors;
+  tracked files and the source distribution match.
+- MoDaCor-examples `tests DLS/I22/tests`, with this branch's `src` on PYTHONPATH:
+  **23 passed**. The examples checkout and its pre-existing user changes were
+  left untouched; pytest cache files were directed outside that repository.
+- Work is local only; nothing was pushed. `auxiliary/` remains untracked and
+  is absent from the implementation commits. No rebase conflict or numerical
+  stop condition occurred, and the refined paired performance guard passes.
 
 **Review log.**
 
