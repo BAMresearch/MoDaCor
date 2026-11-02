@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose, assert_array_equal
 
 from modacor import ureg
@@ -120,3 +121,39 @@ def test_subtract_interpolated_dependency_contract_is_exact():
         },
         processing_writes={"sample.corrected", "sample.remapped", "sample.invalid"},
     )
+
+
+@pytest.mark.parametrize("component", ["propagate_to_all", "background", None])
+@pytest.mark.parametrize("mode", ["linear", "nearest"])
+def test_remapping_matches_release_formula_for_global_named_and_empty(component, mode):
+    from modacor.models.interpolation import remap_coefficients_1d
+
+    sample_axis = np.array([-1.0, 0.0, 0.5, 1.0, 2.0, 3.0])
+    background_axis = np.array([0.0, 1.0, 2.0])
+    values = np.array([2.0, 4.0, 8.0])
+    sigma = np.array([0.1, 0.2, 0.3])
+    pd = ProcessingData()
+    pd["sample"] = _curve(sample_axis, np.full(sample_axis.shape, 10.0))
+    pd["background"] = _curve(
+        background_axis, values, signal_uncertainties={} if component is None else {component: sigma}
+    )
+    step = SubtractInterpolated1D(
+        processing_data=pd,
+        configuration={
+            "with_processing_keys": ["sample", "background"],
+            "mode": mode,
+            "remapped_background_key": "remapped",
+        },
+    )
+    step.calculate()
+    left, right, lw, rw, valid = remap_coefficients_1d(background_axis, sample_axis, mode=mode, max_gap=None)
+    expected = lw * values[left] + rw * values[right]
+    expected[~valid] = np.nan
+    actual = pd["sample"]["remapped"]
+    assert_allclose(actual.signal, expected, rtol=1e-12, atol=0, equal_nan=True)
+    assert actual.uncertainties.keys() == (set() if component is None else {component})
+    if component is not None:
+        expected_sigma = np.sqrt((lw * sigma[left]) ** 2 + (rw * sigma[right]) ** 2)
+        expected_sigma[~valid] = np.nan
+        assert_allclose(actual.uncertainties[component], expected_sigma, rtol=1e-12, atol=0, equal_nan=True)
+    assert actual.axes == []

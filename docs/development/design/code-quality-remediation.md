@@ -2043,6 +2043,8 @@ explicitly limited to the completed helper refactor.
 
 - **B1:** relocated FindScaleFactor1D `_combined_sigma` (v1.16.0 lines 40–48). Uses `quadrature_aggregator`, retaining scalar/broadcast output shapes and the empty-mapping 1.0 fallback. Three focused cases cover empty, global-only and named/broadcast sigmas. Focused module/dataclass suite: 1314 passed; all 266 release calls / 685 component arrays match at rtol=1e-12, atol=0 (including the original 219 calls).
 
+- **B2:** relocated SubtractInterpolated1D remapping (v1.16.0 lines 208–231). Both indexed branches now use BaseData arithmetic and exact dimensionless weight containers. Existing coefficient/index selection, invalid-output NaNs and output metadata remain unchanged. Six focused cases compare the release formula for linear/nearest modes with global-only, named and empty uncertainty mappings (including exact points and out-of-range points). Suite: 1320 passed; 266 release calls / 685 component arrays match.
+
 **Review log.**
 
 - **Classification (2026-10-31): approved, with scope decisions.** Commit
