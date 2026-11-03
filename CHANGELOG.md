@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## v1.17.0 (2026-11-02)
+
+### Bug fixes
+
+* fix: narrow scientific and container exception handlers ([`d7d613f`](https://github.com/BAMresearch/MoDaCor/commit/d7d613f7ae7c8ad38e1fd72104e8601a19bc1e91))
+
+* fix: narrow I/O conversion handlers and log lifecycle failures ([`f9792c3`](https://github.com/BAMresearch/MoDaCor/commit/f9792c38c172cc285072deab6d879ec4278eab65))
+
+* fix: preserve tracebacks at server exception boundaries ([`903a1a2`](https://github.com/BAMresearch/MoDaCor/commit/903a1a2912238cf2b46d30fbf4696bc8b944df88))
+
+### Documentation
+
+* docs: record the R14, R09 and R10 reviews in the remediation tracker ([`1491147`](https://github.com/BAMresearch/MoDaCor/commit/14911477aea5e45e8dcc79e6c40923f8d1033114))
+
+* docs: record the R08 review in the remediation tracker ([`e647b28`](https://github.com/BAMresearch/MoDaCor/commit/e647b28755f35c7bdfd33076d3bd9c21863ae42d))
+
+* docs: record R08 validation and alternating timings ([`6742adb`](https://github.com/BAMresearch/MoDaCor/commit/6742adb82007049146da9428c8ffc56812c80bac))
+
+### Features
+
+* feat: enforce required step arguments ([`15ad6b7`](https://github.com/BAMresearch/MoDaCor/commit/15ad6b79d7ea2900849e67dc205aae9369739067))
+
+### Refactoring
+
+* refactor: use attrs for the resolved sample-mu record ([`6365b91`](https://github.com/BAMresearch/MoDaCor/commit/6365b91f8b0470103f0377760b4d39ffda56aaa4))
+
+* refactor: move the shared-mu derivative into models.attenuation ([`49e5a1c`](https://github.com/BAMresearch/MoDaCor/commit/49e5a1c0cb33f2ae4c4b68253762866000d6a625))
+
+* refactor: move sensitivity contraction into models.uncertainty ([`a2a51c9`](https://github.com/BAMresearch/MoDaCor/commit/a2a51c91770a581aa1d5fa44c17ddb1e992f9f1a))
+
+* refactor: move integration grouping and quadrature kernels into models.integration ([`de21c72`](https://github.com/BAMresearch/MoDaCor/commit/de21c722f69528417ff31e4681e305f718477c7d))
+
+* refactor: move axis and grouped reduction kernels into models.reduction ([`d31279a`](https://github.com/BAMresearch/MoDaCor/commit/d31279abfb9ab0ee28f0e7c37c335590be327dc3))
+
+* refactor: move weighted scatter kernels into models.statistics ([`33056a2`](https://github.com/BAMresearch/MoDaCor/commit/33056a209e92896ef07d42d357e68adff68e344e))
+
+* refactor: form the capillary residual by BaseData division ([`c0ba580`](https://github.com/BAMresearch/MoDaCor/commit/c0ba58093b69930b7530214549b5fd03ee5224bd))
+
+* refactor: derive the xraylib linear attenuation coefficient with units ([`22b00ae`](https://github.com/BAMresearch/MoDaCor/commit/22b00aebc79967a7e4bfe11826dcd766ea234733))
+
+* refactor: remap backgrounds with BaseData arithmetic in SubtractInterpolated1D ([`7d8ac43`](https://github.com/BAMresearch/MoDaCor/commit/7d8ac43ffc902ffa1e4d8674f51c4a0e5453b265))
+
+* refactor: combine FindScaleFactor1D sigmas with the shared quadrature aggregator ([`75222f1`](https://github.com/BAMresearch/MoDaCor/commit/75222f1c3688ac1e6c57688e5b268bcaacb09303))
+
 ## v1.16.1 (2026-11-02)
 
 ### Bug fixes
