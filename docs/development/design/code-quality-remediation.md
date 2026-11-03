@@ -2316,7 +2316,7 @@ change to the server's API error responses (`tests/server` unchanged).
   when another item touches them, plus the module template and the files this
   item edits for references; no mass rewrite.
 - **Item 3, references: scientific steps only.** Of 42 public steps, 12 cite
-  the 2013 review, 4 a specific paper and 2 the NeXus mask convention; 25 are
+  the 2013 review, 3 a specific paper and 2 the NeXus mask convention; 25 are
   empty (the count of 8 above predates later steps). The 12 empty scientific
   steps get a reference: AngleToQ, AttenuatorPlateCorrection,
   DetectorEfficiencyCorrection, FindCenterOfMass1D,
@@ -2839,14 +2839,22 @@ finite-difference test.
   shared calibration scale, left for Stage 2 source responses. Each module's
   documentation states the fixed-abscissa model. The intended end state, with
   a separate Q uncertainty and smearing profile, is R19.
-- **Row 10, metadata mean (`prepare_static_scalar`): SEM plus reduced
-  components.** Each configured measurement component is carried through the
-  weighted mean as independent per-sample errors,
-  `σ_mean = sqrt(Σ w_i² σ_i²) / Σ w_i` (σ/√n_eff for uniform σ), using the
-  existing weighted-mean reduction. The SEM of the scatter is added under the
-  jitter key as now. A configured component named like the jitter key is a
-  configuration conflict and raises. Outputs change only where array-valued
-  metadata has configured uncertainty sources.
+- **Row 10, metadata mean (`prepare_static_scalar`): SEM plus unreduced
+  components** (revised in review on 2026-11-03; first decided as reduced
+  components). Each configured component is carried as the weighted mean of its
+  σ, `σ_mean = Σ w_i σ_i / Σ w_i`, so averaging frames does not shrink it. The
+  SEM of the scatter is added under the jitter key as now. A configured
+  component named like the jitter key is a configuration conflict and raises.
+  Outputs change only where array-valued metadata has configured uncertainty
+  sources.
+
+  Reason for the revision: in the MOUSE example data, every frame carries the
+  same wavelength (0.15406 nm) and the same `wavelength_error` (0.005 nm).
+  The reduced rule gave 0.005/√n: 0.0022 nm for a 5-frame file and
+  0.00125 nm for a 16-frame file. The uncertainty of a fixed source property
+  would then depend on how many frames were recorded. Before R16 the term was
+  dropped entirely: the frames do not scatter, so the SEM, and with it the
+  wavelength uncertainty, was 0.
 
 **Implementation notes (2026-11-03).**
 
