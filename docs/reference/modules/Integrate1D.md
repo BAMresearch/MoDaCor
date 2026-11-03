@@ -7,7 +7,7 @@ Integrate sampled 1D BaseData while propagating coordinate units and independent
 - **Import path:** `modacor.modules.base_modules.integrate_1d.Integrate1D`
 - **Source:** [`src/modacor/modules/base_modules/integrate_1d.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/integrate_1d.py)
 - **Module ID:** Integrate1D
-- **Module version:** 20260929.2
+- **Module version:** 20261103.1
 - **Keywords:** integrate, quadrature, trapezoid, simpson, 1D
 
 ## Required data keys
@@ -56,4 +56,4 @@ _No data-key roles declared._
 | `with_processing_keys` | list | Yes | - | - | DataBundles integrated over their common valid domain. |
 
 ## Notes
-The shared coordinate may be nonuniform. It must be monotonic unless sort_axis is enabled. Repeated coordinates are rejected by default; duplicate_axis='mean' replaces each run with its arithmetic mean signal and independently propagated uncertainty of that mean. Invalid or masked samples in any input are omitted from every integral.
+The shared coordinate may be nonuniform. It must be monotonic unless sort_axis is enabled. Repeated coordinates are rejected by default; duplicate_axis='mean' replaces each run with its arithmetic mean signal and independently propagated uncertainty of that mean. Invalid or masked samples in any input are omitted from every integral. The axis is treated as exact (fixed abscissae); axis uncertainties are not propagated.

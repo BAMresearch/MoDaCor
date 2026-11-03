@@ -30,7 +30,7 @@ from modacor.modules.helpers.scattering.photon_energy import as_photon_wavelengt
 
 logger = MessageHandler(name=__name__)
 
-__version__ = "20261103.1"
+__version__ = "20261103.2"
 __all__ = ["XSGeometryFromPixelCoordinates"]
 
 
@@ -184,8 +184,11 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         ],
         step_doc="Compute Q-vector components and angles from lab-frame pixel coordinates.",
         step_note=(
-            "Photon metadata is loaded from IoSources. Energy or wavelength representation is inferred "
-            "from its units and converted to wavelength with uncertainty-aware BaseData arithmetic."
+            "Photon metadata is loaded from IoSources. Energy or wavelength representation is inferred from its "
+            "units and converted to wavelength with uncertainty-aware BaseData arithmetic. Psi has no "
+            "uncertainty. Geometry uncertainties are shared calibration terms that the current per-key model "
+            "would treat as independent; propagation awaits shared contributions in later stages of the "
+            "uncertainty specification."
         ),
     )
 

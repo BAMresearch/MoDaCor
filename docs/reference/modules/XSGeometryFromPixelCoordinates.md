@@ -7,7 +7,7 @@ Compute Q-vector components and angles from lab-frame pixel coordinates.
 - **Import path:** `modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordinates.XSGeometryFromPixelCoordinates`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/xs_geometry_from_pixel_coordinates.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/xs_geometry_from_pixel_coordinates.py)
 - **Module ID:** XSGeometryFromPixelCoordinates
-- **Module version:** 20261103.1
+- **Module version:** 20261103.2
 - **Keywords:** geometry, Q, Psi, TwoTheta, Solid Angle, Omega, scattering
 
 ## Required data keys
@@ -93,4 +93,4 @@ _No data-key roles declared._
 | `sample_z_units_source` | str or NoneType | No | - | - | IoSources key for sample z-position units. |
 
 ## Notes
-Photon metadata is loaded from IoSources. Energy or wavelength representation is inferred from its units and converted to wavelength with uncertainty-aware BaseData arithmetic.
+Photon metadata is loaded from IoSources. Energy or wavelength representation is inferred from its units and converted to wavelength with uncertainty-aware BaseData arithmetic. Psi has no uncertainty. Geometry uncertainties are shared calibration terms that the current per-key model would treat as independent; propagation awaits shared contributions in later stages of the uncertainty specification.

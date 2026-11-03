@@ -162,3 +162,16 @@ particular, broadcasting and repeated use of a correction do not establish
 independence. Systematic contributions must not be combined in quadrature merely
 for convenience. Choose uncertainty models and explicit combinations to match the
 measurement, and retain diagnostic outputs where a stronger model is needed.
+
+Known omissions in scientific steps:
+
+- `AttenuatorPlateCorrection` and `DetectorEfficiencyCorrection` do not propagate
+  CosAlpha uncertainty into their correction factors. `FlatPlateSelfAbsorptionCorrection`
+  propagates transmission uncertainty but omits CosAlpha uncertainty.
+- `PolarizationCorrection` omits TwoTheta and Psi uncertainties;
+  `XSGeometryFromPixelCoordinates` assigns no uncertainty to Psi. These geometry
+  uncertainties are shared calibration terms that the current per-key model
+  would treat as independent. Their propagation waits for shared contributions
+  and source responses in later stages of the uncertainty specification.
+- `Integrate1D`, `FindScaleFactor1D`, and `SubtractInterpolated1D` treat their axes
+  as exact (fixed abscissae); axis uncertainties are not propagated.

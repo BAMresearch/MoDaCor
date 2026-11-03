@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 __all__ = ["DetectorEfficiencyCorrection"]
-__version__ = "20261102.1"
+__version__ = "20261103.1"
 
 from pathlib import Path
 
@@ -189,8 +189,11 @@ class DetectorEfficiencyCorrection(ProcessStep):
         step_keywords=["detector", "efficiency", "attenuation", "absorption"],
         step_doc="Divide signal by angle-dependent detector absorption efficiency.",
         step_note=(
-            "Material parameters can be provided as direct values or *_source paths. "
-            "xraylib is used for material lookup unless linear_attenuation_coefficient is configured directly."
+            "Material parameters can be provided as direct values or *_source paths. xraylib is used for material"
+            " lookup unless linear_attenuation_coefficient is configured directly. The correction factor carries "
+            "no uncertainty from CosAlpha. Geometry uncertainties are shared calibration terms that the current "
+            "per-key model would treat as independent; propagation awaits shared contributions in later stages of"
+            " the uncertainty specification."
         ),
     )
 

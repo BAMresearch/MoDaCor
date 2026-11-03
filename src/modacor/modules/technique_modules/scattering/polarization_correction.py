@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 __all__ = ["PolarizationCorrection"]
-__version__ = "20261102.2"
+__version__ = "20261103.1"
 
 from pathlib import Path
 from typing import Any
@@ -101,6 +101,10 @@ class PolarizationCorrection(ProcessStep):
 
             mode='stokes' is reserved for a future implementation once the
             Stokes reference-frame convention has been fixed.
+
+            No uncertainty from TwoTheta or Psi is propagated. Geometry uncertainties are shared
+            calibration terms that the current per-key model would treat as independent; propagation
+            awaits shared contributions in later stages of the uncertainty specification.
         """,
     )
 

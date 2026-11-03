@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["Integrate1D"]
-__version__ = "20260929.2"
+__version__ = "20261103.1"
 
 from pathlib import Path
 
@@ -76,15 +76,14 @@ class Integrate1D(ProcessStep):
         },
         step_keywords=["integrate", "quadrature", "trapezoid", "simpson", "1D"],
         step_doc=(
-            "Integrate sampled 1D BaseData while propagating coordinate units and "
-            "independent uncertainty components."
+            "Integrate sampled 1D BaseData while propagating coordinate units and independent uncertainty components."
         ),
         step_note=(
-            "The shared coordinate may be nonuniform. It must be monotonic unless sort_axis "
-            "is enabled. Repeated coordinates are rejected by default; duplicate_axis='mean' "
-            "replaces each run with its arithmetic mean signal and independently propagated "
-            "uncertainty of that mean. Invalid or masked samples in any input are omitted from "
-            "every integral."
+            "The shared coordinate may be nonuniform. It must be monotonic unless sort_axis is enabled. Repeated "
+            "coordinates are rejected by default; duplicate_axis='mean' replaces each run with its arithmetic "
+            "mean signal and independently propagated uncertainty of that mean. Invalid or masked samples in any "
+            "input are omitted from every integral. The axis is treated as exact (fixed abscissae); axis "
+            "uncertainties are not propagated."
         ),
     )
 

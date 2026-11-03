@@ -7,7 +7,7 @@ Correct angle-dependent self-absorption for a transmission-normalized flat sampl
 - **Import path:** `modacor.modules.technique_modules.scattering.flat_plate_self_absorption_correction.FlatPlateSelfAbsorptionCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/flat_plate_self_absorption_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/flat_plate_self_absorption_correction.py)
 - **Module ID:** FlatPlateSelfAbsorptionCorrection
-- **Module version:** 20261102.1
+- **Module version:** 20261103.1
 - **Keywords:** sample, self absorption, flat plate, transmission
 
 ## Required data keys
@@ -60,4 +60,4 @@ Correct angle-dependent self-absorption for a transmission-normalized flat sampl
 | `with_processing_keys` | list | No | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
 
 ## Notes
-For s=1/cos(2theta), x=(s-1) ln(T), the relative attenuation is expm1(x)/x. The expression is the depth integral for scattering generated uniformly through a plate and is not the same as transmission through a separate downstream attenuator.
+For s=1/cos(2theta), x=(s-1) ln(T), the relative attenuation is expm1(x)/x. The expression is the depth integral for scattering generated uniformly through a plate and is not the same as transmission through a separate downstream attenuator. Transmission uncertainties are propagated; CosAlpha uncertainty is not. Geometry uncertainties are shared calibration terms that the current per-key model would treat as independent; propagation awaits shared contributions in later stages of the uncertainty specification.

@@ -7,7 +7,7 @@ Remap a 1D background by nearest neighbour or linear interpolation, then subtrac
 - **Import path:** `modacor.modules.base_modules.subtract_interpolated_1d.SubtractInterpolated1D`
 - **Source:** [`src/modacor/modules/base_modules/subtract_interpolated_1d.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/subtract_interpolated_1d.py)
 - **Module ID:** SubtractInterpolated1D
-- **Module version:** 20260929.1
+- **Module version:** 20261103.1
 - **Keywords:** subtract, background, nearest, linear, remap, 1D
 
 ## Required data keys
@@ -59,4 +59,4 @@ _No data-key roles declared._
 | `with_processing_keys` | list | Yes | - | - | Two processing keys: sample/minuend then background/subtrahend. |
 
 ## Notes
-Nearest mode always chooses the nearest valid background coordinate and has no tolerance setting. Neither mode extrapolates: sample points outside the background domain are invalidated. max_gap applies only to linear bracket width. Linear uncertainties are propagated from interpolation coefficients before BaseData subtraction.
+Nearest mode always chooses the nearest valid background coordinate and has no tolerance setting. Neither mode extrapolates: sample points outside the background domain are invalidated. max_gap applies only to linear bracket width. Linear uncertainties are propagated from interpolation coefficients before BaseData subtraction. The axis is treated as exact (fixed abscissae); axis uncertainties are not propagated.

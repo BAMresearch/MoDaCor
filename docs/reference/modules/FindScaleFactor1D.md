@@ -7,7 +7,7 @@ Compute a normal robust-fit or uncertainty-weighted lognormal scale between two 
 - **Import path:** `modacor.modules.base_modules.find_scale_factor1d.FindScaleFactor1D`
 - **Source:** [`src/modacor/modules/base_modules/find_scale_factor1d.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/find_scale_factor1d.py)
 - **Module ID:** FindScaleFactor1D
-- **Module version:** 20261002.1
+- **Module version:** 20261103.1
 - **Keywords:** scale, calibration, lognormal, 1D
 
 ## Required data keys
@@ -80,4 +80,4 @@ _No data-key roles declared._
 DOI 10.1107/S1600577513030117
 
 ## Notes
-The fitted scale uncertainty is stored under scale_uncertainty_key. Reduced chi-square is a goodness-of-fit diagnostic; it does not automatically inflate the formal fitted uncertainty.
+The fitted scale uncertainty is stored under scale_uncertainty_key. Reduced chi-square is a goodness-of-fit diagnostic; it does not automatically inflate the formal fitted uncertainty. The axis is treated as exact (fixed abscissae); axis uncertainties are not propagated.
