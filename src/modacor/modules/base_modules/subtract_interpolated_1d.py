@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["SubtractInterpolated1D"]
-__version__ = "20261103.1"
+__version__ = "20261103.2"
 
 from pathlib import Path
 
@@ -93,6 +93,7 @@ class SubtractInterpolated1D(ProcessStep):
             "coefficients before BaseData subtraction. The axis is treated as exact (fixed abscissae); axis "
             "uncertainties are not propagated."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     @staticmethod

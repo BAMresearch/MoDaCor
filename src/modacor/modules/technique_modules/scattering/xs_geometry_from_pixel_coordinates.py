@@ -30,7 +30,7 @@ from modacor.modules.helpers.scattering.photon_energy import as_photon_wavelengt
 
 logger = MessageHandler(name=__name__)
 
-__version__ = "20261103.2"
+__version__ = "20261103.3"
 __all__ = ["XSGeometryFromPixelCoordinates"]
 
 
@@ -190,6 +190,7 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
             "would treat as independent; propagation awaits shared contributions in later stages of the "
             "uncertainty specification."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     output_keys: Tuple[str, ...] = (

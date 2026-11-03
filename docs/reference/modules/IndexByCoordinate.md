@@ -7,7 +7,7 @@ Assign one coordinate value per input point to a one-dimensional bin index.
 - **Import path:** `modacor.modules.base_modules.index_by_coordinate.IndexByCoordinate`
 - **Source:** [`src/modacor/modules/base_modules/index_by_coordinate.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/index_by_coordinate.py)
 - **Module ID:** IndexByCoordinate
-- **Module version:** 20261102.1
+- **Module version:** 20261103.1
 - **Keywords:** indexing, binning, coordinate, reduction
 
 ## Required data keys
@@ -58,6 +58,9 @@ _No fixed data keys declared._
 | `n_bins` | int or NoneType | No | - | - | Generated bin count; defaults to 100 when omitted. |
 | `spacing` | str or NoneType | No | - | - | Generated edge spacing, 'linear' or 'log'; defaults to 'linear'. |
 | `with_processing_keys` | str or list or NoneType | No | - | - | ProcessingData key(s) whose coordinate should be indexed. |
+
+## References
+DOI 10.1107/S1600576717015096
 
 ## Notes
 Bins are left-inclusive and right-exclusive except for the included final right edge. Non-finite and out-of-range coordinates receive index -1. Masks are applied by downstream reducers.

@@ -7,7 +7,7 @@ Find a masked, windowed intensity centroid without assuming a peak shape.
 - **Import path:** `modacor.modules.base_modules.find_center_of_mass_1d.FindCenterOfMass1D`
 - **Source:** [`src/modacor/modules/base_modules/find_center_of_mass_1d.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/find_center_of_mass_1d.py)
 - **Module ID:** FindCenterOfMass1D
-- **Module version:** 20260929.1
+- **Module version:** 20261103.1
 - **Keywords:** centroid, center of mass, peak, beam centre, 1D
 
 ## Required data keys
@@ -69,6 +69,9 @@ _No fixed data keys declared._
 | `signal_key` | str | No | signal | processing_read_basedata_key | Intensity BaseData key. |
 | `width_units` | str or NoneType | No | - | - | Units for half_width and convergence_tolerance; defaults to axis units. |
 | `with_processing_keys` | str or list or NoneType | Yes | - | - | DataBundle key or keys containing peaks to centre. |
+
+## References
+DOI 10.1107/S1600576717015096
 
 ## Notes
 The coarse maximum selects a contiguous valid peak region. After optional baseline subtraction, negative intensities are clipped to zero. Signal and coordinate uncertainty components are propagated separately to the scalar centre.

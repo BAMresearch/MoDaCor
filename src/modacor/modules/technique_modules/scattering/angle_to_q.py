@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["AngleToQ"]
-__version__ = "20261101.1"
+__version__ = "20261103.1"
 
 from pathlib import Path
 
@@ -109,6 +109,7 @@ class AngleToQ(ProcessStep):
             "uncertainty-aware BaseData arithmetic. The angle sign is retained. Q is returned in 1/m; "
             "use ConvertUnits to select output units."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     @staticmethod

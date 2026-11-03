@@ -7,7 +7,7 @@ Apply angle-dependent attenuator plate transmission.
 - **Import path:** `modacor.modules.technique_modules.scattering.attenuator_plate_correction.AttenuatorPlateCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/attenuator_plate_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/attenuator_plate_correction.py)
 - **Module ID:** AttenuatorPlateCorrection
-- **Module version:** 20261103.1
+- **Module version:** 20261103.2
 - **Keywords:** attenuator, plate, attenuation, absorption, transmission
 
 ## Required data keys
@@ -98,6 +98,9 @@ Apply angle-dependent attenuator plate transmission.
 | `wavelength_units` | str | No | angstrom | - | Units for wavelength. |
 | `wavelength_units_source` | str or NoneType | No | - | - | Optional IoSources key for wavelength units. |
 | `with_processing_keys` | list | No | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
+
+## References
+DOI 10.1107/S1600576717015096
 
 ## Notes
 Material parameters can be provided as direct values or *_source paths. xraylib is used for material lookup unless linear_attenuation_coefficient is configured directly. The default applies a physical correction by dividing by transmission; apply_as='multiply' is provided for DAWN cross-validation where the recorded operation applies the attenuation factor itself. The correction factor carries no uncertainty from CosAlpha. Geometry uncertainties are shared calibration terms that the current per-key model would treat as independent; propagation awaits shared contributions in later stages of the uncertainty specification.

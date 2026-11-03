@@ -50,6 +50,9 @@ python -m sphinx -E -W --keep-going -b html docs dist/docs
 ## Review points
 
 - Keep `modacor.modules.__all__` aligned with the intended public step surface.
+- Scientific steps must cite a `step_reference`. Infrastructure steps may omit
+  one only through the explicit `INFRASTRUCTURE_REFERENCE_ALLOWLIST` in
+  `tests/modules/test_public_module_contracts.py`; keep every allowlist name public.
 - Keep package dependencies one-way: modules may use models, geometry, and IO;
   models may use geometry; geometry must remain format- and pipeline-independent.
 - Promote reusable mathematics out of `ProcessStep` methods, and do not import

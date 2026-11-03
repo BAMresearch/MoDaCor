@@ -15,7 +15,7 @@ __copyright__ = "Copyright 2026, The MoDaCor team"
 __date__ = "04/01/2026"
 __status__ = "Development"
 
-__version__ = "20261102.1"
+__version__ = "20261103.1"
 __all__ = ["CanonicalDetectorFrame", "PixelCoordinates3D"]
 
 from typing import Dict, Tuple
@@ -235,6 +235,7 @@ class PixelCoordinates3D(ProcessStep):
         },
         step_keywords=["geometry", "coordinates", "detector"],
         step_doc="Computes 3D detector element center coordinates in lab-frame axes.",
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     def _load_from_sources(self, key: str) -> BaseData:

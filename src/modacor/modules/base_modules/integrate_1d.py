@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["Integrate1D"]
-__version__ = "20261103.1"
+__version__ = "20261103.2"
 
 from pathlib import Path
 
@@ -85,6 +85,7 @@ class Integrate1D(ProcessStep):
             "input are omitted from every integral. The axis is treated as exact (fixed abscissae); axis "
             "uncertainties are not propagated."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     def dependency_contract(self) -> ProcessStepDependencies:

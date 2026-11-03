@@ -7,7 +7,7 @@ Computes 3D detector element center coordinates in lab-frame axes.
 - **Import path:** `modacor.modules.technique_modules.scattering.pixel_coordinates_3d.PixelCoordinates3D`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/pixel_coordinates_3d.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/pixel_coordinates_3d.py)
 - **Module ID:** PixelCoordinates3D
-- **Module version:** 20261102.1
+- **Module version:** 20261103.1
 - **Keywords:** geometry, coordinates, detector
 
 ## Required data keys
@@ -92,3 +92,6 @@ _No data-key roles declared._
 | `pixel_pitch_slow_source` | str or NoneType | No | - | - | IoSources key for slow-axis detector element size signal. Required unless detector_frame is given. |
 | `pixel_pitch_slow_uncertainties_sources` | dict | No | {} | - | Uncertainty sources for slow-axis detector element size. |
 | `pixel_pitch_slow_units_source` | str or NoneType | No | - | - | IoSources key for slow-axis detector element size units; prefer length units such as m or mm. |
+
+## References
+DOI 10.1107/S1600576717015096

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["FindCenterOfMass1D"]
-__version__ = "20260929.1"
+__version__ = "20261103.1"
 
 from pathlib import Path
 
@@ -109,6 +109,7 @@ class FindCenterOfMass1D(ProcessStep):
             "negative intensities are clipped to zero. Signal and coordinate uncertainty components are "
             "propagated separately to the scalar centre."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     def _output_keys(self) -> tuple[str, str, str, str, str]:

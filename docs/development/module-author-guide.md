@@ -320,6 +320,12 @@ accurate:
 - `step_doc`
 - `step_note` and `step_keywords` where useful
 
+Scientific steps must cite a reference in `step_reference` (for example,
+`DOI 10.1107/S1600576717015096`). An infrastructure step may omit a reference
+only when it appears in `INFRASTRUCTURE_REFERENCE_ALLOWLIST` in
+`tests/modules/test_public_module_contracts.py`. Add a new scientific step with
+its reference, or explicitly add an infrastructure step to that allowlist.
+
 The generated pages under `docs/reference/modules/` come from that metadata via:
 
 ```bash

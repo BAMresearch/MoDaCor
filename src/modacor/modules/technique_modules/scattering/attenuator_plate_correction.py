@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 __all__ = ["AttenuatorPlateCorrection"]
-__version__ = "20261103.1"
+__version__ = "20261103.2"
 
 from pathlib import Path
 
@@ -204,6 +204,7 @@ class AttenuatorPlateCorrection(ProcessStep):
             "per-key model would treat as independent; propagation awaits shared contributions in later stages of"
             " the uncertainty specification."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     def calculate(self) -> dict[str, DataBundle]:
