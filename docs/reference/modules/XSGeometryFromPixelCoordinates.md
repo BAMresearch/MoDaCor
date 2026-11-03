@@ -7,7 +7,7 @@ Compute Q-vector components and angles from lab-frame pixel coordinates.
 - **Import path:** `modacor.modules.technique_modules.scattering.xs_geometry_from_pixel_coordinates.XSGeometryFromPixelCoordinates`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/xs_geometry_from_pixel_coordinates.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/xs_geometry_from_pixel_coordinates.py)
 - **Module ID:** XSGeometryFromPixelCoordinates
-- **Module version:** 20261102.1
+- **Module version:** 20261103.1
 - **Keywords:** geometry, Q, Psi, TwoTheta, Solid Angle, Omega, scattering
 
 ## Required data keys
