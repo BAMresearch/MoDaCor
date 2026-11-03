@@ -91,16 +91,17 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | done |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | done |
 | R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | done |
-| R08 | Audit remaining unit stripping in modules | contract | M | medium | approved |
-| R09 | Narrow broad `except Exception` handlers | robustness | M | medium | approved |
-| R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | item 1 done; 2–3 open |
+| R08 | Audit remaining unit stripping in modules | contract | M | medium | done (v1.17.0, PR #160) |
+| R09 | Narrow broad `except Exception` handlers | robustness | M | medium | done (v1.17.0, PR #161) |
+| R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | item 1 done; 2–3 decided |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | done |
-| R14 | The `required` argument flag is never enforced | contract | S | medium | approved |
-| R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
-| R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
+| R14 | The `required` argument flag is never enforced | contract | S | medium | done (v1.17.0, PR #161) |
+| R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | done (v1.14.0, PR #152) |
+| R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decided |
 | R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | done (v1.15.0, PR #154) |
-| R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | approved |
+| R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | done (v1.16.0, PR #156) |
+| R19 | Q uncertainty and Q resolution (smearing profile) | science | L | high | future; design needed |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -1643,10 +1644,9 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
 
 ## R08 — Audit remaining unit stripping in modules
 
-**Status:** implementation complete on `quality-remediation-r08b` (2026-11-02),
-rebased without conflicts onto v1.16.1 (`835df4c`). Numerical comparisons and
-performance baselines remain v1.16.0 (`0d0839b`). Final validation is recorded
-below. The ten missing-uncertainty rows remain in R16.
+**Status:** done. Merged in PR #160 and released in v1.17.0. Numerical
+comparisons and performance baselines are against v1.16.0 (`0d0839b`). The ten
+missing-uncertainty rows moved to R16.
 
 **Inventory (2026-10-31, after R07).** A pattern search (`.magnitude`,
 `.m_as(`, `np.asarray(… .signal)`, `float(… .signal)`, `.to(…).magnitude`)
@@ -2177,7 +2177,7 @@ performance stop was cleared in review; no new stop condition arose.
 
 ## R09 — Narrow broad `except Exception` handlers
 
-**Status:** in review
+**Status:** done. Merged in PR #161 and released in v1.17.0.
 
 **Problem.** There are broad `except Exception` handlers in
 `server/runtime_service.py` (7), `io/tiled/tiled_source.py` (3),
@@ -2283,7 +2283,8 @@ change to the server's API error responses (`tests/server` unchanged).
 
 ## R10 — Conventions
 
-**Status:** item 1 done; items 2 (file headers) and 3 (`step_reference`) open, pending maintainer decisions.
+**Status:** item 1 done; items 2 (file headers) and 3 (`step_reference`)
+decided on 2026-11-03, ready for implementation.
 
 **Scope.**
 
@@ -2302,6 +2303,33 @@ change to the server's API error responses (`tests/server` unchanged).
    (DOI 10.1088/0953-8984/25/38/383201) and 8 are empty. Where a more specific
    reference exists, add it; otherwise keep the general review, but do not
    leave the field empty. The maintainer supplies or approves the references.
+
+**Decisions (maintainer, 2026-11-03).**
+
+- **Item 2, headers: SPDX plus authors.** A package file starts with the SPDX
+  line and a module docstring, then `__all__`, and `__version__` in step
+  modules (it is recorded as the step version in pipeline specs and graph
+  output). Existing `__authors__` lists stay, for contributor credit. Drop
+  `__coding__`, `__copyright__`, `__date__`, `__status__` and the
+  shebang/coding comment lines: the copyright is in `LICENSE`, and the date and
+  status go stale. Survey on 2026-11-03: 58 package files use the full block,
+  76 the SPDX style, and 14 (mostly `__init__.py`) neither. Files change only
+  when another item touches them, plus the module template and the files this
+  item edits for references; no mass rewrite.
+- **Item 3, references: scientific steps only.** Of 42 public steps, 12 cite
+  the 2013 review, 4 a specific paper and 2 the NeXus mask convention; 25 are
+  empty (the count of 8 above predates later steps). The 12 empty scientific
+  steps get a reference: AngleToQ, AttenuatorPlateCorrection,
+  DetectorEfficiencyCorrection, FindCenterOfMass1D,
+  FlatPlateSelfAbsorptionCorrection, IndexByCoordinate, IndexedAverager,
+  Integrate1D, PixelCoordinates3D, PolarizationCorrection,
+  SubtractInterpolated1D and XSGeometryFromPixelCoordinates. The fallback is the
+  modular correction-sequence paper (Pauw et al. 2017,
+  DOI 10.1107/S1600576717015096); the maintainer may substitute specific
+  references later. The 13 infrastructure steps (I/O, bookkeeping, units,
+  masks, plotting, `Negate`) may stay empty. A test enforces the split through
+  an explicit allowlist of infrastructure steps, so a new step needs a
+  reference unless it is added there.
 
 **Acceptance criteria.** As in the scope above; reference pages regenerated.
 
@@ -2439,7 +2467,8 @@ guards. Verified with `tox -e py312 -- -rs`:
 
 ## R14 — The `required` argument flag is never enforced
 
-**Status:** in review. Option (a), with approved conditional-input validation.
+**Status:** done. Option (a), with approved conditional-input validation.
+Merged in PR #161 and released in v1.17.0.
 
 **Problem.** Argument specs can say `"required": True`, but nothing at
 runtime checks it. Only `scripts/generate_module_doc.py` reads it, to fill the
@@ -2562,7 +2591,7 @@ been checked.
 
 ## R15 — Server: explain source/sink and run failures, and keep logs
 
-**Status:** approved; in progress on branch `quality-remediation-r08-r13-r15`.
+**Status:** done. Merged in PR #152 and released in v1.14.0.
 Raised 2026-10-31: registering
 sources and sinks in a server session returned only a failure code, and no log
 said what went wrong.
@@ -2710,8 +2739,8 @@ unwritable-ancestor failures are covered by focused tests.
 
 ## R16 — Uncertainty propagation gaps found by the R08 audit
 
-**Status:** decision needed (maintainer), row by row. Split out of R08 on
-2026-10-31.
+**Status:** decided on 2026-11-03, ready for implementation. Split out of R08
+on 2026-10-31.
 
 **Problem.** The R08 audit found ten places where an output carries no
 uncertainty contribution from an uncertain input. Each fix changes published
@@ -2736,6 +2765,46 @@ scope (like the capillary wall-μ in `capillary-self-absorption.md`), or
 defer. Implement the accepted rows with model sensitivities in `models` and
 attach named components at the BaseData boundary, each with an analytic or
 finite-difference test.
+
+**Decisions (maintainer, 2026-11-03).**
+
+- **Rows 1–5, angle sensitivities (attenuator plate, detector efficiency,
+  flat-plate self-absorption, polarization, Psi): defer and document now.** The
+  geometry uncertainties behind them (distance, beam centre, pixel pitch,
+  wavelength) are shared calibration terms. Stage 0 can only add them as
+  independent per-pixel components, which would count one distance error as
+  independent in several correction factors. In SAXS the sensitivities are
+  small (cos α ≈ 1). Each module's documentation states the omission, and the
+  uncertainty data-model page lists it. Implementation waits for shared
+  contributions in Stage 1 and source responses in Stage 2.
+- **Row 6, CosAlpha clip: raise an error.** CosAlpha is `n · r̂`, with `n`
+  the configured `detector_normal` (default `(0, 0, 1)`, pointing away from the
+  sample). A negative value means the ray reaches the back face of the
+  detector. For a flat detector the sign is the same for every pixel, so
+  negative values mean the normal is flipped or the detector faces away from
+  the sample; mixed signs mean the normal does not match the pixel plane. Both
+  are configuration errors. Today the clip turns them into a zero solid angle and
+  infinite corrected intensities, and the plate corrections already reject
+  CosAlpha ≤ 0. The clip is removed, and `XSGeometryFromPixelCoordinates`
+  raises a `ValueError` that names the count of affected pixels and the most
+  negative value. It points to a flipped normal when all pixels are negative, or
+  to a normal that does not match the pixel plane when signs are mixed. Zero
+  (grazing incidence) stays allowed. This is noted in `interface-migrations.md`.
+- **Rows 7–9, axis uncertainties (Integrate1D, FindScaleFactor1D,
+  SubtractInterpolated1D): axes are exact, documented.** After binning, a Q
+  "uncertainty" is mostly the spread of Q within a bin, a descriptive spread in
+  the specification's sense, not a coordinate error. The real Q error is a
+  shared calibration scale, left for Stage 2 source responses. Each module's
+  documentation states the fixed-abscissa model. The intended end state, with
+  a separate Q uncertainty and smearing profile, is R19.
+- **Row 10, metadata mean (`prepare_static_scalar`): SEM plus reduced
+  components.** Each configured measurement component is carried through the
+  weighted mean as independent per-sample errors,
+  `σ_mean = sqrt(Σ w_i² σ_i²) / Σ w_i` (σ/√n_eff for uniform σ), using the
+  existing weighted-mean reduction. The SEM of the scatter is added under the
+  jitter key as now. A configured component named like the jitter key is a
+  configuration conflict and raises. Outputs change only where array-valued
+  metadata has configured uncertainty sources.
 
 **Implementation notes.** _(implementer)_
 
@@ -2899,8 +2968,9 @@ made after the R17 commit.
 
 ## R18 — Central unit conversion for BaseData (includes the transmission-unit bug)
 
-**Status:** implemented (2026-11-02), including the maintainer-authorized
-capillary mapping follow-up. The separate examples migration follows release.
+**Status:** done, including the maintainer-authorized capillary mapping
+follow-up. Merged in PR #156 and released in v1.16.0; the examples migration
+followed separately.
 
 **Decisions (2026-11-01).**
 
@@ -3135,6 +3205,47 @@ a `fix:`.
   - The `"*"` selection logged 231 INFO lines per USAXS run, one per bundle
     lacking a key. `ConvertUnits` now logs one INFO summary per step, with the
     skipped bundle names at DEBUG.
+
+---
+
+## R19 — Q uncertainty and Q resolution (smearing profile)
+
+**Status:** future; design needed. Raised by the maintainer on 2026-11-03
+during the R16 decisions. Depends on Stage 2 of the uncertainty specification
+for the shared calibration terms.
+
+**Goal.** Give the Q axis two separate descriptions, as NXcanSAS does with
+`resolutions` alongside `uncertainties`:
+
+- **Q uncertainty: the unknowns.** Calibration errors of unknown sign, such as
+  the sample–detector distance, the mean wavelength, the beam centre and the
+  pixel-pitch calibration. Each is shared by every Q point, so it is a Stage 2
+  source with a signed response, not an independent per-point error.
+- **Smearing profile: the knowns.** Spreads that broaden every measured point
+  by a known amount: wavelength spread, beam height (size), beam divergence,
+  sample thickness (the scattering position spreads along the beam),
+  detector sensor thickness (parallax), pixel size and bin width. This is a
+  resolution kernel, not an uncertainty. It never enters
+  `BaseData.uncertainties` and is never combined with them in quadrature.
+
+Some parameters contribute to both: the wavelength (a calibration error on the
+mean and a spread), and the distance (a calibration error, while sample
+thickness spreads it).
+
+**Open design questions.**
+
+- How the profile is represented: per-point Gaussian widths, or shape
+  parameters per contribution. Also how it combines through binning, for
+  example Gaussian widths in quadrature plus a box for the bin width.
+- Which steps produce it: geometry, binning and averaging.
+- Its output fields in NXcanSAS and the other sinks.
+
+**Interaction with current behaviour.** The Q "uncertainty" after binning is
+mostly the spread of Q within a bin, which is a resolution term. A wavelength
+spread or pixel size entered through `photon_uncertainties_sources` or the
+pixel-pitch uncertainty sources ends up in the Q uncertainty today. These move
+when R19 is implemented. Until then, the axes are treated as exact in
+Integrate1D, FindScaleFactor1D and SubtractInterpolated1D (R16 rows 7–9).
 
 ---
 
