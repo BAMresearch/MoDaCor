@@ -102,6 +102,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | done (v1.15.0, PR #154) |
 | R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | done (v1.16.0, PR #156) |
 | R19 | Q uncertainty and Q resolution (smearing profile) | science | L | high | future; design needed |
+| R20 | Uncertainty sources ignore their own units | bug | S | high | decided |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -3375,6 +3376,44 @@ spread or pixel size entered through `photon_uncertainties_sources` or the
 pixel-pitch uncertainty sources ends up in the Q uncertainty today. These move
 when R19 is implemented. Until then, the axes are treated as exact in
 Integrate1D, FindScaleFactor1D and SubtractInterpolated1D (R16 rows 7–9).
+
+---
+
+## R20 — Uncertainty sources ignore their own units
+
+**Status:** decided on 2026-11-03; implement on the R16 branch, so both ship
+in one release. Found in the R16 review.
+
+**Problem.** `dataclasses.helpers.basedata_from_sources` and the
+material-attenuation loader read every uncertainty dataset as a bare array, in
+the signal's units. The dataset's own `units` attribute is never read. Every
+`*_uncertainties_sources` setting in every module goes through these two
+loaders. In the MOUSE example data, `incident_wavelength` is in nm and
+`wavelength_error` is in ångström. With R16 row 10, MOUSE would carry
+0.005 nm instead of 0.0005 nm, ten times too large (Δλ/λ ≈ 3.2% instead of
+0.32%). Before R16 the term was dropped, which hid this.
+
+**Decision (maintainer, 2026-11-03).**
+
+- When the source provides units for an uncertainty dataset
+  (`get_data_attributes(...)["units"]`), the uncertainty is converted to the
+  signal's units. It is converted as a difference, by the rule `BaseData`
+  applies to its own uncertainties, never as an absolute value.
+- Without such units, the uncertainty is in the signal's units, as now.
+- Incompatible or unreadable units raise a `ValueError` naming the uncertainty,
+  its source and both units.
+- A units override on the signal (`AppendProcessingData.units_override`)
+  applies to its uncertainties too, and their attributes are not read: the
+  override says the file's labels are not to be trusted.
+
+**Acceptance criteria.** Both loaders share one implementation. MOUSE gives
+`wavelength_error` 0.0005 nm. Pipelines whose uncertainty datasets have no
+units, or use a units override, give identical results. Any example pipeline
+that would now raise or change is reported.
+
+**Implementation notes.** _(implementer)_
+
+**Review log.** _(reviewer)_
 
 ---
 
