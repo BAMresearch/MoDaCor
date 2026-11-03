@@ -147,6 +147,18 @@ For an unweighted mean of independent samples,
 denominator. `ReduceDimensionality` propagates each existing key and can add
 scatter-derived estimates using the producer rule above.
 
+`prepare_static_scalar` preserves the existing weighted mean and scatter SEM of
+array-valued detector metadata, and carries each configured component as the
+weighted mean of its sigma using the same weights as the nominal mean. These
+components are unreduced: a constant sigma does not shrink with the number of
+frames. Scalar and broadcastable component arrays are supported; NaN propagates.
+The SEM is added under
+the configured jitter key; a component already named like that key raises a
+configuration-conflict error. A global-only `propagate_to_all` component is first
+averaged without reduction, then folded into the SEM as `hypot(SEM, sigma_global_mean)` using the
+Stage 0 producer rule, with the standard INFO log and no mixed output mapping.
+Scalar metadata passes through unchanged.
+
 `Integrate1D` uses quadrature coefficients `c_i` and computes
 `sigma_I = sqrt(sum((c_i sigma_i)²))` for each key. The output unit is the signal
 unit multiplied by the coordinate unit. Invalid, masked or zero-weight samples
