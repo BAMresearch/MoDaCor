@@ -7,7 +7,7 @@ Correct angle-dependent self-absorption for a transmission-normalized flat sampl
 - **Import path:** `modacor.modules.technique_modules.scattering.flat_plate_self_absorption_correction.FlatPlateSelfAbsorptionCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/flat_plate_self_absorption_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/flat_plate_self_absorption_correction.py)
 - **Module ID:** FlatPlateSelfAbsorptionCorrection
-- **Module version:** 20261103.2
+- **Module version:** 20261103.3
 - **Keywords:** sample, self absorption, flat plate, transmission
 
 ## Required data keys

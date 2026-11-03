@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
+"""Correct angle-dependent self-absorption for a transmission-normalized flat sample."""
+
 from __future__ import annotations
 
 __all__ = ["FlatPlateSelfAbsorptionCorrection"]
-__version__ = "20261103.2"
+__version__ = "20261103.3"
 
 from pathlib import Path
 

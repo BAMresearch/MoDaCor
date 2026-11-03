@@ -7,7 +7,7 @@ Integrate sampled 1D BaseData while propagating coordinate units and independent
 - **Import path:** `modacor.modules.base_modules.integrate_1d.Integrate1D`
 - **Source:** [`src/modacor/modules/base_modules/integrate_1d.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/integrate_1d.py)
 - **Module ID:** Integrate1D
-- **Module version:** 20261103.2
+- **Module version:** 20261103.3
 - **Keywords:** integrate, quadrature, trapezoid, simpson, 1D
 
 ## Required data keys

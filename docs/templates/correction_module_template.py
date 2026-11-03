@@ -1,18 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Template for a scientific correction ProcessStep."""
 
 from __future__ import annotations
 
-__coding__ = "utf-8"
-__authors__ = ["Your Name"]  # add names to the list as appropriate
-__copyright__ = "Copyright 2025, The MoDaCor team"
-__date__ = "01/01/2026"
-__status__ = "Development"  # "Development", "Production"
-# end of header and standard imports
-
 __all__ = ["YourCorrectionStep"]
-__version__ = "20260101.1"
+__version__ = "20261103.1"
+__authors__ = ["Your Name"]
 
 from pathlib import Path
 from typing import Any

@@ -7,7 +7,7 @@ Find a masked, windowed intensity centroid without assuming a peak shape.
 - **Import path:** `modacor.modules.base_modules.find_center_of_mass_1d.FindCenterOfMass1D`
 - **Source:** [`src/modacor/modules/base_modules/find_center_of_mass_1d.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/find_center_of_mass_1d.py)
 - **Module ID:** FindCenterOfMass1D
-- **Module version:** 20261103.1
+- **Module version:** 20261103.2
 - **Keywords:** centroid, center of mass, peak, beam centre, 1D
 
 ## Required data keys

@@ -49,6 +49,11 @@ python -m sphinx -E -W --keep-going -b html docs dist/docs
 
 ## Review points
 
+- For package files otherwise edited, use SPDX plus a module docstring, followed
+  by any future imports, `__all__`, and `__version__` in step modules. Preserve
+  existing `__authors__` lists. Remove obsolete `__coding__`, `__copyright__`,
+  `__date__`, `__status__`, and shebang/coding comments. Copyright is in `LICENSE`;
+  dates and status go stale. Update the module template; avoid a mass rewrite.
 - Keep `modacor.modules.__all__` aligned with the intended public step surface.
 - Scientific steps must cite a `step_reference`. Infrastructure steps may omit
   one only through the explicit `INFRASTRUCTURE_REFERENCE_ALLOWLIST` in

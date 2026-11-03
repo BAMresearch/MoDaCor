@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
+"""Find a masked, windowed intensity centroid without assuming a peak shape."""
 
 from __future__ import annotations
 
 __all__ = ["FindCenterOfMass1D"]
-__version__ = "20261103.1"
+__version__ = "20261103.2"
 
 from pathlib import Path
 

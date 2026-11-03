@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Divide signal by the linear-polarization intensity factor."""
 
 from __future__ import annotations
 
 __all__ = ["PolarizationCorrection"]
-__version__ = "20261103.2"
+__version__ = "20261103.3"
 
 from pathlib import Path
 from typing import Any

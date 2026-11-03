@@ -7,7 +7,7 @@ Computes 3D detector element center coordinates in lab-frame axes.
 - **Import path:** `modacor.modules.technique_modules.scattering.pixel_coordinates_3d.PixelCoordinates3D`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/pixel_coordinates_3d.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/pixel_coordinates_3d.py)
 - **Module ID:** PixelCoordinates3D
-- **Module version:** 20261103.1
+- **Module version:** 20261103.2
 - **Keywords:** geometry, coordinates, detector
 
 ## Required data keys

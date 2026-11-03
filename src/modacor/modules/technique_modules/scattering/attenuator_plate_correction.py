@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Apply angle-dependent attenuator plate transmission."""
 
 from __future__ import annotations
 
 __all__ = ["AttenuatorPlateCorrection"]
-__version__ = "20261103.2"
+__version__ = "20261103.3"
 
 from pathlib import Path
 

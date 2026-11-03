@@ -1,17 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Adapt detector metadata and detector indices to BaseData."""
 
 from __future__ import annotations
 
-__coding__ = "utf-8"
-__authors__ = ["Brian R. Pauw"]
-__copyright__ = "Copyright 2026, The MoDaCor team"
-__date__ = "06/01/2026"
-__status__ = "Development"  # "Development", "Production"
-
-__version__ = "20261103.1"
 __all__ = ["require_scalar", "prepare_static_scalar", "detector_index_basedata"]
+__version__ = "20261103.2"
+__authors__ = ["Brian R. Pauw"]
 
 import numpy as np
 import pint

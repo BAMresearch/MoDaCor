@@ -7,7 +7,7 @@ Remap a 1D background by nearest neighbour or linear interpolation, then subtrac
 - **Import path:** `modacor.modules.base_modules.subtract_interpolated_1d.SubtractInterpolated1D`
 - **Source:** [`src/modacor/modules/base_modules/subtract_interpolated_1d.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/subtract_interpolated_1d.py)
 - **Module ID:** SubtractInterpolated1D
-- **Module version:** 20261103.2
+- **Module version:** 20261103.3
 - **Keywords:** subtract, background, nearest, linear, remap, 1D
 
 ## Required data keys

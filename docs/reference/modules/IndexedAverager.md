@@ -7,7 +7,7 @@ Compute weighted group means from a precomputed integer index map.
 - **Import path:** `modacor.modules.base_modules.indexed_averager.IndexedAverager`
 - **Source:** [`src/modacor/modules/base_modules/indexed_averager.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/indexed_averager.py)
 - **Module ID:** IndexedAverager
-- **Module version:** 20261103.1
+- **Module version:** 20261103.2
 - **Keywords:** indexed, grouped, weighted average, reduction
 
 ## Required data keys

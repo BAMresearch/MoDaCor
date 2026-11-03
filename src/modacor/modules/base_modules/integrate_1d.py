@@ -1,9 +1,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
+"""
+Integrate sampled 1D BaseData while propagating coordinate units and independent uncertainty
+components.
+"""
 
 from __future__ import annotations
 
 __all__ = ["Integrate1D"]
-__version__ = "20261103.2"
+__version__ = "20261103.3"
 
 from pathlib import Path
 

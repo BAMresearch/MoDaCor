@@ -7,7 +7,7 @@ Compute a normal robust-fit or uncertainty-weighted lognormal scale between two 
 - **Import path:** `modacor.modules.base_modules.find_scale_factor1d.FindScaleFactor1D`
 - **Source:** [`src/modacor/modules/base_modules/find_scale_factor1d.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/find_scale_factor1d.py)
 - **Module ID:** FindScaleFactor1D
-- **Module version:** 20261103.1
+- **Module version:** 20261103.2
 - **Keywords:** scale, calibration, lognormal, 1D
 
 ## Required data keys

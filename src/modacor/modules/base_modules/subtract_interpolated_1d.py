@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
+"""Remap a 1D background by nearest neighbour or linear interpolation, then subtract it."""
 
 from __future__ import annotations
 
 __all__ = ["SubtractInterpolated1D"]
-__version__ = "20261103.2"
+__version__ = "20261103.3"
 
 from pathlib import Path
 

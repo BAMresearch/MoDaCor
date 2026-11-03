@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Compute Q-vector components and angles from lab-frame pixel coordinates."""
 
 from __future__ import annotations
+
+__all__ = ["XSGeometryFromPixelCoordinates"]
+__version__ = "20261103.4"
 
 from pathlib import Path
 from typing import Dict, Tuple
@@ -29,9 +31,6 @@ from modacor.modules.helpers.scattering.detector_data import (
 from modacor.modules.helpers.scattering.photon_energy import as_photon_wavelength
 
 logger = MessageHandler(name=__name__)
-
-__version__ = "20261103.3"
-__all__ = ["XSGeometryFromPixelCoordinates"]
 
 
 class XSGeometryFromPixelCoordinates(ProcessStep):

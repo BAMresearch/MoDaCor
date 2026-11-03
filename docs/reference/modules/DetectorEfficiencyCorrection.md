@@ -7,7 +7,7 @@ Divide signal by angle-dependent detector absorption efficiency.
 - **Import path:** `modacor.modules.technique_modules.scattering.detector_efficiency_correction.DetectorEfficiencyCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/detector_efficiency_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/detector_efficiency_correction.py)
 - **Module ID:** DetectorEfficiencyCorrection
-- **Module version:** 20261103.2
+- **Module version:** 20261103.3
 - **Keywords:** detector, efficiency, attenuation, absorption
 
 ## Required data keys

@@ -7,7 +7,7 @@ Convert an angle relative to its direct-beam or diffraction centre into signed Q
 - **Import path:** `modacor.modules.technique_modules.scattering.angle_to_q.AngleToQ`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/angle_to_q.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/angle_to_q.py)
 - **Module ID:** AngleToQ
-- **Module version:** 20261103.1
+- **Module version:** 20261103.2
 - **Keywords:** scattering angle, two theta, Bragg angle, Q, momentum transfer, geometry
 
 ## Required data keys

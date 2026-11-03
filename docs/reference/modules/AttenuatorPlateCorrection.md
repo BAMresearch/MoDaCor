@@ -7,7 +7,7 @@ Apply angle-dependent attenuator plate transmission.
 - **Import path:** `modacor.modules.technique_modules.scattering.attenuator_plate_correction.AttenuatorPlateCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/attenuator_plate_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/attenuator_plate_correction.py)
 - **Module ID:** AttenuatorPlateCorrection
-- **Module version:** 20261103.2
+- **Module version:** 20261103.3
 - **Keywords:** attenuator, plate, attenuation, absorption, transmission
 
 ## Required data keys
