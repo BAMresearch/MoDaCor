@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Runtime API facade and session lifecycle operations."""
 
 from __future__ import annotations
 
@@ -13,7 +12,6 @@ from typing import Any
 
 from modacor.dataclasses.processing_data import ProcessingData
 from modacor.debug.pipeline_tracer import PlainUnicodeRenderer
-from modacor.io.buffer.codec import decode_npy, encode_npy
 from modacor.io.chunk_planning import resolve_chunk_input_plan
 from modacor.io.chunking import ChunkPlan, ChunkSpec, ProvisionalChunkPlan, ProvisionalChunkSpec
 from modacor.io.io_sinks import IoSinks
@@ -23,6 +21,7 @@ from modacor.runner.pipeline import Pipeline
 from modacor.runner.pipeline_runner import PipelineRunError, RunResult
 from modacor.runner.process_step_registry import ProcessStepRegistry
 
+from .buffer_service import BufferService
 from .chunked_outputs import ChunkedOutputManager
 from .errors import ApiError, IOBuildError
 from .execution import find_dirty_step_ids
@@ -30,7 +29,8 @@ from .io_diagnostics import check_file_location
 from .io_utils import bind_chunk_source_slices, build_sinks_from_session, build_sources_from_session, write_hdf_output
 from .planning import build_dry_run_plan, missing_required_source_refs, ordered_step_ids, resolve_effective_mode
 from .runtime_policy import RuntimePolicy
-from .session_manager import PipelineSession, SessionManager
+from .session_manager import PipelineSession
+from .session_service import SessionService
 from .source_profiles import get_source_profile, list_source_profiles
 
 __all__ = ["RuntimeService"]
@@ -100,17 +100,22 @@ class ProcessPreparation:
 
 
 @dataclass(slots=True)
-class RuntimeService:
+class RuntimeService(SessionService):
     """Application service for the MoDaCor runtime API."""
 
-    manager: SessionManager
     policy: RuntimePolicy = field(default_factory=RuntimePolicy.trusted)
     process_step_registry: ProcessStepRegistry = field(init=False)
     chunked_outputs: ChunkedOutputManager = field(init=False)
 
+    _buffers: BufferService = field(init=False, repr=False)
+
     def __post_init__(self) -> None:
         self.process_step_registry = self.policy.create_process_step_registry()
         self.chunked_outputs = ChunkedOutputManager(policy=self.policy)
+        self._buffers = BufferService(
+            manager=self.manager,
+            policy=self.policy,
+        )
 
     def _chunk_sink_registration(self, payload: dict[str, Any]) -> dict[str, Any]:
         sink_raw = payload.get("sink")
@@ -719,26 +724,7 @@ class RuntimeService:
         data_key: str,
         payload: bytes,
     ) -> dict[str, Any]:
-        self._require_session(session_id)
-        try:
-            self.policy.validate_buffer_upload(payload)
-        except ValueError as exc:
-            raise ApiError(status_code=413, detail=str(exc)) from exc
-        try:
-            array = decode_npy(payload)
-            self.manager.buffer_store.put_array(session_id, "source", source_ref, data_key, array)
-        except Exception as exc:
-            # API boundary: arbitrary decoder/store failures retain the existing 422 response.
-            logger.warning("Invalid .npy buffer payload", exc_info=True, extra={"session_id": session_id})
-            raise ApiError(status_code=422, detail=f"Invalid .npy buffer payload: {exc}") from exc
-        return {
-            "session_id": session_id,
-            "kind": "source",
-            "ref": source_ref,
-            "data_key": data_key.strip("/"),
-            "shape": list(array.shape),
-            "dtype": str(array.dtype),
-        }
+        return self._buffers.put_buffer_source_array(session_id, source_ref, data_key, payload)
 
     def put_buffer_source_attrs(
         self,
@@ -747,17 +733,7 @@ class RuntimeService:
         data_key: str,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
-        self._require_session(session_id)
-        if not isinstance(payload, dict):
-            raise ApiError(status_code=422, detail="Buffer attrs payload must be an object.")
-        self.manager.buffer_store.put_attrs(session_id, "source", source_ref, data_key, payload)
-        return {
-            "session_id": session_id,
-            "kind": "source",
-            "ref": source_ref,
-            "data_key": data_key.strip("/"),
-            "attrs": dict(payload),
-        }
+        return self._buffers.put_buffer_source_attrs(session_id, source_ref, data_key, payload)
 
     def put_buffer_source_metadata(
         self,
@@ -766,50 +742,16 @@ class RuntimeService:
         data_key: str,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
-        self._require_session(session_id)
-        if not isinstance(payload, dict) or "value" not in payload:
-            raise ApiError(status_code=422, detail="Buffer metadata payload must be an object containing 'value'.")
-        self.manager.buffer_store.put_metadata(session_id, "source", source_ref, data_key, payload["value"])
-        return {
-            "session_id": session_id,
-            "kind": "source",
-            "ref": source_ref,
-            "data_key": data_key.strip("/"),
-            "value": payload["value"],
-        }
+        return self._buffers.put_buffer_source_metadata(session_id, source_ref, data_key, payload)
 
     def get_buffer_sink_array(self, session_id: str, sink_ref: str, data_key: str) -> bytes:
-        self._require_session(session_id)
-        try:
-            array = self.manager.buffer_store.get_array(session_id, "sink", sink_ref, data_key)
-        except KeyError as exc:
-            raise ApiError(status_code=404, detail=str(exc)) from exc
-        return encode_npy(array)
+        return self._buffers.get_buffer_sink_array(session_id, sink_ref, data_key)
 
     def get_buffer_manifest(self, session_id: str, kind: str, ref: str) -> dict[str, Any]:
-        self._require_session(session_id)
-        try:
-            return self.manager.buffer_store.manifest(session_id, kind, ref)
-        except ValueError as exc:
-            raise ApiError(status_code=422, detail=str(exc)) from exc
+        return self._buffers.get_buffer_manifest(session_id, kind, ref)
 
     def get_plot_payload(self, session_id: str, sink_ref: str, plot_id: str) -> dict[str, Any]:
-        session = self._require_session(session_id)
-        try:
-            plot = self.manager.buffer_store.get_metadata(session_id, "sink", sink_ref, plot_id)
-        except KeyError as exc:
-            raise ApiError(status_code=404, detail=str(exc)) from exc
-        if not isinstance(plot, dict):
-            raise ApiError(status_code=500, detail=f"Stored plot payload {sink_ref!r}/{plot_id!r} is not an object.")
-        return {
-            "session_id": session_id,
-            "sink_ref": sink_ref,
-            "plot_id": plot_id,
-            "state": session.state,
-            "updated_utc": session.updated_utc,
-            "latest_run": session.run_history[-1] if session.run_history else None,
-            "plot": plot,
-        }
+        return self._buffers.get_plot_payload(session_id, sink_ref, plot_id)
 
     def clear_buffers(
         self,
@@ -819,18 +761,13 @@ class RuntimeService:
         ref: str | None = None,
         data_key: str | None = None,
     ) -> dict[str, Any]:
-        self._require_session(session_id)
-        try:
-            removed = self.manager.buffer_store.clear(session_id, kind=kind, ref=ref, data_key=data_key)
-        except ValueError as exc:
-            raise ApiError(status_code=422, detail=str(exc)) from exc
-        return {"session_id": session_id, "removed": removed}
+        return self._buffers.clear_buffers(session_id, kind=kind, ref=ref, data_key=data_key)
 
     def clear_buffer_sink(self, session_id: str, sink_ref: str) -> dict[str, Any]:
-        return self.clear_buffers(session_id, kind="sink", ref=sink_ref)
+        return self._buffers.clear_buffer_sink(session_id, sink_ref)
 
     def clear_buffer_sink_array(self, session_id: str, sink_ref: str, data_key: str) -> dict[str, Any]:
-        return self.clear_buffers(session_id, kind="sink", ref=sink_ref, data_key=data_key)
+        return self._buffers.clear_buffer_sink_array(session_id, sink_ref, data_key)
 
     def process(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = self._parse_process_request(payload)
@@ -995,12 +932,6 @@ class RuntimeService:
             "session_id": session_id,
             "payload": {"state": session.state, "active_run_id": session.active_run_id},
         }
-
-    def _require_session(self, session_id: str) -> PipelineSession:
-        session = self.manager.get_session(session_id)
-        if session is None:
-            raise ApiError(status_code=404, detail="Session not found.")
-        return session
 
     def _latest_failed_run(self, session: PipelineSession) -> dict[str, Any] | None:
         for run_meta in reversed(session.run_history):
