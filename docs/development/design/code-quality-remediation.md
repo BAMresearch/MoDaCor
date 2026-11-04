@@ -102,7 +102,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | done (v1.15.0, PR #154) |
 | R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | done (v1.16.0, PR #156) |
 | R19 | Q uncertainty and Q resolution (smearing profile) | science | L | high | future; design needed |
-| R20 | Uncertainty sources ignore their own units | bug | S | high | decided |
+| R20 | Uncertainty sources ignore their own units | bug | S | high | in review |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -2938,6 +2938,8 @@ finite-difference test.
   unreduced-component decision are both reflected in the final implementation. No example files were changed and nothing was pushed.
 
 
+- After R20, MOUSE `wavelength_error` is **0.0005 nm**, converted from 0.005 Å.
+
 **Review log.** _(reviewer)_
 
 ---
@@ -3381,8 +3383,8 @@ Integrate1D, FindScaleFactor1D and SubtractInterpolated1D (R16 rows 7–9).
 
 ## R20 — Uncertainty sources ignore their own units
 
-**Status:** decided on 2026-11-03; implement on the R16 branch, so both ship
-in one release. Found in the R16 review.
+**Status:** implemented on the R16 branch on 2026-11-04, in review. Ships
+with R16; found during its review.
 
 **Problem.** `dataclasses.helpers.basedata_from_sources` and the
 material-attenuation loader read every uncertainty dataset as a bare array, in
@@ -3411,7 +3413,133 @@ loaders. In the MOUSE example data, `incident_wavelength` is in nm and
 units, or use a units override, give identical results. Any example pipeline
 that would now raise or change is reported.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes (2026-11-04).**
+
+- Added one `uncertainties_from_sources` implementation in
+  `dataclasses/helpers.py`, shared by `basedata_from_sources` and the
+  material-attenuation direct-value loader. It decodes byte unit attributes,
+  treats missing/None/blank attributes as signal units, and uses a zero-valued
+  BaseData carrying the sigma followed by `magnitudes(signal_units)` for actual
+  conversion. No conversion factors are reimplemented. Matching units avoid
+  extra detector-array allocations. Actual conversions log at DEBUG only.
+- Offset/non-multiplicative source or target units are rejected, including
+  equal offset units: Pint must map zero to zero for a difference. Parse and
+  compatibility failures are chained into ValueError naming the uncertainty,
+  reference and both units. Attribute parsing has a dedicated broad boundary
+  for Pint grammar errors (including AssertionError and TokenError); conversion
+  retains its narrow exception tuple so unexpected conversion errors surface.
+  Signal-unit parsing and BaseData._parse_units remain unchanged.
+- Attribute-free YAML sources currently raise NotImplementedError rather than
+  return an empty mapping. The shared loader handles that explicit capability
+  error as absent attributes, retaining previous YAML behavior.
+- Added keyword-only `units_override` to `basedata_from_sources` and wired it
+  into AppendProcessingData. The override skips signal-unit metadata and
+  uncertainty attributes; raw signal/sigma values and override labels are kept,
+  including scalar percent/count-per-percent overrides. Removed the post-load
+  relabel. Updated docstrings, public argument descriptions, the units model
+  page and interface migration, and regenerated AppendProcessingData's reference.
+  Its version is `20261104.1`; touched package headers follow R10.
+- Added 31 HDF/YAML-backed cases in
+  `tests/dataclasses/test_uncertainty_source_units.py`: angstrom-to-nm conversion,
+  bytes/missing/blank/matching units, incompatible/unparseable/offset units,
+  DEBUG logging, attribute-free YAML, direct material values, and helper/step
+  overrides for scalar and array data. The original 27 cases before the
+  implementation gave **21 failed, 6 passed**; initial loader/Append/material
+  checks afterwards gave **63 passed**. The parser review added `m/(`, `1/`,
+  and `m s-1` to the invalid-unit cases and a guard for unexpected conversion
+  errors. Against the pre-fix parser: **2 failed, 29 passed**; after the parser
+  fixup, focused uncertainty-source checks: **31 passed**.
+- Four percent-transmission route comparisons initially failed because their
+  fixture scaled sigma values to percent while still advertising dimensionless
+  attributes. TransmissionSource now obtains its attribute label from the same
+  metadata provider that the test changes. All numerical assertions in
+  `test_flat_plate_self_absorption_correction.py::test_percent_transmission_matches_dimensionless`
+  remain unchanged (two shapes and two uncertainty keys). The fixture correction
+  was autosquashed into the implementation commit; focused correction/loader
+  checks initially: **38 passed**.
+
+**Example audit.** Expanded every tracked example pipeline: 12 YAMLs, with
+98 non-empty uncertainty-source uses in 10 pipelines. Checked every locally
+matching uncertainty dataset in the corresponding instrument folders, including
+all sample/background aliases: 732 HDF files inspected (40 MOUSE, 15 SAXSess-I,
+677 I22), yielding 270 dataset/config matches in the 28 HDF groups below.
+The remaining nine source uses are the YAML defaults (four uses) and two CSV
+reference curves (five uses); these were checked through the actual loaders.
+Pipeline-selected signal units, rather than an inferred signal label, define the
+target. No target units were unresolved.
+
+Of the 270 HDF matches, 230 keep matching units, 20 have no units and keep their
+values, and 20 convert: all are MOUSE `wavelength_error`. No other dataset would
+raise or change numerical values. The table groups identical source paths/unit
+policies across pipeline steps and aliases; file counts count local matches,
+not arbitrary assignments of those files to sample roles.
+
+| Instrument | Dataset / source | Own units attribute | Signal units | units_override | Rule | Local files |
+| --- | --- | --- | --- | --- | --- | --- |
+| BAM/MOUSE | `/entry1/instrument/detector00/data_uncertainties_poisson` | `counts` | `counts` | none | keep (matching units) | 20 |
+| BAM/MOUSE | `/entry1/instrument/detector00/data_uncertainties_sem` | `counts` | `counts` | none | keep (matching units) | 20 |
+| BAM/MOUSE | `/entry1/sample/transmission_averaged/sem` | `dimensionless` | `dimensionless` | none | keep (matching units) | 20 |
+| BAM/MOUSE | `/entry1/sample/beam/wavelength_error` | `angstrom` | `nm` | none | convert 0.005 Å → 0.0005 nm | 20 |
+| BAM/MOUSE | `/entry1/sample/thickness_averaged/sem` | `m` | `m` | none | keep (matching units) | 20 |
+| BAM/MOUSE | `/entry1/instrument/detector00/detector_readout_time` | `s` | `s` | none | keep (matching units) | 20 |
+| BAM/MOUSE | `/entry1/sample/largest_scattering_probability_estimate` | absent | `dimensionless` | none | keep (no units) | 20 |
+| BAM/SAXSess_I | `/entry/instrument/detector/frame_exposure_time_uncertainty` | `s` | `s` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/sample/beam/transmitted_flux_uncertainty` | `arbitrary_flux_unit/s` | `arbitrary_flux_unit/s` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/instrument/detector/transformations/det_z_uncertainty` | `mm` | `mm` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/instrument/detector/transformations/det_x_uncertainty` | `mm` | `mm` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/instrument/detector/transformations/det_y_uncertainty` | `mm` | `mm` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/sample/transformations/sample_z_uncertainty` | `mm` | `mm` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/sample/beam/incident_wavelength_uncertainty` | `nm` | `nm` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/sample/thickness_averaged/mean_uncertainty` | `m` | `m` | none | keep (matching units) | 9 |
+| DLS/I22 | `/entry1/low_gain_front/subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/low_gain_front/dark_offset_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/low_gain_rear/subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/low_gain_rear/dark_offset_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/high_gain_front/subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/high_gain_front/dark_offset_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/high_gain_rear/subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/high_gain_rear/dark_offset_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/low_gain_front/i0_subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/high_gain_front/i0_subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/modacor/normalization/bsdiodes_channel_1_std` | `count/s` | `count/s` | none | keep (matching units) | 6 |
+| DLS/I22 | `/entry1/sample/transmission_sem` | `dimensionless` | `dimensionless` | none | keep (matching units) | 6 |
+| DLS/I22 | `/modacor/normalization/i0_channel_1_sem` | `count/s` | `count/s` | none | keep (matching units) | 6 |
+| BAM/SAXSess_I | `defaults::detector/darkcurrent/uncertainty` (YAML) | unavailable | `count/s` | none | keep | 1 |
+| BAM/SAXSess_I | `i_cal_reference::I_sigma` (CSV) | not read | `1/(m sr)` | `1/(m sr)` | keep override | 1 |
+| DLS/I22 | `intensity_calibration_reference::I_sigma` (CSV) | not read | `1/(cm sr)` | `1/(cm sr)` | keep override | 1 |
+
+- YAML data are from `BAM/SAXSess_I/config/SAXSess_I.yaml`; the dark-current
+  component remains 1e-9 count/s. The CSV files are
+  `BAM/SAXSess_I/data/calibration/water_cal_reference.pdh` and
+  `DLS/I22/data/Glassy Carbon L average.dat`. Compared all **725** and **158**
+  reference signal/sigma values respectively against the pre-R20 loader plus
+  its post-load override: values and units are unchanged (`rtol=1e-12, atol=0`).
+- Read-only MOUSE comparison against `e2d2353` (immediately before R20), loading
+  incident wavelength, its unit attribute and the wavelength_error source:
+
+  | MOUSE file | Samples | wavelength_error before (nm) | wavelength_error after (nm) | wavelength_jitter before → after (nm) |
+  | --- | --- | --- | --- | --- |
+  | `MOUSE_20260903_1_123_stacked_modacor.nxs` | 5 | 0.005 | 0.0005 | 0 → 0 |
+  | `MOUSE_20260903_1_125_stacked_modacor.nxs` | 10 | 0.004999999999999999 | 0.0005000000000000001 | 0 → 0 |
+  | `MOUSE_20260903_1_127_stacked_modacor.nxs` | 16 | 0.005 | 0.0005 | 0 → 0 |
+
+  The source errors are 0.005 Å; all three now carry approximately
+  **0.0005 nm**. The nominal wavelength remains exactly
+  **0.15406012535095215 nm**. R20 resolves the component-unit mismatch noted
+  in the R16 measurements above; no data or pipeline files were edited.
+- Final development suite after the parser fixup, with access tracing:
+  **2087 passed, 1 skipped**, 2 subtests passed. `tox -e py312`:
+  **2085 passed, 3 skipped**, 2 subtests passed; `tox -e lint` **passed**.
+  Docs, manifest and example checks passed during implementation and independent
+  review; these were not repeated for the parser-only fixup.
+  The opt-in RSS/Tiled skips and three existing unary/inverse warnings are
+  unchanged. MoDaCor-examples `tests` and `DLS/I22/tests` with branch `src` on
+  PYTHONPATH: **23 passed**; its four pre-existing modified files were untouched.
+- No example stop condition was hit. Changes outside the allowed MOUSE source
+  were absent from the local-data audit. The percent test-fixture metadata was
+  corrected without weakening or changing its expected numerical results.
+  `auxiliary/` remains untracked; nothing was pushed.
+
 
 **Review log.** _(reviewer)_
 
