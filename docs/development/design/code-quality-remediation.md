@@ -94,7 +94,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | done (v1.17.0, PR #160) |
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | done (v1.17.0, PR #161) |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | done (v1.17.1, PR #163) |
-| R11 | Split `RuntimeService` into focused services | structure | L | medium | ready |
+| R11 | Split `RuntimeService` into focused services | structure | L | medium | in review |
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | done |
 | R14 | The `required` argument flag is never enforced | contract | S | medium | done (v1.17.0, PR #161) |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | done (v1.14.0, PR #152) |
@@ -2420,7 +2420,7 @@ and 3 (`step_reference`) released in v1.17.1 (PR #163).
 
 ## R11 — Split `RuntimeService` into focused services
 
-**Status:** ready (2026-11-04), on branch `quality-remediation-r11`. The plan
+**Status:** in review (2026-11-04), on branch `quality-remediation-r11`. The plan
 update below refines the approach.
 
 **Problem.** `server/runtime_service.py` is 1516 lines, essentially one class.
@@ -2499,7 +2499,121 @@ v1.17.1. Where they differ from the text above, this update takes precedence.
   scope. Combined coverage of the facade and the new modules must not fall
   below the Step 0 figure.
 
-**Implementation notes.** _(implementer)_
+**Implementation notes.** 2026-11-04:
+
+- Added 48 public-API characterization cases before production changes, in
+  `tests/server/test_runtime_characterization.py`. They cover source/sink/sample
+  registration and validation, policy rejection, missing resources, reset and
+  recovery, run queries, process-request validation, real pipeline failures in
+  auto fallback, trace reports, and chunk initialization/reopen/recovery state.
+  The constructor annotation guard checks `manager` and `policy` with
+  `typing.get_type_hints`; source tests assert successful sample registration
+  before failure/recovery checks and name the missing `driver.full_shape`
+  error explicitly. The provisional buffer source uses `buffer://s`.
+- Full-suite line coverage (covered statements / total; the terminal's `Cover`
+  column also includes branches):
+
+  | Measurement | Covered / total | Line coverage | Full-suite result |
+  | --- | --- | --- | --- |
+  | Before Step 0 | 586 / 789 | 74.27% | 2087 passed, 1 skipped |
+  | After Step 0, before extraction | 714 / 789 | 90.49% | 2135 passed, 1 skipped |
+  | Final facade plus all seven new modules | 882 / 959 | 91.97% | 2135 passed, 1 skipped |
+
+  Coverage used `COVERAGE_CORE=ctrace`, `--cov=modacor.server`, and
+  `--cov-branch`. The final coverage run also wrote a JSON report for summing
+  the eight files; unrelated server files are excluded from the combined figure.
+- Final module sizes (`wc -l`):
+
+  | Module under `src/modacor/server/` | Lines |
+  | --- | ---: |
+  | `runtime_service.py` | 367 |
+  | `session_service.py` | 24 |
+  | `buffer_service.py` | 145 |
+  | `chunked_output_service.py` | 224 |
+  | `session_resources.py` | 255 |
+  | `process_requests.py` | 87 |
+  | `process_failure.py` | 332 |
+  | `process_service.py` | 535 |
+
+  Every server module is below 600 lines. The facade retains its session,
+  health, readiness, policy, template, summary, and latest-error bodies, with
+  explicit single-line delegations for extracted public operations.
+- A one-off, uncommitted script compared `origin/main` with the implementation:
+  `inspect.signature(RuntimeService, eval_str=True)`, the set of 44 public
+  names, and all 40 public method signatures (also with `eval_str=True`)
+  are **identical**, including defaults and resolved annotations.
+  A separate source comparison found every original method body unchanged
+  except the permitted mechanical wiring and trace-helper dedentation.
+  Identity checks confirmed each service shares the facade's own objects
+  for only the collaborators it uses: buffer and resource services receive
+  manager/policy; the chunked-output service also receives chunked outputs;
+  both process services receive all four collaborators. `ProcessService`
+  holds the same composed failure handler. `SessionService` uses an eager
+  manager annotation, with a comment explaining why; all six subclass
+  constructor annotations resolve without annotation-only imports.
+- Commit sequence and exhaustive non-move edits for each extraction:
+  - `e4cac04`, `test: characterize RuntimeService failure, recovery and fallback
+    paths`: new tests only; no production changes.
+  - `91a52bb`, buffer extraction: imports and R10 module headers/exports;
+    slotted `SessionService` with the relocated, eagerly annotated manager
+    field and sole `_require_session`; facade inheritance, service
+    field/construction and
+    explicit delegations; service class header/fields limited to manager/policy.
+    No method-body edits.
+  - `68fb7b1`, chunked-output extraction: imports, new module header/exports,
+    service class/fields limited to manager/policy/chunked outputs, facade
+    field/construction and delegations. No method-body edits.
+  - `59d3a74`, source/sink extraction: imports, new module header/exports,
+    service class/fields limited to manager/policy, facade field/construction
+    and delegations; relocated logger creation and the corresponding
+    diagnostics logger-name filter.
+    No method-body edits.
+  - `11ea4a4`, request/helper extraction: imports and new module header/exports;
+    `_trace_report` becomes a module function by removing its unused `self`
+    parameter and dedenting; callers use `_trace_report(...)`. Container,
+    provenance, trace, and exception bodies are otherwise unchanged.
+  - `f15adb4`, failure extraction: imports, new module header/exports, service
+    class/fields and facade field/construction; the process failure call now
+    uses `self._failures._handle_process_failure(...)`; tests patch both
+    runner lookup locations with the same fake; diagnostics logger names
+    follow the moved failure code. No other method-body edits.
+  - `5c9e591`, process extraction: imports, new module header/exports, service
+    class/fields and facade field/construction/delegations; compose the
+    existing failure handler into `ProcessService`; move `_latest_failed_run`
+    beside `latest_error`; retarget runner/deepcopy patches; move facade
+    `__all__` beside the header and normalize field spacing. Inherited
+    manager annotations resolve through the eager base; subclass modules
+    and the facade need no annotation-only `SessionManager` imports. No
+    other method-body edits.
+
+  New headers, imports, class fields, and wiring follow isort/Black formatting;
+  moved bodies retain their original formatting and comments.
+- Existing-test edits are limited to lookup targets and logger names (final
+  file lines):
+  - `tests/server/test_api_e2e.py`: deepcopy at 316; runner targets at
+    449–450, 490–491, 537–538, 579–580, 1243–1244, 1790–1791, 1880–1881,
+    and 1953–1954. Both process modules use the same fake at each site.
+  - `tests/server/test_diagnostics.py`: registration logger at 66; runner
+    targets at 81–82; failure logger names at 91 and 96.
+  - The new characterization file's runner targets followed the moves at
+    `tests/server/test_runtime_characterization.py:273–274`; its assertions
+    were unchanged after Step 0.
+- Checks: after Step 0 and every extraction commit, server/client tests passed
+  (**158 passed** at each rewritten checkpoint). Final access-traced
+  development suite:
+  **2135 passed, 1 skipped**, 2 subtests passed; Python 3.12 tox suite:
+  **2133 passed, 3 skipped**, 2 subtests passed. Three existing warnings remain.
+  `ruff check --select F401 src/modacor/server` is clean. Tox `py312`,
+  `lint`, `docs`, and `manifest` passed. The sandboxed manifest run could
+  not download isolated-build dependencies; the network-enabled retry
+  passed with version-control and sdist file lists matching.
+- Suspected pre-existing bug, excluded from characterization per the Step 0
+  stop rule: a `chunk_output.chunk_spec` missing `schema_version` produces HTTP
+  404 with detail `'schema_version'`, because its parser `KeyError` is mapped
+  as a missing output. No test pins that behavior and no fix is included.
+  No extraction needed changed expectations, logic changes, circular-import
+  restructuring, or an oversized module. `auxiliary/` remains untracked and
+  nothing was pushed.
 
 **Review log.** _(reviewer)_
 
