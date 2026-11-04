@@ -7,7 +7,7 @@ Append signal data from IoSources into a processing DataBundle.
 - **Import path:** `modacor.modules.base_modules.append_processing_data.AppendProcessingData`
 - **Source:** [`src/modacor/modules/base_modules/append_processing_data.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/append_processing_data.py)
 - **Module ID:** AppendProcessingData
-- **Module version:** 20261102.1
+- **Module version:** 20261104.1
 - **Keywords:** append, processing, data, signal
 
 ## Required data keys
@@ -48,9 +48,9 @@ _No data-key roles declared._
 | `processing_key` | str | Yes |  | - | ProcessingData key to create or update. |
 | `rank_of_data` | int or str | No | 2 | - | BaseData rank as int or IoSources metadata reference. |
 | `signal_location` | str | Yes |  | - | IoSources reference '<io_source_id>::<dataset_path>'. |
-| `uncertainties_sources` | dict | No | {} | - | Mapping of uncertainty name to IoSources reference. |
+| `uncertainties_sources` | dict | No | {} | - | Map uncertainty names to source references; dataset units convert to signal units unless overridden. |
 | `units_location` | str or NoneType | No | - | - | Optional IoSources reference for units metadata. |
-| `units_override` | str or NoneType | No | - | - | Optional unit string that overrides loaded units. |
+| `units_override` | str or NoneType | No | - | - | Optional unit label for signal and uncertainties; skips their unit metadata without conversion. |
 | `weights_location` | str or NoneType | No | - | - | Optional IoSources reference for BaseData weights. |
 
 ## Notes

@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+__all__ = ["IndexedAverager"]
+__version__ = "20261103.2"
+
 from pathlib import Path
 
 import numpy as np
@@ -22,9 +25,6 @@ from modacor.models.reduction import (
 )
 from modacor.models.uncertainty import with_uncertainty_estimates
 from modacor.modules.helpers import normalize_str_list
-
-__all__ = ["IndexedAverager"]
-__version__ = "20261030.1"
 
 _DIAGNOSTIC_KEYS = (
     "bin_count",
@@ -157,6 +157,7 @@ class IndexedAverager(ProcessStep):
             "The index map alone determines membership. The optional axis is averaged over the same valid, "
             "unmasked observations and weights; bin edges are neither required nor read."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     def _configuration_keys(self) -> tuple[str, str, str | None, str | None, str]:
@@ -205,7 +206,7 @@ class IndexedAverager(ProcessStep):
             "uncertainty_weight_key"
         ):
             raise ValueError(
-                "IndexedAverager: uncertainty_weight_key is required when " "use_value_uncertainty_weights is true."
+                "IndexedAverager: uncertainty_weight_key is required when use_value_uncertainty_weights is true."
             )
 
     def dependency_contract(self) -> ProcessStepDependencies:
@@ -306,7 +307,7 @@ class IndexedAverager(ProcessStep):
         unknown = selected - available
         if unknown:
             raise ValueError(
-                "IndexedAverager: stats_keys contains keys that are not the value or axis: " f"{sorted(unknown)!r}."
+                f"IndexedAverager: stats_keys contains keys that are not the value or axis: {sorted(unknown)!r}."
             )
         return selected
 

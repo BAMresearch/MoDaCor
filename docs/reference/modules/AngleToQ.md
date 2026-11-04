@@ -7,7 +7,7 @@ Convert an angle relative to its direct-beam or diffraction centre into signed Q
 - **Import path:** `modacor.modules.technique_modules.scattering.angle_to_q.AngleToQ`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/angle_to_q.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/angle_to_q.py)
 - **Module ID:** AngleToQ
-- **Module version:** 20261101.1
+- **Module version:** 20261103.2
 - **Keywords:** scattering angle, two theta, Bragg angle, Q, momentum transfer, geometry
 
 ## Required data keys
@@ -60,6 +60,9 @@ _No fixed data keys declared._
 | `photon_uncertainties_sources` | dict | No | {} | - | Uncertainty sources for photon energy or wavelength metadata. |
 | `photon_units_source` | str or NoneType | Yes | - | - | IoSources key for photon energy or wavelength units. |
 | `with_processing_keys` | str or list or NoneType | Yes | - | - | DataBundle key or keys whose angular coordinates are converted. |
+
+## References
+DOI 10.1107/S1600576717015096
 
 ## Notes
 Uses Q = 4*pi/lambda*sin(angle/2) for scattering_angle/two_theta and Q = 4*pi/lambda*sin(angle) for bragg_angle/theta. Photon metadata is loaded from IoSources; energy or wavelength representation is inferred from its units and converted with uncertainty-aware BaseData arithmetic. The angle sign is retained. Q is returned in 1/m; use ConvertUnits to select output units.

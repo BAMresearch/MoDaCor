@@ -1,17 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Adapt detector metadata and detector indices to BaseData."""
 
 from __future__ import annotations
 
-__coding__ = "utf-8"
-__authors__ = ["Brian R. Pauw"]
-__copyright__ = "Copyright 2026, The MoDaCor team"
-__date__ = "06/01/2026"
-__status__ = "Development"  # "Development", "Production"
-
-__version__ = "20260106.1"
 __all__ = ["require_scalar", "prepare_static_scalar", "detector_index_basedata"]
+__version__ = "20261103.2"
+__authors__ = ["Brian R. Pauw"]
 
 import numpy as np
 import pint
@@ -19,6 +13,7 @@ import pint
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData, _validate_uncertainties
 from modacor.models.statistics import static_weighted_mean_sem
+from modacor.models.uncertainty import with_uncertainty_estimates
 
 
 def require_scalar(name: str, bd: BaseData) -> BaseData:
@@ -69,10 +64,18 @@ def prepare_static_scalar(
 ) -> BaseData:
     """
     Reduce a possibly-array BaseData to a scalar via weighted mean (bd.weights) and
-    assign uncertainty as standard error of the mean (SEM).
+    retain unreduced configured components alongside the scatter SEM.
 
     - If bd is already scalar: squeeze+RoD=0 and return.
     - If bd.weights is None: uniform weights are assumed.
+    - For an array, each configured component is the weighted mean of its sigma,
+      using the same weights and weight handling as the nominal mean. Scalar and
+      broadcastable sigmas are supported; a constant sigma does not shrink as
+      the number of metadata samples increases.
+    - Add the SEM under uncertainty_key; an existing component with that name is
+      a configuration conflict. The Stage 0 producer rule folds a global-only
+      propagate_to_all component into that SEM with hypot(SEM, mean sigma),
+      replaces the global key, and logs the legacy fold at INFO.
 
     Notes
     -----
@@ -92,11 +95,18 @@ def prepare_static_scalar(
             bd.signal.squeeze(), bd.units, uncertainties=bd.uncertainties, weights=bd.weights.squeeze()
         )
 
+    if uncertainty_key in bd.uncertainties:
+        raise ValueError(f"Uncertainty component {uncertainty_key!r} conflicts with the scatter SEM key.")
+
     mean, sem = static_weighted_mean_sem(bd.signal, bd.weights)
+    components = {
+        name: static_weighted_mean_sem(np.broadcast_to(sigma, bd.signal.shape), bd.weights)[0]
+        for name, sigma in bd.uncertainties.items()
+    }
 
     return BaseData.from_scalar(
         signal=np.array(mean, dtype=float),
         units=bd.units,
-        uncertainties={uncertainty_key: np.array(sem, dtype=float)},
+        uncertainties=with_uncertainty_estimates(components, {uncertainty_key: sem}),
         rank_of_data=0,
     )

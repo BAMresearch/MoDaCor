@@ -1,17 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Compute a normal robust-fit or uncertainty-weighted lognormal scale between two 1D curves."""
 
 from __future__ import annotations
 
-__coding__ = "utf-8"
-__authors__ = ["Brian R. Pauw"]
-__copyright__ = "Copyright 2025, The MoDaCor team"
-__date__ = "12/12/2025"
-__status__ = "Development"
-
 __all__ = ["FindScaleFactor1D"]
-__version__ = "20261002.1"
+__version__ = "20261103.2"
+__authors__ = ["Brian R. Pauw"]
 
 from pathlib import Path
 from typing import Dict
@@ -207,7 +201,8 @@ class FindScaleFactor1D(ProcessStep):
         step_doc="Compute a normal robust-fit or uncertainty-weighted lognormal scale between two 1D curves.",
         step_note=(
             "The fitted scale uncertainty is stored under scale_uncertainty_key. Reduced chi-square is a "
-            "goodness-of-fit diagnostic; it does not automatically inflate the formal fitted uncertainty."
+            "goodness-of-fit diagnostic; it does not automatically inflate the formal fitted uncertainty. The "
+            "axis is treated as exact (fixed abscissae); axis uncertainties are not propagated."
         ),
         step_reference="DOI 10.1107/S1600577513030117",
     )

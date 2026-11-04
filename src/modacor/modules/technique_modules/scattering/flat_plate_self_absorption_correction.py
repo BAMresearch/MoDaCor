@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
+"""Correct angle-dependent self-absorption for a transmission-normalized flat sample."""
+
 from __future__ import annotations
 
 __all__ = ["FlatPlateSelfAbsorptionCorrection"]
-__version__ = "20261102.1"
+__version__ = "20261103.3"
 
 from pathlib import Path
 
@@ -86,10 +88,14 @@ class FlatPlateSelfAbsorptionCorrection(ProcessStep):
         step_keywords=["sample", "self absorption", "flat plate", "transmission"],
         step_doc="Correct angle-dependent self-absorption for a transmission-normalized flat sample.",
         step_note=(
-            "For s=1/cos(2theta), x=(s-1) ln(T), the relative attenuation is expm1(x)/x. "
-            "The expression is the depth integral for scattering generated uniformly through a plate and is not "
-            "the same as transmission through a separate downstream attenuator."
+            "For s=1/cos(2theta), x=(s-1) ln(T), the relative attenuation is expm1(x)/x. The expression is the "
+            "depth integral for scattering generated uniformly through a plate and is not the same as "
+            "transmission through a separate downstream attenuator. Transmission uncertainties are propagated; "
+            "CosAlpha uncertainty is not. Geometry uncertainties are shared calibration terms that the current "
+            "per-key model would treat as independent; propagation awaits shared contributions in later stages of"
+            " the uncertainty specification."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     def calculate(self) -> dict[str, DataBundle]:

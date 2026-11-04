@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Compute Q-vector components and angles from lab-frame pixel coordinates."""
 
 from __future__ import annotations
+
+__all__ = ["XSGeometryFromPixelCoordinates"]
+__version__ = "20261103.4"
 
 from pathlib import Path
 from typing import Dict, Tuple
@@ -29,9 +31,6 @@ from modacor.modules.helpers.scattering.detector_data import (
 from modacor.modules.helpers.scattering.photon_energy import as_photon_wavelength
 
 logger = MessageHandler(name=__name__)
-
-__version__ = "20261102.1"
-__all__ = ["XSGeometryFromPixelCoordinates"]
 
 
 class XSGeometryFromPixelCoordinates(ProcessStep):
@@ -184,9 +183,13 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         ],
         step_doc="Compute Q-vector components and angles from lab-frame pixel coordinates.",
         step_note=(
-            "Photon metadata is loaded from IoSources. Energy or wavelength representation is inferred "
-            "from its units and converted to wavelength with uncertainty-aware BaseData arithmetic."
+            "Photon metadata is loaded from IoSources. Energy or wavelength representation is inferred from its "
+            "units and converted to wavelength with uncertainty-aware BaseData arithmetic. Psi has no "
+            "uncertainty. Geometry uncertainties are shared calibration terms that the current per-key model "
+            "would treat as independent; propagation awaits shared contributions in later stages of the "
+            "uncertainty specification."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     output_keys: Tuple[str, ...] = (
@@ -375,10 +378,19 @@ class XSGeometryFromPixelCoordinates(ProcessStep):
         # dΩ ≈ A * cos(alpha) / R^2, with cos(alpha)=n·rhat
         # Here A is computed from detector element sizes in length units.
         n = detector_normal
-        cos_alpha = (rhat_x * n[0]) + (rhat_y * n[1]) + (rhat_z * n[2])
-        cos_alpha_clipped = cos_alpha.copy()
-        cos_alpha_clipped.signal = np.clip(cos_alpha.signal, 0.0, None)
-        CosAlpha = cos_alpha_clipped
+        CosAlpha = (rhat_x * n[0]) + (rhat_y * n[1]) + (rhat_z * n[2])
+        negative = CosAlpha.signal < 0.0
+        count = int(np.count_nonzero(negative))
+        if count:
+            minimum = float(np.min(CosAlpha.signal[negative]))
+            if not np.any(CosAlpha.signal > 0.0):
+                cause = "detector_normal points toward the sample (flipped sign), or the detector faces away from it"
+            else:
+                cause = "detector_normal does not match the pixel plane (e_fast/e_slow)"
+            raise ValueError(
+                f"XSGeometryFromPixelCoordinates ({self.step_id}): negative CosAlpha at {count} affected pixels; "
+                f"minimum CosAlpha={minimum}; {cause}."
+            )
 
         area_pixel = pitch_fast * pitch_slow
         Omega = (area_pixel * CosAlpha) / (R**2)

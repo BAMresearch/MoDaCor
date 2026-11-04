@@ -7,7 +7,7 @@ Divide signal by the linear-polarization intensity factor.
 - **Import path:** `modacor.modules.technique_modules.scattering.polarization_correction.PolarizationCorrection`
 - **Source:** [`src/modacor/modules/technique_modules/scattering/polarization_correction.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/technique_modules/scattering/polarization_correction.py)
 - **Module ID:** PolarizationCorrection
-- **Module version:** 20261102.2
+- **Module version:** 20261103.3
 - **Keywords:** polarization, polarisation, scattering, correction
 
 ## Required data keys
@@ -63,6 +63,9 @@ Divide signal by the linear-polarization intensity factor.
 | `two_theta_key` | str | No | TwoTheta | processing_read_basedata_key | BaseData key containing the scattering angle 2theta. |
 | `with_processing_keys` | list | No | ["sample"] | - | ProcessingData keys whose signal should be corrected. |
 
+## References
+DOI 10.1107/S1600576717015096
+
 ## Notes
 
             The implemented mode is DAWN/pyFAI-style linear_fraction:
@@ -72,3 +75,7 @@ Divide signal by the linear-polarization intensity factor.
 
             mode='stokes' is reserved for a future implementation once the
             Stokes reference-frame convention has been fixed.
+
+            No uncertainty from TwoTheta or Psi is propagated. Geometry uncertainties are shared
+            calibration terms that the current per-key model would treat as independent; propagation
+            awaits shared contributions in later stages of the uncertainty specification.

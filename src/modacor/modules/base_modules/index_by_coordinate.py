@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+__all__ = ["IndexByCoordinate"]
+__version__ = "20261103.2"
+
 from pathlib import Path
 
 import numpy as np
@@ -14,9 +17,6 @@ from modacor.dataclasses.process_step import ProcessStep
 from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 from modacor.models.binning import assign_bin_indices, generate_bin_edges, validate_bin_edges
 from modacor.modules.helpers import scalar_in_units
-
-__all__ = ["IndexByCoordinate"]
-__version__ = "20261102.1"
 
 
 class IndexByCoordinate(ProcessStep):
@@ -98,6 +98,7 @@ class IndexByCoordinate(ProcessStep):
             "Bins are left-inclusive and right-exclusive except for the included final right edge. "
             "Non-finite and out-of-range coordinates receive index -1. Masks are applied by downstream reducers."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     @staticmethod

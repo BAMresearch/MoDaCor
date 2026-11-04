@@ -147,6 +147,18 @@ For an unweighted mean of independent samples,
 denominator. `ReduceDimensionality` propagates each existing key and can add
 scatter-derived estimates using the producer rule above.
 
+`prepare_static_scalar` preserves the existing weighted mean and scatter SEM of
+array-valued detector metadata, and carries each configured component as the
+weighted mean of its sigma using the same weights as the nominal mean. These
+components are unreduced: a constant sigma does not shrink with the number of
+frames. Scalar and broadcastable component arrays are supported; NaN propagates.
+The SEM is added under
+the configured jitter key; a component already named like that key raises a
+configuration-conflict error. A global-only `propagate_to_all` component is first
+averaged without reduction, then folded into the SEM as `hypot(SEM, sigma_global_mean)` using the
+Stage 0 producer rule, with the standard INFO log and no mixed output mapping.
+Scalar metadata passes through unchanged.
+
 `Integrate1D` uses quadrature coefficients `c_i` and computes
 `sigma_I = sqrt(sum((c_i sigma_i)²))` for each key. The output unit is the signal
 unit multiplied by the coordinate unit. Invalid, masked or zero-weight samples
@@ -162,3 +174,16 @@ particular, broadcasting and repeated use of a correction do not establish
 independence. Systematic contributions must not be combined in quadrature merely
 for convenience. Choose uncertainty models and explicit combinations to match the
 measurement, and retain diagnostic outputs where a stronger model is needed.
+
+Known omissions in scientific steps:
+
+- `AttenuatorPlateCorrection` and `DetectorEfficiencyCorrection` do not propagate
+  CosAlpha uncertainty into their correction factors. `FlatPlateSelfAbsorptionCorrection`
+  propagates transmission uncertainty but omits CosAlpha uncertainty.
+- `PolarizationCorrection` omits TwoTheta and Psi uncertainties;
+  `XSGeometryFromPixelCoordinates` assigns no uncertainty to Psi. These geometry
+  uncertainties are shared calibration terms that the current per-key model
+  would treat as independent. Their propagation waits for shared contributions
+  and source responses in later stages of the uncertainty specification.
+- `Integrate1D`, `FindScaleFactor1D`, and `SubtractInterpolated1D` treat their axes
+  as exact (fixed abscissae); axis uncertainties are not propagated.

@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Apply angle-dependent attenuator plate transmission."""
 
 from __future__ import annotations
 
 __all__ = ["AttenuatorPlateCorrection"]
-__version__ = "20261102.1"
+__version__ = "20261103.3"
 
 from pathlib import Path
 
@@ -196,11 +195,15 @@ class AttenuatorPlateCorrection(ProcessStep):
         step_keywords=["attenuator", "plate", "attenuation", "absorption", "transmission"],
         step_doc="Apply angle-dependent attenuator plate transmission.",
         step_note=(
-            "Material parameters can be provided as direct values or *_source paths. "
-            "xraylib is used for material lookup unless linear_attenuation_coefficient is configured directly. "
-            "The default applies a physical correction by dividing by transmission; apply_as='multiply' is provided "
-            "for DAWN cross-validation where the recorded operation applies the attenuation factor itself."
+            "Material parameters can be provided as direct values or *_source paths. xraylib is used for material"
+            " lookup unless linear_attenuation_coefficient is configured directly. The default applies a physical"
+            " correction by dividing by transmission; apply_as='multiply' is provided for DAWN cross-validation "
+            "where the recorded operation applies the attenuation factor itself. The correction factor carries no"
+            " uncertainty from CosAlpha. Geometry uncertainties are shared calibration terms that the current "
+            "per-key model would treat as independent; propagation awaits shared contributions in later stages of"
+            " the uncertainty specification."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     def calculate(self) -> dict[str, DataBundle]:

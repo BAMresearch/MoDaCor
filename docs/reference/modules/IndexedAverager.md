@@ -7,7 +7,7 @@ Compute weighted group means from a precomputed integer index map.
 - **Import path:** `modacor.modules.base_modules.indexed_averager.IndexedAverager`
 - **Source:** [`src/modacor/modules/base_modules/indexed_averager.py`](https://github.com/BAMresearch/MoDaCor/blob/main/src/modacor/modules/base_modules/indexed_averager.py)
 - **Module ID:** IndexedAverager
-- **Module version:** 20261030.1
+- **Module version:** 20261103.2
 - **Keywords:** indexed, grouped, weighted average, reduction
 
 ## Required data keys
@@ -63,6 +63,9 @@ _No data-key roles declared._
 | `use_value_weights` | bool | No | True | - | Use the value BaseData weights for both the value and output axis. |
 | `value_key` | str | No | signal | - | BaseData value to average. |
 | `with_processing_keys` | str or list or NoneType | No | - | - | ProcessingData key(s) to reduce. |
+
+## References
+DOI 10.1107/S1600576717015096
 
 ## Notes
 The index map alone determines membership. The optional axis is averaged over the same valid, unmasked observations and weights; bin edges are neither required nor read.

@@ -91,16 +91,18 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R05 | Core-container validation and untested contracts (rescoped) | bug + tests | S | medium | done |
 | R06 | Repository hygiene: untracked artefacts and `.gitignore` | housekeeping | XS | low | done |
 | R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | done |
-| R08 | Audit remaining unit stripping in modules | contract | M | medium | approved |
-| R09 | Narrow broad `except Exception` handlers | robustness | M | medium | approved |
-| R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | item 1 done; 2–3 open |
+| R08 | Audit remaining unit stripping in modules | contract | M | medium | done (v1.17.0, PR #160) |
+| R09 | Narrow broad `except Exception` handlers | robustness | M | medium | done (v1.17.0, PR #161) |
+| R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | item 1 done; 2–3 in review |
 | R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | done |
-| R14 | The `required` argument flag is never enforced | contract | S | medium | approved |
-| R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | in progress |
-| R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decision needed |
+| R14 | The `required` argument flag is never enforced | contract | S | medium | done (v1.17.0, PR #161) |
+| R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | done (v1.14.0, PR #152) |
+| R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decided |
 | R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | done (v1.15.0, PR #154) |
-| R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | approved |
+| R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | done (v1.16.0, PR #156) |
+| R19 | Q uncertainty and Q resolution (smearing profile) | science | L | high | future; design needed |
+| R20 | Uncertainty sources ignore their own units | bug | S | high | in review |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -1643,10 +1645,9 @@ branch `quality-remediation-r07`, which also carries the R06 commits.
 
 ## R08 — Audit remaining unit stripping in modules
 
-**Status:** implementation complete on `quality-remediation-r08b` (2026-11-02),
-rebased without conflicts onto v1.16.1 (`835df4c`). Numerical comparisons and
-performance baselines remain v1.16.0 (`0d0839b`). Final validation is recorded
-below. The ten missing-uncertainty rows remain in R16.
+**Status:** done. Merged in PR #160 and released in v1.17.0. Numerical
+comparisons and performance baselines are against v1.16.0 (`0d0839b`). The ten
+missing-uncertainty rows moved to R16.
 
 **Inventory (2026-10-31, after R07).** A pattern search (`.magnitude`,
 `.m_as(`, `np.asarray(… .signal)`, `float(… .signal)`, `.to(…).magnitude`)
@@ -2177,7 +2178,7 @@ performance stop was cleared in review; no new stop condition arose.
 
 ## R09 — Narrow broad `except Exception` handlers
 
-**Status:** in review
+**Status:** done. Merged in PR #161 and released in v1.17.0.
 
 **Problem.** There are broad `except Exception` handlers in
 `server/runtime_service.py` (7), `io/tiled/tiled_source.py` (3),
@@ -2283,7 +2284,7 @@ change to the server's API error responses (`tests/server` unchanged).
 
 ## R10 — Conventions
 
-**Status:** item 1 done; items 2 (file headers) and 3 (`step_reference`) open, pending maintainer decisions.
+**Status:** item 1 done; items 2 (file headers) and 3 (`step_reference`) implemented, in review.
 
 **Scope.**
 
@@ -2303,6 +2304,33 @@ change to the server's API error responses (`tests/server` unchanged).
    reference exists, add it; otherwise keep the general review, but do not
    leave the field empty. The maintainer supplies or approves the references.
 
+**Decisions (maintainer, 2026-11-03).**
+
+- **Item 2, headers: SPDX plus authors.** A package file starts with the SPDX
+  line and a module docstring, then `__all__`, and `__version__` in step
+  modules (it is recorded as the step version in pipeline specs and graph
+  output). Existing `__authors__` lists stay, for contributor credit. Drop
+  `__coding__`, `__copyright__`, `__date__`, `__status__` and the
+  shebang/coding comment lines: the copyright is in `LICENSE`, and the date and
+  status go stale. Survey on 2026-11-03: 58 package files use the full block,
+  76 the SPDX style, and 14 (mostly `__init__.py`) neither. Files change only
+  when another item touches them, plus the module template and the files this
+  item edits for references; no mass rewrite.
+- **Item 3, references: scientific steps only.** Of 42 public steps, 12 cite
+  the 2013 review, 3 a specific paper and 2 the NeXus mask convention; 25 are
+  empty (the count of 8 above predates later steps). The 12 empty scientific
+  steps get a reference: AngleToQ, AttenuatorPlateCorrection,
+  DetectorEfficiencyCorrection, FindCenterOfMass1D,
+  FlatPlateSelfAbsorptionCorrection, IndexByCoordinate, IndexedAverager,
+  Integrate1D, PixelCoordinates3D, PolarizationCorrection,
+  SubtractInterpolated1D and XSGeometryFromPixelCoordinates. The fallback is the
+  modular correction-sequence paper (Pauw et al. 2017,
+  DOI 10.1107/S1600576717015096); the maintainer may substitute specific
+  references later. The 13 infrastructure steps (I/O, bookkeeping, units,
+  masks, plotting, `Negate`) may stay empty. A test enforces the split through
+  an explicit allowlist of infrastructure steps, so a new step needs a
+  reference unless it is added there.
+
 **Acceptance criteria.** As in the scope above; reference pages regenerated.
 
 **Implementation notes.**
@@ -2311,8 +2339,8 @@ change to the server's API error responses (`tests/server` unchanged).
   `@frozen(slots=True)`. Its fields, construction, and scientific use are unchanged.
   `MaterialAttenuation` already uses attrs; the former statistics helper record
   now lives in `models/statistics.py`, where dataclasses remain allowed.
-- Items 2 and 3 remain open for maintainer decisions. No file-header convention
-  or scientific references were changed.
+- Items 2 and 3 were left open during the item 1 implementation; their
+  2026-11-03 implementation is recorded below.
 - Validation: focused capillary tests **67 passed**; attrs identity, frozen-field
   assignment, and slots verified directly.
 - Final combined R14/R09/R10 checks (access trace active; no opt-outs added):
@@ -2333,6 +2361,49 @@ change to the server's API error responses (`tests/server` unchanged).
   maintainer's explicit approval. `auxiliary/` remains untracked and excluded.
   All commits remain local; nothing was pushed.
 
+
+**Items 2–3 implementation (2026-11-03).**
+
+- Re-derived the split from the 42 public steps and their metadata/roles:
+  **25** references were empty, comprising the **12** scientific additions and
+  **13** infrastructure exceptions below. Both lists match the decision.
+  All **17** existing non-empty references were preserved byte-for-byte.
+- Added `DOI 10.1107/S1600576717015096` to: AngleToQ,
+  AttenuatorPlateCorrection, DetectorEfficiencyCorrection, FindCenterOfMass1D,
+  FlatPlateSelfAbsorptionCorrection, IndexByCoordinate, IndexedAverager,
+  Integrate1D, PixelCoordinates3D, PolarizationCorrection,
+  SubtractInterpolated1D, XSGeometryFromPixelCoordinates.
+- Infrastructure allowlist: AppendProcessingData, AppendSink, AppendSource,
+  ConcatenateDatabundles, ConvertUnits, CopyDataBundleKeys, DilateMask, Negate,
+  Plot1DVisualization, Plot2DVisualization, ReduceMask, SinkProcessingData,
+  ThresholdMask. `tests/modules/test_public_module_contracts.py` now checks
+  every public reference and verifies every allowlist name is public.
+  Regression proof before the citations: **12 failed, 106 passed**;
+  metadata/document-generation checks afterwards: **130 passed**.
+- Recorded SPDX plus module docstring, exports/version, and retained authors in
+  the author guide and checklist. Required future imports precede exports to
+  keep Python's syntax valid. Converted only the **14** package files touched
+  by R16/references (**13** steps plus detector_data) and the correction template.
+  Every touched step version was bumped; references were regenerated.
+- Audited all tracked Python for the dropped dunders: initially **425**
+  definitions, **0** name/attribute reads and **0** dynamic-name string uses.
+  No dependency blocked removal. Verified that non-header executable AST,
+  import sets, authors and exports were preserved across all **15** converted
+  files; isort reordered imports and black normalized literals where needed.
+- Final combined validation after review fixups, with the access trace active
+  and no opt-outs:
+  development suite **2056 passed, 1 skipped**, 2 subtests passed;
+  `tox -e py312` **2054 passed, 3 skipped**, 2 subtests passed;
+  `tox -e lint` and `tox -e docs` **passed** after the review fixups.
+  `tox -e manifest` passed in the original implementation/review; no file-list
+  changes were introduced by the fixups.
+  The skips remain the opt-in RSS test and, in tox only, two optional Tiled
+  integrations; the three existing unary/inverse divide-by-zero warnings remain.
+- MoDaCor-examples `tests` and `DLS/I22/tests` with branch `src` on PYTHONPATH:
+  **23 passed**. No example assertions or repository files were edited; its four
+  pre-existing modified files remain intact. Exact approved R16 numerical
+  changes are recorded under R16 below. No numerical stop condition was hit.
+  `auxiliary/` remains untracked; all commits remain local and nothing was pushed.
 
 **Review log.** _(reviewer)_
 
@@ -2439,7 +2510,8 @@ guards. Verified with `tox -e py312 -- -rs`:
 
 ## R14 — The `required` argument flag is never enforced
 
-**Status:** in review. Option (a), with approved conditional-input validation.
+**Status:** done. Option (a), with approved conditional-input validation.
+Merged in PR #161 and released in v1.17.0.
 
 **Problem.** Argument specs can say `"required": True`, but nothing at
 runtime checks it. Only `scripts/generate_module_doc.py` reads it, to fill the
@@ -2562,7 +2634,7 @@ been checked.
 
 ## R15 — Server: explain source/sink and run failures, and keep logs
 
-**Status:** approved; in progress on branch `quality-remediation-r08-r13-r15`.
+**Status:** done. Merged in PR #152 and released in v1.14.0.
 Raised 2026-10-31: registering
 sources and sinks in a server session returned only a failure code, and no log
 said what went wrong.
@@ -2710,8 +2782,8 @@ unwritable-ancestor failures are covered by focused tests.
 
 ## R16 — Uncertainty propagation gaps found by the R08 audit
 
-**Status:** decision needed (maintainer), row by row. Split out of R08 on
-2026-10-31.
+**Status:** implemented per the 2026-11-03 decisions, in review. Split out of
+R08 on 2026-10-31; shared-calibration propagation remains deferred as decided.
 
 **Problem.** The R08 audit found ten places where an output carries no
 uncertainty contribution from an uncertain input. Each fix changes published
@@ -2737,7 +2809,136 @@ defer. Implement the accepted rows with model sensitivities in `models` and
 attach named components at the BaseData boundary, each with an analytic or
 finite-difference test.
 
-**Implementation notes.** _(implementer)_
+**Decisions (maintainer, 2026-11-03).**
+
+- **Rows 1–5, angle sensitivities (attenuator plate, detector efficiency,
+  flat-plate self-absorption, polarization, Psi): defer and document now.** The
+  geometry uncertainties behind them (distance, beam centre, pixel pitch,
+  wavelength) are shared calibration terms. Stage 0 can only add them as
+  independent per-pixel components, which would count one distance error as
+  independent in several correction factors. In SAXS the sensitivities are
+  small (cos α ≈ 1). Each module's documentation states the omission, and the
+  uncertainty data-model page lists it. Implementation waits for shared
+  contributions in Stage 1 and source responses in Stage 2.
+- **Row 6, CosAlpha clip: raise an error.** CosAlpha is `n · r̂`, with `n`
+  the configured `detector_normal` (default `(0, 0, 1)`, pointing away from the
+  sample). A negative value means the ray reaches the back face of the
+  detector. For a flat detector the sign is the same for every pixel, so
+  negative values mean the normal is flipped or the detector faces away from
+  the sample; mixed signs mean the normal does not match the pixel plane. Both
+  are configuration errors. Today the clip turns them into a zero solid angle and
+  infinite corrected intensities, and the plate corrections already reject
+  CosAlpha ≤ 0. The clip is removed, and `XSGeometryFromPixelCoordinates`
+  raises a `ValueError` that names the count of affected pixels and the most
+  negative value. It points to a flipped normal when all pixels are negative, or
+  to a normal that does not match the pixel plane when signs are mixed. Zero
+  (grazing incidence) stays allowed. This is noted in `interface-migrations.md`.
+- **Rows 7–9, axis uncertainties (Integrate1D, FindScaleFactor1D,
+  SubtractInterpolated1D): axes are exact, documented.** After binning, a Q
+  "uncertainty" is mostly the spread of Q within a bin, a descriptive spread in
+  the specification's sense, not a coordinate error. The real Q error is a
+  shared calibration scale, left for Stage 2 source responses. Each module's
+  documentation states the fixed-abscissa model. The intended end state, with
+  a separate Q uncertainty and smearing profile, is R19.
+- **Row 10, metadata mean (`prepare_static_scalar`): SEM plus unreduced
+  components** (revised in review on 2026-11-03; first decided as reduced
+  components). Each configured component is carried as the weighted mean of its
+  σ, `σ_mean = Σ w_i σ_i / Σ w_i`, so averaging frames does not shrink it. The
+  SEM of the scatter is added under the jitter key as now. A configured
+  component named like the jitter key is a configuration conflict and raises.
+  Outputs change only where array-valued metadata has configured uncertainty
+  sources.
+
+  Reason for the revision: in the MOUSE example data, every frame carries the
+  same wavelength (0.15406 nm) and the same `wavelength_error` (0.005 nm).
+  The reduced rule gave 0.005/√n: 0.0022 nm for a 5-frame file and
+  0.00125 nm for a 16-frame file. The uncertainty of a fixed source property
+  would then depend on how many frames were recorded. Before R16 the term was
+  dropped entirely: the frames do not scatter, so the SEM, and with it the
+  wavelength uncertainty, was 0.
+
+**Implementation notes (2026-11-03).**
+
+- Row 6: removed the CosAlpha clip. Strictly negative incidence now raises
+  ValueError naming the step ID, affected pixel count and minimum cosine.
+  Negative incidence with no positive pixels identifies a flipped normal or a
+  detector facing away, including arrays containing NaN or zero pixels. Both
+  positive and negative values identify a normal inconsistent with the pixel
+  plane. Zero and NaN alone retain their previous behavior. Added the interface migration note.
+  The two negative-incidence regressions failed before the change (**2 failed,
+  8 passed**). After Part A, the full traced suite was **1997 passed, 1 skipped**
+  and examples **23 passed**; no existing test hit the new error.
+- Row 10 (revised in review): `prepare_static_scalar` still takes its nominal
+  mean and scatter SEM directly from `static_weighted_mean_sem`. Each existing
+  component is broadcast to the signal shape and passed to the same model
+  function with the same weights; its mean sigma is retained **unreduced**.
+  Constant sigmas do not shrink with frame count. No formula is duplicated in
+  the adapter and `weighted_axis_reduction` is no longer used here. Scalar and
+  broadcastable sigmas and the existing size-one weight convention are supported;
+  NaN propagates. Components named like the SEM key still raise a conflict,
+  and the scalar passthrough branch is unchanged.
+- The standard Stage 0 install remains
+  `with_uncertainty_estimates(components, {uncertainty_key: sem})`. A global-only
+  component yields only the jitter key with `hypot(SEM, mean_global_sigma)` and
+  the standard INFO log. Named components retain the original scatter SEM.
+- Updated the metadata tests for the revised sigma-mean rule: uniform sigma 0.4
+  stays 0.4; weighted sigmas 0.2/0.3/0.4 with weights 1/2/3 give 1/3; scalar 0.6
+  stays 0.6; the NaN-signal case retains sigma 0.3. Added a constant-wavelength
+  test for 5 and 16 samples, both retaining 0.005 nm. Added negative-incidence
+  tests with NaN and zero companions to verify flipped-normal diagnostics.
+  Before these fixes, the changed regressions gave **11 failed, 27 passed**;
+  afterwards the helper/geometry/statistics selection gave **53 passed**.
+  Nominal mean, SEM, empty-input, scalar-passthrough, input-ownership and
+  collision checks remain active. Numerical expectations changed only in the
+  R16 metadata-component fixtures, as required by the revised decision.
+- Restored PolarizationCorrection's original readable triple-quoted note and
+  inserted the omission sentences inside it. The generated Notes section
+  differs from origin/main only by those added sentences; the separately
+  approved version and citation updates are retained.
+- Exact final Part B comparison against origin/main (all fixture values in m):
+
+  | Regression case | Output component | Before | After |
+  | --- | --- | --- | --- |
+  | Uniform named sigma 0.4, four samples (also singleton weights) | measurement | absent | 0.4 |
+  | Weighted samples 2, 4, 6; weights 1, 2, 3 | measurement | absent | 0.3333333333333333 |
+  | Same weighted samples; scalar calibration sigma 0.6 | calibration | absent | 0.6 |
+  | NaN-containing signal, three samples, sigma 0.3 | measurement | absent | 0.3 |
+  | Uniform global sigma 0.4, four samples | jitter | 0.5590169943749475 | 0.687386354243376 |
+  | Same global sigma; weights 1, 2, 3, 4 | jitter | 0.5477225575051661 | 0.6782329983125268 |
+
+  Nominal means are unchanged: 2.5 (uniform), 4.666666666666667
+  (weighted named), 3.0 (weighted global), or NaN for NaN input. Named-input
+  jitter stays 0.5590169943749475 (uniform), 0.9296222517045282
+  (weighted named), or NaN. A component colliding with the jitter key raises
+  instead of being dropped.
+- Real-data check, read-only, against the origin/main helper: loaded
+  `/entry1/sample/beam/incident_wavelength` and `wavelength_error` from the
+  requested MoDaCor-examples `BAM/MOUSE/data` files. The BaseData unit is taken
+  from the wavelength attribute (`nm`), with `wavelength_error` supplied as a
+  component in those units, using `uncertainty_key="wavelength_jitter"`.
+
+  | MOUSE file | Samples | wavelength_error before (nm) | wavelength_error after (nm) | wavelength_jitter before → after (nm) |
+  | --- | --- | --- | --- | --- |
+  | `MOUSE_20260903_1_123_stacked_modacor.nxs` | 5 | absent | 0.005 | 0 → 0 |
+  | `MOUSE_20260903_1_125_stacked_modacor.nxs` | 10 | absent | 0.004999999999999999 (≈0.005) | 0 → 0 |
+  | `MOUSE_20260903_1_127_stacked_modacor.nxs` | 16 | absent | 0.005 | 0 → 0 |
+
+  The nominal wavelength is unchanged at **0.15406012535095215 nm** in all
+  three files. The error datasets themselves have `units="angstrom"`, unlike
+  the wavelength's `units="nm"`. This comparison follows the requested
+  component interpretation in wavelength units; the helper does not inspect
+  or convert a separate component-unit attribute. No data/metadata was edited.
+- Rows 1–5: the five describers state the omitted angle/Psi contributions and
+  shared-calibration reason. Rows 7–9: Integrate1D, FindScaleFactor1D and
+  SubtractInterpolated1D explicitly use fixed abscissae and ignore axis
+  uncertainty. Updated the uncertainty model's reduction and scientific
+  limitation sections and regenerated the module reference pages.
+- Final full/tox/examples results are recorded under R10 above. No numerical
+  stop condition occurred. The Stage 0 fold clarification and the later
+  unreduced-component decision are both reflected in the final implementation. No example files were changed and nothing was pushed.
+
+
+- After R20, MOUSE `wavelength_error` is **0.0005 nm**, converted from 0.005 Å.
 
 **Review log.** _(reviewer)_
 
@@ -2899,8 +3100,9 @@ made after the R17 commit.
 
 ## R18 — Central unit conversion for BaseData (includes the transmission-unit bug)
 
-**Status:** implemented (2026-11-02), including the maintainer-authorized
-capillary mapping follow-up. The separate examples migration follows release.
+**Status:** done, including the maintainer-authorized capillary mapping
+follow-up. Merged in PR #156 and released in v1.16.0; the examples migration
+followed separately.
 
 **Decisions (2026-11-01).**
 
@@ -3135,6 +3337,211 @@ a `fix:`.
   - The `"*"` selection logged 231 INFO lines per USAXS run, one per bundle
     lacking a key. `ConvertUnits` now logs one INFO summary per step, with the
     skipped bundle names at DEBUG.
+
+---
+
+## R19 — Q uncertainty and Q resolution (smearing profile)
+
+**Status:** future; design needed. Raised by the maintainer on 2026-11-03
+during the R16 decisions. Depends on Stage 2 of the uncertainty specification
+for the shared calibration terms.
+
+**Goal.** Give the Q axis two separate descriptions, as NXcanSAS does with
+`resolutions` alongside `uncertainties`:
+
+- **Q uncertainty: the unknowns.** Calibration errors of unknown sign, such as
+  the sample–detector distance, the mean wavelength, the beam centre and the
+  pixel-pitch calibration. Each is shared by every Q point, so it is a Stage 2
+  source with a signed response, not an independent per-point error.
+- **Smearing profile: the knowns.** Spreads that broaden every measured point
+  by a known amount: wavelength spread, beam height (size), beam divergence,
+  sample thickness (the scattering position spreads along the beam),
+  detector sensor thickness (parallax), pixel size and bin width. This is a
+  resolution kernel, not an uncertainty. It never enters
+  `BaseData.uncertainties` and is never combined with them in quadrature.
+
+Some parameters contribute to both: the wavelength (a calibration error on the
+mean and a spread), and the distance (a calibration error, while sample
+thickness spreads it).
+
+**Open design questions.**
+
+- How the profile is represented: per-point Gaussian widths, or shape
+  parameters per contribution. Also how it combines through binning, for
+  example Gaussian widths in quadrature plus a box for the bin width.
+- Which steps produce it: geometry, binning and averaging.
+- Its output fields in NXcanSAS and the other sinks.
+
+**Interaction with current behaviour.** The Q "uncertainty" after binning is
+mostly the spread of Q within a bin, which is a resolution term. A wavelength
+spread or pixel size entered through `photon_uncertainties_sources` or the
+pixel-pitch uncertainty sources ends up in the Q uncertainty today. These move
+when R19 is implemented. Until then, the axes are treated as exact in
+Integrate1D, FindScaleFactor1D and SubtractInterpolated1D (R16 rows 7–9).
+
+---
+
+## R20 — Uncertainty sources ignore their own units
+
+**Status:** implemented on the R16 branch on 2026-11-04, in review. Ships
+with R16; found during its review.
+
+**Problem.** `dataclasses.helpers.basedata_from_sources` and the
+material-attenuation loader read every uncertainty dataset as a bare array, in
+the signal's units. The dataset's own `units` attribute is never read. Every
+`*_uncertainties_sources` setting in every module goes through these two
+loaders. In the MOUSE example data, `incident_wavelength` is in nm and
+`wavelength_error` is in ångström. With R16 row 10, MOUSE would carry
+0.005 nm instead of 0.0005 nm, ten times too large (Δλ/λ ≈ 3.2% instead of
+0.32%). Before R16 the term was dropped, which hid this.
+
+**Decision (maintainer, 2026-11-03).**
+
+- When the source provides units for an uncertainty dataset
+  (`get_data_attributes(...)["units"]`), the uncertainty is converted to the
+  signal's units. It is converted as a difference, by the rule `BaseData`
+  applies to its own uncertainties, never as an absolute value.
+- Without such units, the uncertainty is in the signal's units, as now.
+- Incompatible or unreadable units raise a `ValueError` naming the uncertainty,
+  its source and both units.
+- A units override on the signal (`AppendProcessingData.units_override`)
+  applies to its uncertainties too, and their attributes are not read: the
+  override says the file's labels are not to be trusted.
+
+**Acceptance criteria.** Both loaders share one implementation. MOUSE gives
+`wavelength_error` 0.0005 nm. Pipelines whose uncertainty datasets have no
+units, or use a units override, give identical results. Any example pipeline
+that would now raise or change is reported.
+
+**Implementation notes (2026-11-04).**
+
+- Added one `uncertainties_from_sources` implementation in
+  `dataclasses/helpers.py`, shared by `basedata_from_sources` and the
+  material-attenuation direct-value loader. It decodes byte unit attributes,
+  treats missing/None/blank attributes as signal units, and uses a zero-valued
+  BaseData carrying the sigma followed by `magnitudes(signal_units)` for actual
+  conversion. No conversion factors are reimplemented. Matching units avoid
+  extra detector-array allocations. Actual conversions log at DEBUG only.
+- Offset/non-multiplicative source or target units are rejected, including
+  equal offset units: Pint must map zero to zero for a difference. Parse and
+  compatibility failures are chained into ValueError naming the uncertainty,
+  reference and both units. Attribute parsing has a dedicated broad boundary
+  for Pint grammar errors (including AssertionError and TokenError); conversion
+  retains its narrow exception tuple so unexpected conversion errors surface.
+  Signal-unit parsing and BaseData._parse_units remain unchanged.
+- Attribute-free YAML sources currently raise NotImplementedError rather than
+  return an empty mapping. The shared loader handles that explicit capability
+  error as absent attributes, retaining previous YAML behavior.
+- Added keyword-only `units_override` to `basedata_from_sources` and wired it
+  into AppendProcessingData. The override skips signal-unit metadata and
+  uncertainty attributes; raw signal/sigma values and override labels are kept,
+  including scalar percent/count-per-percent overrides. Removed the post-load
+  relabel. Updated docstrings, public argument descriptions, the units model
+  page and interface migration, and regenerated AppendProcessingData's reference.
+  Its version is `20261104.1`; touched package headers follow R10.
+- Added 31 HDF/YAML-backed cases in
+  `tests/dataclasses/test_uncertainty_source_units.py`: angstrom-to-nm conversion,
+  bytes/missing/blank/matching units, incompatible/unparseable/offset units,
+  DEBUG logging, attribute-free YAML, direct material values, and helper/step
+  overrides for scalar and array data. The original 27 cases before the
+  implementation gave **21 failed, 6 passed**; initial loader/Append/material
+  checks afterwards gave **63 passed**. The parser review added `m/(`, `1/`,
+  and `m s-1` to the invalid-unit cases and a guard for unexpected conversion
+  errors. Against the pre-fix parser: **2 failed, 29 passed**; after the parser
+  fixup, focused uncertainty-source checks: **31 passed**.
+- Four percent-transmission route comparisons initially failed because their
+  fixture scaled sigma values to percent while still advertising dimensionless
+  attributes. TransmissionSource now obtains its attribute label from the same
+  metadata provider that the test changes. All numerical assertions in
+  `test_flat_plate_self_absorption_correction.py::test_percent_transmission_matches_dimensionless`
+  remain unchanged (two shapes and two uncertainty keys). The fixture correction
+  was autosquashed into the implementation commit; focused correction/loader
+  checks initially: **38 passed**.
+
+**Example audit.** Expanded every tracked example pipeline: 12 YAMLs, with
+98 non-empty uncertainty-source uses in 10 pipelines. Checked every locally
+matching uncertainty dataset in the corresponding instrument folders, including
+all sample/background aliases: 732 HDF files inspected (40 MOUSE, 15 SAXSess-I,
+677 I22), yielding 270 dataset/config matches in the 28 HDF groups below.
+The remaining nine source uses are the YAML defaults (four uses) and two CSV
+reference curves (five uses); these were checked through the actual loaders.
+Pipeline-selected signal units, rather than an inferred signal label, define the
+target. No target units were unresolved.
+
+Of the 270 HDF matches, 230 keep matching units, 20 have no units and keep their
+values, and 20 convert: all are MOUSE `wavelength_error`. No other dataset would
+raise or change numerical values. The table groups identical source paths/unit
+policies across pipeline steps and aliases; file counts count local matches,
+not arbitrary assignments of those files to sample roles.
+
+| Instrument | Dataset / source | Own units attribute | Signal units | units_override | Rule | Local files |
+| --- | --- | --- | --- | --- | --- | --- |
+| BAM/MOUSE | `/entry1/instrument/detector00/data_uncertainties_poisson` | `counts` | `counts` | none | keep (matching units) | 20 |
+| BAM/MOUSE | `/entry1/instrument/detector00/data_uncertainties_sem` | `counts` | `counts` | none | keep (matching units) | 20 |
+| BAM/MOUSE | `/entry1/sample/transmission_averaged/sem` | `dimensionless` | `dimensionless` | none | keep (matching units) | 20 |
+| BAM/MOUSE | `/entry1/sample/beam/wavelength_error` | `angstrom` | `nm` | none | convert 0.005 Å → 0.0005 nm | 20 |
+| BAM/MOUSE | `/entry1/sample/thickness_averaged/sem` | `m` | `m` | none | keep (matching units) | 20 |
+| BAM/MOUSE | `/entry1/instrument/detector00/detector_readout_time` | `s` | `s` | none | keep (matching units) | 20 |
+| BAM/MOUSE | `/entry1/sample/largest_scattering_probability_estimate` | absent | `dimensionless` | none | keep (no units) | 20 |
+| BAM/SAXSess_I | `/entry/instrument/detector/frame_exposure_time_uncertainty` | `s` | `s` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/sample/beam/transmitted_flux_uncertainty` | `arbitrary_flux_unit/s` | `arbitrary_flux_unit/s` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/instrument/detector/transformations/det_z_uncertainty` | `mm` | `mm` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/instrument/detector/transformations/det_x_uncertainty` | `mm` | `mm` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/instrument/detector/transformations/det_y_uncertainty` | `mm` | `mm` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/sample/transformations/sample_z_uncertainty` | `mm` | `mm` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/sample/beam/incident_wavelength_uncertainty` | `nm` | `nm` | none | keep (matching units) | 9 |
+| BAM/SAXSess_I | `/entry/sample/thickness_averaged/mean_uncertainty` | `m` | `m` | none | keep (matching units) | 9 |
+| DLS/I22 | `/entry1/low_gain_front/subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/low_gain_front/dark_offset_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/low_gain_rear/subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/low_gain_rear/dark_offset_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/high_gain_front/subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/high_gain_front/dark_offset_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/high_gain_rear/subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/high_gain_rear/dark_offset_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/low_gain_front/i0_subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/entry1/high_gain_front/i0_subread_sem` | `count` | `count` | none | keep (matching units) | 4 |
+| DLS/I22 | `/modacor/normalization/bsdiodes_channel_1_std` | `count/s` | `count/s` | none | keep (matching units) | 6 |
+| DLS/I22 | `/entry1/sample/transmission_sem` | `dimensionless` | `dimensionless` | none | keep (matching units) | 6 |
+| DLS/I22 | `/modacor/normalization/i0_channel_1_sem` | `count/s` | `count/s` | none | keep (matching units) | 6 |
+| BAM/SAXSess_I | `defaults::detector/darkcurrent/uncertainty` (YAML) | unavailable | `count/s` | none | keep | 1 |
+| BAM/SAXSess_I | `i_cal_reference::I_sigma` (CSV) | not read | `1/(m sr)` | `1/(m sr)` | keep override | 1 |
+| DLS/I22 | `intensity_calibration_reference::I_sigma` (CSV) | not read | `1/(cm sr)` | `1/(cm sr)` | keep override | 1 |
+
+- YAML data are from `BAM/SAXSess_I/config/SAXSess_I.yaml`; the dark-current
+  component remains 1e-9 count/s. The CSV files are
+  `BAM/SAXSess_I/data/calibration/water_cal_reference.pdh` and
+  `DLS/I22/data/Glassy Carbon L average.dat`. Compared all **725** and **158**
+  reference signal/sigma values respectively against the pre-R20 loader plus
+  its post-load override: values and units are unchanged (`rtol=1e-12, atol=0`).
+- Read-only MOUSE comparison against `e2d2353` (immediately before R20), loading
+  incident wavelength, its unit attribute and the wavelength_error source:
+
+  | MOUSE file | Samples | wavelength_error before (nm) | wavelength_error after (nm) | wavelength_jitter before → after (nm) |
+  | --- | --- | --- | --- | --- |
+  | `MOUSE_20260903_1_123_stacked_modacor.nxs` | 5 | 0.005 | 0.0005 | 0 → 0 |
+  | `MOUSE_20260903_1_125_stacked_modacor.nxs` | 10 | 0.004999999999999999 | 0.0005000000000000001 | 0 → 0 |
+  | `MOUSE_20260903_1_127_stacked_modacor.nxs` | 16 | 0.005 | 0.0005 | 0 → 0 |
+
+  The source errors are 0.005 Å; all three now carry approximately
+  **0.0005 nm**. The nominal wavelength remains exactly
+  **0.15406012535095215 nm**. R20 resolves the component-unit mismatch noted
+  in the R16 measurements above; no data or pipeline files were edited.
+- Final development suite after the parser fixup, with access tracing:
+  **2087 passed, 1 skipped**, 2 subtests passed. `tox -e py312`:
+  **2085 passed, 3 skipped**, 2 subtests passed; `tox -e lint` **passed**.
+  Docs, manifest and example checks passed during implementation and independent
+  review; these were not repeated for the parser-only fixup.
+  The opt-in RSS/Tiled skips and three existing unary/inverse warnings are
+  unchanged. MoDaCor-examples `tests` and `DLS/I22/tests` with branch `src` on
+  PYTHONPATH: **23 passed**; its four pre-existing modified files were untouched.
+- No example stop condition was hit. Changes outside the allowed MOUSE source
+  were absent from the local-data audit. The percent test-fixture metadata was
+  corrected without weakening or changing its expected numerical results.
+  `auxiliary/` remains untracked; nothing was pushed.
+
+
+**Review log.** _(reviewer)_
 
 ---
 

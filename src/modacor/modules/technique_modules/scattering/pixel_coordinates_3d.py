@@ -1,23 +1,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Computes 3D detector element center coordinates in lab-frame axes."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from modacor.dataclasses.helpers import basedata_from_sources
-from modacor.dataclasses.process_step_describer import ProcessStepDescriber, argument_value_is_missing
-
-__coding__ = "utf-8"
-__authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
-__copyright__ = "Copyright 2026, The MoDaCor team"
-__date__ = "04/01/2026"
-__status__ = "Development"
-
-__version__ = "20261102.1"
 __all__ = ["CanonicalDetectorFrame", "PixelCoordinates3D"]
+__version__ = "20261103.2"
+__authors__ = ["Brian R. Pauw"]
 
+from pathlib import Path
 from typing import Dict, Tuple
 
 import numpy as np
@@ -28,8 +18,10 @@ from attrs import define
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
+from modacor.dataclasses.helpers import basedata_from_sources
 from modacor.dataclasses.messagehandler import MessageHandler
 from modacor.dataclasses.process_step import ProcessStep, ProcessStepDependencies
+from modacor.dataclasses.process_step_describer import ProcessStepDescriber, argument_value_is_missing
 from modacor.geometry import unit_vector3
 from modacor.io.nexus.geometry import load_nexus_detector_frame_inputs
 from modacor.modules.helpers import attach_prepared_data, normalize_str_list
@@ -235,6 +227,7 @@ class PixelCoordinates3D(ProcessStep):
         },
         step_keywords=["geometry", "coordinates", "detector"],
         step_doc="Computes 3D detector element center coordinates in lab-frame axes.",
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     def _load_from_sources(self, key: str) -> BaseData:

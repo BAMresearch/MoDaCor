@@ -14,6 +14,34 @@ from modacor.dataclasses.process_step_describer import ProcessStepDescriber
 
 PUBLIC_STEP_NAMES = tuple(modacor.modules.__all__)
 
+# Infrastructure steps may omit scientific references; every other public step cites one.
+INFRASTRUCTURE_REFERENCE_ALLOWLIST = {
+    "AppendProcessingData",
+    "AppendSink",
+    "AppendSource",
+    "ConcatenateDatabundles",
+    "ConvertUnits",
+    "CopyDataBundleKeys",
+    "DilateMask",
+    "Negate",
+    "Plot1DVisualization",
+    "Plot2DVisualization",
+    "ReduceMask",
+    "SinkProcessingData",
+    "ThresholdMask",
+}
+
+
+def test_reference_allowlist_contains_only_public_steps():
+    assert INFRASTRUCTURE_REFERENCE_ALLOWLIST <= set(PUBLIC_STEP_NAMES)
+
+
+@pytest.mark.parametrize("step_name", PUBLIC_STEP_NAMES)
+def test_public_scientific_steps_cite_a_reference(step_name):
+    reference = getattr(modacor.modules, step_name).documentation.step_reference
+    assert reference.strip() or step_name in INFRASTRUCTURE_REFERENCE_ALLOWLIST
+
+
 # Multi-bundle and I/O contracts remain explicit; retain their existing
 # hand-written default metadata expectations.
 CUSTOM_DEFAULT_METADATA_CONTRACTS = {

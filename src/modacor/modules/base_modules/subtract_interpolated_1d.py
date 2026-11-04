@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
+"""Remap a 1D background by nearest neighbour or linear interpolation, then subtract it."""
 
 from __future__ import annotations
 
 __all__ = ["SubtractInterpolated1D"]
-__version__ = "20260929.1"
+__version__ = "20261103.3"
 
 from pathlib import Path
 
@@ -90,8 +91,10 @@ class SubtractInterpolated1D(ProcessStep):
             "Nearest mode always chooses the nearest valid background coordinate and has no tolerance setting. "
             "Neither mode extrapolates: sample points outside the background domain are invalidated. max_gap "
             "applies only to linear bracket width. Linear uncertainties are propagated from interpolation "
-            "coefficients before BaseData subtraction."
+            "coefficients before BaseData subtraction. The axis is treated as exact (fixed abscissae); axis "
+            "uncertainties are not propagated."
         ),
+        step_reference="DOI 10.1107/S1600576717015096",
     )
 
     @staticmethod

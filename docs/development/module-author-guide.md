@@ -71,6 +71,14 @@ exported from `modacor.modules` and cannot be selected by a pipeline.
 
 ## Required class structure
 
+Package files start with `# SPDX-License-Identifier: BSD-3-Clause` and a module
+docstring. After any required future imports, place `__all__`, then `__version__`
+in step modules; the version is recorded in pipeline specs and graph output.
+Keep existing `__authors__` lists for contributor credit. Omit `__coding__`,
+`__copyright__`, `__date__`, `__status__`, and shebang/coding comment lines:
+copyright belongs in `LICENSE`, while dates and status go stale. Apply this
+convention when a file is otherwise edited; do not rewrite untouched files.
+
 Every module must:
 
 1. Subclass `modacor.dataclasses.process_step.ProcessStep`.
@@ -319,6 +327,12 @@ accurate:
 - `modifies`
 - `step_doc`
 - `step_note` and `step_keywords` where useful
+
+Scientific steps must cite a reference in `step_reference` (for example,
+`DOI 10.1107/S1600576717015096`). An infrastructure step may omit a reference
+only when it appears in `INFRASTRUCTURE_REFERENCE_ALLOWLIST` in
+`tests/modules/test_public_module_contracts.py`. Add a new scientific step with
+its reference, or explicitly add an infrastructure step to that allowlist.
 
 The generated pages under `docs/reference/modules/` come from that metadata via:
 

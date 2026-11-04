@@ -414,3 +414,64 @@ def test_geometry_dependency_contract_tracks_nested_nexus_sources():
             "sample.Omega",
         },
     )
+
+
+def _compute_cos_alpha(normal, x=(-1.0, 1.0)):
+    return XSGeometryFromPixelCoordinates(step_id="detector-geometry")._compute(
+        coord_x=BaseData(np.asarray(x), ureg.m),
+        coord_y=BaseData(np.zeros(len(x)), ureg.m),
+        coord_z=BaseData(np.ones(len(x)), ureg.m),
+        sample_z=BaseData.from_scalar(0.0, ureg.m),
+        wavelength=BaseData.from_scalar(1e-10, ureg.m),
+        pitch_slow=BaseData.from_scalar(1e-3, ureg.m),
+        pitch_fast=BaseData.from_scalar(1e-3, ureg.m),
+        detector_normal=np.asarray(normal),
+    )
+
+
+@pytest.mark.parametrize(
+    "normal, count, cause",
+    [
+        ((0.0, 0.0, -1.0), 2, "points toward the sample"),
+        ((1.0, 0.0, 0.0), 1, "does not match the pixel plane"),
+    ],
+)
+def test_negative_cos_alpha_reports_geometry_error(normal, count, cause):
+    with pytest.raises(ValueError) as caught:
+        _compute_cos_alpha(normal)
+    message = str(caught.value)
+    assert "XSGeometryFromPixelCoordinates (detector-geometry)" in message
+    assert f"{count} affected pixels" in message
+    assert f"minimum CosAlpha={-1.0 / np.sqrt(2.0)}" in message
+    assert "detector_normal" in message and cause in message
+    if count == 2:
+        assert "detector faces away" in message
+    else:
+        assert "e_fast/e_slow" in message
+
+
+def test_zero_cos_alpha_is_allowed():
+    output = _compute_cos_alpha((0.0, 1.0, 0.0))
+    np.testing.assert_allclose(output["CosAlpha"].signal, 0.0, rtol=1e-12, atol=0)
+    np.testing.assert_allclose(output["Omega"].signal, 0.0, rtol=1e-12, atol=0)
+
+
+def test_nan_cos_alpha_keeps_existing_nan_behavior():
+    output = _compute_cos_alpha((0.0, 0.0, 1.0), x=(np.nan, 1.0))
+    assert np.isnan(output["CosAlpha"].signal[0])
+    assert np.isnan(output["Omega"].signal[0])
+
+
+@pytest.mark.parametrize(
+    "normal, x",
+    [((0.0, 0.0, -1.0), (np.nan, 1.0)), ((-1.0, 0.0, 0.0), (0.0, 1.0))],
+)
+def test_negative_cos_alpha_with_nan_or_zero_reports_flipped_normal(normal, x):
+    with np.errstate(divide="ignore", invalid="ignore"), pytest.raises(ValueError) as caught:
+        _compute_cos_alpha(normal, x=x)
+    message = str(caught.value)
+    assert "XSGeometryFromPixelCoordinates (detector-geometry)" in message
+    assert "1 affected pixels" in message
+    assert f"minimum CosAlpha={-1.0 / np.sqrt(2.0)}" in message
+    assert "points toward the sample" in message
+    assert "does not match" not in message
