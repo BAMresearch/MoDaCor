@@ -78,7 +78,7 @@ def test_run_failure_logs_traceback_and_keeps_api_error_payload(client, caplog, 
     def fail(*args, **kwargs):
         raise ValueError("scientific failure")
 
-    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fail)
+    monkeypatch.setattr("modacor.server.process_service.run_pipeline_job", fail)
     monkeypatch.setattr("modacor.server.process_failure.run_pipeline_job", fail)
     with caplog.at_level(logging.ERROR, logger="modacor.server"):
         response = client.post("/v1/sessions/diagnostics/process", json={"mode": "full"})

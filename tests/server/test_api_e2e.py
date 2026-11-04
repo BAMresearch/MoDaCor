@@ -313,7 +313,7 @@ steps:
         calls["count"] += 1
         return value
 
-    monkeypatch.setattr("modacor.server.runtime_service.deepcopy", fake_deepcopy)
+    monkeypatch.setattr("modacor.server.process_service.deepcopy", fake_deepcopy)
 
     _post_json(
         client,
@@ -446,7 +446,7 @@ def test_api_process_passes_configured_sinks_to_runner(monkeypatch, tmp_path: Pa
             stopped_after_step=None,
         )
 
-    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    monkeypatch.setattr("modacor.server.process_service.run_pipeline_job", fake_run_pipeline_job)
     monkeypatch.setattr("modacor.server.process_failure.run_pipeline_job", fake_run_pipeline_job)
 
     result = _post_json(client, "/v1/sessions/sess-runner-sinks/process", {"mode": "full"})
@@ -487,7 +487,7 @@ def test_api_process_stores_trace_report_in_run_metadata(monkeypatch):
             stopped_after_step=None,
         )
 
-    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    monkeypatch.setattr("modacor.server.process_service.run_pipeline_job", fake_run_pipeline_job)
     monkeypatch.setattr("modacor.server.process_failure.run_pipeline_job", fake_run_pipeline_job)
 
     result = _post_json(client, "/v1/sessions/sess-trace-report/process", {"mode": "full"})
@@ -534,7 +534,7 @@ def test_api_process_failure_stores_partial_trace_report(monkeypatch):
             failed_step_id="FA",
         )
 
-    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    monkeypatch.setattr("modacor.server.process_service.run_pipeline_job", fake_run_pipeline_job)
     monkeypatch.setattr("modacor.server.process_failure.run_pipeline_job", fake_run_pipeline_job)
 
     response = client.post("/v1/sessions/sess-failed-trace-report/process", json={"mode": "full"})
@@ -576,7 +576,7 @@ def test_api_process_write_hdf_closes_file_for_immediate_reopen(monkeypatch, tmp
             stopped_after_step=None,
         )
 
-    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    monkeypatch.setattr("modacor.server.process_service.run_pipeline_job", fake_run_pipeline_job)
     monkeypatch.setattr("modacor.server.process_failure.run_pipeline_job", fake_run_pipeline_job)
     out_file = tmp_path / "server-output.h5"
 
@@ -1240,7 +1240,7 @@ steps:
             stopped_after_step=None,
         )
 
-    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    monkeypatch.setattr("modacor.server.process_service.run_pipeline_job", fake_run_pipeline_job)
     monkeypatch.setattr("modacor.server.process_failure.run_pipeline_job", fake_run_pipeline_job)
 
     result = _post_json(
@@ -1787,7 +1787,7 @@ steps:
             chunk_spec=chunk_spec,
         )
 
-    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    monkeypatch.setattr("modacor.server.process_service.run_pipeline_job", fake_run_pipeline_job)
     monkeypatch.setattr("modacor.server.process_failure.run_pipeline_job", fake_run_pipeline_job)
     for ordinal in (0, 1):
         process_payload = {
@@ -1877,7 +1877,7 @@ def test_chunk_publication_failure_is_distinct_from_pipeline_failure(monkeypatch
             chunk_spec=kwargs.get("chunk_spec"),
         )
 
-    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    monkeypatch.setattr("modacor.server.process_service.run_pipeline_job", fake_run_pipeline_job)
     monkeypatch.setattr("modacor.server.process_failure.run_pipeline_job", fake_run_pipeline_job)
     response = client.post(
         "/v1/sessions/bad-writer/process",
@@ -1950,7 +1950,7 @@ def test_chunked_output_reopens_after_server_restart_and_detaches_safely(monkeyp
             chunk_spec=chunk,
         )
 
-    monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fake_run_pipeline_job)
+    monkeypatch.setattr("modacor.server.process_service.run_pipeline_job", fake_run_pipeline_job)
     monkeypatch.setattr("modacor.server.process_failure.run_pipeline_job", fake_run_pipeline_job)
     first_client = TestClient(create_app())
     _post_json(
