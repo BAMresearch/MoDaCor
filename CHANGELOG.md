@@ -1,6 +1,36 @@
 # CHANGELOG
 
-## v1.17.0 (2026-11-02)
+## v1.17.1 (2026-11-04)
+
+### Bug fixes
+
+* fix: convert uncertainty sources to the signal's units ([`d3e6ffe`](https://github.com/BAMresearch/MoDaCor/commit/d3e6ffe3c6b11eca651e1a398930d62dec7ada6c))
+
+* fix: keep configured uncertainties when averaging array metadata ([`676c2d2`](https://github.com/BAMresearch/MoDaCor/commit/676c2d2e526b9ad4d48b027807baefe75c5e524e))
+
+* fix: reject negative CosAlpha in pixel geometry ([`d132f96`](https://github.com/BAMresearch/MoDaCor/commit/d132f96cc7bbe231aa88f45bee150a9dfe3d5188))
+
+### Code style
+
+* style: adopt the SPDX header convention ([`deae09b`](https://github.com/BAMresearch/MoDaCor/commit/deae09b92076e307ee1d9af3eac981ca98eddc11))
+
+### Documentation
+
+* docs: document uncertainty source unit audit ([`6a13faf`](https://github.com/BAMresearch/MoDaCor/commit/6a13faf3631f4c14e5adf116b0293f079cf09a5c))
+
+* docs: record the uncertainty-source units decision in the remediation tracker ([`e2d2353`](https://github.com/BAMresearch/MoDaCor/commit/e2d235348d58e2ffa9fbc036af8d84bc84454c35))
+
+* docs: revise the R16 metadata-mean decision to unreduced components ([`1709129`](https://github.com/BAMresearch/MoDaCor/commit/1709129b9e7978b0ff412b24c10e59ea18a6e912))
+
+* docs: record R16 and R10 implementation notes in the remediation tracker ([`114a6d1`](https://github.com/BAMresearch/MoDaCor/commit/114a6d1b9a1c9bd9b1283143e5a052a494501a4f))
+
+* docs: cite references for the scientific processing steps ([`16f5b62`](https://github.com/BAMresearch/MoDaCor/commit/16f5b622a15e6c00b6e56dc9e2656f00e7204944))
+
+* docs: state uncertainty omissions in angle corrections and axis-based steps ([`77cbfc9`](https://github.com/BAMresearch/MoDaCor/commit/77cbfc912e924aedc4bd673206602a3931e87a58))
+
+* docs: record the R16 and R10 decisions in the remediation tracker ([`e9118b4`](https://github.com/BAMresearch/MoDaCor/commit/e9118b486477c0a386c933840d4c654e0e4372ec))
+
+## v1.17.0 (2026-11-03)
 
 ### Bug fixes
 
