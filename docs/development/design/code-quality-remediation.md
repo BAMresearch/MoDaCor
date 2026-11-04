@@ -93,16 +93,16 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R07 | Declarative data-key dependencies, verified by an access-trace test | design | M–L | high | done |
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | done (v1.17.0, PR #160) |
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | done (v1.17.0, PR #161) |
-| R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | item 1 done; 2–3 in review |
-| R11 | Split `RuntimeService` into focused services | structure | L | medium | open |
+| R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | done (v1.17.1, PR #163) |
+| R11 | Split `RuntimeService` into focused services | structure | L | medium | ready |
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | done |
 | R14 | The `required` argument flag is never enforced | contract | S | medium | done (v1.17.0, PR #161) |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | done (v1.14.0, PR #152) |
-| R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | decided |
+| R16 | Uncertainty propagation gaps found by the R08 audit | science | M | medium | done (v1.17.1, PR #163) |
 | R17 | BaseData uncertainty correctness: Stage 0 of the uncertainty specification | bug | M | high | done (v1.15.0, PR #154) |
 | R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | done (v1.16.0, PR #156) |
 | R19 | Q uncertainty and Q resolution (smearing profile) | science | L | high | future; design needed |
-| R20 | Uncertainty sources ignore their own units | bug | S | high | in review |
+| R20 | Uncertainty sources ignore their own units | bug | S | high | done (v1.17.1, PR #163) |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -2284,7 +2284,8 @@ change to the server's API error responses (`tests/server` unchanged).
 
 ## R10 — Conventions
 
-**Status:** item 1 done; items 2 (file headers) and 3 (`step_reference`) implemented, in review.
+**Status:** done. Item 1 released in v1.17.0 (PR #161); items 2 (file headers)
+and 3 (`step_reference`) released in v1.17.1 (PR #163).
 
 **Scope.**
 
@@ -2410,12 +2411,17 @@ change to the server's API error responses (`tests/server` unchanged).
 - **(2026-11-02): item 1 approved.** `_ResolvedSampleMu` is a frozen, slotted
   attrs class; the records in `models/` stay dataclasses, as allowed. Items 2
   and 3 wait for maintainer decisions.
+- **(2026-11-04): items 2 and 3 approved; done.** Nothing reads the removed
+  header fields, and every `__authors__` list is kept. The reference test
+  rebuilds both step lists from the code, so the infrastructure list cannot
+  go out of date. Merged in PR #163 and released in v1.17.1.
 
 ---
 
 ## R11 — Split `RuntimeService` into focused services
 
-**Status:** open. Do this after R09.
+**Status:** ready (2026-11-04), on branch `quality-remediation-r11`. The plan
+update below refines the approach.
 
 **Problem.** `server/runtime_service.py` is 1516 lines, essentially one class.
 It covers health and policy, session CRUD, source and sink management, buffer
@@ -2450,6 +2456,48 @@ Move one service per commit, with no logic edits in the same commit.
 - No public method signature changes on `RuntimeService`.
 
 This item should get its own branch and pull request.
+
+**Plan update (2026-11-04, reviewer).** These measurements are on `main` at
+v1.17.1. Where they differ from the text above, this update takes precedence.
+
+- **Size and coverage.** `runtime_service.py` has 1634 lines and 789
+  statements, with 74.3 % line coverage from the full suite. The largest gaps
+  are:
+  - source and sink management: about 53 missing lines;
+  - `_run_auto_fallback`: 32;
+  - chunked-output initialize, reopen and recover: 27;
+  - `recover`: 20;
+  - `_parse_process_request`: 11;
+  - `reset`: 8.
+- **Coupling.** The method groups barely call each other: only
+  `_require_session` (used by every group) and `_latest_failed_run` cross
+  group lines. `server/api.py` calls public methods only, and nothing
+  reassigns the service's fields after construction.
+- **Shared registry.** Users register custom steps on
+  `app.state.runtime_service.process_step_registry`
+  (`docs/server/custom-steps-and-io.md`). Every service must hold the facade's
+  own `manager`, `policy`, `process_step_registry` and `chunked_outputs`
+  objects, not copies.
+- **Process code size.** The process group alone is about 800 lines. A single
+  `ProcessExecutor` would break the 600-line limit, so it becomes three
+  modules:
+  - the request types and shared helpers;
+  - `ProcessService`: process, dry run, reset, recover, run queries, and
+    request parsing through finalization;
+  - failure handling and the auto fallback.
+- **Test edits.** Tests patch `modacor.server.runtime_service.run_pipeline_job`
+  (10 places) and `.deepcopy` (1) by module path. One diagnostics test also
+  filters log records by the logger name `modacor.server.runtime_service`.
+  The only allowed edits to existing tests are such patch targets and logger
+  names, changed to follow the moved code in the same commit. Where a moved
+  name is looked up in two modules, both are patched with the same fake.
+  Expectations do not change.
+- **Logger names.** Moved code logs under its new module's logger name. The
+  server's root handlers capture every `modacor.*` logger, so no records are
+  lost.
+- **Coverage after the split.** The client is untouched and stays out of
+  scope. Combined coverage of the facade and the new modules must not fall
+  below the Step 0 figure.
 
 **Implementation notes.** _(implementer)_
 
@@ -2782,8 +2830,8 @@ unwritable-ancestor failures are covered by focused tests.
 
 ## R16 — Uncertainty propagation gaps found by the R08 audit
 
-**Status:** implemented per the 2026-11-03 decisions, in review. Split out of
-R08 on 2026-10-31; shared-calibration propagation remains deferred as decided.
+**Status:** done; released in v1.17.1 (PR #163). Split out of R08 on
+2026-10-31; shared-calibration propagation remains deferred as decided.
 
 **Problem.** The R08 audit found ten places where an output carries no
 uncertainty contribution from an uncertain input. Each fix changes published
@@ -2941,6 +2989,20 @@ finite-difference test.
 - After R20, MOUSE `wavelength_error` is **0.0005 nm**, converted from 0.005 Å.
 
 **Review log.** _(reviewer)_
+
+- **(2026-11-03): first implementation reviewed; changes requested.**
+  1. Row 10: the maintainer revised the rule to unreduced components, because
+     the reduced rule made the constant MOUSE `wavelength_error` shrink with
+     frame count.
+  2. The polarization step note had become concatenated fragments; restore the
+     triple-quoted text.
+  3. The CosAlpha cause check used `count == size`. That reports "mixed signs"
+     for an all-negative detector that also has NaN pixels.
+  4. Tracker notes: correct the reference count and the row 10 table.
+- **(2026-11-04): fixups approved; done.** No test relied on the CosAlpha clip,
+  and the I22 pipelines configure no geometry uncertainty sources. The review
+  found that uncertainty sources ignored their units attribute, which became
+  R20. Merged together with R20 in PR #163 and released in v1.17.1.
 
 ---
 
@@ -3383,8 +3445,8 @@ Integrate1D, FindScaleFactor1D and SubtractInterpolated1D (R16 rows 7–9).
 
 ## R20 — Uncertainty sources ignore their own units
 
-**Status:** implemented on the R16 branch on 2026-11-04, in review. Ships
-with R16; found during its review.
+**Status:** done; released with R16 in v1.17.1 (PR #163). Found during the
+R16 review.
 
 **Problem.** `dataclasses.helpers.basedata_from_sources` and the
 material-attenuation loader read every uncertainty dataset as a bare array, in
@@ -3542,6 +3604,18 @@ not arbitrary assignments of those files to sample roles.
 
 
 **Review log.** _(reviewer)_
+
+- **(2026-11-04): changes requested.** An independent audit of the 98
+  uncertainty-source uses in the 10 example pipelines matched the table above.
+  One problem: Pint's parser raises `AssertionError`, `tokenize.TokenError`,
+  `SyntaxError` or `TypeError` for malformed strings such as `"1/"`, `"m/("`
+  and `"m s-1"`. These escaped the contextual `ValueError`. Rejecting equal
+  offset units (degC with degC) is accepted, because a difference needs
+  `delta_degC` or K.
+- **(2026-11-04): fixup approved; done.** Attribute parsing is now a broad
+  boundary with a chained cause, while conversion keeps the narrow exception
+  tuple. Through the real loader, MOUSE files 123, 125 and 127 give
+  `wavelength_error` 0.0005 nm. Merged in PR #163 and released in v1.17.1.
 
 ---
 
