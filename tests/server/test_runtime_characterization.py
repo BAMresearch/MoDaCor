@@ -271,6 +271,7 @@ def test_auto_fallback_run_records_trace_and_chunk_state(client, monkeypatch, tm
         return run_pipeline_job(pipeline, **kwargs)
 
     monkeypatch.setattr("modacor.server.runtime_service.run_pipeline_job", fail_partial)
+    monkeypatch.setattr("modacor.server.process_failure.run_pipeline_job", fail_partial)
     response = client.post(
         "/v1/sessions/load/process",
         json={
