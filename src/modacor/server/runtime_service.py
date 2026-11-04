@@ -10,8 +10,6 @@ from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any
 
-from modacor.dataclasses.processing_data import ProcessingData
-from modacor.debug.pipeline_tracer import PlainUnicodeRenderer
 from modacor.io.chunking import ChunkSpec, ProvisionalChunkSpec
 from modacor.io.io_sinks import IoSinks
 from modacor.io.io_sources import IoSources
@@ -27,6 +25,15 @@ from .errors import ApiError, IOBuildError
 from .execution import find_dirty_step_ids
 from .io_utils import bind_chunk_source_slices, build_sinks_from_session, build_sources_from_session, write_hdf_output
 from .planning import build_dry_run_plan, missing_required_source_refs, ordered_step_ids, resolve_effective_mode
+from .process_requests import (
+    ChunkPublishRequest,
+    ProcessPreparation,
+    ProcessRequest,
+    _ChunkPublicationError,
+    _pipeline_trace_events,
+    _source_provenance,
+    _trace_report,
+)
 from .runtime_policy import RuntimePolicy
 from .session_manager import PipelineSession
 from .session_resources import SessionResourceService
@@ -36,67 +43,6 @@ from .source_profiles import get_source_profile, list_source_profiles
 __all__ = ["RuntimeService"]
 
 logger = logging.getLogger(__name__)
-
-TRACE_REPORT_LINES = 500
-
-
-def _source_provenance(session: PipelineSession) -> list[dict[str, str]]:
-    """Record source identity without persisting constructor kwargs or credentials."""
-
-    return [
-        {name: str(registration[name]) for name in ("ref", "type", "location")}
-        for registration in session.sources.values()
-    ]
-
-
-def _pipeline_trace_events(pipeline: Pipeline) -> list[Any]:
-    """Flatten lightweight, array-free step events in execution order."""
-
-    return [event for step_events in pipeline.trace_events.values() for event in step_events]
-
-
-@dataclass(frozen=True, slots=True)
-class ChunkPublishRequest:
-    output_id: str
-    chunk_spec: ChunkSpec | ProvisionalChunkSpec
-
-
-@dataclass(slots=True)
-class ProcessRequest:
-    """Normalized process request payload used by runtime service methods."""
-
-    mode: str
-    changed_sources: list[str]
-    changed_keys: list[str]
-    write_hdf: dict[str, Any] | None = None
-    run_name: str | None = None
-    rollback_snapshot: bool = True
-    chunk_output: ChunkPublishRequest | None = None
-    resolved_source_slices: list[dict[str, Any]] = field(default_factory=list)
-
-
-class _ChunkPublicationError(RuntimeError):
-    def __init__(
-        self,
-        output_id: str,
-        chunk_spec: ChunkSpec | ProvisionalChunkSpec,
-        original_exception: Exception,
-    ) -> None:
-        super().__init__(str(original_exception))
-        self.output_id = output_id
-        self.chunk_spec = chunk_spec
-        self.original_exception = original_exception
-
-
-@dataclass(slots=True)
-class ProcessPreparation:
-    """Execution preparation details for a process request."""
-
-    selected_step_ids: set[str] | None = None
-    snapshot_before_partial: ProcessingData | None = None
-    dirty_step_ids_ordered: list[str] = field(default_factory=list)
-    boundary_step_id: str | None = None
-    early_response: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)
@@ -876,7 +822,7 @@ class RuntimeService(SessionService):
                 details["chunk_output"]["provisional_hash"] = request.chunk_output.chunk_spec.provisional_hash
         if request.resolved_source_slices:
             details["source_slices"] = request.resolved_source_slices
-        trace_report = self._trace_report(result)
+        trace_report = _trace_report(result)
         if trace_report is not None:
             details["trace_report"] = trace_report
 
@@ -929,7 +875,7 @@ class RuntimeService(SessionService):
         if isinstance(exc, PipelineRunError):
             if exc.failed_step_id is not None:
                 error_details["failed_step_id"] = exc.failed_step_id
-            trace_report = self._trace_report(exc.result)
+            trace_report = _trace_report(exc.result)
             if trace_report is not None:
                 error_details["trace_report"] = trace_report
         if isinstance(exc, _ChunkPublicationError):
@@ -1086,7 +1032,7 @@ class RuntimeService(SessionService):
             fallback_topo_ids = ordered_step_ids(fallback_result.pipeline)
             fallback_executed_set = set(fallback_result.executed_steps)
             fallback_skipped = [step_id for step_id in fallback_topo_ids if step_id not in fallback_executed_set]
-            trace_report = self._trace_report(fallback_result)
+            trace_report = _trace_report(fallback_result)
             details: dict[str, Any] = {
                 "status": "succeeded",
                 "executed_steps": fallback_result.executed_steps,
@@ -1150,7 +1096,7 @@ class RuntimeService(SessionService):
             if isinstance(fallback_exc, PipelineRunError):
                 if fallback_exc.failed_step_id is not None:
                     error_details["failed_step_id"] = fallback_exc.failed_step_id
-                trace_report = self._trace_report(fallback_exc.result)
+                trace_report = _trace_report(fallback_exc.result)
                 if trace_report is not None:
                     error_details["trace_report"] = trace_report
 
@@ -1179,11 +1125,3 @@ class RuntimeService(SessionService):
                     "details": {"session_id": session_id, "run_id": fallback_id},
                 },
             ) from fallback_exc
-
-    def _trace_report(self, result: RunResult) -> str | None:
-        if result.tracer is None:
-            return None
-        return result.tracer.last_report(
-            TRACE_REPORT_LINES,
-            renderer=PlainUnicodeRenderer(wrap_in_markdown_codeblock=False),
-        )
