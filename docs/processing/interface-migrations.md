@@ -15,6 +15,16 @@ The synthetic [Quickstart](../getting-started/quickstart.md) is unaffected.
 Ordinary explicit `steps` documents also remain valid; the `step_blocks` and
 `for_each` schema is additive.
 
+## R20: uncertainty-source units are converted
+
+Uncertainty datasets with a `units` attribute are now converted to the signal's
+units as differences. Missing or blank attributes retain the previous assumption
+that the values already use signal units. Incompatible, unparseable, and offset
+units raise `ValueError` naming the uncertainty, source, and both units. Correct
+the source metadata or supply a compatible uncertainty dataset. A signal's
+`units_override` applies to its uncertainties too: it skips unit metadata and
+retains numerical values with the override label.
+
 ## R16: negative detector-incidence cosines raise ValueError
 
 `XSGeometryFromPixelCoordinates` now rejects a detector normal pointing toward

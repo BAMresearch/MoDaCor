@@ -1,23 +1,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Load source data and uncertainty components into a processing bundle."""
 
 from __future__ import annotations
 
-__coding__ = "utf-8"
-__authors__ = ["Brian R. Pauw"]  # add names to the list as appropriate
-__copyright__ = "Copyright 2025, The MoDaCor team"
-__date__ = "30/10/2025"
-__status__ = "Development"  # "Development", "Production"
-# end of header and standard imports
-
 __all__ = ["AppendProcessingData"]
-__version__ = "20261102.1"
+__version__ = "20261104.1"
+__authors__ = ["Brian R. Pauw"]
 
 from pathlib import Path
 from typing import Any
 
-from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
 from modacor.dataclasses.databundle import DataBundle
 from modacor.dataclasses.helpers import basedata_from_sources
@@ -45,11 +37,13 @@ class AppendProcessingData(ProcessStep):
 
     1. Loads the signal array from ``signal_location`` (string reference).
     2. Loads units either from:
+       - ``units_override`` as a direct unit label for signal and uncertainties, or
        - ``units_location`` via :meth:`IoSources.get_static_metadata`, or
-       - ``units_override`` as a direct units string, or
        - defaults to dimensionless if neither is provided.
     3. Optionally loads weights from ``weights_location``.
-    4. Optionally loads uncertainty arrays from ``uncertainties_sources``.
+    4. Optionally loads uncertainty arrays from ``uncertainties_sources``,
+       converting their unit attributes to signal units. Missing attributes use
+       signal units. An override skips unit metadata and retains all values.
     5. Wraps everything in a :class:`BaseData` instance.
     6. Sets ``BaseData.rank_of_data`` based on the configured ``rank_of_data``:
        - If it is an ``int``, it is used directly.
@@ -106,7 +100,9 @@ class AppendProcessingData(ProcessStep):
             "units_override": {
                 "type": (str, type(None)),
                 "default": None,
-                "doc": "Optional unit string that overrides loaded units.",
+                "doc": (
+                    "Optional unit label for signal and uncertainties; skips their unit metadata without conversion."
+                ),
             },
             "weights_location": {
                 "type": (str, type(None)),
@@ -116,7 +112,10 @@ class AppendProcessingData(ProcessStep):
             "uncertainties_sources": {
                 "type": dict,
                 "default": {},
-                "doc": "Mapping of uncertainty name to IoSources reference.",
+                "doc": (
+                    "Map uncertainty names to source references; dataset units convert to signal units unless"
+                    " overridden."
+                ),
             },
         },
         step_keywords=["append", "processing", "data", "signal"],
@@ -297,12 +296,15 @@ class AppendProcessingData(ProcessStep):
             dimensionless.
 
         - ``units_override`` (str | None):
-            Direct units string (e.g. ``"counts"`` or ``"1/m"``) that overrides
-            any value loaded via ``units_location``.
+            Direct unit label (e.g. ``"counts"`` or ``"1/m"``) for the signal and
+            all uncertainty values. Unit metadata is skipped and numerical
+            values are retained without conversion.
 
         - ``uncertainties_sources`` (dict[str, str]):
             Mapping from uncertainty name (e.g. ``"poisson"``) to data reference
-            (``'<source_ref>::<dataset_path>'``).
+            (``'<source_ref>::<dataset_path>'``). Dataset unit attributes convert
+            sigmas to signal units as differences; missing attributes use signal
+            units. An override applies to sigmas too and skips their attributes.
         """
         cfg = self._load_and_validate_configuration()
 
@@ -331,14 +333,8 @@ class AppendProcessingData(ProcessStep):
             units_source=units_location,
             uncertainty_sources=uncertainties_sources,
             weights_source=weights_location,
+            units_override=units_override,
         )
-
-        # Override units if requested
-        if units_override is not None:
-            logger.debug(
-                f"AppendProcessingData: overriding units for '{processing_key}' to '{units_override}'.",
-            )
-            bd.units = ureg.Unit(units_override)
 
         # Set rank_of_data; BaseData's own validation handles bounds
         bd.rank_of_data = rank_of_data

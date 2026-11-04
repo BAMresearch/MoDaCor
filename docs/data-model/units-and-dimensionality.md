@@ -9,6 +9,15 @@ Unit conversion applies the same multiplicative factor to the signal and every
 absolute uncertainty. Offset-unit conversion is deliberately rejected because
 uncertainties would require an explicit delta-unit policy.
 
+When loading uncertainty sources, MoDaCor reads each dataset's own `units`
+attribute and converts its sigma values to the signal's units through the
+central `BaseData` conversion path. Missing, `None`, or blank attributes mean
+the values already use the signal's units. Bytes are decoded as UTF-8.
+Incompatible, unparseable, or offset units raise `ValueError` identifying the
+uncertainty, source reference, and both units; actual conversions log at DEBUG.
+`AppendProcessingData.units_override` labels both signal and uncertainties
+without converting their values, and skips their unit metadata entirely.
+
 `rank_of_data` describes how many trailing dimensions carry the scientific data
 grid:
 

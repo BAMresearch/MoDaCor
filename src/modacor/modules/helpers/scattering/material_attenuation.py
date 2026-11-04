@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# /usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Resolve material attenuation configuration and source metadata."""
 
 from __future__ import annotations
 
-__version__ = "20261030.1"
+__version__ = "20261104.1"
 
 from typing import Any
 
@@ -13,7 +12,7 @@ from attrs import frozen
 
 from modacor import ureg
 from modacor.dataclasses.basedata import BaseData
-from modacor.dataclasses.helpers import basedata_from_sources
+from modacor.dataclasses.helpers import basedata_from_sources, uncertainties_from_sources
 from modacor.io.io_sources import IoSources
 from modacor.modules.helpers.scattering.photon_energy import photon_energy_from_wavelength
 
@@ -48,13 +47,11 @@ def scalar_quantity_from_config_or_source(
         )
 
     if name in cfg and cfg[name] is not None:
+        units = ureg.Unit(str(cfg.get(f"{name}_units", default_units)))
         return BaseData.from_scalar(
             signal=np.asarray(cfg[name], dtype=float),
-            units=ureg.Unit(str(cfg.get(f"{name}_units", default_units))),
-            uncertainties={
-                uncertainty_name: io_sources.get_data(reference)
-                for uncertainty_name, reference in uncertainty_sources.items()
-            },
+            units=units,
+            uncertainties=uncertainties_from_sources(io_sources, uncertainty_sources, units),
             rank_of_data=0,
         )
 

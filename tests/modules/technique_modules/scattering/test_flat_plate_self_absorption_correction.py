@@ -24,7 +24,7 @@ class TransmissionSource(IoSource):
         return np.asarray(0.5)
 
     def get_data_attributes(self, data_key):
-        return {"units": "dimensionless"}
+        return {"units": self.get_static_metadata(f"{data_key}@units")}
 
     def get_static_metadata(self, data_key):
         return "dimensionless"
