@@ -63,7 +63,7 @@ def test_io_registration_update_and_deletion_logs_identity(client, caplog, kind)
         assert client.put(f"/v1/sessions/diagnostics/{kind}s", json={f"{kind}s": [registration]}).status_code == 200
         assert client.post(f"/v1/sessions/diagnostics/{kind}s/patch", json=registration).status_code == 200
         assert client.delete(f"/v1/sessions/diagnostics/{kind}s/data").status_code == 204
-    records = [record for record in caplog.records if record.name == "modacor.server.runtime_service"]
+    records = [record for record in caplog.records if record.name == "modacor.server.session_resources"]
     assert len(records) == 3
     for record, action in zip(records, ["registered", "updated", "deleted"]):
         assert record.levelno == logging.INFO
