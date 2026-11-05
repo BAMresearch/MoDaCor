@@ -103,7 +103,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | done (v1.16.0, PR #156) |
 | R19 | Q uncertainty and Q resolution (smearing profile) | science | L | high | future; design needed |
 | R20 | Uncertainty sources ignore their own units | bug | S | high | done (v1.17.1, PR #163) |
-| R21 | A malformed process `chunk_spec` returns 404 instead of 422 | bug | XS | low | open |
+| R21 | A malformed process `chunk_spec` returns 404 instead of 422 | bug | XS | low | done; PR pending (with R11) |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -3758,8 +3758,8 @@ not arbitrary assignments of those files to sample roles.
 
 ## R21 — A malformed process `chunk_spec` returns 404 instead of 422
 
-**Status:** open. Found during R11 Step 0 and left out of the
-characterization tests.
+**Status:** done (2026-11-05), on branch `quality-remediation-r11`, to ship
+with R11. Found during R11 Step 0 and left out of the characterization tests.
 
 **Problem.** In `ProcessService._parse_process_request`
 (`src/modacor/server/process_service.py`), one `try` block wraps both the
@@ -3781,6 +3781,23 @@ session, so it needs no change.
 **Acceptance criteria.** A missing or malformed `chunk_spec` field gives 422
 and names the field. An unknown `output_id` still gives 404. Existing tests
 pass unchanged.
+
+**Implementation notes.** 2026-11-05, implemented by the reviewer at the
+maintainer's request, so it had no separate implementer and reviewer.
+
+- A small module-level helper, `_chunk_spec_from_request`, turns the parser's
+  `KeyError` into a `ValueError`, so the existing handler returns 422 with
+  `Invalid chunk_spec: missing field '<name>'.` A narrower change than the
+  approach above: the lookup order and all other error paths stay as they
+  were. Every `KeyError` that `from_dict` raises is a missing required key,
+  at the top level or in a placement; `validate_for_plan` raises only
+  `ValueError`.
+- Tests: a missing `schema_version` or `placements` gives 422 with that
+  detail on both `process` and `process/dry-run`, with no run recorded. They
+  failed with 404 before the fix. The unknown-output test now covers both
+  `chunk_id` and `chunk_spec` references and still expects 404.
+- `docs/reference/server-api.md` now states the 404/422 split for
+  `chunk_output`.
 
 ---
 
