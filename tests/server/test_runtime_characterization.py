@@ -224,12 +224,41 @@ def test_process_request_validation(client, payload, detail, endpoint):
     assert client.get("/v1/sessions/s/runs").json()["runs"] == []
 
 
-def test_process_unknown_chunk_output(client):
+@pytest.mark.parametrize("reference", ["chunk_id", "chunk_spec"])
+def test_process_unknown_chunk_output(client, reference):
+    if reference == "chunk_id":
+        chunk = {"chunk_id": "c0"}
+    else:
+        chunk = {"chunk_spec": _server_chunk(_server_chunk_plan(), 0).to_dict()}
     response = client.post(
-        "/v1/sessions/s/process", json={"mode": "full", "chunk_output": {"output_id": "missing", "chunk_id": "c0"}}
+        "/v1/sessions/s/process", json={"mode": "full", "chunk_output": {"output_id": "missing", **chunk}}
     )
     assert response.status_code == 404
     assert "missing" in response.json()["detail"]
+    assert client.get("/v1/sessions/s/runs").json()["runs"] == []
+
+
+@pytest.mark.parametrize("field", ["schema_version", "placements"])
+@pytest.mark.parametrize("endpoint", ["process", "process/dry-run"])
+def test_process_chunk_spec_missing_field(client, tmp_path, endpoint, field):
+    plan = _server_chunk_plan()
+    initialized = client.post(
+        "/v1/chunked-outputs",
+        json={
+            "sink": {"ref": "out", "type": "hdf_chunked", "location": str(tmp_path / "chunks.h5")},
+            "subpath": "run",
+            "plan": plan.to_dict(),
+        },
+    )
+    assert initialized.status_code == 201, initialized.text
+    spec = _server_chunk(plan, 0).to_dict()
+    del spec[field]
+    response = client.post(
+        f"/v1/sessions/s/{endpoint}",
+        json={"mode": "full", "chunk_output": {"output_id": initialized.json()["output_id"], "chunk_spec": spec}},
+    )
+    assert response.status_code == 422
+    assert response.json() == {"detail": f"Invalid chunk_spec: missing field '{field}'."}
     assert client.get("/v1/sessions/s/runs").json()["runs"] == []
 
 

@@ -538,7 +538,9 @@ Notes:
 - `chunk_output` is optional. When present, the server passes the successful
   run's `ProcessingData` to the initialized output and only responds with
   success after the chunk manifest has been flushed. Publication failures use
-  `CHUNK_WRITE_FAILED` and are distinct from pipeline failures.
+  `CHUNK_WRITE_FAILED` and are distinct from pipeline failures. An unknown
+  `output_id` or `chunk_id` returns 404; a malformed or mismatched
+  `chunk_spec` returns 422, naming the problem.
 - A plan's non-static `source_bindings` automatically add their source
   references to partial-run invalidation. Callers do not need to repeat those
   references in `changed_sources`.

@@ -38,6 +38,14 @@ from .session_manager import PipelineSession
 from .session_service import SessionService
 
 
+def _chunk_spec_from_request(spec_raw: dict[str, Any]) -> ChunkSpec:
+    try:
+        return ChunkSpec.from_dict(spec_raw)
+    except KeyError as exc:
+        # A missing field is a malformed request, not an unknown output (404).
+        raise ValueError(f"Invalid chunk_spec: missing field {exc}.") from exc
+
+
 @dataclass(slots=True)
 class ProcessService(SessionService):
     """ProcessService operations for the runtime facade."""
@@ -255,7 +263,7 @@ class ProcessService(SessionService):
                 if isinstance(spec_raw, dict):
                     if resource.plan is None:
                         raise ValueError("An awaiting-schema output accepts chunk_id, not a complete chunk_spec.")
-                    chunk_spec: ChunkSpec | ProvisionalChunkSpec = ChunkSpec.from_dict(spec_raw)
+                    chunk_spec: ChunkSpec | ProvisionalChunkSpec = _chunk_spec_from_request(spec_raw)
                     chunk_spec.validate_for_plan(resource.plan)
                 else:
                     chunk_spec = self.chunked_outputs.execution_chunk(output_id, chunk_id)
