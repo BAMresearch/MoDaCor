@@ -94,7 +94,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | done (v1.17.0, PR #160) |
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | done (v1.17.0, PR #161) |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | done (v1.17.1, PR #163) |
-| R11 | Split `RuntimeService` into focused services | structure | L | medium | in review |
+| R11 | Split `RuntimeService` into focused services | structure | L | medium | approved; PR pending |
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | done |
 | R14 | The `required` argument flag is never enforced | contract | S | medium | done (v1.17.0, PR #161) |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | done (v1.14.0, PR #152) |
@@ -103,6 +103,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | done (v1.16.0, PR #156) |
 | R19 | Q uncertainty and Q resolution (smearing profile) | science | L | high | future; design needed |
 | R20 | Uncertainty sources ignore their own units | bug | S | high | done (v1.17.1, PR #163) |
+| R21 | A malformed process `chunk_spec` returns 404 instead of 422 | bug | XS | low | open |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -2420,8 +2421,8 @@ and 3 (`step_reference`) released in v1.17.1 (PR #163).
 
 ## R11 — Split `RuntimeService` into focused services
 
-**Status:** in review (2026-11-04), on branch `quality-remediation-r11`. The plan
-update below refines the approach.
+**Status:** approved (2026-11-05), on branch `quality-remediation-r11`; PR
+pending. The plan update below refines the approach.
 
 **Problem.** `server/runtime_service.py` is 1516 lines, essentially one class.
 It covers health and policy, session CRUD, source and sink management, buffer
@@ -2616,6 +2617,28 @@ v1.17.1. Where they differ from the text above, this update takes precedence.
   nothing was pushed.
 
 **Review log.** _(reviewer)_
+
+- **(2026-11-04): changes requested.** Each extraction commit is a pure move
+  under `git diff --color-moved=zebra --color-moved-ws=allow-indentation-change`.
+  The facade's constructor, 44 public names and 40 method signatures match
+  `main`, and every commit passes the server and client tests. Three small
+  points:
+  - every service declared the policy, step registry and chunked-output
+    manager, whether it used them or not;
+  - six `SessionManager` imports existed only so that inherited constructor
+    annotations resolve. Linters other than this repository's flake8 report
+    them as unused, and an import cleanup would delete them silently;
+  - two characterization tests did not assert a sample registration they
+    relied on.
+
+  The suspected 404 is a real, older bug outside this item's scope; it is
+  recorded as R21.
+- **(2026-11-05): fixups approved.** Services now declare only the
+  collaborators they use. `SessionService` annotates `manager` eagerly, so no
+  annotation-only imports remain, and a test pins the facade's resolved
+  constructor annotations; that test also passes on `main`. Re-verified: 158
+  server and client tests at each commit, 2135 passed in the full suite, tox
+  `py312`, `lint`, `docs` and `manifest` pass, and combined coverage is 91.97%.
 
 ---
 
@@ -3730,6 +3753,34 @@ not arbitrary assignments of those files to sample roles.
   boundary with a chained cause, while conversion keeps the narrow exception
   tuple. Through the real loader, MOUSE files 123, 125 and 127 give
   `wavelength_error` 0.0005 nm. Merged in PR #163 and released in v1.17.1.
+
+---
+
+## R21 — A malformed process `chunk_spec` returns 404 instead of 422
+
+**Status:** open. Found during R11 Step 0 and left out of the
+characterization tests.
+
+**Problem.** In `ProcessService._parse_process_request`
+(`src/modacor/server/process_service.py`), one `try` block wraps both the
+output lookup `self.chunked_outputs.get(output_id)` and
+`ChunkSpec.from_dict(spec_raw)`. Its `except KeyError` maps to HTTP 404,
+which is right for an unknown output. But `from_dict` also raises `KeyError`
+for a missing field, so a `chunk_output.chunk_spec` without `schema_version`
+returns 404 with the detail `'schema_version'`. The client is told that
+something was not found, when its request was malformed. Creating a chunked
+output (`ChunkedOutputService`) already maps the same parser errors to 422.
+
+**Approach.** Parse the chunk spec outside the lookup's `KeyError` handler, so
+that `KeyError`, `TypeError` and `ValueError` from parsing all become 422 with
+a detail that names the chunk spec and the missing field. An unknown
+`output_id` stays 404. Add API tests for both cases. This is a `fix:` commit,
+so it makes a patch release. `modacor.client` handles 404 only when deleting a
+session, so it needs no change.
+
+**Acceptance criteria.** A missing or malformed `chunk_spec` field gives 422
+and names the field. An unknown `output_id` still gives 404. Existing tests
+pass unchanged.
 
 ---
 
