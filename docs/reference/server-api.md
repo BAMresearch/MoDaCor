@@ -16,7 +16,16 @@ Companion OpenAPI schema:
 The runtime service is divided into these public-facing implementation areas:
 
 - `src/modacor/server/api.py` is a thin FastAPI binding layer.
-- `src/modacor/server/runtime_service.py` owns session orchestration and run lifecycle behavior.
+- `src/modacor/server/runtime_service.py` is the public facade and owns session
+  lifecycle, summaries, health, policy, and latest-error queries.
+- `src/modacor/server/session_service.py` provides shared session lookup.
+- `src/modacor/server/buffer_service.py` handles buffer I/O and plot payloads.
+- `src/modacor/server/chunked_output_service.py` handles chunked-output lifecycle requests.
+- `src/modacor/server/session_resources.py` manages session sources and sinks.
+- `src/modacor/server/process_requests.py` holds process request types and shared
+  trace/provenance helpers; `process_service.py` owns planning, execution,
+  reset/recovery, and run queries; `process_failure.py` handles failures and
+  automatic full-run fallback.
 - `src/modacor/server/planning.py` owns dry-run planning and dirty-step calculations.
 - `src/modacor/server/io_utils.py` adapts session source/sink registrations into runtime IO objects.
 - `src/modacor/server/chunked_outputs.py` owns server-level output registrations
@@ -529,7 +538,9 @@ Notes:
 - `chunk_output` is optional. When present, the server passes the successful
   run's `ProcessingData` to the initialized output and only responds with
   success after the chunk manifest has been flushed. Publication failures use
-  `CHUNK_WRITE_FAILED` and are distinct from pipeline failures.
+  `CHUNK_WRITE_FAILED` and are distinct from pipeline failures. An unknown
+  `output_id` or `chunk_id` returns 404; a malformed or mismatched
+  `chunk_spec` returns 422, naming the problem.
 - A plan's non-static `source_bindings` automatically add their source
   references to partial-run invalidation. Callers do not need to repeat those
   references in `changed_sources`.
