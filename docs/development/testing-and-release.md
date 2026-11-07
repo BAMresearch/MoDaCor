@@ -30,3 +30,10 @@ Version and changelog updates are produced by the release-preparation workflow
 after changes reach `main`. Local version inspection must use
 `semantic-release version --print`; do not create release tags from a feature
 branch.
+
+Merging the release-preparation pull request sets the new version, and the
+release job on that merge commit tags it and starts publishing. If that job
+fails, for example on a GitHub server error, re-run that workflow run before
+merging anything else. Later pushes to `main` do not take over the tag: their
+release job fails with "this commit did not set version …" until the version's
+own commit is tagged.
