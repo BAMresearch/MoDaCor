@@ -94,7 +94,7 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R08 | Audit remaining unit stripping in modules | contract | M | medium | done (v1.17.0, PR #160) |
 | R09 | Narrow broad `except Exception` handlers | robustness | M | medium | done (v1.17.0, PR #161) |
 | R10 | Conventions: `attrs` in step modules, headers, `step_reference` | consistency | S–M | low | done (v1.17.1, PR #163) |
-| R11 | Split `RuntimeService` into focused services | structure | L | medium | approved; PR pending |
+| R11 | Split `RuntimeService` into focused services | structure | L | medium | done (v1.17.1, PR #165) |
 | R13 | CI never exercises the xraylib (attenuation) path | tests / CI | XS | medium | done |
 | R14 | The `required` argument flag is never enforced | contract | S | medium | done (v1.17.0, PR #161) |
 | R15 | Server: explain source/sink and run failures, and keep logs | diagnostics | S–M | high | done (v1.14.0, PR #152) |
@@ -103,7 +103,8 @@ Status values: `open`, `ready`, `in progress`, `in review`,
 | R18 | Central unit conversion for BaseData (includes the transmission-unit bug) | contract | M | high | done (v1.16.0, PR #156) |
 | R19 | Q uncertainty and Q resolution (smearing profile) | science | L | high | future; design needed |
 | R20 | Uncertainty sources ignore their own units | bug | S | high | done (v1.17.1, PR #163) |
-| R21 | A malformed process `chunk_spec` returns 404 instead of 422 | bug | XS | low | done; PR pending (with R11) |
+| R21 | A malformed process `chunk_spec` returns 404 instead of 422 | bug | XS | low | done (v1.17.1, PR #165) |
+| R22 | The release job can tag the wrong commit after a failed run | CI | XS | high | done; PR pending |
 | R12 | Large I/O files (`hdf_chunked_processing_sink`, `chunking`) | structure | L | low | deferred |
 | E01 | MoDaCor-examples: slim I22 preprocessing helpers | examples | M | medium | open |
 
@@ -2421,8 +2422,9 @@ and 3 (`step_reference`) released in v1.17.1 (PR #163).
 
 ## R11 — Split `RuntimeService` into focused services
 
-**Status:** approved (2026-11-05), on branch `quality-remediation-r11`; PR
-pending. The plan update below refines the approach.
+**Status:** done. Merged in PR #165 on 2026-11-07 and published in v1.17.1
+(see R22 for why it is not in a v1.17.2). The plan update below refines the
+approach.
 
 **Problem.** `server/runtime_service.py` is 1516 lines, essentially one class.
 It covers health and policy, session CRUD, source and sink management, buffer
@@ -3758,8 +3760,8 @@ not arbitrary assignments of those files to sample roles.
 
 ## R21 — A malformed process `chunk_spec` returns 404 instead of 422
 
-**Status:** done (2026-11-05), on branch `quality-remediation-r11`, to ship
-with R11. Found during R11 Step 0 and left out of the characterization tests.
+**Status:** done. Merged with R11 in PR #165 and published in v1.17.1 (see
+R22). Found during R11 Step 0 and left out of the characterization tests.
 
 **Problem.** In `ProcessService._parse_process_request`
 (`src/modacor/server/process_service.py`), one `try` block wraps both the
@@ -3798,6 +3800,49 @@ maintainer's request, so it had no separate implementer and reviewer.
   `chunk_id` and `chunk_spec` references and still expects 404.
 - `docs/reference/server-api.md` now states the 404/422 split for
   `chunk_output`.
+
+---
+
+## R22 — The release job can tag the wrong commit after a failed run
+
+**Status:** done (2026-11-07); PR pending.
+
+**Problem.** Merging the v1.17.1 release-preparation PR (#164, `dcd9a78`) on
+2026-11-04 set the version to 1.17.1. Its release job then failed: GitHub
+returned a server error when the `v1.17.1` tag was pushed. Nothing was tagged
+or published, and this went unnoticed. On 2026-11-07, the merge of PR #165
+(`1e4cecf`, R11 and R21) ran the release job again. The job checks out the
+current `main` and tags any commit whose version has no tag yet, so it tagged
+`1e4cecf` as `v1.17.1` and published 1.17.1 to PyPI. semantic-release then
+found no commits after that tag, so the R21 `fix:` produced no v1.17.2.
+
+The published package is complete: 1.17.1 contains R10, R16, R20, R11 and
+R21. Only the record was wrong. The v1.17.1 changelog listed neither R21 nor
+the R11 commits, and its date was the date of the failed run. A re-run of the
+failed run would not have helped, because it would also have checked out the
+current `main`.
+
+**Fix.**
+
+- The release job checks out the commit that triggered the run
+  (`github.sha`), so a re-run tags that commit.
+- It tags only when that push set the version, that is, when the first
+  parent has a different `__version__`. Otherwise a missing tag fails the job
+  with "this commit did not set version …", instead of tagging a later merge.
+- `docs/development/testing-and-release.md` says what to do: re-run the failed
+  run of the commit that set the version.
+- The v1.17.1 changelog section was regenerated with `semantic-release
+  changelog` from the tags as they are now. It gains the R21 fix and the R11
+  commits, and its date becomes 2026-11-07. No other section changes. The
+  `v1.17.1` tag stays on `1e4cecf`, because the published files on PyPI
+  cannot be replaced.
+
+**Verification.** The new tagging step was run against the real history in a
+scratch clone with a scratch remote:
+
+- on `dcd9a78` without a tag, it tags `dcd9a78` and reports a new version;
+- on `1e4cecf` without a tag, it fails with the new message;
+- with the tag present, it reports that there is nothing to release.
 
 ---
 
