@@ -1,8 +1,10 @@
 # CHANGELOG
 
-## v1.17.1 (2026-11-04)
+## v1.17.1 (2026-11-07)
 
 ### Bug fixes
+
+* fix: return 422 for a process chunk_spec with a missing field ([`952095c`](https://github.com/BAMresearch/MoDaCor/commit/952095cb22d68298933e4aa2e15417e331ab3b21))
 
 * fix: convert uncertainty sources to the signal's units ([`d3e6ffe`](https://github.com/BAMresearch/MoDaCor/commit/d3e6ffe3c6b11eca651e1a398930d62dec7ada6c))
 
@@ -15,6 +17,14 @@
 * style: adopt the SPDX header convention ([`deae09b`](https://github.com/BAMresearch/MoDaCor/commit/deae09b92076e307ee1d9af3eac981ca98eddc11))
 
 ### Documentation
+
+* docs: record the R21 implementation notes ([`d949e7b`](https://github.com/BAMresearch/MoDaCor/commit/d949e7bdde844b569f5c3f183d715ebaa7042c25))
+
+* docs: record R11 approval and the process chunk-spec 404 bug ([`9c364b5`](https://github.com/BAMresearch/MoDaCor/commit/9c364b59c3e9b61e3683135082afb6213ee320b1))
+
+* docs: record R11 implementation notes in the remediation tracker ([`d8e3d20`](https://github.com/BAMresearch/MoDaCor/commit/d8e3d200ddc67f404e6f282f0679444fb74bf9fa))
+
+* docs: record v1.17.1 and refine the RuntimeService split plan ([`e8d5ff6`](https://github.com/BAMresearch/MoDaCor/commit/e8d5ff6469ff7a170201ddb29f2ba654fdc65b7c))
 
 * docs: document uncertainty source unit audit ([`6a13faf`](https://github.com/BAMresearch/MoDaCor/commit/6a13faf3631f4c14e5adf116b0293f079cf09a5c))
 
@@ -29,6 +39,24 @@
 * docs: state uncertainty omissions in angle corrections and axis-based steps ([`77cbfc9`](https://github.com/BAMresearch/MoDaCor/commit/77cbfc912e924aedc4bd673206602a3931e87a58))
 
 * docs: record the R16 and R10 decisions in the remediation tracker ([`e9118b4`](https://github.com/BAMresearch/MoDaCor/commit/e9118b486477c0a386c933840d4c654e0e4372ec))
+
+### Refactoring
+
+* refactor: move process execution into ProcessService ([`5c9e591`](https://github.com/BAMresearch/MoDaCor/commit/5c9e591646a0aea86687bbd4b263e3809e4cfe30))
+
+* refactor: move process failure handling into ProcessFailureHandler ([`f15adb4`](https://github.com/BAMresearch/MoDaCor/commit/f15adb4a561778f93ad26b027359c13f8eee2264))
+
+* refactor: move process requests and trace helpers into process_requests ([`11ea4a4`](https://github.com/BAMresearch/MoDaCor/commit/11ea4a4655665e57b1ee98ec13355351cc8eaa84))
+
+* refactor: move source and sink methods into SessionResourceService ([`59d3a74`](https://github.com/BAMresearch/MoDaCor/commit/59d3a747a60a8256865e64fca518275d65289113))
+
+* refactor: move chunked-output methods into ChunkedOutputService ([`68fb7b1`](https://github.com/BAMresearch/MoDaCor/commit/68fb7b1095664a2c185da0030c3817c1a6398634))
+
+* refactor: move buffer methods into BufferService ([`91a52bb`](https://github.com/BAMresearch/MoDaCor/commit/91a52bbd4cee104ee2333eddb8a706bf0d876fed))
+
+### Testing
+
+* test: characterize RuntimeService failure, recovery and fallback paths ([`e4cac04`](https://github.com/BAMresearch/MoDaCor/commit/e4cac04df85b18a93209706c0a269e1e24aa0906))
 
 ## v1.17.0 (2026-11-03)
 
